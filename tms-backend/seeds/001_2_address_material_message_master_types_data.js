@@ -1,0 +1,262 @@
+exports.seed = async function(knex) {
+  // Delete existing entries
+  await knex('address_type_master').del();
+  await knex('material_types_master').del();
+  await knex('message_type_master').del();
+
+  // Address Type Master data
+  await knex('address_type_master').insert([
+    {
+      address_type_id: 'AT001',
+      address: 'Home Address',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      address_type_id: 'AT002',
+      address: 'Office Address',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      address_type_id: 'AT003',
+      address: 'Warehouse Address',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      address_type_id: 'AT004',
+      address: 'Delivery Point',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      address_type_id: 'AT005',
+      address: 'Pickup Point',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      address_type_id: 'AT006',
+      address: 'Transit Hub',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    }
+  ]);
+
+  // Material Types Master data
+  await knex('material_types_master').insert([
+    {
+      material_types_id: 'MT001',
+      material_types: 'Raw Materials',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      material_types_id: 'MT002',
+      material_types: 'Finished Goods',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      material_types_id: 'MT003',
+      material_types: 'Hazardous Materials',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      material_types_id: 'MT004',
+      material_types: 'Perishable Goods',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      material_types_id: 'MT005',
+      material_types: 'Fragile Items',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      material_types_id: 'MT006',
+      material_types: 'Bulk Materials',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      material_types_id: 'MT007',
+      material_types: 'Liquid Materials',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      material_types_id: 'MT008',
+      material_types: 'Manufactured Parts',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    }
+  ]);
+
+  // Message Type Master data
+  await knex('message_type_master').insert([
+    {
+      message_type_id: 'MSG001',
+      message_type: 'Information',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      message_type_id: 'MSG002',
+      message_type: 'Warning',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      message_type_id: 'MSG003',
+      message_type: 'Error',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      message_type_id: 'MSG004',
+      message_type: 'Success',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      message_type_id: 'MSG005',
+      message_type: 'Alert',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      message_type_id: 'MSG006',
+      message_type: 'Notification',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      message_type_id: 'MSG007',
+      message_type: 'System Message',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    },
+    {
+      message_type_id: 'MSG008',
+      message_type: 'User Message',
+      created_at: knex.fn.now(),
+      created_on: knex.fn.now(),
+      created_by: 'SYSTEM',
+      updated_at: knex.fn.now(),
+      updated_on: knex.fn.now(),
+      updated_by: 'SYSTEM',
+      status: 'ACTIVE'
+    }
+  ]);
+
+  console.log('✅ Address, Material Types, and Message Type Master sample data seeded successfully!');
+};
