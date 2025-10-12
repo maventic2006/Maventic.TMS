@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/* Global Styles */
+body {
+  background-color: rgb(245 247 250);
+  color: rgb(13 26 51);
+  font-family: "Inter", "Poppins", system-ui, sans-serif;
+}
+
+/* Custom component classes for consistent styling */
+.tms-card {
+  background-color: white;
+  border: 1px solid rgb(229 231 235);
+  border-radius: 0.75rem;
+  box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+}
+
+.tms-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.tms-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(59 130 246);
+}
+
+.tms-button:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.tms-button-primary {
+  background-color: rgb(255 165 0);
+  color: white;
+}
+
+.tms-button-primary:hover {
+  background-color: rgb(255 165 0 / 0.9);
+}
+
+.tms-button-secondary {
+  background-color: rgb(229 231 235);
+  color: rgb(13 26 51);
+}
+
+.tms-button-secondary:hover {
+  background-color: rgb(229 231 235 / 0.8);
+}
+
+.tms-input {
+  display: flex;
+  height: 2.5rem;
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(229 231 235);
+  background-color: rgb(245 247 250);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.tms-input::placeholder {
+  color: rgb(107 114 128);
+}
+
+.tms-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(59 130 246);
+}
+
+.tms-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
