@@ -25,6 +25,23 @@ export const USER_ROLES = {
   DRIVER: "driver",
 };
 
+// User Type ID to Role Mapping
+export const USER_TYPE_ROLE_MAPPING = {
+  UT001: USER_ROLES.CONSIGNOR,     // Consignor
+  UT002: USER_ROLES.TRANSPORTER,   // Transporter
+  UT003: USER_ROLES.TRANSPORTER,   // Independent Vehicle Owner -> Transporter
+  UT004: USER_ROLES.TRANSPORTER,   // Transporter Contact -> Transporter
+  UT005: USER_ROLES.TRANSPORTER,   // Vehicle Ownership -> Transporter
+  UT006: USER_ROLES.CONSIGNOR,     // Consignor WH -> Consignor
+  UT007: USER_ROLES.DRIVER,        // Driver
+  UT008: USER_ROLES.ADMIN,         // Owner -> Admin
+};
+
+// Utility function to map user_type_id to role
+export const mapUserTypeToRole = (user_type_id) => {
+  return USER_TYPE_ROLE_MAPPING[user_type_id] || null;
+};
+
 // Status Constants
 export const INDENT_STATUS = {
   DRAFT: "draft",

@@ -137,16 +137,16 @@ const resetPassword = async (req, res) => {
       user_id: user.user_id,
       user_type_id: user.user_type_id,
       user_full_name: user.user_full_name,
-      email_id: user.email_id,
-      mobile_number: user.mobile_number,
-      alternet_mobile: user.alternet_mobile,
-      whats_app_number: user.whats_app_number,
-      from_date: user.from_date,
-      to_date: user.to_date,
-      is_active: user.is_active,
-      created_by_user_id: user.created_by_user_id,
-      consignor_id: user.consignor_id,
-      approval_cycle: user.approval_cycle,
+      email_id: user.email_id || '',
+      mobile_number: user.mobile_number || '',
+      alternet_mobile: user.alternet_mobile || null,
+      whats_app_number: user.whats_app_number || null,
+      from_date: user.from_date || new Date(),
+      to_date: user.to_date || null,
+      is_active: user.is_active || 1,
+      created_by_user_id: user.created_by_user_id || null,
+      consignor_id: user.consignor_id || null,
+      approval_cycle: user.approval_cycle || null,
       password: hashedPassword,
       password_type: "actual",
       created_at: new Date(),
@@ -170,11 +170,37 @@ const resetPassword = async (req, res) => {
 /**
  * Verify Token Controller
  */
-const verifyToken = (req, res) => {
-  res.json({
-    success: true,
-    user: req.user,
-  });
+const verifyToken = async (req, res) => {
+  try {
+    const { user_id } = req.user;
+
+    // Fetch full user data from database
+    const user = await knex("user_master")
+      .where({ user_id: user_id })
+      .andWhere({ status: "ACTIVE" })
+      .first();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Return user data (excluding password)
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      user: userWithoutPassword,
+    });
+  } catch (error) {
+    console.error("Token verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
 };
 
 /**

@@ -1,7 +1,16 @@
 import axios from "axios";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+// Debug logging (can be removed in production)
+if (import.meta.env.NODE_ENV === 'development') {
+  console.log("🔧 API Configuration:", {
+    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+    API_BASE_URL: API_BASE_URL,
+    NODE_ENV: import.meta.env.NODE_ENV
+  });
+}
 
 // Create axios instance
 const api = axios.create({
@@ -19,9 +28,20 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Debug logging
+    console.log("🚀 Making API Request:", {
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      method: config.method,
+      data: config.data
+    });
+    
     return config;
   },
   (error) => {
+    console.error("🔥 Request Error:", error);
     return Promise.reject(error);
   }
 );
@@ -29,6 +49,11 @@ api.interceptors.request.use(
 // Response interceptor for error handling and token refresh
 api.interceptors.response.use(
   (response) => {
+    console.log("✅ API Response:", {
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    });
     return response;
   },
   async (error) => {
@@ -38,19 +63,11 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refreshToken,
-          });
-
-          const { token } = response.data.data;
-          localStorage.setItem("token", token);
-
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return api(originalRequest);
-        }
+        // For now, redirect to login since refresh endpoint is not implemented
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+        window.location.href = "/login";
+        return Promise.reject(error);
       } catch (refreshError) {
         // Refresh failed, redirect to login
         localStorage.removeItem("token");
@@ -72,11 +89,26 @@ api.interceptors.response.use(
       console.error("Request timeout");
     } else if (!error.response) {
       // Network error
-      console.error("Network error");
+      console.error("🔥 Network error details:", {
+        message: error.message,
+        code: error.code,
+        config: {
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+          method: error.config?.method
+        }
+      });
     }
 
     return Promise.reject(error);
   }
 );
+
+// Test connectivity on module load
+if (typeof window !== 'undefined') {
+  api.get('/health')
+    .then(() => console.log('✅ Backend connectivity test: SUCCESS'))
+    .catch(err => console.error('❌ Backend connectivity test: FAILED', err.message));
+}
 
 export default api;

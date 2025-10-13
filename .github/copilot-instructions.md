@@ -11,8 +11,28 @@ TMS-Dev-2 is an AI-agent-driven development project in its initial phase. Curren
 ├── chatmodes/                    # AI agent behavior configurations
 │   └── beastMode_lates.chatmode.md  # Autonomous agent workflow definition
 ├── instructions/                 # Agent memory and behavior storage
-│   └── memory.instruction.md     # User preferences and system behaviors
+│   ├── memory.instruction.md     # User preferences and system behaviors
+│   └── development-guidelines.md # Frontend/Backend development standards
 └── copilot-instructions.md       # Project architecture documentation (this file)
+
+frontend/                         # React + Vite frontend application
+├── src/
+│   ├── components/               # Reusable UI components
+│   ├── features/                 # Feature-based modules (auth, dashboard, etc.)
+│   ├── redux/                    # State management with RTK
+│   ├── routes/                   # App routing configuration
+│   └── utils/                    # API client and utilities
+├── .env                          # Environment configuration
+└── package.json
+
+tms-backend/                      # Node.js + Express backend API
+├── controllers/                  # Business logic layer
+├── routes/                       # REST API endpoints
+├── middleware/                   # Authentication & error handling
+├── migrations/                   # Database schema migrations
+├── config/                       # Database and environment config
+├── .env                          # Backend environment variables
+└── server.js                     # Application entry point
 ```
 
 ### Core Architectural Patterns
@@ -35,6 +55,21 @@ TMS-Dev-2 is an AI-agent-driven development project in its initial phase. Curren
 - **Persistent Instructions**: User preferences and system behaviors stored in `memory.instruction.md`
 - **Cross-Session Context**: Maintains user workflow preferences and technology choices
 - **Behavioral Consistency**: Ensures consistent AI agent responses across different sessions
+- **Development Guidelines**: Comprehensive frontend/backend standards in `development-guidelines.md`
+
+### Frontend Application (React + Vite)
+- **Authentication System**: Login/logout with JWT token management via Redux Toolkit
+- **Component Architecture**: Feature-based organization with reusable UI components
+- **State Management**: Redux Toolkit with async thunks for API integration
+- **API Client**: Axios-based client with interceptors for token handling
+- **Environment Configuration**: Vite environment variables for API endpoints
+
+### Backend API (Node.js + Express)
+- **Authentication Controller**: JWT-based login with bcrypt password hashing
+- **Database Integration**: Knex.js ORM with MySQL database connectivity
+- **Middleware Stack**: CORS, Helmet, Morgan for security and logging
+- **Route Structure**: Modular REST API endpoints for auth, warehouses, vehicles, etc.
+- **Environment Management**: dotenv configuration for database and server settings
 
 ### Documentation Architecture
 - **Separation of Concerns**: Clear distinction between agent behavior (memory) and project structure (copilot instructions)

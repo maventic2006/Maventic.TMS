@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api";
+import { mapUserTypeToRole } from "../../utils/constants";
 
 // Async thunks
 export const loginUser = createAsyncThunk(
@@ -7,9 +8,14 @@ export const loginUser = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await api.post("/auth/login", credentials);
-      const { token, user, requirePasswordReset } = response.data;
-      localStorage.setItem("token", token);
-      return { token, user, requirePasswordReset };
+      
+      if (response.data.success) {
+        const { token, user, requirePasswordReset } = response.data;
+        localStorage.setItem("token", token);
+        return { token, user, requirePasswordReset };
+      } else {
+        return rejectWithValue(response.data.message || "Login failed");
+      }
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || "Login failed");
     }
@@ -19,16 +25,11 @@ export const loginUser = createAsyncThunk(
 export const refreshToken = createAsyncThunk(
   "auth/refreshToken",
   async (_, { rejectWithValue }) => {
-    try {
-      const response = await api.post("/auth/refresh");
-      const { token } = response.data.data;
-      localStorage.setItem("token", token);
-      return { token };
-    } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || "Token refresh failed"
-      );
-    }
+    // Refresh token endpoint not implemented yet
+    // For now, just reject and redirect to login
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    return rejectWithValue("Token refresh not implemented");
   }
 );
 
@@ -36,12 +37,41 @@ export const logoutUser = createAsyncThunk(
   "auth/logoutUser",
   async (_, { rejectWithValue }) => {
     try {
-      await api.post("/auth/logout");
+      const response = await api.post("/auth/logout");
       localStorage.removeItem("token");
-      return {};
+      
+      if (response.data.success) {
+        return {};
+      } else {
+        return rejectWithValue(response.data.message || "Logout failed");
+      }
     } catch (error) {
       localStorage.removeItem("token");
       return rejectWithValue(error.response?.data?.message || "Logout failed");
+    }
+  }
+);
+
+export const verifyToken = createAsyncThunk(
+  "auth/verifyToken",
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return rejectWithValue("No token found");
+      }
+      
+      const response = await api.get("/auth/verify");
+      
+      if (response.data.success) {
+        return { user: response.data.user, token };
+      } else {
+        localStorage.removeItem("token");
+        return rejectWithValue(response.data.message || "Token verification failed");
+      }
+    } catch (error) {
+      localStorage.removeItem("token");
+      return rejectWithValue(error.response?.data?.message || "Token verification failed");
     }
   }
 );
@@ -51,10 +81,15 @@ export const resetPassword = createAsyncThunk(
   async ({ userId, newPassword }, { rejectWithValue }) => {
     try {
       const response = await api.post("/auth/reset-password", {
-        userId,
-        newPassword,
+        user_id: userId,
+        newPassword: newPassword,
       });
-      return response.data;
+      
+      if (response.data.success) {
+        return response.data;
+      } else {
+        return rejectWithValue(response.data.message || "Password reset failed");
+      }
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || "Password reset failed"
@@ -66,8 +101,9 @@ export const resetPassword = createAsyncThunk(
 const initialState = {
   user: null,
   token: localStorage.getItem("token"),
-  isAuthenticated: false,
-  isLoading: false,
+  isAuthenticated: false, // Will be set to true after token verification
+  isPasswordReset: false, // Flag to track if user has reset their password
+  isLoading: !!localStorage.getItem("token"), // Set loading if token exists to prevent premature routing
   error: null,
   permissions: [],
   role: null,
@@ -85,15 +121,19 @@ const authSlice = createSlice({
       state.token = token;
       state.user = user;
       state.isAuthenticated = true;
-      state.role = user?.role;
+      state.role = mapUserTypeToRole(user?.user_type_id);
       state.permissions = user?.permissions || [];
     },
     clearCredentials: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+      state.isPasswordReset = false;
       state.role = null;
       state.permissions = [];
+    },
+    setPasswordReset: (state, action) => {
+      state.isPasswordReset = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -108,7 +148,7 @@ const authSlice = createSlice({
         state.token = action.payload.token;
         state.user = action.payload.user;
         state.isAuthenticated = true;
-        state.role = action.payload.user?.role;
+        state.role = mapUserTypeToRole(action.payload.user?.user_type_id);
         state.permissions = action.payload.user?.permissions || [];
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -135,6 +175,26 @@ const authSlice = createSlice({
         state.role = null;
         state.permissions = [];
       })
+      // Verify Token
+      .addCase(verifyToken.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(verifyToken.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.role = mapUserTypeToRole(action.payload.user?.user_type_id);
+        state.permissions = action.payload.user?.permissions || [];
+      })
+      .addCase(verifyToken.rejected, (state) => {
+        state.isLoading = false;
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        state.role = null;
+        state.permissions = [];
+      })
       // Reset Password
       .addCase(resetPassword.pending, (state) => {
         state.isLoading = true;
@@ -143,6 +203,7 @@ const authSlice = createSlice({
       .addCase(resetPassword.fulfilled, (state) => {
         state.isLoading = false;
         state.error = null;
+        state.isPasswordReset = true; // Mark password as reset
       })
       .addCase(resetPassword.rejected, (state, action) => {
         state.isLoading = false;
@@ -151,6 +212,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, clearCredentials } =
+export const { clearError, setCredentials, clearCredentials, setPasswordReset } =
   authSlice.actions;
 export default authSlice.reducer;

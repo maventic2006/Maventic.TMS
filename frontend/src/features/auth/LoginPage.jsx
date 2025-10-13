@@ -21,7 +21,7 @@ const LoginPage = () => {
     (state) => state.auth
   );
 
-  const from = location.state?.from?.pathname || "/dashboard";
+  const from = location.state?.from?.pathname || "/tms-portal";
 
   const {
     register,
@@ -36,10 +36,11 @@ const LoginPage = () => {
   });
 
   useEffect(() => {
+    // If user is already authenticated, redirect to TMS portal
     if (isAuthenticated) {
-      navigate(from, { replace: true });
+      navigate("/tms-portal", { replace: true });
     }
-  }, [isAuthenticated, navigate, from]);
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     // Clear any previous errors when component mounts
@@ -57,9 +58,11 @@ const LoginPage = () => {
 
       // Check if password reset is required
       if (result.requirePasswordReset) {
+        // Navigate to reset password page
         navigate(`/reset-password/${data.userId}`, { replace: true });
       } else {
-        navigate(from, { replace: true });
+        // Password reset not required, navigate to TMS portal
+        navigate("/tms-portal", { replace: true });
       }
     } catch (error) {
       // Error is handled by the redux slice
@@ -189,17 +192,17 @@ const LoginPage = () => {
         </div>
 
         {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600 mb-2">Demo Credentials:</p>
-          <div className="space-y-1 text-xs text-gray-500">
+        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-sm text-blue-800 font-semibold mb-2">Test Credentials:</p>
+          <div className="space-y-1 text-xs text-blue-700">
             <p>
-              <strong>Consignor:</strong> consignor / password123
+              <strong>Username:</strong> test
             </p>
             <p>
-              <strong>Transporter:</strong> transporter / password123
+              <strong>Password:</strong> test123
             </p>
-            <p>
-              <strong>Driver:</strong> driver / password123
+            <p className="text-blue-600 mt-2 italic">
+              Note: First login will require password reset
             </p>
           </div>
         </div>

@@ -9,6 +9,7 @@ import {
   resetPassword,
   logoutUser,
   clearError,
+  setPasswordReset,
 } from "../../redux/slices/authSlice";
 
 // Password validation schema with industry standards
@@ -102,6 +103,8 @@ const ResetPasswordPage = () => {
         })
       ).unwrap();
 
+      // Mark password as reset and show success modal
+      dispatch(setPasswordReset(true));
       setShowSuccessModal(true);
     } catch (error) {
       console.error("Password reset error:", error);
@@ -110,7 +113,10 @@ const ResetPasswordPage = () => {
 
   const handleLogoutAndRedirect = async () => {
     try {
+      // Clear authentication state and navigate to login
       await dispatch(logoutUser());
+      // Clear password reset flag for fresh login
+      dispatch(setPasswordReset(false));
       navigate("/login", { replace: true });
     } catch (error) {
       console.error("Logout error:", error);
