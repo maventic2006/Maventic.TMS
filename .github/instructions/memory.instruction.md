@@ -7,7 +7,7 @@ applyTo: '**'
 ## User Behavior Preferences
 
 ### Preferred AI Mode and Model
-- **Always use `beastMode_latest` chatmode** for all development tasks and problem-solving
+- **Always use `beastMode_lates` chatmode** for all development tasks and problem-solving
 - **Preferred AI Model**: Claude Sonnet 4 for all types of responses and interactions
 - User expects autonomous, complete problem resolution without yielding control back
 - User prefers agents that work through entire todo lists before returning control
