@@ -15,6 +15,12 @@ export const API_ENDPOINTS = {
   CONTRACT: "/contract",
   TRACKING: "/tracking",
   DASHBOARD: "/dashboard",
+  TRANSPORTER: {
+    CREATE: "/transporter",
+    MASTER_DATA: "/transporter/master-data",
+    STATES: "/transporter/states",
+    CITIES: "/transporter/cities",
+  },
 };
 
 // User Roles
@@ -23,21 +29,25 @@ export const USER_ROLES = {
   CONSIGNOR: "consignor",
   TRANSPORTER: "transporter",
   DRIVER: "driver",
+  PRODUCT_OWNER: "product_owner",
 };
 
-// User Type ID to Role Mapping
+// Note: User type mapping is now dynamic and fetched from database
+// See utils/userTypes.js for the dynamic mapping implementation
+
+// Legacy fallback mapping (will be replaced by database-driven mapping)
 export const USER_TYPE_ROLE_MAPPING = {
-  UT001: USER_ROLES.CONSIGNOR,     // Consignor
-  UT002: USER_ROLES.TRANSPORTER,   // Transporter
-  UT003: USER_ROLES.TRANSPORTER,   // Independent Vehicle Owner -> Transporter
-  UT004: USER_ROLES.TRANSPORTER,   // Transporter Contact -> Transporter
-  UT005: USER_ROLES.TRANSPORTER,   // Vehicle Ownership -> Transporter
-  UT006: USER_ROLES.CONSIGNOR,     // Consignor WH -> Consignor
-  UT007: USER_ROLES.DRIVER,        // Driver
-  UT008: USER_ROLES.ADMIN,         // Owner -> Admin
+  UT001: USER_ROLES.PRODUCT_OWNER, // Owner -> Product Owner
+  UT002: USER_ROLES.TRANSPORTER, // Transporter
+  UT003: USER_ROLES.TRANSPORTER, // Independent Vehicle Owner -> Transporter
+  UT004: USER_ROLES.TRANSPORTER, // Transporter Contact -> Transporter
+  UT005: USER_ROLES.TRANSPORTER, // Vehicle Ownership -> Transporter
+  UT006: USER_ROLES.CONSIGNOR, // Consignor WH -> Consignor
+  UT007: USER_ROLES.DRIVER, // Driver
+  UT008: USER_ROLES.CONSIGNOR, // Consignor
 };
 
-// Utility function to map user_type_id to role
+// Legacy utility function - use mapUserTypeToRole from utils/userTypes.js instead
 export const mapUserTypeToRole = (user_type_id) => {
   return USER_TYPE_ROLE_MAPPING[user_type_id] || null;
 };

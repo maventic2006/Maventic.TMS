@@ -5,11 +5,10 @@ const JWT_SECRET =
   process.env.JWT_SECRET || "tms-secret-key-change-in-production";
 
 /**
- * Middleware to authenticate JWT token
+ * Middleware to authenticate JWT token from cookies
  */
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+  const token = req.cookies?.authToken;
 
   if (!token) {
     return res.status(401).json({

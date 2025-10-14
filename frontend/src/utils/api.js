@@ -4,11 +4,11 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 // Debug logging (can be removed in production)
-if (import.meta.env.NODE_ENV === 'development') {
+if (import.meta.env.NODE_ENV === "development") {
   console.log("🔧 API Configuration:", {
     VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
     API_BASE_URL: API_BASE_URL,
-    NODE_ENV: import.meta.env.NODE_ENV
+    NODE_ENV: import.meta.env.NODE_ENV,
   });
 }
 
@@ -16,28 +16,24 @@ if (import.meta.env.NODE_ENV === 'development') {
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: true, // Include cookies in requests
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Request interceptor to attach auth token
+// Request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
     // Debug logging
     console.log("🚀 Making API Request:", {
       url: config.url,
       baseURL: config.baseURL,
       fullURL: `${config.baseURL}${config.url}`,
       method: config.method,
-      data: config.data
+      data: config.data,
     });
-    
+
     return config;
   },
   (error) => {
@@ -52,7 +48,7 @@ api.interceptors.response.use(
     console.log("✅ API Response:", {
       url: response.config.url,
       status: response.status,
-      data: response.data
+      data: response.data,
     });
     return response;
   },
@@ -62,19 +58,11 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      try {
-        // For now, redirect to login since refresh endpoint is not implemented
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
+      // For cookie-based auth, only redirect to login if not already there
+      if (!window.location.pathname.includes("/login")) {
         window.location.href = "/login";
-        return Promise.reject(error);
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
-        return Promise.reject(refreshError);
       }
+      return Promise.reject(error);
     }
 
     // Handle different error types
@@ -95,8 +83,8 @@ api.interceptors.response.use(
         config: {
           url: error.config?.url,
           baseURL: error.config?.baseURL,
-          method: error.config?.method
-        }
+          method: error.config?.method,
+        },
       });
     }
 
@@ -105,10 +93,13 @@ api.interceptors.response.use(
 );
 
 // Test connectivity on module load
-if (typeof window !== 'undefined') {
-  api.get('/health')
-    .then(() => console.log('✅ Backend connectivity test: SUCCESS'))
-    .catch(err => console.error('❌ Backend connectivity test: FAILED', err.message));
+if (typeof window !== "undefined") {
+  api
+    .get("/health")
+    .then(() => console.log("✅ Backend connectivity test: SUCCESS"))
+    .catch((err) =>
+      console.error("❌ Backend connectivity test: FAILED", err.message)
+    );
 }
 
 export default api;
