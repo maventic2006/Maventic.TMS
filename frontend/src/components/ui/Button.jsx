@@ -17,7 +17,7 @@ const Button = React.forwardRef(
     ref
   ) => {
     const baseClasses =
-      "tms-button focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
+      "tms-button rounded-button text-body font-sans focus-visible:ring-2 focus-visible:ring-primary-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
 
     const variantClasses = {
       default: "tms-button-primary",

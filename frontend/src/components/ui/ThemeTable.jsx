@@ -7,7 +7,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./select";
+} from "./Select";
 import ThemedCheckbox from "./themed/ThemedCheckbox";
 import ThemedSwitch from "./themed/ThemedSwitch";
 

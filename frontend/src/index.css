@@ -2,8 +2,8 @@
 
 /* Global Styles */
 body {
-  background-color: rgb(245 247 250);
-  color: rgb(13 26 51);
+  background-color: #F8FAFC; /* primary.background */
+  color: #0F172A; /* text.primary */
   font-family: "Inter", "Poppins", system-ui, sans-serif;
 }
 

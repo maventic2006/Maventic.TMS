@@ -5,6 +5,13 @@ import {
   fetchStates,
   fetchCities,
 } from "../../../redux/slices/transporterSlice";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../components/ui/Select";
 
 const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
   const dispatch = useDispatch();
@@ -305,71 +312,100 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                             />
                           </td>
                           <td className="px-3">
-                            <select
+                            <Select
                               value={address.country || ""}
-                              onChange={(e) =>
-                                updateAddress(index, "country", e.target.value)
+                              onValueChange={(value) =>
+                                updateAddress(index, "country", value)
                               }
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
-                                errors.addresses?.[index]?.country
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
                             >
-                              <option value="">Country</option>
-                              {masterData?.countries?.map((country) => (
-                                <option key={country.code} value={country.code}>
-                                  {country.name}
-                                </option>
-                              ))}
-                            </select>
+                              <SelectTrigger
+                                className={`min-w-[200px] ${
+                                  errors.addresses?.[index]?.country
+                                    ? "border-red-500"
+                                    : ""
+                                }`}
+                              >
+                                <SelectValue placeholder="Country" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {masterData?.countries?.map((country) => (
+                                  <SelectItem
+                                    key={country.code}
+                                    value={country.code}
+                                  >
+                                    {country.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </td>
                           <td className="px-3">
-                            <select
+                            <Select
                               value={address.state || ""}
-                              onChange={(e) =>
-                                updateAddress(index, "state", e.target.value)
+                              onValueChange={(value) =>
+                                updateAddress(index, "state", value)
                               }
                               disabled={!address.country}
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                                errors.addresses?.[index]?.state
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
                             >
-                              <option value="">State</option>
-                              {getStatesForCountry(address.country).map(
-                                (state) => (
-                                  <option key={state.code} value={state.code}>
-                                    {state.name}
-                                  </option>
-                                )
-                              )}
-                            </select>
+                              <SelectTrigger
+                                className={`min-w-[200px] ${
+                                  errors.addresses?.[index]?.state
+                                    ? "border-red-500"
+                                    : ""
+                                } ${
+                                  !address.country
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
+                                }`}
+                              >
+                                <SelectValue placeholder="State" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {getStatesForCountry(address.country).map(
+                                  (state) => (
+                                    <SelectItem
+                                      key={state.code}
+                                      value={state.code}
+                                    >
+                                      {state.name}
+                                    </SelectItem>
+                                  )
+                                )}
+                              </SelectContent>
+                            </Select>
                           </td>
                           <td className="px-3">
-                            <select
+                            <Select
                               value={address.city || ""}
-                              onChange={(e) =>
-                                updateAddress(index, "city", e.target.value)
+                              onValueChange={(value) =>
+                                updateAddress(index, "city", value)
                               }
                               disabled={!address.state}
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                                errors.addresses?.[index]?.city
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
                             >
-                              <option value="">City</option>
-                              {getCitiesForCountryState(
-                                address.country,
-                                address.state
-                              ).map((city) => (
-                                <option key={city.code} value={city.code}>
-                                  {city.name}
-                                </option>
-                              ))}
-                            </select>
+                              <SelectTrigger
+                                className={`min-w-[200px] ${
+                                  errors.addresses?.[index]?.city
+                                    ? "border-red-500"
+                                    : ""
+                                } ${
+                                  !address.state
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
+                                }`}
+                              >
+                                <SelectValue placeholder="City" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {getCitiesForCountryState(
+                                  address.country,
+                                  address.state
+                                ).map((city) => (
+                                  <SelectItem key={city.code} value={city.code}>
+                                    {city.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </td>
                           <td className="px-3">
                             <input
@@ -417,28 +453,32 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                             />
                           </td>
                           <td className="px-3">
-                            <select
+                            <Select
                               value={address.addressType || ""}
-                              onChange={(e) =>
-                                updateAddress(
-                                  index,
-                                  "addressType",
-                                  e.target.value
-                                )
+                              onValueChange={(value) =>
+                                updateAddress(index, "addressType", value)
                               }
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
-                                errors.addresses?.[index]?.addressType
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
                             >
-                              <option value="">Select Type</option>
-                              {masterData?.addressTypes?.map((type) => (
-                                <option key={type.value} value={type.value}>
-                                  {type.label}
-                                </option>
-                              ))}
-                            </select>
+                              <SelectTrigger
+                                className={`min-w-[200px] ${
+                                  errors.addresses?.[index]?.addressType
+                                    ? "border-red-500"
+                                    : ""
+                                }`}
+                              >
+                                <SelectValue placeholder="Select Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {masterData?.addressTypes?.map((type) => (
+                                  <SelectItem
+                                    key={type.value}
+                                    value={type.value}
+                                  >
+                                    {type.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </td>
                           <td className="px-3">
                             <button

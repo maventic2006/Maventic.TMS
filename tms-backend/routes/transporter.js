@@ -13,8 +13,8 @@ const checkProductOwnerAccess = (req, res, next) => {
   // Get user type from token
   const userType = req.user?.user_type_id;
 
-  // UT008 is Owner (product owner as per requirements)
-  if (userType !== "UT008") {
+  // UT001 is Owner (product owner as per requirements)
+  if (userType !== "UT001") {
     return res.status(403).json({
       success: false,
       error: {

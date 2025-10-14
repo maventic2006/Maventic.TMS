@@ -481,23 +481,23 @@ backend/
 #### RESTful Endpoint Structure
 
 ```
-GET    /api/v1/:module           # List resources
-POST   /api/v1/:module           # Create resource
-GET    /api/v1/:module/:id       # Get specific resource
-PUT    /api/v1/:module/:id       # Update resource
-DELETE /api/v1/:module/:id       # Delete resource
+GET    /api/:module           # List resources
+POST   /api/:module           # Create resource
+GET    /api/:module/:id       # Get specific resource
+PUT    /api/:module/:id       # Update resource
+DELETE /api/:module/:id       # Delete resource
 ```
 
 #### Example Endpoints
 
 ```
-/api/v1/auth/login
-/api/v1/auth/refresh
-/api/v1/indent
-/api/v1/indent/:id
-/api/v1/rfq
-/api/v1/contract
-/api/v1/tracking
+/api/auth/login
+/api/auth/refresh
+/api/indent
+/api/indent/:id
+/api/rfq
+/api/contract
+/api/tracking
 ```
 
 #### Query Parameters Standards

@@ -15,6 +15,7 @@ import ResetPasswordPage from "./features/auth/ResetPasswordPage";
 import Dashboard from "./features/dashboard/Dashboard";
 import IndentPage from "./features/indent/IndentPage";
 import TMSLandingPage from "./pages/TMSLandingPage";
+import TransporterMaintenance from "./pages/TransporterMaintenance";
 import CreateTransporterPage from "./features/transporter/CreateTransporterPage";
 import { verifyToken, logoutUser } from "./redux/slices/authSlice";
 import { USER_ROLES } from "./utils/constants";
@@ -229,6 +230,23 @@ function App() {
                   }
                 />
 
+                {/* Alternative landing page route */}
+                <Route
+                  path="/landing"
+                  element={
+                    <PrivateRoute
+                      roles={[
+                        USER_ROLES.ADMIN,
+                        USER_ROLES.CONSIGNOR,
+                        USER_ROLES.TRANSPORTER,
+                        USER_ROLES.DRIVER,
+                      ]}
+                    >
+                      <TMSLandingPage />
+                    </PrivateRoute>
+                  }
+                />
+
                 <Route
                   path="/dashboard"
                   element={
@@ -248,13 +266,61 @@ function App() {
                   }
                 />
 
+                {/* Transporter Management Routes */}
+                <Route
+                  path="/transporters"
+                  element={
+                    <PrivateRoute
+                      roles={[
+                        USER_ROLES.ADMIN,
+                        USER_ROLES.CONSIGNOR,
+                        USER_ROLES.TRANSPORTER,
+                        USER_ROLES.PRODUCT_OWNER,
+                      ]}
+                    >
+                      <TransporterMaintenance />
+                    </PrivateRoute>
+                  }
+                />
+
                 <Route
                   path="/transporter/create"
                   element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <CreateTransporterPage />
-                      </Layout>
+                    <PrivateRoute
+                      roles={[
+                        USER_ROLES.ADMIN,
+                        USER_ROLES.CONSIGNOR,
+                        USER_ROLES.TRANSPORTER,
+                        USER_ROLES.PRODUCT_OWNER,
+                      ]}
+                    >
+                      <CreateTransporterPage />
+                    </PrivateRoute>
+                  }
+                />
+
+                <Route
+                  path="/transporter/:id"
+                  element={
+                    <PrivateRoute
+                      roles={[
+                        USER_ROLES.ADMIN,
+                        USER_ROLES.CONSIGNOR,
+                        USER_ROLES.TRANSPORTER,
+                      ]}
+                    >
+                      <div className="min-h-screen bg-primary-background p-4">
+                        <div className="max-w-4xl mx-auto">
+                          <h1 className="text-2xl font-bold text-text-primary mb-6">
+                            Transporter Details
+                          </h1>
+                          <div className="bg-card-background rounded-lg shadow-sm border border-gray-200 p-6">
+                            <p className="text-text-secondary">
+                              Transporter details view coming soon...
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </PrivateRoute>
                   }
                 />

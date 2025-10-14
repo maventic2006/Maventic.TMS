@@ -2,7 +2,7 @@ import React from "react";
 import { clsx } from "clsx";
 
 const Card = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={clsx("tms-card", className)} {...props} />
+  <div ref={ref} className={clsx("tms-card bg-card-background rounded-card shadow-card", className)} {...props} />
 ));
 Card.displayName = "Card";
 
@@ -19,7 +19,7 @@ const CardTitle = React.forwardRef(({ className, ...props }, ref) => (
   <h3
     ref={ref}
     className={clsx(
-      "text-lg font-semibold leading-none tracking-tight text-foreground",
+      "text-subtitle text-text-primary font-sans leading-none tracking-tight",
       className
     )}
     {...props}
@@ -30,7 +30,7 @@ CardTitle.displayName = "CardTitle";
 const CardDescription = React.forwardRef(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={clsx("text-sm text-muted-foreground", className)}
+    className={clsx("text-body text-text-secondary", className)}
     {...props}
   />
 ));
