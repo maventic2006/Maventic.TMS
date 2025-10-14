@@ -8,19 +8,82 @@ import React, {
 import { clsx } from "clsx";
 import { ChevronDown, Check } from "lucide-react";
 
+// Global context for managing dropdown state across all Select components
+const GlobalDropdownContext = createContext();
+
+// Global dropdown provider to manage which dropdown is open
+const GlobalDropdownProvider = ({ children }) => {
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+
+  const openDropdown = (id) => {
+    setOpenDropdownId(id);
+  };
+
+  const closeDropdown = () => {
+    setOpenDropdownId(null);
+  };
+
+  const isDropdownOpen = (id) => {
+    return openDropdownId === id;
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Close dropdown if clicked outside any dropdown
+      const isInsideDropdown = event.target.closest(
+        "[data-dropdown-container]"
+      );
+      if (!isInsideDropdown) {
+        closeDropdown();
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  return (
+    <GlobalDropdownContext.Provider
+      value={{ openDropdown, closeDropdown, isDropdownOpen }}
+    >
+      {children}
+    </GlobalDropdownContext.Provider>
+  );
+};
+
 // Context for Select component
 const SelectContext = createContext();
 
 // Main Select component (shadcn/ui style)
 const Select = ({ children, value, onValueChange, disabled, ...props }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const globalDropdownContext = useContext(GlobalDropdownContext);
+  const dropdownId = useRef(Math.random().toString(36).substr(2, 9)).current;
   const [selectedValue, setSelectedValue] = useState(value || "");
+
+  const isOpen = globalDropdownContext?.isDropdownOpen(dropdownId) || false;
+
+  const setIsOpen = (open) => {
+    if (!globalDropdownContext) return;
+
+    if (open && !disabled) {
+      globalDropdownContext.openDropdown(dropdownId);
+    } else {
+      globalDropdownContext.closeDropdown();
+    }
+  };
 
   const handleValueChange = (newValue) => {
     setSelectedValue(newValue);
     onValueChange?.(newValue);
-    setIsOpen(false);
+    globalDropdownContext?.closeDropdown();
   };
+
+  // Update selected value when prop changes
+  useEffect(() => {
+    setSelectedValue(value || "");
+  }, [value]);
 
   return (
     <SelectContext.Provider
@@ -30,9 +93,12 @@ const Select = ({ children, value, onValueChange, disabled, ...props }) => {
         selectedValue,
         handleValueChange,
         disabled,
+        dropdownId,
       }}
     >
-      <div className="relative">{children}</div>
+      <div className="relative" data-dropdown-container>
+        {children}
+      </div>
     </SelectContext.Provider>
   );
 };
@@ -78,16 +144,41 @@ SelectValue.displayName = "SelectValue";
 const SelectContent = React.forwardRef(
   ({ className, children, ...props }, ref) => {
     const { isOpen } = useContext(SelectContext);
+    const contentRef = useRef(null);
+    const [position, setPosition] = useState({ top: "100%", bottom: "auto" });
+
+    useEffect(() => {
+      if (isOpen && contentRef.current) {
+        const rect = contentRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const spaceBelow = viewportHeight - rect.top;
+        const spaceAbove = rect.top;
+
+        // If there's not enough space below and more space above, open upward
+        if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+          setPosition({ bottom: "100%", top: "auto" });
+        } else {
+          setPosition({ top: "100%", bottom: "auto" });
+        }
+      }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     return (
       <div
-        ref={ref}
+        ref={(node) => {
+          if (ref) {
+            if (typeof ref === "function") ref(node);
+            else ref.current = node;
+          }
+          contentRef.current = node;
+        }}
         className={clsx(
-          "absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
+          "absolute z-[9999] mt-1 max-h-60 w-full overflow-auto rounded-md border border-gray-200 bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
           className
         )}
+        style={position}
         {...props}
       >
         {children}
@@ -132,26 +223,44 @@ const StatusSelect = ({
   placeholder = "Select status",
   className,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const globalDropdownContext = useContext(GlobalDropdownContext);
+  const dropdownId = useRef(Math.random().toString(36).substr(2, 9)).current;
   const dropdownRef = useRef(null);
+  const contentRef = useRef(null);
+  const [position, setPosition] = useState({ top: "100%", bottom: "auto" });
+
+  const isOpen = globalDropdownContext?.isDropdownOpen(dropdownId) || false;
+
+  const setIsOpen = (open) => {
+    if (!globalDropdownContext) return;
+
+    if (open) {
+      globalDropdownContext.openDropdown(dropdownId);
+    } else {
+      globalDropdownContext.closeDropdown();
+    }
+  };
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
+    if (isOpen && contentRef.current) {
+      const rect = contentRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.top;
+      const spaceAbove = rect.top;
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+      // If there's not enough space below and more space above, open upward
+      if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+        setPosition({ bottom: "100%", top: "auto" });
+      } else {
+        setPosition({ top: "100%", bottom: "auto" });
+      }
+    }
+  }, [isOpen]);
 
   const selectedOption = options.find((option) => option.value === value);
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative" ref={dropdownRef} data-dropdown-container>
       <button
         type="button"
         className={clsx(
@@ -172,7 +281,11 @@ const StatusSelect = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+        <div
+          ref={contentRef}
+          className="absolute z-[9999] mt-2 w-full origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+          style={position}
+        >
           <div className="py-1 max-h-60 overflow-auto">
             {options.map((option) => (
               <button
@@ -186,7 +299,7 @@ const StatusSelect = ({
                 )}
                 onClick={() => {
                   onChange(option.value);
-                  setIsOpen(false);
+                  globalDropdownContext?.closeDropdown();
                 }}
               >
                 <div className="flex items-center justify-between">
@@ -211,4 +324,5 @@ export {
   SelectContent,
   SelectItem,
   StatusSelect,
+  GlobalDropdownProvider,
 };
