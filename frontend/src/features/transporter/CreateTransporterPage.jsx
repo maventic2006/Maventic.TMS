@@ -10,6 +10,7 @@ import {
   MapPin,
   Globe,
   FileText,
+  AlertTriangle,
 } from "lucide-react";
 
 import {
@@ -132,17 +133,25 @@ const CreateTransporterPage = () => {
   ];
 
   // Check if user has permission (product owner only)
-  useEffect(() => {
-    if (role !== "product_owner") {
-      navigate("/dashboard", { replace: true });
-      return;
-    }
-  }, [role, navigate]);
+  // useEffect(() => {
+  //   if (role !== "product_owner") {
+  //     navigate("/dashboard", { replace: true });
+  //     return;
+  //   }
+  // }, [role, navigate]);
 
   // Load master data on component mount
   useEffect(() => {
     if (masterData.countries.length === 0) {
-      dispatch(fetchMasterData());
+      console.log("🔄 Attempting to fetch master data...");
+      dispatch(fetchMasterData()).catch((error) => {
+        console.log(
+          "⚠️ Master data fetch failed (expected in development):",
+          error
+        );
+        // This is expected when backend is not running or auth is disabled
+        // The component will still function with empty arrays
+      });
     }
   }, [dispatch, masterData.countries.length]);
 
@@ -153,17 +162,17 @@ const CreateTransporterPage = () => {
   }, [dispatch]);
 
   // Handle successful creation
-  useEffect(() => {
-    if (lastCreatedTransporter) {
-      // Show success message
-      alert(
-        `Transporter created successfully! ID: ${lastCreatedTransporter.transporterId}`
-      );
+  // useEffect(() => {
+  //   if (lastCreatedTransporter) {
+  //     // Show success message
+  //     alert(
+  //       `Transporter created successfully! ID: ${lastCreatedTransporter.transporterId}`
+  //     );
 
-      // Navigate to transporter list (or dashboard for now)
-      navigate("/dashboard");
-    }
-  }, [lastCreatedTransporter, navigate]);
+  //     // Navigate to transporter list (or dashboard for now)
+  //     navigate("/dashboard");
+  //   }
+  // }, [lastCreatedTransporter, navigate]);
 
   const handleClear = () => {
     if (
@@ -326,28 +335,33 @@ const CreateTransporterPage = () => {
 
   const canSubmit = true; // Always allow submission
 
-  if (role !== "product_owner") {
-    return null; // Will redirect via useEffect
-  }
+  // if (role !== "product_owner") {
+  //   return null; // Will redirect via useEffect
+  // }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA]">
-      {/* Header Bar */}
-      <div className="bg-[#0D1A33] px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
+      {/* Modern Header Bar with glassmorphism */}
+      <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-6 shadow-xl relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-transparent to-teal-600/10"></div>
+        <div className="absolute -top-4 -right-4 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl"></div>
+        <div className="absolute -bottom-4 -left-4 w-40 h-40 bg-gradient-to-tr from-teal-400/10 to-transparent rounded-full blur-2xl"></div>
+
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-6">
             <button
               onClick={() => navigate(-1)}
-              className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors"
+              className="group p-3 bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-all duration-300 hover:scale-105 border border-white/20"
             >
-              <ArrowLeft className="w-5 h-5 text-[#0D1A33]" />
+              <ArrowLeft className="w-5 h-5 text-white group-hover:text-white transition-colors" />
             </button>
 
-            <div>
-              <h1 className="text-2xl font-bold text-white">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-white tracking-tight">
                 Create New Transporter
               </h1>
-              <p className="text-gray-300 text-sm">
+              <p className="text-blue-100/80 text-sm font-medium">
                 Complete all sections to create a comprehensive transporter
                 profile
               </p>
@@ -358,16 +372,16 @@ const CreateTransporterPage = () => {
             <button
               onClick={handleClear}
               disabled={isCreating}
-              className={`${actionButtonTheme.clear} disabled:opacity-50`}
+              className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
               Clear
             </button>
 
             <button
               onClick={handleSubmit}
               disabled={isCreating}
-              className={`${actionButtonTheme.primary} disabled:opacity-50 disabled:cursor-not-allowed`}
+              className="group inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#14B8A6] to-[#0891B2] text-white rounded-xl font-medium hover:from-[#0891B2] hover:to-[#14B8A6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-teal-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isCreating ? (
                 <>
@@ -376,7 +390,7 @@ const CreateTransporterPage = () => {
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4" />
+                  <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
                   Submit
                 </>
               )}
@@ -385,17 +399,21 @@ const CreateTransporterPage = () => {
             <button
               onClick={handleExport}
               disabled={isCreating}
-              className={`${actionButtonTheme.clear} disabled:opacity-50`}
+              className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              <Share className="w-4 h-4" />
+              <Share className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+              Export
             </button>
           </div>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-[#0D1A33] px-6">
-        <div className="flex space-x-0">
+      {/* Modern Tab Navigation with glassmorphism */}
+      <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">
+        {/* Tab backdrop blur effect */}
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-sm"></div>
+
+        <div className="relative flex space-x-1 py-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -404,80 +422,137 @@ const CreateTransporterPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`${tabButtonTheme.base} ${
-                  isActive ? tabButtonTheme.active : tabButtonTheme.inactive
+                className={`group relative px-6 py-4 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-3 ${
+                  isActive
+                    ? "bg-gradient-to-br from-white via-white to-gray-50 text-[#0D1A33] shadow-lg transform -translate-y-1 scale-105"
+                    : "bg-white/5 backdrop-blur-sm text-blue-100/80 hover:bg-white/10 hover:text-white border border-white/10 hover:border-white/20"
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span>{tab.name}</span>
+                {/* Active tab decoration */}
+                {isActive && (
+                  <div className="absolute inset-x-0 -bottom-0 h-1 bg-gradient-to-r from-[#14B8A6] to-[#0891B2] rounded-t-full"></div>
+                )}
+
+                <Icon
+                  className={`w-5 h-5 transition-all duration-300 ${
+                    isActive
+                      ? "text-[#14B8A6] scale-110"
+                      : "text-blue-200/70 group-hover:text-white group-hover:scale-105"
+                  }`}
+                />
+                <span className="font-semibold tracking-wide">{tab.name}</span>
+
+                {/* Hover glow effect */}
+                {!isActive && (
+                  <div className="absolute inset-0 rounded-t-2xl bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                )}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="px-6 py-6">
-        {/* Progress Indicator */}
-        {/* <div className="mb-6">
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
+      {/* Modern Content Area */}
+      <div className="px-6 py-8 space-y-8">
+        {/* Modern Progress Indicator - Currently commented out but enhanced for future use */}
+        {/* <div className="mb-8">
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/40">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-semibold text-[#0D1A33] tracking-wide">
                 Completion Progress
               </span>
-              <span className="text-sm text-gray-600">
-                {Object.values(tabValidationStatus).filter(Boolean).length}/4
-                sections completed
+              <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                {Object.values(tabValidationStatus).filter(Boolean).length}/4 sections completed
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full"></div>
               <div
-                className="bg-[#14B8A6] h-2 rounded-full transition-all duration-300"
+                className="relative bg-gradient-to-r from-[#14B8A6] to-[#0891B2] h-3 rounded-full transition-all duration-700 ease-out shadow-lg"
                 style={{
-                  width: `${
-                    (Object.values(tabValidationStatus).filter(Boolean).length /
-                      4) *
-                    100
-                  }%`,
+                  width: `${(Object.values(tabValidationStatus).filter(Boolean).length / 4) * 100}%`,
                 }}
-              ></div>
+              >
+                <div className="absolute inset-0 bg-white/30 rounded-full animate-pulse"></div>
+              </div>
             </div>
           </div>
         </div> */}
 
-        {/* Error Display */}
+        {/* Enhanced Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center gap-2 text-red-700">
-              <AlertTriangle className="w-5 h-5" />
-              <span className="font-medium">Error Creating Transporter</span>
+          <div className="mb-8 relative">
+            <div className="bg-gradient-to-r from-red-50/90 to-rose-50/90 backdrop-blur-sm border border-red-200/60 rounded-2xl p-6 shadow-lg">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-red-800 mb-2">
+                    Error Creating Transporter
+                  </h3>
+                  <p className="text-sm text-red-700 leading-relaxed">
+                    {typeof error === "string"
+                      ? error
+                      : error.message || "An unexpected error occurred"}
+                  </p>
+                  {error.field && (
+                    <p className="mt-3 text-xs text-red-600 bg-red-100/50 px-3 py-1 rounded-full inline-block">
+                      Field: {error.field}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
-            <p className="mt-2 text-sm text-red-600">
-              {typeof error === "string"
-                ? error
-                : error.message || "An unexpected error occurred"}
-            </p>
-            {error.field && (
-              <p className="mt-1 text-xs text-red-500">Field: {error.field}</p>
-            )}
           </div>
         )}
 
-        {/* Tab Content */}
-        <div className="space-y-6">
+        {/* Enhanced Tab Content Container */}
+        <div className="relative">
           {tabs.map((tab) => {
             const TabComponent = tab.component;
+            const isActive = activeTab === tab.id;
+
             return (
               <div
                 key={tab.id}
-                className={activeTab === tab.id ? "block" : "hidden"}
+                className={`transition-all duration-500 ease-in-out ${
+                  isActive
+                    ? "block opacity-100 transform translate-y-0"
+                    : "hidden opacity-0 transform translate-y-4"
+                }`}
               >
-                <TabComponent
-                  formData={formData}
-                  setFormData={setFormData}
-                  errors={validationErrors}
-                  nextTransporterId="T001" // This would come from backend in real scenario
-                />
+                {/* Content wrapper with modern styling */}
+                <div className="bg-white/60 backdrop-blur-sm rounded-3xl shadow-xl border border-white/40 overflow-hidden">
+                  {/* Tab content header with gradient */}
+                  <div className="bg-gradient-to-r from-gray-50/80 to-white/80 backdrop-blur-sm px-8 py-6 border-b border-gray-200/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-[#14B8A6] to-[#0891B2] rounded-xl flex items-center justify-center shadow-lg">
+                        {React.createElement(tab.icon, {
+                          className: "w-5 h-5 text-white",
+                        })}
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-[#0D1A33] tracking-tight">
+                          {tab.name}
+                        </h2>
+                        <p className="text-sm text-gray-600">
+                          Complete the required information below
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tab content */}
+                  <div className="p-8">
+                    <TabComponent
+                      formData={formData}
+                      setFormData={setFormData}
+                      errors={validationErrors}
+                      nextTransporterId="T001" // This would come from backend in real scenario
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}

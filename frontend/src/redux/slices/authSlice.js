@@ -6,16 +6,70 @@ export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (credentials, { rejectWithValue }) => {
     try {
-      const response = await api.post("/auth/login", credentials);
+      console.log("📡 Starting login attempt:", {
+        user_id: credentials.user_id,
+      });
+      console.log("🌐 API Base URL:", import.meta.env.VITE_API_BASE_URL);
 
-      if (response.data.success) {
-        const { user, requirePasswordReset } = response.data;
+      const loginUrl = `${
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"
+      }/auth/login`;
+      console.log("🔗 Login URL:", loginUrl);
+
+      // Try using fetch directly to bypass axios issues with timeout
+      console.log("🚀 Making fetch request...");
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(loginUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Include cookies
+        body: JSON.stringify(credentials),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log("📨 Fetch response received:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
+      const data = await response.json();
+      console.log("📦 Response data:", data);
+
+      if (response.ok && data.success) {
+        const { user, requirePasswordReset } = data;
+        console.log("✅ Login successful for user:", user?.user_id);
         return { user, requirePasswordReset };
       } else {
-        return rejectWithValue(response.data.message || "Login failed");
+        console.log("❌ Login failed:", data.message || "Unknown error");
+        return rejectWithValue(data.message || "Login failed");
       }
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Login failed");
+      console.error("🔥 Login error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+
+      if (error.name === "AbortError") {
+        return rejectWithValue("Login request timed out. Please try again.");
+      } else if (
+        error.name === "TypeError" &&
+        error.message.includes("fetch")
+      ) {
+        return rejectWithValue(
+          "Unable to connect to server. Please check if the backend is running."
+        );
+      }
+
+      return rejectWithValue(error.message || "Login failed");
     }
   }
 );
@@ -55,13 +109,26 @@ export const verifyToken = createAsyncThunk(
 
       if (response.data.success) {
         const { user } = response.data;
+        console.log("✅ Token verification successful:", {
+          user: user?.user_id,
+        });
         return { user };
       } else {
+        console.log("❌ Token verification failed:", response.data.message);
         return rejectWithValue(
           response.data.message || "Token verification failed"
         );
       }
     } catch (error) {
+      // Handle different error cases
+      if (error.response?.status === 401) {
+        console.log("🔒 No valid authentication token found");
+      } else if (error.response?.status === 403) {
+        console.log("🚫 Authentication token expired or invalid");
+      } else {
+        console.error("❌ Token verification error:", error);
+      }
+
       return rejectWithValue(
         error.response?.data?.message || "Token verification failed"
       );
@@ -112,7 +179,7 @@ const initialState = {
   user: null,
   isAuthenticated: false,
   isPasswordReset: false,
-  isLoading: true, // Set loading to true to check auth status on app start
+  isLoading: false, // Changed to false to prevent stuck loading when server is down
   error: null,
   permissions: [],
   role: null,
@@ -138,6 +205,9 @@ const authSlice = createSlice({
       state.isPasswordReset = false;
       state.role = null;
       state.permissions = [];
+    },
+    setAuthInitialized: (state) => {
+      state.isLoading = false;
     },
     setPasswordReset: (state, action) => {
       state.isPasswordReset = action.payload;
@@ -216,5 +286,6 @@ export const {
   setCredentials,
   clearCredentials,
   setPasswordReset,
+  setAuthInitialized,
 } = authSlice.actions;
 export default authSlice.reducer;

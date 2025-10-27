@@ -773,9 +773,347 @@ const getCitiesByCountryAndState = async (req, res) => {
   }
 };
 
+// Get all transporters with pagination and filters
+const getTransporters = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 25,
+      search = "",
+      transporterId = "",
+      status = "",
+      businessName = "",
+      state = "",
+      city = "",
+      transportMode = "",
+    } = req.query;
+
+    // Convert page and limit to integers
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Build base query
+    let query = knex("transporter_general_info as tgi")
+      .leftJoin("tms_address as addr", "tgi.address_id", "addr.address_id")
+      .select(
+        "tgi.transporter_id",
+        "tgi.business_name",
+        "tgi.trans_mode_road",
+        "tgi.trans_mode_rail",
+        "tgi.trans_mode_air",
+        "tgi.trans_mode_sea",
+        "tgi.active_flag",
+        "tgi.from_date",
+        "tgi.to_date",
+        "tgi.avg_rating",
+        "tgi.status",
+        "tgi.created_by",
+        "tgi.created_on",
+        "tgi.updated_on",
+        "addr.country",
+        "addr.state",
+        "addr.city",
+        "addr.district",
+        knex.raw(
+          "CONCAT(addr.address_line1, ', ', addr.city, ', ', addr.state, ', ', addr.country) as address"
+        )
+      );
+
+    // Apply filters
+    if (search) {
+      query = query.where(function () {
+        this.where("tgi.business_name", "like", `%${search}%`)
+          .orWhere("tgi.transporter_id", "like", `%${search}%`)
+          .orWhere("addr.city", "like", `%${search}%`)
+          .orWhere("addr.state", "like", `%${search}%`);
+      });
+    }
+
+    if (transporterId) {
+      query = query.where("tgi.transporter_id", "like", `%${transporterId}%`);
+    }
+
+    if (status) {
+      query = query.where("tgi.status", status);
+    }
+
+    if (businessName) {
+      query = query.where("tgi.business_name", "like", `%${businessName}%`);
+    }
+
+    if (state) {
+      query = query.where("addr.state", "like", `%${state}%`);
+    }
+
+    if (city) {
+      query = query.where("addr.city", "like", `%${city}%`);
+    }
+
+    if (transportMode) {
+      const modes = transportMode.split(",");
+      query = query.where(function () {
+        modes.forEach((mode) => {
+          switch (mode.toUpperCase()) {
+            case "R":
+            case "ROAD":
+              this.orWhere("tgi.trans_mode_road", true);
+              break;
+            case "RL":
+            case "RAIL":
+              this.orWhere("tgi.trans_mode_rail", true);
+              break;
+            case "A":
+            case "AIR":
+              this.orWhere("tgi.trans_mode_air", true);
+              break;
+            case "S":
+            case "SEA":
+              this.orWhere("tgi.trans_mode_sea", true);
+              break;
+          }
+        });
+      });
+    }
+
+    // Get total count for pagination
+    const totalQuery = query.clone();
+    const totalResult = await totalQuery.count("* as count").first();
+    const total = parseInt(totalResult.count);
+
+    // Apply pagination
+    const transporters = await query
+      .orderBy("tgi.created_on", "desc")
+      .limit(limitNum)
+      .offset(offset);
+
+    // Transform transport modes to match frontend expected format
+    const transformedTransporters = transporters.map((transporter) => {
+      const transportModes = [];
+      if (transporter.trans_mode_road) transportModes.push("R");
+      if (transporter.trans_mode_rail) transportModes.push("RL");
+      if (transporter.trans_mode_air) transportModes.push("A");
+      if (transporter.trans_mode_sea) transportModes.push("S");
+
+      return {
+        id: transporter.transporter_id,
+        businessName: transporter.business_name,
+        transportMode: transportModes,
+        status: transporter.status,
+        avgRating: transporter.avg_rating,
+        country: transporter.country,
+        state: transporter.state,
+        city: transporter.city,
+        district: transporter.district,
+        address: transporter.address,
+        createdBy: transporter.created_by,
+        createdOn: transporter.created_on
+          ? new Date(transporter.created_on).toISOString().split("T")[0]
+          : null,
+        updatedOn: transporter.updated_on
+          ? new Date(transporter.updated_on).toISOString().split("T")[0]
+          : null,
+        activeFlag: transporter.active_flag,
+        fromDate: transporter.from_date,
+        toDate: transporter.to_date,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: transformedTransporters,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error fetching transporters:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch transporters",
+        details: error.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+// Get single transporter by ID with full details
+const getTransporterById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get general info with address
+    const transporter = await knex("transporter_general_info as tgi")
+      .leftJoin("tms_address as addr", "tgi.address_id", "addr.address_id")
+      .select(
+        "tgi.*",
+        "addr.address_line1 as street1",
+        "addr.address_line2 as street2",
+        "addr.city",
+        "addr.state",
+        "addr.country",
+        "addr.district",
+        "addr.postal_code",
+        "addr.vat_gst_number as vatNumber"
+      )
+      .where("tgi.transporter_id", id)
+      .first();
+
+    if (!transporter) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Transporter not found",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Get contacts
+    const contacts = await knex("transporter_contact")
+      .where("transporter_id", id)
+      .select("*");
+
+    // Get serviceable areas
+    const serviceableAreas = await knex("transporter_service_area_hdr as hdr")
+      .leftJoin(
+        "transporter_service_area_itm as itm",
+        "hdr.service_area_hdr_id",
+        "itm.service_area_hdr_id"
+      )
+      .where("hdr.transporter_id", id)
+      .select("hdr.country", "itm.state");
+
+    // Group serviceable areas by country
+    const groupedServiceableAreas = serviceableAreas.reduce((acc, area) => {
+      const existingCountry = acc.find((item) => item.country === area.country);
+      if (existingCountry) {
+        if (area.state && !existingCountry.states.includes(area.state)) {
+          existingCountry.states.push(area.state);
+        }
+      } else {
+        acc.push({
+          country: area.country,
+          states: area.state ? [area.state] : [],
+        });
+      }
+      return acc;
+    }, []);
+
+    // Get documents
+    const documents = await knex("transporter_documents as td")
+      .leftJoin("document_upload as du", "td.document_id", "du.document_id")
+      .where("td.transporter_id", id)
+      .select(
+        "td.document_type",
+        "td.document_number",
+        "td.reference_number",
+        "td.country",
+        "td.valid_from",
+        "td.valid_to",
+        "td.status",
+        "du.file_name",
+        "du.file_type",
+        "du.file_data"
+      );
+
+    // Transform transport modes
+    const transportModes = {
+      road: transporter.trans_mode_road,
+      rail: transporter.trans_mode_rail,
+      air: transporter.trans_mode_air,
+      sea: transporter.trans_mode_sea,
+    };
+
+    // Build response
+    const response = {
+      transporterId: transporter.transporter_id,
+      generalDetails: {
+        businessName: transporter.business_name,
+        fromDate: transporter.from_date,
+        toDate: transporter.to_date,
+        avgRating: transporter.avg_rating || 0,
+        transMode: transportModes,
+        activeFlag: transporter.active_flag,
+        createdBy: transporter.created_by,
+        createdOn: transporter.created_on
+          ? new Date(transporter.created_on).toISOString().split("T")[0]
+          : null,
+        updatedBy: transporter.updated_by,
+        updatedOn: transporter.updated_on
+          ? new Date(transporter.updated_on).toISOString().split("T")[0]
+          : null,
+        status: transporter.status,
+      },
+      addresses: [
+        {
+          vatNumber: transporter.vatNumber,
+          country: transporter.country,
+          state: transporter.state,
+          city: transporter.city,
+          street1: transporter.street1,
+          street2: transporter.street2,
+          district: transporter.district,
+          postalCode: transporter.postal_code,
+          isPrimary: true,
+          contacts: contacts.map((contact) => ({
+            name: contact.contact_person_name,
+            role: contact.designation,
+            phoneNumber: contact.phone_number,
+            alternatePhoneNumber: contact.alternate_phone_number,
+            email: contact.email_id,
+            alternateEmail: contact.alternate_email_id,
+            whatsappNumber: contact.whatsapp_number,
+          })),
+        },
+      ],
+      serviceableAreas: groupedServiceableAreas,
+      documents: documents.map((doc) => ({
+        documentType: doc.document_type,
+        documentNumber: doc.document_number,
+        referenceNumber: doc.reference_number,
+        country: doc.country,
+        validFrom: doc.valid_from,
+        validTo: doc.valid_to,
+        status: doc.status,
+        fileName: doc.file_name,
+        fileType: doc.file_type,
+        fileData: doc.file_data,
+      })),
+    };
+
+    res.json({
+      success: true,
+      data: response,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error fetching transporter details:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch transporter details",
+        details: error.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   createTransporter,
   getMasterData,
   getStatesByCountry,
   getCitiesByCountryAndState,
+  getTransporters,
+  getTransporterById,
 };

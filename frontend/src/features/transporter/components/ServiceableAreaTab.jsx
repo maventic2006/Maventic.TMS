@@ -3,6 +3,7 @@ import { Globe, Plus, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchStates } from "../../../redux/slices/transporterSlice";
 import { getComponentTheme } from "../../../utils/theme";
+import { CustomSelect } from "../../../components/ui/Select";
 
 const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
   const dispatch = useDispatch();
@@ -183,31 +184,24 @@ const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
                   <label className="block text-sm font-medium text-gray-700">
                     Service Country <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <CustomSelect
                     value={area.country || ""}
-                    onChange={(e) =>
-                      updateServiceableArea(index, "country", e.target.value)
+                    onValueChange={(value) =>
+                      updateServiceableArea(index, "country", value)
                     }
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 ${
+                    options={getAvailableCountries()}
+                    placeholder="Select country"
+                    searchable
+                    getOptionLabel={(option) => option.name}
+                    getOptionValue={(option) => option.code}
+                    className={
                       errors.serviceableAreas &&
                       errors.serviceableAreas[index]?.country
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-orange-400 focus:border-orange-500"
-                    }`}
-                  >
-                    <option value="">Select country</option>
-                    {/* Show current country even if it's used, plus available ones */}
-                    {area.country && (
-                      <option key={area.country} value={area.country}>
-                        {getCountryName(area.country)}
-                      </option>
-                    )}
-                    {getAvailableCountries().map((country) => (
-                      <option key={country.code} value={country.code}>
-                        {country.name}
-                      </option>
-                    ))}
-                  </select>
+                        ? "border-red-500"
+                        : ""
+                    }
+                    error={errors.serviceableAreas?.[index]?.country}
+                  />
                   {errors.serviceableAreas &&
                     errors.serviceableAreas[index]?.country && (
                       <p className="text-sm text-red-500 flex items-center gap-1">
@@ -223,11 +217,11 @@ const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
 
                   {/* State Selection Dropdown */}
                   {area.country && (
-                    <select
+                    <CustomSelect
                       value=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          const stateCode = e.target.value;
+                      onValueChange={(value) => {
+                        if (value) {
+                          const stateCode = value;
                           const updatedStates = [
                             ...(area.states || []),
                             stateCode,
@@ -235,19 +229,14 @@ const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
                           updateServiceableArea(index, "states", updatedStates);
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                    >
-                      <option value="">Select states to add</option>
-                      {getStatesForCountry(area.country)
-                        .filter(
-                          (state) => !(area.states || []).includes(state.code)
-                        )
-                        .map((state) => (
-                          <option key={state.code} value={state.code}>
-                            {state.name}
-                          </option>
-                        ))}
-                    </select>
+                      options={getStatesForCountry(area.country).filter(
+                        (state) => !(area.states || []).includes(state.code)
+                      )}
+                      placeholder="Select states to add"
+                      searchable
+                      getOptionLabel={(option) => option.name}
+                      getOptionValue={(option) => option.code}
+                    />
                   )}
 
                   {!area.country && (

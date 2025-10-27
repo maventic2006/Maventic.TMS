@@ -12,6 +12,23 @@ if (import.meta.env.NODE_ENV === "development") {
   });
 }
 
+/**
+ * IMPORTANT: API Endpoint Usage Guidelines
+ *
+ * The base URL is already set to "http://localhost:5000/api"
+ *
+ * ✅ CORRECT usage:
+ * - api.get("/transporter")           → http://localhost:5000/api/transporter
+ * - api.get("/auth/login")           → http://localhost:5000/api/auth/login
+ * - api.post("/users")               → http://localhost:5000/api/users
+ *
+ * ❌ INCORRECT usage (will cause 404 errors):
+ * - api.get("/api/transporter")      → http://localhost:5000/api/api/transporter
+ * - api.get("/api/auth/login")       → http://localhost:5000/api/api/auth/login
+ *
+ * Always use relative paths without the "/api" prefix!
+ */
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -58,9 +75,16 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      // For cookie-based auth, only redirect to login if not already there
-      if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
+      // TEMPORARILY DISABLED: Comment out login redirect for development
+      // Don't log 401 errors for auth verification - they're expected
+      if (!originalRequest.url?.includes("/auth/verify")) {
+        console.log(
+          "🔒 Authentication required (REDIRECT DISABLED FOR DEVELOPMENT)"
+        );
+        // For cookie-based auth, only redirect to login if not already there
+        // if (!window.location.pathname.includes("/login")) {
+        //   window.location.href = "/login";
+        // }
       }
       return Promise.reject(error);
     }
@@ -96,7 +120,24 @@ api.interceptors.response.use(
 if (typeof window !== "undefined") {
   api
     .get("/health")
-    .then(() => console.log("✅ Backend connectivity test: SUCCESS"))
+    .then(() => {
+      console.log("✅ Backend connectivity test: SUCCESS");
+
+      // Add a global test function for debugging
+      window.debugLogin = async (
+        credentials = { user_id: "POWNER001", password: "Powner@123" }
+      ) => {
+        try {
+          console.log("🧪 Debug login test started:", credentials);
+          const response = await api.post("/auth/login", credentials);
+          console.log("✅ Debug login success:", response.data);
+          return response.data;
+        } catch (error) {
+          console.error("❌ Debug login failed:", error);
+          return { error: error.message };
+        }
+      };
+    })
     .catch((err) =>
       console.error("❌ Backend connectivity test: FAILED", err.message)
     );

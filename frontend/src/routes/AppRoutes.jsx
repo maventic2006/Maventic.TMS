@@ -1,16 +1,18 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 // Import pages
-import TMSLandingPage from '../pages/TMSLandingPage';
-import TransporterMaintenance from '../pages/TransporterMaintenance';
-import LoginPage from '../features/auth/LoginPage';
-import Dashboard from '../features/dashboard/Dashboard';
-import IndentPage from '../features/indent/IndentPage';
+import TMSLandingPage from "../pages/TMSLandingPage";
+import TransporterMaintenance from "../pages/TransporterMaintenance";
+import LoginPage from "../features/auth/LoginPage";
+import Dashboard from "../features/dashboard/Dashboard";
+import IndentPage from "../features/indent/IndentPage";
+import TransporterDetailsPage from "../features/transporter/TransporterDetailsPage";
+import CreateTransporterPage from "../features/transporter/CreateTransporterPage";
 
 // Protected Route component
-import ProtectedRoute from './ProtectedRoute';
+import ProtectedRoute from "./ProtectedRoute";
 
 const AppRoutes = () => {
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -18,83 +20,74 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route 
-        path="/login" 
-        element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" replace />} 
-      />
-      
-      {/* Landing Page */}
-      <Route 
-        path="/" 
-        element={<TMSLandingPage />} 
+      <Route
+        path="/login"
+        element={
+          !isAuthenticated ? (
+            <LoginPage />
+          ) : (
+            <Navigate to="/dashboard" replace />
+          )
+        }
       />
 
+      {/* Landing Page */}
+      <Route path="/" element={<TMSLandingPage />} />
+
       {/* Protected Routes */}
-      <Route 
-        path="/dashboard" 
+      <Route
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* Transporter Management Routes */}
-      <Route 
-        path="/transporters" 
+      <Route
+        path="/transporters"
         element={
           <ProtectedRoute>
             <TransporterMaintenance />
           </ProtectedRoute>
-        } 
+        }
       />
-      
-      <Route 
-        path="/transporter/create" 
+
+      <Route
+        path="/transporter/create"
         element={
           <ProtectedRoute>
-            <div className="min-h-screen bg-primary-background p-4">
-              <div className="max-w-4xl mx-auto">
-                <h1 className="text-2xl font-bold text-text-primary mb-6">Create New Transporter</h1>
-                <div className="bg-card-background rounded-lg shadow-sm border border-gray-200 p-6">
-                  <p className="text-text-secondary">Create transporter form coming soon...</p>
-                </div>
-              </div>
-            </div>
+            <CreateTransporterPage />
           </ProtectedRoute>
-        } 
+        }
       />
-      
-      <Route 
-        path="/transporter/:id" 
+
+      <Route
+        path="/transporter/:id"
         element={
           <ProtectedRoute>
-            <div className="min-h-screen bg-primary-background p-4">
-              <div className="max-w-4xl mx-auto">
-                <h1 className="text-2xl font-bold text-text-primary mb-6">Transporter Details</h1>
-                <div className="bg-card-background rounded-lg shadow-sm border border-gray-200 p-6">
-                  <p className="text-text-secondary">Transporter details view coming soon...</p>
-                </div>
-              </div>
-            </div>
+            <TransporterDetailsPage />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* Other Features */}
-      <Route 
-        path="/indent" 
+      <Route
+        path="/indent"
         element={
           <ProtectedRoute>
             <IndentPage />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* Catch all route - redirect to dashboard if authenticated, otherwise to login */}
-      <Route 
-        path="*" 
-        element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} 
+      <Route
+        path="*"
+        element={
+          <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
+        }
       />
     </Routes>
   );

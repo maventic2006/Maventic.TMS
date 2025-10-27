@@ -5,24 +5,25 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../select";
+} from "../Select";
 
-const ThemedSelect = ({ 
-  value, 
-  onValueChange, 
-  options = [], 
-  placeholder, 
+const ThemedSelect = ({
+  value,
+  onValueChange,
+  options = [],
+  placeholder,
   disabled = false,
   error = false,
-  className = "" 
+  className = "",
 }) => {
-  const baseClasses = "w-full px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent transition-colors";
+  const baseClasses =
+    "w-full px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent transition-colors";
   const errorClasses = error ? "border-red-500" : "border-gray-300";
   const disabledClasses = disabled ? "bg-gray-100 cursor-not-allowed" : "";
 
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger 
+      <SelectTrigger
         className={`${baseClasses} ${errorClasses} ${disabledClasses} ${className}`}
       >
         <SelectValue placeholder={placeholder} />

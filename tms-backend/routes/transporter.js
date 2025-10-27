@@ -5,6 +5,8 @@ const {
   getMasterData,
   getStatesByCountry,
   getCitiesByCountryAndState,
+  getTransporters,
+  getTransporterById,
 } = require("../controllers/transporterController");
 const { authenticateToken } = require("../middleware/auth");
 
@@ -28,6 +30,8 @@ const checkProductOwnerAccess = (req, res, next) => {
 };
 
 // Routes
+router.get("/", authenticateToken, getTransporters);
+router.get("/:id", authenticateToken, getTransporterById);
 router.post("/", authenticateToken, checkProductOwnerAccess, createTransporter);
 router.get("/master-data", authenticateToken, getMasterData);
 router.get("/states/:countryCode", authenticateToken, getStatesByCountry);

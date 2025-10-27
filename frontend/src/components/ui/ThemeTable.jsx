@@ -1,13 +1,7 @@
 ﻿import React, { useRef } from "react";
 import { Plus, X, Upload, FileText, Image } from "lucide-react";
 import { useSelector } from "react-redux";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./Select";
+import { CustomSelect } from "./Select";
 import ThemedCheckbox from "./themed/ThemedCheckbox";
 import ThemedSwitch from "./themed/ThemedSwitch";
 
@@ -168,28 +162,19 @@ const ThemeTable = ({
     // Select dropdown
     if (column.type === "select") {
       return (
-        <Select
+        <CustomSelect
           value={value}
           onValueChange={(newValue) =>
             handleCellChange(rowIndex, column.key, newValue)
           }
+          options={column.options || []}
+          placeholder={column.placeholder || `Select ${column.label}`}
           disabled={column.disabled}
-        >
-          <SelectTrigger
-            className={`min-w-[200px] ${hasError ? "border-red-500" : ""}`}
-          >
-            <SelectValue
-              placeholder={column.placeholder || `Select ${column.label}`}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {(column.options || []).map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          getOptionLabel={(option) => option.label}
+          getOptionValue={(option) => option.value}
+          className={`min-w-[200px] ${hasError ? "border-red-500" : ""}`}
+          error={hasError}
+        />
       );
     }
 
