@@ -21,6 +21,7 @@ const authRoutes = require("./routes/auth");
 const vehicleRoutes = require("./routes/vehicles");
 const userRoutes = require("./routes/users");
 const materialRoutes = require("./routes/materials");
+const transporterRoutes = require("./routes/transporter");
 
 // Routes
 app.use("/api/warehouses", warehouseRoutes);
@@ -28,6 +29,7 @@ app.use("/api/consignors", consignorRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/materials", materialRoutes);
+app.use("/api/transporters", transporterRoutes);
 app.use("/api/auth", authRoutes);
 
 // Health check endpoint
@@ -46,6 +48,18 @@ app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-app.listen(PORT, () => {
+// Initialize sample data
+const { createSampleData, createComprehensiveSampleData } = require('./controllers/transporterController');
+
+app.listen(PORT, async () => {
   console.log(`🚀 TMS Backend server running on port ${PORT}`);
+  
+  // Create sample transporter data if not exists
+  try {
+    await createSampleData();
+    // Create comprehensive sample data for all related tables
+    await createComprehensiveSampleData();
+  } catch (error) {
+    console.error('Error initializing sample data:', error);
+  }
 });

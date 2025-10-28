@@ -16,6 +16,7 @@ import Dashboard from "./features/dashboard/Dashboard";
 import IndentPage from "./features/indent/IndentPage";
 import TMSLandingPage from "./pages/TMSLandingPage";
 import TransporterMaintenance from "./pages/TransporterMaintenance";
+import TransporterDetails from "./pages/TransporterDetails";
 import { verifyToken } from "./redux/slices/authSlice";
 import { USER_ROLES } from "./utils/constants";
 import "./index.css";
@@ -296,14 +297,7 @@ function App() {
                         USER_ROLES.TRANSPORTER,
                       ]}
                     >
-                      <div className="min-h-screen bg-primary-background p-4">
-                        <div className="max-w-4xl mx-auto">
-                          <h1 className="text-2xl font-bold text-text-primary mb-6">Transporter Details</h1>
-                          <div className="bg-card-background rounded-lg shadow-sm border border-gray-200 p-6">
-                            <p className="text-text-secondary">Transporter details view coming soon...</p>
-                          </div>
-                        </div>
-                      </div>
+                      <TransporterDetails />
                     </PrivateRoute>
                   }
                 />
