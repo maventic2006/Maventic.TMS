@@ -816,7 +816,7 @@ const getTransporters = async (req, res) => {
         "addr.city",
         "addr.district",
         knex.raw(
-          "CONCAT(addr.address_line1, ', ', addr.city, ', ', addr.state, ', ', addr.country) as address"
+          "CONCAT(addr.street_1, ', ', addr.city, ', ', addr.state, ', ', addr.country) as address"
         )
       );
 
@@ -876,9 +876,79 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    // Get total count for pagination
-    const totalQuery = query.clone();
-    const totalResult = await totalQuery.count("* as count").first();
+    // Get total count for pagination - create a fresh query without SELECT fields
+    let countQuery = knex("transporter_general_info as tgi").leftJoin(
+      "tms_address as addr",
+      "tgi.address_id",
+      "addr.address_id"
+    );
+
+    // Apply the same filters to count query
+    if (search) {
+      countQuery = countQuery.where(function () {
+        this.where("tgi.business_name", "like", `%${search}%`)
+          .orWhere("tgi.transporter_id", "like", `%${search}%`)
+          .orWhere("addr.city", "like", `%${search}%`)
+          .orWhere("addr.state", "like", `%${search}%`);
+      });
+    }
+
+    if (transporterId) {
+      countQuery = countQuery.where(
+        "tgi.transporter_id",
+        "like",
+        `%${transporterId}%`
+      );
+    }
+
+    if (businessName) {
+      countQuery = countQuery.where(
+        "tgi.business_name",
+        "like",
+        `%${businessName}%`
+      );
+    }
+
+    if (status) {
+      countQuery = countQuery.where("tgi.status", "like", `%${status}%`);
+    }
+
+    if (state) {
+      countQuery = countQuery.where("addr.state", "like", `%${state}%`);
+    }
+
+    if (city) {
+      countQuery = countQuery.where("addr.city", "like", `%${city}%`);
+    }
+
+    if (transportMode) {
+      const modes = transportMode.split(",");
+      countQuery = countQuery.where(function () {
+        modes.forEach((mode) => {
+          const upperMode = mode.trim().toUpperCase();
+          switch (upperMode) {
+            case "R":
+            case "ROAD":
+              this.orWhere("tgi.trans_mode_road", true);
+              break;
+            case "RL":
+            case "RAIL":
+              this.orWhere("tgi.trans_mode_rail", true);
+              break;
+            case "A":
+            case "AIR":
+              this.orWhere("tgi.trans_mode_air", true);
+              break;
+            case "S":
+            case "SEA":
+              this.orWhere("tgi.trans_mode_sea", true);
+              break;
+          }
+        });
+      });
+    }
+
+    const totalResult = await countQuery.count("* as count").first();
     const total = parseInt(totalResult.count);
 
     // Apply pagination
@@ -954,14 +1024,14 @@ const getTransporterById = async (req, res) => {
       .leftJoin("tms_address as addr", "tgi.address_id", "addr.address_id")
       .select(
         "tgi.*",
-        "addr.address_line1 as street1",
-        "addr.address_line2 as street2",
+        "addr.street_1 as street1",
+        "addr.street_2 as street2",
         "addr.city",
         "addr.state",
         "addr.country",
         "addr.district",
         "addr.postal_code",
-        "addr.vat_gst_number as vatNumber"
+        "addr.vat_number as vatNumber"
       )
       .where("tgi.transporter_id", id)
       .first();
@@ -990,7 +1060,7 @@ const getTransporterById = async (req, res) => {
         "itm.service_area_hdr_id"
       )
       .where("hdr.transporter_id", id)
-      .select("hdr.country", "itm.state");
+      .select("hdr.service_country as country", "itm.service_state as state");
 
     // Group serviceable areas by country
     const groupedServiceableAreas = serviceableAreas.reduce((acc, area) => {
@@ -1009,21 +1079,10 @@ const getTransporterById = async (req, res) => {
     }, []);
 
     // Get documents
-    const documents = await knex("transporter_documents as td")
-      .leftJoin("document_upload as du", "td.document_id", "du.document_id")
-      .where("td.transporter_id", id)
-      .select(
-        "td.document_type",
-        "td.document_number",
-        "td.reference_number",
-        "td.country",
-        "td.valid_from",
-        "td.valid_to",
-        "td.status",
-        "du.file_name",
-        "du.file_type",
-        "du.file_data"
-      );
+    // Note: transporter_documents table doesn't have transporter_id column in current schema
+    // Documents are linked via document_id which is created during transporter creation
+    // For now, return empty array until proper document linking is implemented
+    const documents = [];
 
     // Transform transport modes
     const transportModes = {

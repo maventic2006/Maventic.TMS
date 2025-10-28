@@ -61,13 +61,13 @@ const login = async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    // Set JWT token in HTTP-only cookie
+    // Set JWT token in HTTP-only cookie (expires when browser closes)
     const isProduction = process.env.NODE_ENV === "production";
     res.cookie("authToken", token, {
       httpOnly: true,
       secure: isProduction, // Use secure cookies in production
       sameSite: "strict",
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      // No maxAge - cookie expires when browser closes (session cookie)
     });
 
     // Return user data (excluding password)

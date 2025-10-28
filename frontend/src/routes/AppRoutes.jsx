@@ -34,11 +34,11 @@ const AppRoutes = () => {
       {/* Landing Page */}
       <Route path="/" element={<TMSLandingPage />} />
 
-      {/* Protected Routes */}
+      {/* Protected Routes - All require product_owner role */}
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={["product_owner"]}>
             <Dashboard />
           </ProtectedRoute>
         }
@@ -48,7 +48,7 @@ const AppRoutes = () => {
       <Route
         path="/transporters"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={["product_owner"]}>
             <TransporterMaintenance />
           </ProtectedRoute>
         }
@@ -57,7 +57,7 @@ const AppRoutes = () => {
       <Route
         path="/transporter/create"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={["product_owner"]}>
             <CreateTransporterPage />
           </ProtectedRoute>
         }
@@ -66,7 +66,7 @@ const AppRoutes = () => {
       <Route
         path="/transporter/:id"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={["product_owner"]}>
             <TransporterDetailsPage />
           </ProtectedRoute>
         }
@@ -76,7 +76,7 @@ const AppRoutes = () => {
       <Route
         path="/indent"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={["product_owner"]}>
             <IndentPage />
           </ProtectedRoute>
         }

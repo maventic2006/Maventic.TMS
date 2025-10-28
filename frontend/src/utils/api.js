@@ -75,16 +75,13 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      // TEMPORARILY DISABLED: Comment out login redirect for development
       // Don't log 401 errors for auth verification - they're expected
       if (!originalRequest.url?.includes("/auth/verify")) {
-        console.log(
-          "🔒 Authentication required (REDIRECT DISABLED FOR DEVELOPMENT)"
-        );
-        // For cookie-based auth, only redirect to login if not already there
-        // if (!window.location.pathname.includes("/login")) {
-        //   window.location.href = "/login";
-        // }
+        console.log("🔒 Authentication required - redirecting to login");
+        // For cookie-based auth, redirect to login if not already there
+        if (!window.location.pathname.includes("/login")) {
+          window.location.href = "/login";
+        }
       }
       return Promise.reject(error);
     }

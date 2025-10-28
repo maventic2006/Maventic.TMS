@@ -47,8 +47,14 @@ const GeneralDetailsViewTab = ({ formData, transporterData }) => {
   );
 
   const renderStarRating = (rating) => {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
+    // Convert rating to number and ensure it's valid
+    const numericRating =
+      typeof rating === "number" ? rating : parseFloat(rating) || 0;
+    // Clamp rating between 0 and 5
+    const clampedRating = Math.max(0, Math.min(5, numericRating));
+
+    const fullStars = Math.floor(clampedRating);
+    const hasHalfStar = clampedRating % 1 !== 0;
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
 
     return (
@@ -74,7 +80,7 @@ const GeneralDetailsViewTab = ({ formData, transporterData }) => {
           <Star key={`empty-${i}`} className="w-5 h-5 text-gray-300" />
         ))}
         <span className="ml-2 text-sm font-medium text-gray-700">
-          {rating.toFixed(1)} / 5.0
+          {clampedRating.toFixed(1)} / 5.0
         </span>
       </div>
     );

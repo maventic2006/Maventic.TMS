@@ -179,7 +179,7 @@ const initialState = {
   user: null,
   isAuthenticated: false,
   isPasswordReset: false,
-  isLoading: false, // Changed to false to prevent stuck loading when server is down
+  isLoading: false, // Start as false - AuthInitializer will handle verification with timeouts
   error: null,
   permissions: [],
   role: null,

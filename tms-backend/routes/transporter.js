@@ -21,7 +21,7 @@ const checkProductOwnerAccess = (req, res, next) => {
       success: false,
       error: {
         code: "ACCESS_DENIED",
-        message: "Only product owners can create transporters",
+        message: "Only product owners can access this resource",
       },
     });
   }
@@ -29,15 +29,31 @@ const checkProductOwnerAccess = (req, res, next) => {
   next();
 };
 
-// Routes
-router.get("/", authenticateToken, getTransporters);
-router.get("/:id", authenticateToken, getTransporterById);
+// Routes - All routes require product owner access
+router.get("/", authenticateToken, checkProductOwnerAccess, getTransporters);
+router.get(
+  "/:id",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getTransporterById
+);
 router.post("/", authenticateToken, checkProductOwnerAccess, createTransporter);
-router.get("/master-data", authenticateToken, getMasterData);
-router.get("/states/:countryCode", authenticateToken, getStatesByCountry);
+router.get(
+  "/master-data",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getMasterData
+);
+router.get(
+  "/states/:countryCode",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getStatesByCountry
+);
 router.get(
   "/cities/:countryCode/:stateCode",
   authenticateToken,
+  checkProductOwnerAccess,
   getCitiesByCountryAndState
 );
 

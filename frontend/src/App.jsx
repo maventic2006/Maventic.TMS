@@ -75,10 +75,9 @@ const AuthInitializer = ({ children }) => {
         });
 
         Promise.race([dispatch(verifyToken()), timeoutPromise])
-          .finally(() => {
-            console.log(
-              "✅ Authentication verification complete (or timed out)"
-            );
+          .then(() => {
+            console.log("✅ Token verification successful");
+            dispatch(setAuthInitialized()); // Set loading to false
             clearTimeout(backupTimer);
             setHasInitialized(true);
           })
@@ -278,19 +277,11 @@ function App() {
                   }
                 />
 
-                {/* Protected Routes - Require full authentication and password reset */}
+                {/* Protected Routes - All require product_owner role */}
                 <Route
                   path="/tms-portal"
                   element={
-                    <PrivateRoute
-                      roles={[
-                        USER_ROLES.ADMIN,
-                        USER_ROLES.CONSIGNOR,
-                        USER_ROLES.TRANSPORTER,
-                        USER_ROLES.DRIVER,
-                        USER_ROLES.PRODUCT_OWNER,
-                      ]}
-                    >
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                       <TMSLandingPage />
                     </PrivateRoute>
                   }
@@ -300,14 +291,7 @@ function App() {
                 <Route
                   path="/landing"
                   element={
-                    <PrivateRoute
-                      roles={[
-                        USER_ROLES.ADMIN,
-                        USER_ROLES.CONSIGNOR,
-                        USER_ROLES.TRANSPORTER,
-                        USER_ROLES.DRIVER,
-                      ]}
-                    >
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                       <TMSLandingPage />
                     </PrivateRoute>
                   }
@@ -316,15 +300,7 @@ function App() {
                 <Route
                   path="/dashboard"
                   element={
-                    <PrivateRoute
-                      roles={[
-                        USER_ROLES.ADMIN,
-                        USER_ROLES.CONSIGNOR,
-                        USER_ROLES.TRANSPORTER,
-                        USER_ROLES.DRIVER,
-                        USER_ROLES.PRODUCT_OWNER,
-                      ]}
-                    >
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                       <Layout>
                         <MainContent />
                       </Layout>
@@ -336,14 +312,7 @@ function App() {
                 <Route
                   path="/transporters"
                   element={
-                    <PrivateRoute
-                      roles={[
-                        USER_ROLES.ADMIN,
-                        USER_ROLES.CONSIGNOR,
-                        USER_ROLES.TRANSPORTER,
-                        USER_ROLES.PRODUCT_OWNER,
-                      ]}
-                    >
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                       <TransporterMaintenance />
                     </PrivateRoute>
                   }
@@ -352,14 +321,7 @@ function App() {
                 <Route
                   path="/transporter/create"
                   element={
-                    <PrivateRoute
-                      roles={[
-                        USER_ROLES.ADMIN,
-                        USER_ROLES.CONSIGNOR,
-                        USER_ROLES.TRANSPORTER,
-                        USER_ROLES.PRODUCT_OWNER,
-                      ]}
-                    >
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                       <CreateTransporterPage />
                     </PrivateRoute>
                   }
@@ -368,13 +330,7 @@ function App() {
                 <Route
                   path="/transporter/:id"
                   element={
-                    <PrivateRoute
-                      roles={[
-                        USER_ROLES.ADMIN,
-                        USER_ROLES.CONSIGNOR,
-                        USER_ROLES.TRANSPORTER,
-                      ]}
-                    >
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                       <TransporterDetailsPage />
                     </PrivateRoute>
                   }
