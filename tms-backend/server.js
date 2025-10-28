@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
 const app = express();
@@ -9,7 +10,13 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173", // Frontend URL
+    credentials: true, // Allow cookies to be sent
+  })
+);
+app.use(cookieParser());
 app.use(morgan("combined"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -31,6 +38,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/materials", materialRoutes);
 app.use("/api/transporters", transporterRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/transporter", transporterRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

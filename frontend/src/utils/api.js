@@ -4,40 +4,53 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 // Debug logging (can be removed in production)
-if (import.meta.env.NODE_ENV === 'development') {
+if (import.meta.env.NODE_ENV === "development") {
   console.log("🔧 API Configuration:", {
     VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
     API_BASE_URL: API_BASE_URL,
-    NODE_ENV: import.meta.env.NODE_ENV
+    NODE_ENV: import.meta.env.NODE_ENV,
   });
 }
+
+/**
+ * IMPORTANT: API Endpoint Usage Guidelines
+ *
+ * The base URL is already set to "http://localhost:5000/api"
+ *
+ * ✅ CORRECT usage:
+ * - api.get("/transporter")           → http://localhost:5000/api/transporter
+ * - api.get("/auth/login")           → http://localhost:5000/api/auth/login
+ * - api.post("/users")               → http://localhost:5000/api/users
+ *
+ * ❌ INCORRECT usage (will cause 404 errors):
+ * - api.get("/api/transporter")      → http://localhost:5000/api/api/transporter
+ * - api.get("/api/auth/login")       → http://localhost:5000/api/api/auth/login
+ *
+ * Always use relative paths without the "/api" prefix!
+ */
 
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: true, // Include cookies in requests
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Request interceptor to attach auth token
+// Request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
     // Debug logging
     console.log("🚀 Making API Request:", {
       url: config.url,
       baseURL: config.baseURL,
       fullURL: `${config.baseURL}${config.url}`,
       method: config.method,
-      data: config.data
+      data: config.data,
     });
-    
+
     return config;
   },
   (error) => {
@@ -52,7 +65,7 @@ api.interceptors.response.use(
     console.log("✅ API Response:", {
       url: response.config.url,
       status: response.status,
-      data: response.data
+      data: response.data,
     });
     return response;
   },
@@ -62,19 +75,18 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      try {
-        // For now, redirect to login since refresh endpoint is not implemented
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
-        return Promise.reject(error);
-      } catch (refreshError) {
-        // Refresh failed, redirect to login
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
-        return Promise.reject(refreshError);
+      // TEMPORARILY DISABLED: Comment out login redirect for development
+      // Don't log 401 errors for auth verification - they're expected
+      if (!originalRequest.url?.includes("/auth/verify")) {
+        console.log(
+          "🔒 Authentication required (REDIRECT DISABLED FOR DEVELOPMENT)"
+        );
+        // For cookie-based auth, only redirect to login if not already there
+        // if (!window.location.pathname.includes("/login")) {
+        //   window.location.href = "/login";
+        // }
       }
+      return Promise.reject(error);
     }
 
     // Handle different error types
@@ -95,8 +107,8 @@ api.interceptors.response.use(
         config: {
           url: error.config?.url,
           baseURL: error.config?.baseURL,
-          method: error.config?.method
-        }
+          method: error.config?.method,
+        },
       });
     }
 
@@ -105,10 +117,30 @@ api.interceptors.response.use(
 );
 
 // Test connectivity on module load
-if (typeof window !== 'undefined') {
-  api.get('/health')
-    .then(() => console.log('✅ Backend connectivity test: SUCCESS'))
-    .catch(err => console.error('❌ Backend connectivity test: FAILED', err.message));
+if (typeof window !== "undefined") {
+  api
+    .get("/health")
+    .then(() => {
+      console.log("✅ Backend connectivity test: SUCCESS");
+
+      // Add a global test function for debugging
+      window.debugLogin = async (
+        credentials = { user_id: "POWNER001", password: "Powner@123" }
+      ) => {
+        try {
+          console.log("🧪 Debug login test started:", credentials);
+          const response = await api.post("/auth/login", credentials);
+          console.log("✅ Debug login success:", response.data);
+          return response.data;
+        } catch (error) {
+          console.error("❌ Debug login failed:", error);
+          return { error: error.message };
+        }
+      };
+    })
+    .catch((err) =>
+      console.error("❌ Backend connectivity test: FAILED", err.message)
+    );
 }
 
 // Transporter API functions

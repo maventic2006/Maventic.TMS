@@ -72,13 +72,21 @@ const login = async (req, res) => {
       { expiresIn: "24h" }
     );
 
+    // Set JWT token in HTTP-only cookie
+    const isProduction = process.env.NODE_ENV === "production";
+    res.cookie("authToken", token, {
+      httpOnly: true,
+      secure: isProduction, // Use secure cookies in production
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    });
+
     // Return user data (excluding password)
     const { password: _, ...userWithoutPassword } = user;
 
     res.json({
       success: true,
       message: "Login successful",
-      token,
       user: userWithoutPassword,
       requirePasswordReset:
         user.password_type === "initial" || !user.password_type,
@@ -148,8 +156,8 @@ const resetPassword = async (req, res) => {
       user_id: user.user_id,
       user_type_id: user.user_type_id,
       user_full_name: user.user_full_name,
-      email_id: user.email_id || '',
-      mobile_number: user.mobile_number || '',
+      email_id: user.email_id || "",
+      mobile_number: user.mobile_number || "",
       alternet_mobile: user.alternet_mobile || null,
       whats_app_number: user.whats_app_number || null,
       from_date: user.from_date || new Date(),
@@ -207,6 +215,28 @@ const verifyToken = async (req, res) => {
     });
   } catch (error) {
     console.error("Token verification error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+/**
+ * Get User Types from Database
+ */
+const getUserTypes = async (req, res) => {
+  try {
+    const userTypes = await knex("user_type_master")
+      .select("user_type_id", "user_type_name", "user_type_description")
+      .where({ status: "ACTIVE" });
+
+    res.json({
+      success: true,
+      userTypes: userTypes,
+    });
+  } catch (error) {
+    console.error("Get user types error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -275,8 +305,13 @@ const getUserApplications = async (req, res) => {
  * Logout Controller
  */
 const logout = (req, res) => {
-  // In a production app, you might want to blacklist the token
-  // For now, we'll just send a success response
+  // Clear the auth token cookie
+  res.clearCookie("authToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
   res.json({
     success: true,
     message: "Logged out successfully",
@@ -287,6 +322,7 @@ module.exports = {
   login,
   resetPassword,
   verifyToken,
+  getUserTypes,
   getUserApplications,
   logout,
 };

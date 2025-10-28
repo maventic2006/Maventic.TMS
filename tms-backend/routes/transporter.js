@@ -1,58 +1,44 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { authenticateToken, authorizeRoles, validateTransporterAccess } = require('../middleware/auth');
-const { getTransporters, getTransporterById, createComprehensiveSampleData } = require('../controllers/transporterController');
+const {
+  createTransporter,
+  getMasterData,
+  getStatesByCountry,
+  getCitiesByCountryAndState,
+  getTransporters,
+  getTransporterById,
+} = require("../controllers/transporterController");
+const { authenticateToken } = require("../middleware/auth");
 
-/**
- * @route   GET /api/transporters
- * @desc    Get all transporters with filtering, searching and pagination
- * @access  Protected - Admin, Manager, User
- * @query   page, limit, search, transporterId, status, transportMode, sortBy, sortOrder
- */
-router.get('/', 
-  authenticateToken, 
-  authorizeRoles(['admin', 'manager', 'user']),
-  getTransporters
-);
+// Middleware to check if user is product owner (admin/owner role)
+const checkProductOwnerAccess = (req, res, next) => {
+  // Get user type from token
+  const userType = req.user?.user_type_id;
 
-/**
- * @route   GET /api/transporters/:id
- * @desc    Get single transporter by ID
- * @access  Protected - Admin, Manager, User
- * @param   id - Transporter ID
- */
-router.get('/:id', 
-  authenticateToken, 
-  authorizeRoles(['admin', 'manager', 'user']),
-  validateTransporterAccess,
-  getTransporterById
-);
-
-/**
- * @route   POST /api/transporters/create-sample-data
- * @desc    Create comprehensive sample data for all transporter related tables
- * @access  Protected - Admin only
- */
-router.post('/create-sample-data', 
-  authenticateToken, 
-  authorizeRoles(['admin']),
-  async (req, res) => {
-    try {
-      await createComprehensiveSampleData();
-      res.json({
-        success: true,
-        message: 'Comprehensive sample data created successfully',
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error creating sample data:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create sample data',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
+  // UT001 is Owner (product owner as per requirements)
+  if (userType !== "UT001") {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: "ACCESS_DENIED",
+        message: "Only product owners can create transporters",
+      },
+    });
   }
+
+  next();
+};
+
+// Routes
+router.get("/", authenticateToken, getTransporters);
+router.get("/:id", authenticateToken, getTransporterById);
+router.post("/", authenticateToken, checkProductOwnerAccess, createTransporter);
+router.get("/master-data", authenticateToken, getMasterData);
+router.get("/states/:countryCode", authenticateToken, getStatesByCountry);
+router.get(
+  "/cities/:countryCode/:stateCode",
+  authenticateToken,
+  getCitiesByCountryAndState
 );
 
 module.exports = router;

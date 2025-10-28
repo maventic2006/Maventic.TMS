@@ -1,23 +1,75 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api";
-import { mapUserTypeToRole } from "../../utils/constants";
 
 // Async thunks
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (credentials, { rejectWithValue }) => {
     try {
-      const response = await api.post("/auth/login", credentials);
-      
-      if (response.data.success) {
-        const { token, user, requirePasswordReset } = response.data;
-        localStorage.setItem("token", token);
-        return { token, user, requirePasswordReset };
+      console.log("📡 Starting login attempt:", {
+        user_id: credentials.user_id,
+      });
+      console.log("🌐 API Base URL:", import.meta.env.VITE_API_BASE_URL);
+
+      const loginUrl = `${
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"
+      }/auth/login`;
+      console.log("🔗 Login URL:", loginUrl);
+
+      // Try using fetch directly to bypass axios issues with timeout
+      console.log("🚀 Making fetch request...");
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(loginUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Include cookies
+        body: JSON.stringify(credentials),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log("📨 Fetch response received:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
+      const data = await response.json();
+      console.log("📦 Response data:", data);
+
+      if (response.ok && data.success) {
+        const { user, requirePasswordReset } = data;
+        console.log("✅ Login successful for user:", user?.user_id);
+        return { user, requirePasswordReset };
       } else {
-        return rejectWithValue(response.data.message || "Login failed");
+        console.log("❌ Login failed:", data.message || "Unknown error");
+        return rejectWithValue(data.message || "Login failed");
       }
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Login failed");
+      console.error("🔥 Login error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+
+      if (error.name === "AbortError") {
+        return rejectWithValue("Login request timed out. Please try again.");
+      } else if (
+        error.name === "TypeError" &&
+        error.message.includes("fetch")
+      ) {
+        return rejectWithValue(
+          "Unable to connect to server. Please check if the backend is running."
+        );
+      }
+
+      return rejectWithValue(error.message || "Login failed");
     }
   }
 );
@@ -26,9 +78,7 @@ export const refreshToken = createAsyncThunk(
   "auth/refreshToken",
   async (_, { rejectWithValue }) => {
     // Refresh token endpoint not implemented yet
-    // For now, just reject and redirect to login
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
+    // For cookie-based auth, just reject and redirect to login
     return rejectWithValue("Token refresh not implemented");
   }
 );
@@ -38,15 +88,14 @@ export const logoutUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await api.post("/auth/logout");
-      localStorage.removeItem("token");
-      
+      // Cookie will be cleared by the server
+
       if (response.data.success) {
         return {};
       } else {
         return rejectWithValue(response.data.message || "Logout failed");
       }
     } catch (error) {
-      localStorage.removeItem("token");
       return rejectWithValue(error.response?.data?.message || "Logout failed");
     }
   }
@@ -56,22 +105,33 @@ export const verifyToken = createAsyncThunk(
   "auth/verifyToken",
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        return rejectWithValue("No token found");
-      }
-      
       const response = await api.get("/auth/verify");
-      
+
       if (response.data.success) {
-        return { user: response.data.user, token };
+        const { user } = response.data;
+        console.log("✅ Token verification successful:", {
+          user: user?.user_id,
+        });
+        return { user };
       } else {
-        localStorage.removeItem("token");
-        return rejectWithValue(response.data.message || "Token verification failed");
+        console.log("❌ Token verification failed:", response.data.message);
+        return rejectWithValue(
+          response.data.message || "Token verification failed"
+        );
       }
     } catch (error) {
-      localStorage.removeItem("token");
-      return rejectWithValue(error.response?.data?.message || "Token verification failed");
+      // Handle different error cases
+      if (error.response?.status === 401) {
+        console.log("🔒 No valid authentication token found");
+      } else if (error.response?.status === 403) {
+        console.log("🚫 Authentication token expired or invalid");
+      } else {
+        console.error("❌ Token verification error:", error);
+      }
+
+      return rejectWithValue(
+        error.response?.data?.message || "Token verification failed"
+      );
     }
   }
 );
@@ -84,11 +144,13 @@ export const resetPassword = createAsyncThunk(
         user_id: userId,
         newPassword: newPassword,
       });
-      
+
       if (response.data.success) {
         return response.data;
       } else {
-        return rejectWithValue(response.data.message || "Password reset failed");
+        return rejectWithValue(
+          response.data.message || "Password reset failed"
+        );
       }
     } catch (error) {
       return rejectWithValue(
@@ -98,12 +160,26 @@ export const resetPassword = createAsyncThunk(
   }
 );
 
+// Simple synchronous role mapping
+const mapUserTypeToRole = (userTypeId) => {
+  const roleMapping = {
+    UT001: "product_owner",
+    UT002: "transporter",
+    UT003: "transporter",
+    UT004: "transporter",
+    UT005: "transporter",
+    UT006: "consignor",
+    UT007: "driver",
+    UT008: "consignor",
+  };
+  return roleMapping[userTypeId] || "user";
+};
+
 const initialState = {
   user: null,
-  token: localStorage.getItem("token"),
-  isAuthenticated: false, // Will be set to true after token verification
-  isPasswordReset: false, // Flag to track if user has reset their password
-  isLoading: !!localStorage.getItem("token"), // Set loading if token exists to prevent premature routing
+  isAuthenticated: false,
+  isPasswordReset: false,
+  isLoading: false, // Changed to false to prevent stuck loading when server is down
   error: null,
   permissions: [],
   role: null,
@@ -117,20 +193,21 @@ const authSlice = createSlice({
       state.error = null;
     },
     setCredentials: (state, action) => {
-      const { token, user } = action.payload;
-      state.token = token;
+      const { user } = action.payload;
       state.user = user;
       state.isAuthenticated = true;
-      state.role = mapUserTypeToRole(user?.user_type_id);
+      // Role should be set separately via mapUserRole thunk
       state.permissions = user?.permissions || [];
     },
     clearCredentials: (state) => {
       state.user = null;
-      state.token = null;
       state.isAuthenticated = false;
       state.isPasswordReset = false;
       state.role = null;
       state.permissions = [];
+    },
+    setAuthInitialized: (state) => {
+      state.isLoading = false;
     },
     setPasswordReset: (state, action) => {
       state.isPasswordReset = action.payload;
@@ -145,7 +222,6 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.token = action.payload.token;
         state.user = action.payload.user;
         state.isAuthenticated = true;
         state.role = mapUserTypeToRole(action.payload.user?.user_type_id);
@@ -157,11 +233,7 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
       })
       // Refresh Token
-      .addCase(refreshToken.fulfilled, (state, action) => {
-        state.token = action.payload.token;
-      })
       .addCase(refreshToken.rejected, (state) => {
-        state.token = null;
         state.user = null;
         state.isAuthenticated = false;
         state.role = null;
@@ -170,7 +242,6 @@ const authSlice = createSlice({
       // Logout
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
-        state.token = null;
         state.isAuthenticated = false;
         state.role = null;
         state.permissions = [];
@@ -182,7 +253,6 @@ const authSlice = createSlice({
       .addCase(verifyToken.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload.user;
-        state.token = action.payload.token;
         state.isAuthenticated = true;
         state.role = mapUserTypeToRole(action.payload.user?.user_type_id);
         state.permissions = action.payload.user?.permissions || [];
@@ -190,7 +260,6 @@ const authSlice = createSlice({
       .addCase(verifyToken.rejected, (state) => {
         state.isLoading = false;
         state.user = null;
-        state.token = null;
         state.isAuthenticated = false;
         state.role = null;
         state.permissions = [];
@@ -212,6 +281,11 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, clearCredentials, setPasswordReset } =
-  authSlice.actions;
+export const {
+  clearError,
+  setCredentials,
+  clearCredentials,
+  setPasswordReset,
+  setAuthInitialized,
+} = authSlice.actions;
 export default authSlice.reducer;

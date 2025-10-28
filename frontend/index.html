@@ -4,10 +4,51 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>TMS Portal</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Debug console for login testing -->
+    <script>
+      // Add a global debug function for testing login
+      window.testLogin = async () => {
+        try {
+          console.log('🧪 Testing login API...');
+          const response = await fetch('http://localhost:5000/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              user_id: 'POWNER001',
+              password: 'Powner@123'
+            })
+          });
+          
+          const data = await response.json();
+          console.log('✅ Login test result:', data);
+          
+          if (data.success) {
+            console.log('🍪 Testing auth verification...');
+            const verifyResponse = await fetch('http://localhost:5000/api/auth/verify', {
+              method: 'GET',
+              credentials: 'include'
+            });
+            const verifyData = await verifyResponse.json();
+            console.log('🔍 Verify result:', verifyData);
+          }
+        } catch (error) {
+          console.error('❌ Login test failed:', error);
+        }
+      };
+      
+      // Auto-run test after page loads
+      setTimeout(() => {
+        console.log('🏠 TMS Portal loaded. Run window.testLogin() to test authentication.');
+      }, 1000);
+    </script>
   </body>
 </html>

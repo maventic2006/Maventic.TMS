@@ -1,6 +1,6 @@
 import React from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { LogOut, User, Bell, Settings } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import { Button } from "../ui/Button";
 import { logoutUser } from "../../redux/slices/authSlice";
 import { APP_NAME } from "../../utils/constants";
@@ -36,24 +36,6 @@ const Navbar = () => {
 
         {/* User Section */}
         <div className="flex items-center space-x-4">
-          {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/10"
-          >
-            <Bell className="h-5 w-5" />
-          </Button>
-
-          {/* Settings */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/10"
-          >
-            <Settings className="h-5 w-5" />
-          </Button>
-
           {/* User Profile */}
           <div className="flex items-center space-x-3">
             <div className="flex flex-col text-right">
@@ -80,12 +62,12 @@ const Navbar = () => {
             {/* Logout Button */}
             <Button
               variant="ghost"
-              size="icon"
               onClick={handleLogout}
-              className="text-white hover:bg-white/10"
+              className="text-white hover:bg-white/10 px-4 py-2 text-sm font-medium"
               title="Logout"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-6 w-6 mr-2" />
+              Logout
             </Button>
           </div>
         </div>

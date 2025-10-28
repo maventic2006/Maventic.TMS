@@ -6,6 +6,7 @@ import rfqSlice from "./slices/rfqSlice";
 import contractSlice from "./slices/contractSlice";
 import trackingSlice from "./slices/trackingSlice";
 import dashboardSlice from "./slices/dashboardSlice";
+import transporterSlice from "./slices/transporterSlice";
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     contract: contractSlice,
     tracking: trackingSlice,
     dashboard: dashboardSlice,
+    transporter: transporterSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
