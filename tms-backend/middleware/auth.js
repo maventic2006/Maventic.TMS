@@ -29,6 +29,55 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+/**
+ * Middleware to authorize specific roles
+ */
+const authorizeRoles = (roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+    
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Insufficient permissions",
+      });
+    }
+
+    next();
+  };
+};
+
+/**
+ * Middleware to validate request parameters
+ */
+const validateTransporterAccess = (req, res, next) => {
+  const { id } = req.params; // Correct parameter name from route /:id
+  const userRole = req.user.role;
+  const userId = req.user.user_id; // Correct property from JWT token
+
+  // Admin, manager, and user roles can access all transporters
+  if (userRole === 'admin' || userRole === 'manager' || userRole === 'user' || userRole === 'consignor') {
+    return next();
+  }
+
+  // Transporter can only access their own data
+  if (userRole === 'transporter' && id === userId) {
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: "Access denied to this transporter data",
+  });
+};
+
 module.exports = {
   authenticateToken,
+  authorizeRoles,
+  validateTransporterAccess,
 };

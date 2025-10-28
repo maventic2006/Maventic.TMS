@@ -23,20 +23,20 @@ const StatusPill = ({ status }) => {
     switch (status) {
       case 'Active':
       case 'Approved':
-        return <CheckCircle className="h-4 w-4" />;
+        return <CheckCircle className="h-3 w-3" />;
       case 'Pending':
-        return <Clock className="h-4 w-4" />;
+        return <Clock className="h-3 w-3" />;
       case 'Inactive':
       case 'Rejected':
-        return <XCircle className="h-4 w-4" />;
+        return <XCircle className="h-3 w-3" />;
       default:
         return null;
     }
   };
 
   return (
-    <span className={`inline-flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-medium ${getStatusStyles(status)}`}>
-      {getStatusIcon(status)}
+    <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium shadow-sm ${getStatusStyles(status)}`}>
+      {React.cloneElement(getStatusIcon(status), { className: "h-3 w-3" })}
       <span>{status}</span>
     </span>
   );

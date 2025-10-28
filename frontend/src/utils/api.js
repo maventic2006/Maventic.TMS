@@ -140,4 +140,43 @@ if (typeof window !== "undefined") {
     );
 }
 
+// Transporter API functions
+export const transporterAPI = {
+  // Get all transporters with filtering and pagination
+  getTransporters: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    // Add parameters if they exist
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.search) queryParams.append('search', params.search);
+    if (params.transporterId) queryParams.append('transporterId', params.transporterId);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.transportMode) {
+      if (Array.isArray(params.transportMode)) {
+        queryParams.append('transportMode', params.transportMode.join(','));
+      } else {
+        queryParams.append('transportMode', params.transportMode);
+      }
+    }
+    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    
+    const queryString = queryParams.toString();
+    const url = `/transporters${queryString ? `?${queryString}` : ''}`;
+    
+    return api.get(url);
+  },
+  
+  // Get single transporter by ID
+  getTransporterById: (id) => {
+    return api.get(`/transporters/${id}`);
+  },
+
+  // Alias for getTransporterById (used in TransporterDetails component)
+  getTransporter: (id) => {
+    return api.get(`/transporters/${id}`);
+  }
+};
+
 export default api;

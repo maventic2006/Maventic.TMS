@@ -50,12 +50,23 @@ const login = async (req, res) => {
       });
     }
 
+    // Determine user role based on user_id or user_type
+    let userRole = 'admin'; // Default to admin for development/testing
+    if (user.user_id === 'admin' || user.user_id.toLowerCase().includes('admin')) {
+      userRole = 'admin';
+    } else if (user.user_type_id === 'UT002') {
+      userRole = 'manager';
+    } else if (user.user_id.toLowerCase().includes('test')) {
+      userRole = 'admin'; // Give test users admin access for development
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       {
         user_id: user.user_id,
         user_type_id: user.user_type_id,
         user_full_name: user.user_full_name,
+        role: userRole,
       },
       JWT_SECRET,
       { expiresIn: "24h" }

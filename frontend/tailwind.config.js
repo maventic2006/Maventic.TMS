@@ -55,7 +55,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'Poppins', 'system-ui', 'sans-serif'],
+        sans: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
+        'poppins': ['Poppins', 'sans-serif'],
       },
       fontSize: {
         'header': ['28px', { lineHeight: '1.2', fontWeight: '700' }],
