@@ -98,6 +98,134 @@ applyTo: "**"
 - Prioritize maintainable, scalable solutions over quick fixes
 - Consider performance implications in all architectural decisions
 
+### Country-State-City Selection
+
+- **Package Used**: `country-state-city` npm package (v3.2.1)
+- **Implementation**: Direct frontend usage without API calls
+- **Pattern**: Cascading dropdowns (Country → State → City)
+- **Data Structure**: Use `isoCode` for country/state, `name` for city
+- **Package Methods**:
+  - `Country.getAllCountries()` - Get all countries
+  - `State.getStatesOfCountry(countryCode)` - Get states for a country
+  - `City.getCitiesOfState(countryCode, stateCode)` - Get cities for a state
+- **Key Properties**:
+  - Countries: `isoCode`, `name`, `phonecode`, `currency`, etc.
+  - States: `isoCode`, `name`, `countryCode`, `latitude`, `longitude`
+  - Cities: `name`, `stateCode`, `countryCode`, `latitude`, `longitude`
+
+**Usage Pattern for Components**:
+
+```javascript
+// CORRECT: Import and use country-state-city package
+import { Country, State, City } from "country-state-city";
+
+const allCountries = Country.getAllCountries();
+const countryOptions = allCountries.map((country) => ({
+  value: country.isoCode,  // Use isoCode as value
+  label: country.name       // Use name as label
+}));
+
+// WRONG: Using mock data from Redux for countries
+const countryOptions = masterData?.countries.map(...)  // ❌ Don't use
+```
+
+**Components Using country-state-city**:
+
+- ✅ AddressContactsTab - Uses Country, State, City for address selection
+- ✅ ServiceableAreaTab - Uses Country, State for serviceable areas
+- ✅ DocumentsTab - Uses Country for document country selection
+- All future components needing country/state/city should use this package
+
+**When to Use Mock Data vs country-state-city**:
+
+- **Use country-state-city**: For any country, state, or city dropdown (Address, Documents, Serviceable Areas)
+- **Use Mock/API Data**: For business-specific master data (Document Types, Address Types, Vehicle Types, etc.)
+
+### Master Data Dropdown Format Standard
+
+**CRITICAL**: ALL dropdown options from master data MUST follow this format:
+
+```javascript
+{
+  value: "unique_identifier",  // Database ID or code (e.g., "AT001", "DN001", "US")
+  label: "Display Name"         // Human-readable name (e.g., "Billing Address", "PAN/TIN")
+}
+```
+
+**Implementation Rules**:
+
+1. **Backend API Responses**: Always return `{value, label}` format
+
+   ```javascript
+   // CORRECT: Backend query with aliases
+   .select('doc_name_master_id as value', 'document_name as label')
+
+   // WRONG: Inconsistent field names
+   .select('id', 'name')  // ❌ Don't use
+   ```
+
+2. **Redux Store Mock Data**: Match backend format exactly
+
+   ```javascript
+   // CORRECT: Mock data format
+   documentNames: [
+     { value: "DN001", label: "PAN/TIN" },
+     { value: "DN002", label: "Aadhar Card" },
+   ];
+
+   // WRONG: Using id/name format
+   documentNames: [
+     { id: 1, name: "PAN Card" }, // ❌ Don't use
+   ];
+   ```
+
+3. **CustomSelect Component Usage**: Always specify extractors
+
+   ```javascript
+   // CORRECT: Using value/label
+   <CustomSelect
+     options={masterData?.documentNames || []}
+     getOptionLabel={(option) => option.label}
+     getOptionValue={(option) => option.value}
+   />
+
+   // WRONG: Using id/name
+   <CustomSelect
+     getOptionLabel={(option) => option.name}  // ❌ Inconsistent
+     getOptionValue={(option) => option.id}    // ❌ Inconsistent
+   />
+   ```
+
+4. **ThemeTable Column Options**: Use value/label format
+   ```javascript
+   // CORRECT: Column configuration
+   columns: [
+     {
+       key: "documentType",
+       type: "select",
+       options: documentTypes, // Must be [{value, label}]
+     },
+   ];
+   ```
+
+**Affected Master Data Tables**:
+
+- `document_name_master` → `{value: doc_name_master_id, label: document_name}`
+- `address_type_master` → `{value: address_type_id, label: address_type_name}`
+- `vehicle_type_master` → `{value: vehicle_type_id, label: vehicle_type_name}`
+- `service_frequency_master` → `{value: frequency_id, label: frequency_name}`
+- All future master tables must follow this pattern
+
+**Prevention Checklist**:
+
+- [ ] Backend API returns `{value, label}` format with SQL aliases
+- [ ] Redux mock data uses `{value, label}` format
+- [ ] Redux rejected case fallback uses `{value, label}` format
+- [ ] CustomSelect uses `getOptionLabel={(option) => option.label`
+- [ ] CustomSelect uses `getOptionValue={(option) => option.value}`
+- [ ] ThemeTable columns receive options in `{value, label}` format
+- [ ] Never mix formats like `{id, name}` or `{code, description}`
+
 ---
 
 ## Common Issues and Solutions
@@ -121,6 +249,33 @@ applyTo: "**"
 - [ ] Both success and error paths call `setAuthInitialized()`
 - [ ] Initial Redux state has `isLoading: false`
 - [ ] No cookie check skips verification and immediately initializes
+
+### Dropdown Data Loading Issues
+
+**Issue**: Dropdowns not showing any options (empty dropdown list)  
+**Root Cause**: Mismatch between data format in Redux store and component expectations  
+**Solutions**:
+
+1. **Enforce Standard Format**: All master data dropdowns MUST use `{value, label}` format
+2. **Backend Consistency**: Use SQL aliases in queries: `.select('id_column as value', 'name_column as label')`
+3. **Redux Mock Data**: Match backend format exactly in mock data and fallback data
+4. **Component Usage**: Always specify `getOptionLabel={(option) => option.label}` and `getOptionValue={(option) => option.value}`
+5. **Validation**: Check network tab to verify API response format matches expectations
+
+**Common Scenarios**:
+
+- Document type dropdown empty → Check documentNames format in Redux
+- Address type dropdown empty → Check addressTypes format in Redux
+- Custom dropdown empty → Verify options array format and CustomSelect props
+
+**Prevention Checklist**:
+
+- [ ] Backend API uses SQL aliases for consistent naming (`as value`, `as label`)
+- [ ] Redux initial state mock data uses `{value, label}` format
+- [ ] Redux rejected case fallback uses `{value, label}` format
+- [ ] Component uses `getOptionLabel={(option) => option.label}`
+- [ ] Component uses `getOptionValue={(option) => option.value}`
+- [ ] Test dropdown with actual data from Redux DevTools
 
 ### Database Column Name Mismatches
 
@@ -208,3 +363,50 @@ applyTo: "**"
 - [ ] Implement value clamping for bounded numeric inputs (ratings, percentages)
 - [ ] Test with actual database data, not mock data
 - [ ] Handle null, undefined, and empty string cases explicitly
+
+### React.cloneElement Errors with Null Values
+
+**Issue**: `Error: The argument must be a React element, but you passed null`  
+**Root Cause**: Using `React.cloneElement()` on a value that can be `null` or `undefined`  
+**Solutions**:
+
+1. **Conditional Rendering**: Check if element exists before cloning:
+   ```javascript
+   const icon = getIcon();
+   return <div>{icon && React.cloneElement(icon, { className: "..." })}</div>;
+   ```
+2. **Direct Rendering**: If the element already has the needed props, render directly:
+   ```javascript
+   const icon = getIcon(); // Already includes className
+   return <div>{icon}</div>; // No need for cloneElement
+   ```
+3. **Null Checks in Helper Functions**: Ensure helper functions return valid React elements or null consistently:
+   ```javascript
+   const getIcon = (status) => {
+     switch (status) {
+       case "active":
+         return <CheckIcon />;
+       default:
+         return null; // Explicit null return
+     }
+   };
+   ```
+4. **Fallback Elements**: Provide default element instead of null:
+   ```javascript
+   const icon = getIcon(status) || <DefaultIcon />;
+   ```
+
+**Common Patterns**:
+
+- Status pill components with conditional icons
+- Dynamic icon rendering based on state/props
+- Helper functions that return JSX conditionally
+- Icon libraries that may return null for unknown names
+
+**Prevention Checklist**:
+
+- [ ] Never pass potentially null values to `React.cloneElement()`
+- [ ] Use conditional rendering (`{icon && ...}`) before cloning
+- [ ] Consider if `React.cloneElement()` is necessary (often it's not)
+- [ ] Test all possible values that helper functions can receive
+- [ ] Handle default/unknown cases explicitly in switch statements

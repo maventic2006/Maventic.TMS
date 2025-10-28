@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Phone, Plus, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchStates,
-  fetchCities,
-} from "../../../redux/slices/transporterSlice";
+import { Country, State, City } from "country-state-city";
 import { CustomSelect } from "../../../components/ui/Select";
 
 const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
   const dispatch = useDispatch();
-  const { masterData, statesByCountry, citiesByCountryState } = useSelector(
-    (state) => state.transporter
-  );
+  const { masterData } = useSelector((state) => state.transporter);
 
   const [selectedAddressIndex, setSelectedAddressIndex] = useState(0);
+
+  // Get all countries from country-state-city package
+  const allCountries = Country.getAllCountries();
+
+  // Debug: Log countries data
+  useEffect(() => {
+    console.log("📍 Available countries:", allCountries.length);
+    if (allCountries.length > 0) {
+      console.log("📍 Sample country:", allCountries[0]);
+    }
+  }, []);
 
   const addresses = formData.addresses || [];
   const selectedAddress = addresses[selectedAddressIndex];
@@ -32,32 +38,6 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
       updateAddress(0, "isPrimary", true);
     }
   }, [addresses.length]);
-
-  // Load states when country changes
-  useEffect(() => {
-    addresses.forEach((address) => {
-      if (address.country && !statesByCountry[address.country]) {
-        dispatch(fetchStates(address.country));
-      }
-    });
-  }, [addresses, dispatch, statesByCountry]);
-
-  // Load cities when state changes
-  useEffect(() => {
-    addresses.forEach((address) => {
-      if (address.country && address.state) {
-        const key = `${address.country}_${address.state}`;
-        if (!citiesByCountryState[key]) {
-          dispatch(
-            fetchCities({
-              countryCode: address.country,
-              stateCode: address.state,
-            })
-          );
-        }
-      }
-    });
-  }, [addresses, dispatch, citiesByCountryState]);
 
   const addAddress = () => {
     const newAddress = {
@@ -129,24 +109,10 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
     if (field === "country") {
       updatedAddresses[index].state = "";
       updatedAddresses[index].city = "";
-      if (value && !statesByCountry[value]) {
-        dispatch(fetchStates(value));
-      }
     }
 
     if (field === "state") {
       updatedAddresses[index].city = "";
-      if (value && updatedAddresses[index].country) {
-        const key = `${updatedAddresses[index].country}_${value}`;
-        if (!citiesByCountryState[key]) {
-          dispatch(
-            fetchCities({
-              countryCode: updatedAddresses[index].country,
-              stateCode: value,
-            })
-          );
-        }
-      }
     }
 
     setFormData((prev) => ({
@@ -219,12 +185,13 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
   };
 
   const getStatesForCountry = (countryCode) => {
-    return statesByCountry[countryCode] || [];
+    if (!countryCode) return [];
+    return State.getStatesOfCountry(countryCode);
   };
 
   const getCitiesForCountryState = (countryCode, stateCode) => {
-    const key = `${countryCode}_${stateCode}`;
-    return citiesByCountryState[key] || [];
+    if (!countryCode || !stateCode) return [];
+    return City.getCitiesOfState(countryCode, stateCode);
   };
 
   return (
@@ -307,15 +274,16 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           </td>
                           <td className="px-3">
                             <CustomSelect
+                              key={`country-${index}-${address.country}`}
                               value={address.country || ""}
                               onValueChange={(value) =>
                                 updateAddress(index, "country", value)
                               }
-                              options={masterData?.countries || []}
+                              options={allCountries}
                               placeholder="Country"
                               searchable
                               getOptionLabel={(option) => option.name}
-                              getOptionValue={(option) => option.code}
+                              getOptionValue={(option) => option.isoCode}
                               className={`min-w-[200px] ${
                                 errors.addresses?.[index]?.country
                                   ? "border-red-500"
@@ -326,6 +294,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           </td>
                           <td className="px-3">
                             <CustomSelect
+                              key={`state-${index}-${address.state}`}
                               value={address.state || ""}
                               onValueChange={(value) =>
                                 updateAddress(index, "state", value)
@@ -335,7 +304,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               searchable
                               disabled={!address.country}
                               getOptionLabel={(option) => option.name}
-                              getOptionValue={(option) => option.code}
+                              getOptionValue={(option) => option.isoCode}
                               className={`min-w-[200px] ${
                                 errors.addresses?.[index]?.state
                                   ? "border-red-500"
@@ -346,6 +315,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           </td>
                           <td className="px-3">
                             <CustomSelect
+                              key={`city-${index}-${address.city}`}
                               value={address.city || ""}
                               onValueChange={(value) =>
                                 updateAddress(index, "city", value)
@@ -358,7 +328,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               searchable
                               disabled={!address.state}
                               getOptionLabel={(option) => option.name}
-                              getOptionValue={(option) => option.code}
+                              getOptionValue={(option) => option.name}
                               className={`min-w-[200px] ${
                                 errors.addresses?.[index]?.city
                                   ? "border-red-500"
@@ -414,6 +384,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           </td>
                           <td className="px-3">
                             <CustomSelect
+                              key={`addressType-${index}-${address.addressType}`}
                               value={address.addressType || ""}
                               onValueChange={(value) =>
                                 updateAddress(index, "addressType", value)

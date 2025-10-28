@@ -1,6 +1,7 @@
 import React from "react";
 import { FileText } from "lucide-react";
 import { useSelector } from "react-redux";
+import { Country } from "country-state-city";
 import ThemeTable from "../../../components/ui/ThemeTable";
 
 const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
@@ -10,6 +11,17 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
 
   // Document type options from master data (backend already returns value/label format)
   const documentTypes = masterData?.documentNames || [];
+
+  // Get all countries from country-state-city package
+  const allCountries = Country.getAllCountries();
+
+  // Country options from country-state-city package (convert to value/label format)
+  const countryOptions = React.useMemo(() => {
+    return allCountries.map((country) => ({
+      value: country.isoCode,
+      label: country.name,
+    }));
+  }, []);
 
   // Table column configuration
   const columns = [
@@ -32,11 +44,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       key: "country",
       label: "Country",
       type: "select",
-      options:
-        masterData?.countries?.map((country) => ({
-          value: country.code,
-          label: country.name,
-        })) || [],
+      options: countryOptions,
       placeholder: "Select Country",
       width: "min-w-[200px]",
     },

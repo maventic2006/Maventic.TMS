@@ -214,6 +214,7 @@ const DropdownPortal = ({ isOpen, triggerRef, children, className }) => {
   return createPortal(
     <div
       ref={contentRef}
+      data-dropdown-container
       className={clsx(
         "max-h-72 overflow-y-auto overflow-x-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-lg py-2 text-sm shadow-2xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-300",
         className
@@ -408,6 +409,7 @@ const StatusSelect = ({
 const CustomSelect = ({
   value,
   onChange,
+  onValueChange, // Support both onChange and onValueChange
   options = [],
   placeholder = "Select an option",
   className,
@@ -416,6 +418,8 @@ const CustomSelect = ({
   searchable = false,
   clearable = false,
   required = false,
+  getOptionLabel, // Function to get label from option object
+  getOptionValue, // Function to get value from option object
 }) => {
   const globalDropdownContext = useContext(GlobalDropdownContext);
   const dropdownId = useRef(Math.random().toString(36).substr(2, 9)).current;
@@ -436,33 +440,72 @@ const CustomSelect = ({
     }
   };
 
-  const selectedOption = options.find((option) =>
-    typeof option === "object" ? option.value === value : option === value
+  // Helper functions to extract label and value from options
+  const extractLabel = (option) => {
+    if (!option) return "";
+    if (getOptionLabel) return getOptionLabel(option);
+    if (typeof option === "object") return option.label || option.name || "";
+    return String(option);
+  };
+
+  const extractValue = (option) => {
+    if (!option) return "";
+    if (getOptionValue) return getOptionValue(option);
+    if (typeof option === "object")
+      return option.value || option.id || option.code || option.isoCode || "";
+    return option;
+  };
+
+  const selectedOption = options.find(
+    (option) => extractValue(option) === value
   );
 
   const filteredOptions =
     searchable && searchTerm
       ? options.filter((option) => {
-          const label = typeof option === "object" ? option.label : option;
+          const label = extractLabel(option);
           return label.toLowerCase().includes(searchTerm.toLowerCase());
         })
       : options;
 
+  // Debug logging
+  useEffect(() => {
+    if (value) {
+      const selectedOpt = options.find(
+        (option) => extractValue(option) === value
+      );
+      if (!selectedOpt && options.length > 0) {
+        console.log("⚠️ Value not found in options:", value);
+      }
+    }
+  }, [value, options]);
+
   const handleSelect = (optionValue) => {
-    onChange(optionValue);
+    console.log("✅ Selected:", optionValue);
+
+    // Support both onChange and onValueChange props
+    if (onValueChange) {
+      onValueChange(optionValue);
+    } else if (onChange) {
+      onChange(optionValue);
+    }
     globalDropdownContext?.closeDropdown();
     setSearchTerm("");
   };
 
   const handleClear = (e) => {
     e.stopPropagation();
-    onChange("");
+    if (onValueChange) {
+      onValueChange("");
+    } else if (onChange) {
+      onChange("");
+    }
   };
 
   const getDisplayValue = () => {
     if (!value) return placeholder;
-    if (typeof selectedOption === "object") return selectedOption.label;
-    return selectedOption || value;
+    if (selectedOption) return extractLabel(selectedOption);
+    return value;
   };
 
   return (
@@ -536,10 +579,8 @@ const CustomSelect = ({
             </div>
           ) : (
             filteredOptions.map((option, index) => {
-              const optionValue =
-                typeof option === "object" ? option.value : option;
-              const optionLabel =
-                typeof option === "object" ? option.label : option;
+              const optionValue = extractValue(option);
+              const optionLabel = extractLabel(option);
               const isSelected = value === optionValue;
 
               return (
@@ -552,7 +593,11 @@ const CustomSelect = ({
                       ? "bg-blue-50/60 text-blue-700 font-medium"
                       : "text-gray-700"
                   )}
-                  onClick={() => handleSelect(optionValue)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelect(optionValue);
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="truncate">{optionLabel}</span>

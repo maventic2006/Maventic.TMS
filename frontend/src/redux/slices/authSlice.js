@@ -175,14 +175,60 @@ const mapUserTypeToRole = (userTypeId) => {
   return roleMapping[userTypeId] || "user";
 };
 
+// Helper functions for localStorage persistence
+const loadAuthFromStorage = () => {
+  try {
+    const authData = localStorage.getItem("tms_auth");
+    if (authData) {
+      const parsed = JSON.parse(authData);
+      console.log("💾 Loaded auth data from localStorage:", {
+        userId: parsed.user?.user_id,
+        role: parsed.role,
+      });
+      return parsed;
+    }
+  } catch (error) {
+    console.error("❌ Error loading auth from localStorage:", error);
+    localStorage.removeItem("tms_auth");
+  }
+  return null;
+};
+
+const saveAuthToStorage = (user, role, permissions) => {
+  try {
+    const authData = {
+      user,
+      role,
+      permissions,
+      timestamp: new Date().toISOString(),
+    };
+    localStorage.setItem("tms_auth", JSON.stringify(authData));
+    console.log("💾 Saved auth data to localStorage");
+  } catch (error) {
+    console.error("❌ Error saving auth to localStorage:", error);
+  }
+};
+
+const clearAuthFromStorage = () => {
+  try {
+    localStorage.removeItem("tms_auth");
+    console.log("🗑️ Cleared auth data from localStorage");
+  } catch (error) {
+    console.error("❌ Error clearing auth from localStorage:", error);
+  }
+};
+
+// Load persisted auth state if available
+const persistedAuth = loadAuthFromStorage();
+
 const initialState = {
-  user: null,
-  isAuthenticated: false,
+  user: persistedAuth?.user || null,
+  isAuthenticated: !!persistedAuth?.user,
   isPasswordReset: false,
-  isLoading: false, // Start as false - AuthInitializer will handle verification with timeouts
+  isLoading: false,
   error: null,
-  permissions: [],
-  role: null,
+  permissions: persistedAuth?.permissions || [],
+  role: persistedAuth?.role || null,
 };
 
 const authSlice = createSlice({
@@ -196,8 +242,11 @@ const authSlice = createSlice({
       const { user } = action.payload;
       state.user = user;
       state.isAuthenticated = true;
-      // Role should be set separately via mapUserRole thunk
       state.permissions = user?.permissions || [];
+      const role = mapUserTypeToRole(user?.user_type_id);
+      state.role = role;
+      // Persist to localStorage
+      saveAuthToStorage(user, role, user?.permissions || []);
     },
     clearCredentials: (state) => {
       state.user = null;
@@ -205,6 +254,8 @@ const authSlice = createSlice({
       state.isPasswordReset = false;
       state.role = null;
       state.permissions = [];
+      // Clear from localStorage
+      clearAuthFromStorage();
     },
     setAuthInitialized: (state) => {
       state.isLoading = false;
@@ -224,8 +275,15 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload.user;
         state.isAuthenticated = true;
-        state.role = mapUserTypeToRole(action.payload.user?.user_type_id);
+        const role = mapUserTypeToRole(action.payload.user?.user_type_id);
+        state.role = role;
         state.permissions = action.payload.user?.permissions || [];
+        // Persist to localStorage
+        saveAuthToStorage(
+          action.payload.user,
+          role,
+          action.payload.user?.permissions || []
+        );
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -238,6 +296,8 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.role = null;
         state.permissions = [];
+        // Clear from localStorage
+        clearAuthFromStorage();
       })
       // Logout
       .addCase(logoutUser.fulfilled, (state) => {
@@ -245,6 +305,8 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.role = null;
         state.permissions = [];
+        // Clear from localStorage
+        clearAuthFromStorage();
       })
       // Verify Token
       .addCase(verifyToken.pending, (state) => {
@@ -254,8 +316,15 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload.user;
         state.isAuthenticated = true;
-        state.role = mapUserTypeToRole(action.payload.user?.user_type_id);
+        const role = mapUserTypeToRole(action.payload.user?.user_type_id);
+        state.role = role;
         state.permissions = action.payload.user?.permissions || [];
+        // Persist to localStorage
+        saveAuthToStorage(
+          action.payload.user,
+          role,
+          action.payload.user?.permissions || []
+        );
       })
       .addCase(verifyToken.rejected, (state) => {
         state.isLoading = false;
@@ -263,6 +332,8 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.role = null;
         state.permissions = [];
+        // Clear from localStorage
+        clearAuthFromStorage();
       })
       // Reset Password
       .addCase(resetPassword.pending, (state) => {
