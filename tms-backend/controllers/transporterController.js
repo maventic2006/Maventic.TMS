@@ -786,6 +786,7 @@ const getTransporters = async (req, res) => {
       state = "",
       city = "",
       transportMode = "",
+      vatGst = "",
     } = req.query;
 
     // Convert page and limit to integers
@@ -884,6 +885,10 @@ const getTransporters = async (req, res) => {
 
     if (city) {
       query = query.where("addr.city", "like", `%${city}%`);
+    }
+
+    if (vatGst) {
+      query = query.where("addr.vat_number", "like", `%${vatGst}%`);
     }
 
     if (transportMode) {

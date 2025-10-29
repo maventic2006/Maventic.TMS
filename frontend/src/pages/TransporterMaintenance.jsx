@@ -90,7 +90,7 @@ const TransporterMaintenance = () => {
         params.businessName = appliedFilters.tinPan; // API uses businessName for search
       }
       if (appliedFilters.vatGst) {
-        params.state = appliedFilters.vatGst; // API uses state for search
+        params.vatGst = appliedFilters.vatGst; // API uses vatGst for VAT/GST number search
       }
       if (appliedFilters.transportMode.length > 0) {
         params.transportMode = appliedFilters.transportMode.join(",");
@@ -177,7 +177,7 @@ const TransporterMaintenance = () => {
       params.businessName = appliedFilters.tinPan;
     }
     if (appliedFilters.vatGst) {
-      params.state = appliedFilters.vatGst;
+      params.vatGst = appliedFilters.vatGst;
     }
     if (appliedFilters.transportMode.length > 0) {
       params.transportMode = appliedFilters.transportMode.join(",");

@@ -46,58 +46,16 @@ const TransporterListTable = ({
   searchText,
   onSearchChange
 }) => {
-  if (loading) {
-    return (
-      <Card className="flex items-center justify-center py-16 rounded-2xl shadow-md border border-gray-200">
-        <div className="flex flex-col items-center space-y-4 text-gray-600">
-          <div className="relative">
-            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-            <div className="absolute inset-0 h-8 w-8 border-2 border-orange-200 rounded-full animate-pulse"></div>
-          </div>
-          <span className="text-sm font-medium">Loading transporters...</span>
-          <div className="flex space-x-1">
-            <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-          </div>
-        </div>
-      </Card>
-    );
-  }
-
-  if (transporters.length === 0) {
-    return (
-      <Card className="text-center py-16 rounded-2xl shadow-md border border-gray-200 bg-gradient-to-br from-gray-50 to-white">
-        <div className="flex flex-col items-center space-y-6 text-gray-500">
-          <div className="relative">
-            <Building className="h-20 w-20 text-gray-300" />
-            <div className="absolute -top-2 -right-2 h-6 w-6 bg-orange-100 rounded-full flex items-center justify-center">
-              <div className="h-3 w-3 bg-orange-400 rounded-full"></div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-gray-700">No Transporters Found</h3>
-            <p className="text-sm text-gray-500 max-w-md">
-              Try adjusting your search criteria or filters, or create a new transporter to get started.
-            </p>
-          </div>
-          <div className="flex space-x-2 text-xs text-gray-400">
-            <span>• Check spelling</span>
-            <span>• Clear filters</span>
-            <span>• Try different keywords</span>
-          </div>
-        </div>
-      </Card>
-    );
-  }
-
   // Pagination calculations
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+  
+  // Determine if we should show "no results" message
+  const showNoResults = !loading && transporters.length === 0;
 
   return (
     <Card className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md hover:shadow-lg transition-shadow duration-300">
-      {/* Results Count Section */}
+      {/* Results Count Section - Always visible */}
       <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
         <div className="flex items-center justify-between">
           {/* Left side - Results count */}
@@ -105,7 +63,7 @@ const TransporterListTable = ({
             <span className="text-orange-600 font-bold">{filteredCount}</span> Transporters Found
           </p>
           
-          {/* Right side - Search bar */}
+          {/* Right side - Search bar - Always visible */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             {searchText && (
               <div className="text-xs text-gray-500 hidden sm:block">
@@ -126,22 +84,71 @@ const TransporterListTable = ({
         </div>
       </div>
       
-      {/* Mobile Card Layout - Hidden on desktop */}
-      <div className="block lg:hidden p-4 space-y-4">
-        {transporters.map((transporter, index) => (
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center space-y-4 text-gray-600">
+            <div className="relative">
+              <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+              <div className="absolute inset-0 h-8 w-8 border-2 border-orange-200 rounded-full animate-pulse"></div>
+            </div>
+            <span className="text-sm font-medium">Loading transporters...</span>
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* No Results State */}
+      {showNoResults && (
+        <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-white">
+          <div className="flex flex-col items-center space-y-6 text-gray-500">
+            <div className="relative">
+              <Building className="h-20 w-20 text-gray-300" />
+              <div className="absolute -top-2 -right-2 h-6 w-6 bg-orange-100 rounded-full flex items-center justify-center">
+                <div className="h-3 w-3 bg-orange-400 rounded-full"></div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-gray-700">No Transporters Found</h3>
+              <p className="text-sm text-gray-500 max-w-md">
+                {searchText 
+                  ? `No results found for "${searchText}". Try adjusting your search or use different keywords.`
+                  : "Try adjusting your filters, or create a new transporter to get started."
+                }
+              </p>
+            </div>
+            <div className="flex space-x-2 text-xs text-gray-400">
+              <span>• Check spelling</span>
+              <span>• Clear filters</span>
+              <span>• Try different keywords</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Mobile Card Layout - Only show when there are results */}
+      {!loading && !showNoResults && (
+        <div className="block lg:hidden p-4 space-y-4">
+          {transporters.map((transporter, index) => (
           <motion.div
             key={transporter.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            className="bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-pointer"
-            onClick={() => onTransporterClick(transporter.id)}
+            className="bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300"
           >
             {/* Header row with ID and Status */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <Hash className="h-4 w-4 text-orange-500" />
-                <span className="font-bold text-orange-600 text-sm">
+                <span 
+                  className="font-bold text-orange-600 text-sm hover:text-orange-700 hover:underline cursor-pointer transition-all duration-200"
+                  onClick={() => onTransporterClick(transporter.id)}
+                >
                   {transporter.id}
                 </span>
               </div>
@@ -216,10 +223,12 @@ const TransporterListTable = ({
             </div>
           </motion.div>
         ))}
-      </div>
+        </div>
+      )}
       
-      {/* Desktop Table Layout - Hidden on mobile/tablet */}
-      <div className="hidden lg:block">
+      {/* Desktop Table Layout - Only show when there are results */}
+      {!loading && !showNoResults && (
+        <div className="hidden lg:block">
       <Table>
         <TableHeader>
           <TableRow className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 hover:from-gray-700 hover:via-gray-800 hover:to-gray-700 transition-all duration-300">
@@ -256,11 +265,13 @@ const TransporterListTable = ({
           {transporters.map((transporter, index) => (
             <TableRow
               key={transporter.id}
-              className="hover:bg-gradient-to-r hover:from-orange-50 hover:to-blue-50 transition-all duration-300 cursor-pointer border-b border-gray-100 group hover:shadow-sm"
-              onClick={() => onTransporterClick(transporter.id)}
+              className="hover:bg-gradient-to-r hover:from-orange-50 hover:to-blue-50 transition-all duration-300 border-b border-gray-100 group hover:shadow-sm"
             >
               <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-orange-600 font-bold text-sm hover:text-orange-700 hover:underline cursor-pointer transition-all duration-200 group-hover:scale-105">
+                <span 
+                  className="text-orange-600 font-bold text-sm hover:text-orange-700 hover:underline cursor-pointer transition-all duration-200 group-hover:scale-105"
+                  onClick={() => onTransporterClick(transporter.id)}
+                >
                   {transporter.id}
                 </span>
               </TableCell>
@@ -316,7 +327,8 @@ const TransporterListTable = ({
           ))}
         </TableBody>
       </Table>
-      </div>
+        </div>
+      )}
       
       {/* Pagination Section */}
       {totalItems > 0 && (
