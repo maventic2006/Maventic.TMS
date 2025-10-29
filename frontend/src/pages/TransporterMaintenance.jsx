@@ -23,6 +23,7 @@ const fuzzySearch = (searchText, transporters) => {
       transporter.mobileNumber,
       transporter.emailId,
       transporter.tinPan,
+      transporter.tan,
       transporter.vatGst,
       transporter.address,
       transporter.status,
@@ -88,6 +89,9 @@ const TransporterMaintenance = () => {
       }
       if (appliedFilters.tinPan) {
         params.businessName = appliedFilters.tinPan; // API uses businessName for search
+      }
+      if (appliedFilters.tan) {
+        params.tan = appliedFilters.tan; // API uses tan for TAN number search
       }
       if (appliedFilters.vatGst) {
         params.vatGst = appliedFilters.vatGst; // API uses vatGst for VAT/GST number search
@@ -175,6 +179,9 @@ const TransporterMaintenance = () => {
     }
     if (appliedFilters.tinPan) {
       params.businessName = appliedFilters.tinPan;
+    }
+    if (appliedFilters.tan) {
+      params.tan = appliedFilters.tan;
     }
     if (appliedFilters.vatGst) {
       params.vatGst = appliedFilters.vatGst;

@@ -787,6 +787,7 @@ const getTransporters = async (req, res) => {
       city = "",
       transportMode = "",
       vatGst = "",
+      tan = "",
     } = req.query;
 
     // Convert page and limit to integers
@@ -824,6 +825,8 @@ const getTransporters = async (req, res) => {
         "addr.city",
         "addr.district",
         "addr.vat_number",
+        "addr.tin_pan",
+        "addr.tan",
         knex.raw(
           "CONCAT(addr.street_1, ', ', addr.city, ', ', addr.state, ', ', addr.country) as address"
         ),
@@ -851,6 +854,8 @@ const getTransporters = async (req, res) => {
         "addr.city",
         "addr.district",
         "addr.vat_number",
+        "addr.tin_pan",
+        "addr.tan",
         "addr.street_1",
         "tc.contact_person_name",
         "tc.phone_number",
@@ -889,6 +894,10 @@ const getTransporters = async (req, res) => {
 
     if (vatGst) {
       query = query.where("addr.vat_number", "like", `%${vatGst}%`);
+    }
+
+    if (tan) {
+      query = query.where("addr.tan", "like", `%${tan}%`);
     }
 
     if (transportMode) {
@@ -966,6 +975,14 @@ const getTransporters = async (req, res) => {
       countQuery = countQuery.where("addr.city", "like", `%${city}%`);
     }
 
+    if (vatGst) {
+      countQuery = countQuery.where("addr.vat_number", "like", `%${vatGst}%`);
+    }
+
+    if (tan) {
+      countQuery = countQuery.where("addr.tan", "like", `%${tan}%`);
+    }
+
     if (transportMode) {
       const modes = transportMode.split(",");
       countQuery = countQuery.where(function () {
@@ -1021,6 +1038,8 @@ const getTransporters = async (req, res) => {
         city: transporter.city,
         district: transporter.district,
         address: transporter.address,
+        tinPan: transporter.tin_pan,
+        tan: transporter.tan,
         vatGst: transporter.vat_number,
         contactPersonName: transporter.contact_person_name,
         mobileNumber: transporter.phone_number,
@@ -1080,6 +1099,8 @@ const getTransporterById = async (req, res) => {
         "addr.country",
         "addr.district",
         "addr.postal_code",
+        "addr.tin_pan as tinPan",
+        "addr.tan",
         "addr.vat_number as vatNumber"
       )
       .where("tgi.transporter_id", id)

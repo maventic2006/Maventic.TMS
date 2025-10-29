@@ -6,6 +6,14 @@ import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import StatusPill from './StatusPill';
 
+// Helper function to display N/A for empty or null values
+const displayValue = (value) => {
+  if (value === null || value === undefined || value === '' || value === 'N/A') {
+    return 'N/A';
+  }
+  return value;
+};
+
 const TransportModeIcons = ({ modes }) => {
   const iconMap = {
     'R': { icon: Truck, label: 'R', color: 'text-green-500' },
@@ -173,14 +181,39 @@ const TransporterListTable = ({
                   <Phone className="h-3 w-3 text-gray-400" />
                   <span className="text-xs text-gray-500">Phone</span>
                 </div>
-                <p className="text-sm text-gray-700">{transporter.mobileNumber}</p>
+                <p className="text-sm text-gray-700">{displayValue(transporter.mobileNumber)}</p>
               </div>
               <div>
                 <div className="flex items-center space-x-1 mb-1">
                   <Mail className="h-3 w-3 text-gray-400" />
                   <span className="text-xs text-gray-500">Email</span>
                 </div>
-                <p className="text-sm text-gray-700 truncate">{transporter.emailId}</p>
+                <p className="text-sm text-gray-700 truncate">{displayValue(transporter.emailId)}</p>
+              </div>
+            </div>
+            
+            {/* Tax Information */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+              <div>
+                <div className="flex items-center space-x-1 mb-1">
+                  <Hash className="h-3 w-3 text-gray-400" />
+                  <span className="text-xs text-gray-500">TIN/PAN</span>
+                </div>
+                <p className="text-sm text-gray-700">{displayValue(transporter.tinPan)}</p>
+              </div>
+              <div>
+                <div className="flex items-center space-x-1 mb-1">
+                  <Hash className="h-3 w-3 text-gray-400" />
+                  <span className="text-xs text-gray-500">TAN</span>
+                </div>
+                <p className="text-sm text-gray-700">{displayValue(transporter.tan)}</p>
+              </div>
+              <div>
+                <div className="flex items-center space-x-1 mb-1">
+                  <Hash className="h-3 w-3 text-gray-400" />
+                  <span className="text-xs text-gray-500">VAT/GST</span>
+                </div>
+                <p className="text-sm text-gray-700">{displayValue(transporter.vatGst)}</p>
               </div>
             </div>
             
@@ -203,7 +236,7 @@ const TransporterListTable = ({
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical'
-              }}>{transporter.address}</p>
+              }}>{displayValue(transporter.address)}</p>
             </div>
             
             {/* Footer with additional info */}
@@ -211,13 +244,13 @@ const TransporterListTable = ({
               <div className="flex items-center space-x-1">
                 <User className="h-3 w-3 text-gray-400" />
                 <span className="text-xs text-gray-500">
-                  By {transporter.createdBy}
+                  By {displayValue(transporter.createdBy)}
                 </span>
               </div>
               <div className="flex items-center space-x-1">
                 <Calendar className="h-3 w-3 text-gray-400" />
                 <span className="text-xs text-gray-500">
-                  {transporter.createdOn}
+                  {displayValue(transporter.createdOn)}
                 </span>
               </div>
             </div>
@@ -252,6 +285,7 @@ const TransporterListTable = ({
             <TableHead className="text-white w-28 font-semibold">Mobile Number</TableHead>
             <TableHead className="text-white w-40 font-semibold">Email ID</TableHead>
             <TableHead className="text-white w-32 font-semibold">TIN/PAN</TableHead>
+            <TableHead className="text-white w-28 font-semibold">TAN</TableHead>
             <TableHead className="text-white w-32 font-semibold">VAT/GST</TableHead>
             <TableHead className="text-white w-48 font-semibold">Address</TableHead>
             <TableHead className="text-white w-28 font-semibold">Created By</TableHead>
@@ -278,7 +312,7 @@ const TransporterListTable = ({
               <TableCell className="px-3 py-3 whitespace-nowrap">
                 <div className="max-w-xs">
                   <span className="text-sm text-gray-900 truncate block font-semibold group-hover:text-gray-800" title={transporter.businessName}>
-                    {transporter.businessName}
+                    {displayValue(transporter.businessName)}
                   </span>
                 </div>
               </TableCell>
@@ -286,42 +320,45 @@ const TransporterListTable = ({
                 <TransportModeIcons modes={transporter.transportMode} />
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{transporter.mobileNumber}</span>
+                <span className="text-sm text-gray-600">{displayValue(transporter.mobileNumber)}</span>
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
                 <div className="max-w-xs">
                   <span className="text-sm text-gray-600 truncate block" title={transporter.emailId}>
-                    {transporter.emailId}
+                    {displayValue(transporter.emailId)}
                   </span>
                 </div>
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{transporter.tinPan}</span>
+                <span className="text-sm text-gray-600">{displayValue(transporter.tinPan)}</span>
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{transporter.vatGst}</span>
+                <span className="text-sm text-gray-600">{displayValue(transporter.tan)}</span>
+              </TableCell>
+              <TableCell className="px-3 py-3 whitespace-nowrap">
+                <span className="text-sm text-gray-600">{displayValue(transporter.vatGst)}</span>
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
                 <div className="max-w-48">
                   <span className="text-sm text-gray-600 truncate block" title={transporter.address}>
-                    {transporter.address}
+                    {displayValue(transporter.address)}
                   </span>
                 </div>
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{transporter.createdBy}</span>
+                <span className="text-sm text-gray-600">{displayValue(transporter.createdBy)}</span>
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{transporter.createdOn}</span>
+                <span className="text-sm text-gray-600">{displayValue(transporter.createdOn)}</span>
               </TableCell>
               <TableCell className="px-3 py-3">
                 <StatusPill status={transporter.status} />
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{transporter.approver}</span>
+                <span className="text-sm text-gray-600">{displayValue(transporter.approver)}</span>
               </TableCell>
               <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{transporter.approvedOn}</span>
+                <span className="text-sm text-gray-600">{displayValue(transporter.approvedOn)}</span>
               </TableCell>
             </TableRow>
           ))}
