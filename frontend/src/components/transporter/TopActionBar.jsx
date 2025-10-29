@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { ArrowLeft, Plus, Filter } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card, CardContent } from '../ui/Card';
@@ -71,4 +71,4 @@ const TopActionBar = ({
   );
 };
 
-export default TopActionBar;
+export default memo(TopActionBar);

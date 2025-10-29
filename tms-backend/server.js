@@ -56,18 +56,6 @@ app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// Initialize sample data
-const { createSampleData, createComprehensiveSampleData } = require('./controllers/transporterController');
-
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`🚀 TMS Backend server running on port ${PORT}`);
-  
-  // Create sample transporter data if not exists
-  try {
-    await createSampleData();
-    // Create comprehensive sample data for all related tables
-    await createComprehensiveSampleData();
-  } catch (error) {
-    console.error('Error initializing sample data:', error);
-  }
 });

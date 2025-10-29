@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Building, Phone, Mail, Hash, MapPin, Loader2, Truck, Plane, Train, Ship, User, Calendar, CheckCircle, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/Table';
@@ -369,4 +369,4 @@ const TransporterListTable = ({
   );
 };
 
-export default TransporterListTable;
+export default memo(TransporterListTable);

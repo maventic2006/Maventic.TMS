@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import TopActionBar from "../components/transporter/TopActionBar";
@@ -6,6 +6,37 @@ import TransporterFilterPanel from "../components/transporter/TransporterFilterP
 import TransporterListTable from "../components/transporter/TransporterListTable";
 import PaginationBar from "../components/transporter/PaginationBar";
 import { fetchTransporters } from "../redux/slices/transporterSlice";
+
+// Fuzzy search utility function
+const fuzzySearch = (searchText, transporters) => {
+  if (!searchText || searchText.trim() === "") {
+    return transporters;
+  }
+
+  const searchLower = searchText.toLowerCase().trim();
+  
+  return transporters.filter((transporter) => {
+    // Search across multiple fields
+    const searchableFields = [
+      transporter.id,
+      transporter.businessName,
+      transporter.mobileNumber,
+      transporter.emailId,
+      transporter.tinPan,
+      transporter.vatGst,
+      transporter.address,
+      transporter.status,
+      transporter.createdBy,
+      ...(transporter.transportMode || [])
+    ];
+
+    // Check if any field contains the search text (case-insensitive partial match)
+    return searchableFields.some((field) => {
+      if (field === null || field === undefined) return false;
+      return String(field).toLowerCase().includes(searchLower);
+    });
+  });
+};
 
 // Main Transporter Maintenance Component
 const TransporterMaintenance = () => {
@@ -21,6 +52,7 @@ const TransporterMaintenance = () => {
   const [searchText, setSearchText] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
+  // Separate state for filter inputs and applied filters
   const [filters, setFilters] = useState({
     transporterId: "",
     tan: "",
@@ -30,7 +62,16 @@ const TransporterMaintenance = () => {
     transportMode: [],
   });
 
-  // Fetch transporters when component mounts or when filters/search change
+  const [appliedFilters, setAppliedFilters] = useState({
+    transporterId: "",
+    tan: "",
+    tinPan: "",
+    vatGst: "",
+    status: "",
+    transportMode: [],
+  });
+
+  // Fetch transporters when component mounts or when appliedFilters change (not on every keystroke)
   useEffect(() => {
     const fetchData = () => {
       const params = {
@@ -38,80 +79,116 @@ const TransporterMaintenance = () => {
         limit: pagination.limit || 25,
       };
 
-      // Add search parameter
-      if (searchText) {
-        params.search = searchText;
+      // Only add applied filter parameters (not the typing state)
+      if (appliedFilters.transporterId) {
+        params.transporterId = appliedFilters.transporterId;
       }
-
-      // Add filter parameters
-      if (filters.transporterId) {
-        params.transporterId = filters.transporterId;
+      if (appliedFilters.status) {
+        params.status = appliedFilters.status;
       }
-      if (filters.status) {
-        params.status = filters.status;
+      if (appliedFilters.tinPan) {
+        params.businessName = appliedFilters.tinPan; // API uses businessName for search
       }
-      if (filters.tinPan) {
-        params.businessName = filters.tinPan; // API uses businessName for search
+      if (appliedFilters.vatGst) {
+        params.state = appliedFilters.vatGst; // API uses state for search
       }
-      if (filters.vatGst) {
-        params.state = filters.vatGst; // API uses state for search
-      }
-      if (filters.transportMode.length > 0) {
-        params.transportMode = filters.transportMode.join(",");
+      if (appliedFilters.transportMode.length > 0) {
+        params.transportMode = appliedFilters.transportMode.join(",");
       }
 
       dispatch(fetchTransporters(params));
     };
 
-    // Debounce the API call
-    const timer = setTimeout(fetchData, 300);
-    return () => clearTimeout(timer);
-  }, [dispatch, searchText, filters, pagination.page]);
+    fetchData();
+  }, [dispatch, appliedFilters, pagination.page]);
 
   // Initial load
   useEffect(() => {
     dispatch(fetchTransporters({ page: 1, limit: 25 }));
   }, [dispatch]);
 
-  const handleFilterChange = (key, value) => {
+  const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
     }));
-  };
+  }, []);
 
-  const handleSearchChange = (text) => {
+  const handleApplyFilters = useCallback(() => {
+    // Apply filters by copying current filter state to appliedFilters
+    setAppliedFilters({ ...filters });
+  }, [filters]);
+
+  const handleClearFilters = useCallback(() => {
+    // Clear both filter input state and applied filters
+    const emptyFilters = {
+      transporterId: "",
+      tan: "",
+      tinPan: "",
+      vatGst: "",
+      status: "",
+      transportMode: [],
+    };
+    setFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+  }, []);
+
+  const handleSearchChange = useCallback((text) => {
     setSearchText(text);
-  };
+  }, []);
 
-  const handleTransporterClick = (transporterId) => {
+  // Apply client-side fuzzy search filtering
+  const filteredTransporters = useMemo(() => {
+    return fuzzySearch(searchText, transporters);
+  }, [searchText, transporters]);
+
+  const handleTransporterClick = useCallback((transporterId) => {
     navigate(`/transporter/${transporterId}`);
-  };
+  }, [navigate]);
 
-  const handleCreateNew = () => {
+  const handleCreateNew = useCallback(() => {
     navigate("/transporter/create");
-  };
+  }, [navigate]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     // Implement logout logic
     localStorage.removeItem("token");
     navigate("/login");
-  };
+  }, [navigate]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     navigate("/tms-portal");
-  };
+  }, [navigate]);
 
-  const handlePageChange = (page) => {
-    dispatch(
-      fetchTransporters({
-        page,
-        limit: pagination.limit || 25,
-        search: searchText,
-        ...filters,
-      })
-    );
-  };
+  const handlePageChange = useCallback((page) => {
+    // Build params using only appliedFilters (not search or unapplied filters)
+    const params = {
+      page,
+      limit: pagination.limit || 25,
+    };
+
+    if (appliedFilters.transporterId) {
+      params.transporterId = appliedFilters.transporterId;
+    }
+    if (appliedFilters.status) {
+      params.status = appliedFilters.status;
+    }
+    if (appliedFilters.tinPan) {
+      params.businessName = appliedFilters.tinPan;
+    }
+    if (appliedFilters.vatGst) {
+      params.state = appliedFilters.vatGst;
+    }
+    if (appliedFilters.transportMode.length > 0) {
+      params.transportMode = appliedFilters.transportMode.join(",");
+    }
+
+    dispatch(fetchTransporters(params));
+  }, [dispatch, pagination.limit, appliedFilters]);
+
+  const handleToggleFilters = useCallback(() => {
+    setShowFilters(!showFilters);
+  }, [showFilters]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-background via-gray-50 to-blue-50/30 p-4 lg:p-6">
@@ -122,7 +199,7 @@ const TransporterMaintenance = () => {
           onBack={handleBack}
           totalCount={pagination.total || 0}
           showFilters={showFilters}
-          onToggleFilters={() => setShowFilters(!showFilters)}
+          onToggleFilters={handleToggleFilters}
           searchText={searchText}
           onSearchChange={handleSearchChange}
         />
@@ -130,11 +207,13 @@ const TransporterMaintenance = () => {
         <TransporterFilterPanel
           filters={filters}
           onFilterChange={handleFilterChange}
+          onApplyFilters={handleApplyFilters}
+          onClearFilters={handleClearFilters}
           showFilters={showFilters}
         />
 
         <TransporterListTable
-          transporters={transporters}
+          transporters={filteredTransporters}
           loading={isFetching}
           onTransporterClick={handleTransporterClick}
           currentPage={pagination.page}
@@ -142,7 +221,9 @@ const TransporterMaintenance = () => {
           totalItems={pagination.total}
           itemsPerPage={pagination.limit}
           onPageChange={handlePageChange}
-          filteredCount={pagination.total}
+          filteredCount={filteredTransporters.length}
+          searchText={searchText}
+          onSearchChange={handleSearchChange}
         />
 
         {error && (

@@ -5,6 +5,9 @@ import api from "../../utils/api";
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
   async (credentials, { rejectWithValue }) => {
+    const controller = new AbortController();
+    let timeoutId;
+
     try {
       console.log("📡 Starting login attempt:", {
         user_id: credentials.user_id,
@@ -16,11 +19,34 @@ export const loginUser = createAsyncThunk(
       }/auth/login`;
       console.log("🔗 Login URL:", loginUrl);
 
-      // Try using fetch directly to bypass axios issues with timeout
-      console.log("🚀 Making fetch request...");
+      // First, check if backend is reachable with a quick health check
+      console.log("🏥 Checking backend health...");
+      try {
+        const healthCheck = await fetch(
+          loginUrl.replace("/auth/login", "/health"),
+          {
+            method: "GET",
+            signal: AbortSignal.timeout(3000), // 3 second timeout for health check
+          }
+        );
+        console.log("✅ Backend is reachable");
+      } catch (healthError) {
+        console.error("❌ Backend health check failed:", healthError);
+        if (healthError.name === "TimeoutError" || healthError.name === "AbortError") {
+          return rejectWithValue(
+            "Backend server is not responding. Please ensure the server is running on http://localhost:5000"
+          );
+        }
+        // Continue anyway - health endpoint might not exist
+      }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      console.log("🚀 Making login request...");
+
+      // Set a longer timeout for actual login (30 seconds)
+      timeoutId = setTimeout(() => {
+        console.warn("⏱️ Login request timeout triggered after 30 seconds");
+        controller.abort();
+      }, 30000);
 
       const response = await fetch(loginUrl, {
         method: "POST",
@@ -32,6 +58,7 @@ export const loginUser = createAsyncThunk(
         signal: controller.signal,
       });
 
+      // Clear timeout on successful response
       clearTimeout(timeoutId);
 
       console.log("📨 Fetch response received:", {
@@ -52,24 +79,47 @@ export const loginUser = createAsyncThunk(
         return rejectWithValue(data.message || "Login failed");
       }
     } catch (error) {
+      // Clear timeout in case of error
+      if (timeoutId) clearTimeout(timeoutId);
+
       console.error("🔥 Login error details:", {
         name: error.name,
         message: error.message,
         stack: error.stack,
       });
 
+      // Handle different error types
       if (error.name === "AbortError") {
-        return rejectWithValue("Login request timed out. Please try again.");
+        console.error("⏱️ Request was aborted (timeout or cancelled)");
+        return rejectWithValue(
+          "Login request timed out after 30 seconds. The server might be slow or not responding. Please check if the backend is running and try again."
+        );
+      } else if (error.name === "TimeoutError") {
+        console.error("⏱️ Request timed out");
+        return rejectWithValue(
+          "Login request timed out. Please check your network connection and try again."
+        );
       } else if (
         error.name === "TypeError" &&
-        error.message.includes("fetch")
+        (error.message.includes("fetch") || error.message.includes("Failed to fetch"))
       ) {
+        console.error("🌐 Network error - cannot reach server");
         return rejectWithValue(
-          "Unable to connect to server. Please check if the backend is running."
+          "Cannot connect to server. Please ensure:\n1. Backend server is running (npm start in tms-backend)\n2. Server is on http://localhost:5000\n3. No firewall is blocking the connection"
+        );
+      } else if (error.name === "SyntaxError") {
+        console.error("📄 Invalid JSON response from server");
+        return rejectWithValue(
+          "Server returned invalid response. The backend might be experiencing issues."
         );
       }
 
-      return rejectWithValue(error.message || "Login failed");
+      return rejectWithValue(
+        error.message || "Login failed due to an unexpected error"
+      );
+    } finally {
+      // Ensure timeout is always cleared
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 );

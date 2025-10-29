@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Truck, Plane, Train, Ship, X, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '../ui/Card';
@@ -6,7 +6,7 @@ import { Input, Label } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { StatusSelect } from '../ui/Select';
 
-const TransporterFilterPanel = ({ filters, onFilterChange, showFilters }) => {
+const TransporterFilterPanel = ({ filters, onFilterChange, onApplyFilters, onClearFilters, showFilters }) => {
   const transportModes = [
     { value: 'R', label: 'R', icon: Truck },
     { value: 'A', label: 'A', icon: Plane },
@@ -22,15 +22,6 @@ const TransporterFilterPanel = ({ filters, onFilterChange, showFilters }) => {
     { value: 'Inactive', label: 'Inactive' },
     { value: 'Rejected', label: 'Rejected' }
   ];
-
-  const clearFilters = () => {
-    onFilterChange('transporterId', '');
-    onFilterChange('tan', '');
-    onFilterChange('tinPan', '');
-    onFilterChange('vatGst', '');
-    onFilterChange('status', '');
-    onFilterChange('transportMode', []);
-  };
 
   return (
     <AnimatePresence>
@@ -153,7 +144,7 @@ const TransporterFilterPanel = ({ filters, onFilterChange, showFilters }) => {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 pt-4">
               <Button
                 variant="outline"
-                onClick={clearFilters}
+                onClick={onClearFilters}
                 className="bg-white/60 backdrop-blur-sm hover:bg-white hover:shadow-lg hover:scale-105 transition-all duration-200 border-gray-200 hover:border-red-300 rounded-xl w-full sm:w-auto"
               >
                 <X className="h-4 w-4 mr-2" />
@@ -161,6 +152,7 @@ const TransporterFilterPanel = ({ filters, onFilterChange, showFilters }) => {
               </Button>
               <Button
                 variant="default"
+                onClick={onApplyFilters}
                 className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 hover:scale-105 hover:shadow-lg transition-all duration-200 rounded-xl w-full sm:w-auto"
               >
                 <Search className="h-4 w-4 mr-2" />
@@ -177,4 +169,4 @@ const TransporterFilterPanel = ({ filters, onFilterChange, showFilters }) => {
   );
 };
 
-export default TransporterFilterPanel;
+export default memo(TransporterFilterPanel);

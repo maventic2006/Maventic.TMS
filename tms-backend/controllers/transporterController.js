@@ -793,9 +793,16 @@ const getTransporters = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Build base query
+    // Build base query with contacts
     let query = knex("transporter_general_info as tgi")
-      .leftJoin("tms_address as addr", "tgi.address_id", "addr.address_id")
+      .leftJoin("tms_address as addr", function() {
+        this.on("tgi.transporter_id", "=", "addr.user_reference_id")
+            .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"));
+      })
+      .leftJoin("transporter_contact as tc", function() {
+        this.on("tgi.transporter_id", "=", "tc.transporter_id")
+            .andOn("tc.status", "=", knex.raw("'ACTIVE'"));
+      })
       .select(
         "tgi.transporter_id",
         "tgi.business_name",
@@ -815,9 +822,38 @@ const getTransporters = async (req, res) => {
         "addr.state",
         "addr.city",
         "addr.district",
+        "addr.vat_number",
         knex.raw(
           "CONCAT(addr.street_1, ', ', addr.city, ', ', addr.state, ', ', addr.country) as address"
-        )
+        ),
+        "tc.contact_person_name",
+        "tc.phone_number",
+        "tc.email_id"
+      )
+      .groupBy(
+        "tgi.transporter_id",
+        "tgi.business_name",
+        "tgi.trans_mode_road",
+        "tgi.trans_mode_rail",
+        "tgi.trans_mode_air",
+        "tgi.trans_mode_sea",
+        "tgi.active_flag",
+        "tgi.from_date",
+        "tgi.to_date",
+        "tgi.avg_rating",
+        "tgi.status",
+        "tgi.created_by",
+        "tgi.created_on",
+        "tgi.updated_on",
+        "addr.country",
+        "addr.state",
+        "addr.city",
+        "addr.district",
+        "addr.vat_number",
+        "addr.street_1",
+        "tc.contact_person_name",
+        "tc.phone_number",
+        "tc.email_id"
       );
 
     // Apply filters
@@ -877,11 +913,15 @@ const getTransporters = async (req, res) => {
     }
 
     // Get total count for pagination - create a fresh query without SELECT fields
-    let countQuery = knex("transporter_general_info as tgi").leftJoin(
-      "tms_address as addr",
-      "tgi.address_id",
-      "addr.address_id"
-    );
+    let countQuery = knex("transporter_general_info as tgi")
+      .leftJoin("tms_address as addr", function() {
+        this.on("tgi.transporter_id", "=", "addr.user_reference_id")
+            .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"));
+      })
+      .leftJoin("transporter_contact as tc", function() {
+        this.on("tgi.transporter_id", "=", "tc.transporter_id")
+            .andOn("tc.status", "=", knex.raw("'ACTIVE'"));
+      });
 
     // Apply the same filters to count query
     if (search) {
@@ -948,12 +988,12 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    const totalResult = await countQuery.count("* as count").first();
+    const totalResult = await countQuery.countDistinct("tgi.transporter_id as count").first();
     const total = parseInt(totalResult.count);
 
     // Apply pagination
     const transporters = await query
-      .orderBy("tgi.created_on", "desc")
+      .orderBy("tgi.transporter_id", "asc")
       .limit(limitNum)
       .offset(offset);
 
@@ -976,6 +1016,10 @@ const getTransporters = async (req, res) => {
         city: transporter.city,
         district: transporter.district,
         address: transporter.address,
+        vatGst: transporter.vat_number,
+        contactPersonName: transporter.contact_person_name,
+        mobileNumber: transporter.phone_number,
+        emailId: transporter.email_id,
         createdBy: transporter.created_by,
         createdOn: transporter.created_on
           ? new Date(transporter.created_on).toISOString().split("T")[0]
