@@ -15,6 +15,21 @@ import {
 const GeneralDetailsViewTab = ({ formData, transporterData }) => {
   const data = formData || transporterData;
 
+  // Helper function to format date from ISO to readable format
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (error) {
+      return "N/A";
+    }
+  };
+
   const transportModes = [
     {
       key: "road",
@@ -125,7 +140,7 @@ const GeneralDetailsViewTab = ({ formData, transporterData }) => {
             <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-gray-500" />
               <p className="text-gray-800">
-                {data?.generalDetails?.fromDate || "N/A"}
+                {formatDate(data?.generalDetails?.fromDate)}
               </p>
             </div>
           </div>
@@ -137,7 +152,7 @@ const GeneralDetailsViewTab = ({ formData, transporterData }) => {
             <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-gray-500" />
               <p className="text-gray-800">
-                {data?.generalDetails?.toDate || "N/A"}
+                {formatDate(data?.generalDetails?.toDate)}
               </p>
             </div>
           </div>

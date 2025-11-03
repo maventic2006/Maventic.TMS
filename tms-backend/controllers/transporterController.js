@@ -2,6 +2,8 @@ const knex = require("../config/database");
 const { Country, State, City } = require("country-state-city");
 const fs = require("fs").promises;
 const path = require("path");
+const ERROR_MESSAGES = require("../utils/errorMessages");
+const { validateDocumentNumber } = require("../utils/documentValidation");
 
 // Helper function to generate unique IDs
 const generateTransporterId = async () => {
@@ -12,40 +14,130 @@ const generateTransporterId = async () => {
   return `T${count.toString().padStart(3, "0")}`;
 };
 
-const generateAddressId = async () => {
-  const result = await knex("tms_address").count("* as count").first();
-  const count = parseInt(result.count) + 1;
-  return `ADDR${count.toString().padStart(4, "0")}`;
+// Collision-resistant ID generation - checks if ID exists before returning
+const generateAddressId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("tms_address").count("* as count").first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `ADDR${count.toString().padStart(4, "0")}`;
+
+    console.log(`  🔍 Checking address ID: ${newId} (attempt ${attempts + 1})`);
+
+    // Check if this ID already exists
+    const existing = await trx("tms_address")
+      .where("address_id", newId)
+      .first();
+    if (!existing) {
+      console.log(`  ✅ Address ID ${newId} is unique`);
+      return newId;
+    }
+
+    console.log(`  ❌ Address ID ${newId} already exists, trying next...`);
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique address ID after 100 attempts");
 };
 
-const generateContactId = async () => {
-  const result = await knex("transporter_contact").count("* as count").first();
-  const count = parseInt(result.count) + 1;
-  return `TC${count.toString().padStart(4, "0")}`;
+const generateContactId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("transporter_contact").count("* as count").first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `TC${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("transporter_contact")
+      .where("tcontact_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique contact ID after 100 attempts");
 };
 
-const generateServiceAreaHeaderId = async () => {
-  const result = await knex("transporter_service_area_hdr")
-    .count("* as count")
-    .first();
-  const count = parseInt(result.count) + 1;
-  return `SAH${count.toString().padStart(4, "0")}`;
+const generateServiceAreaHeaderId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("transporter_service_area_hdr")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `SAH${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("transporter_service_area_hdr")
+      .where("service_header_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique service area header ID after 100 attempts"
+  );
 };
 
-const generateServiceAreaItemId = async () => {
-  const result = await knex("transporter_service_area_itm")
-    .count("* as count")
-    .first();
-  const count = parseInt(result.count) + 1;
-  return `SAI${count.toString().padStart(4, "0")}`;
+const generateServiceAreaItemId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("transporter_service_area_itm")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `SAI${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("transporter_service_area_itm")
+      .where("service_item_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique service area item ID after 100 attempts"
+  );
 };
 
-const generateDocumentId = async () => {
-  const result = await knex("transporter_documents")
-    .count("* as count")
-    .first();
-  const count = parseInt(result.count) + 1;
-  return `DOC${count.toString().padStart(4, "0")}`;
+const generateDocumentId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("transporter_documents")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `DOC${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("transporter_documents")
+      .where("document_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique document ID after 100 attempts");
 };
 
 const generateDocumentUploadId = async () => {
@@ -56,7 +148,8 @@ const generateDocumentUploadId = async () => {
 
 // Validation functions
 const validatePhoneNumber = (phoneNumber) => {
-  const phoneRegex = /^\+[1-9]\d{1,14}$/;
+  // Allow exactly 10 digits only (no country code, no special characters)
+  const phoneRegex = /^[6-9]\d{9}$/;
   return phoneRegex.test(phoneNumber);
 };
 
@@ -80,10 +173,18 @@ const validateVATNumber = (vatNumber, country) => {
 
 // Create Transporter Controller
 const createTransporter = async (req, res) => {
-  const trx = await knex.transaction();
-
   try {
     const { generalDetails, addresses, serviceableAreas, documents } = req.body;
+
+    console.log("🔍 Starting transporter creation - VALIDATION PHASE");
+    console.log(
+      "Serviceable Areas Payload:",
+      JSON.stringify(serviceableAreas, null, 2)
+    );
+
+    // ========================================
+    // PHASE 1: COMPLETE VALIDATION (NO DATABASE OPERATIONS)
+    // ========================================
 
     // Validate general details
     if (
@@ -94,8 +195,7 @@ const createTransporter = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message:
-            "Business name is required and must be at least 2 characters",
+          message: ERROR_MESSAGES.BUSINESS_NAME_TOO_SHORT,
           field: "businessName",
         },
       });
@@ -106,7 +206,7 @@ const createTransporter = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "From date is required",
+          message: ERROR_MESSAGES.FROM_DATE_REQUIRED,
           field: "fromDate",
         },
       });
@@ -125,7 +225,7 @@ const createTransporter = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "At least one transport mode must be selected",
+          message: ERROR_MESSAGES.TRANSPORT_MODE_REQUIRED,
           field: "transportModes",
         },
       });
@@ -137,7 +237,7 @@ const createTransporter = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "At least one address must be provided",
+          message: ERROR_MESSAGES.ADDRESS_REQUIRED,
           field: "addresses",
         },
       });
@@ -155,12 +255,8 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Invalid VAT number format for address ${i + 1}`,
+            message: ERROR_MESSAGES.VAT_NUMBER_INVALID,
             field: `addresses[${i}].vatNumber`,
-            details: {
-              provided: address.vatNumber,
-              expected: "Valid VAT number format for the selected country",
-            },
           },
         });
       }
@@ -170,9 +266,7 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Country, state and city are required for address ${
-              i + 1
-            }`,
+            message: ERROR_MESSAGES.COUNTRY_STATE_CITY_REQUIRED,
             field: `addresses[${i}]`,
           },
         });
@@ -184,9 +278,7 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `At least one contact must be provided for address ${
-              i + 1
-            }`,
+            message: ERROR_MESSAGES.CONTACT_REQUIRED,
             field: `addresses[${i}].contacts`,
           },
         });
@@ -201,9 +293,7 @@ const createTransporter = async (req, res) => {
             success: false,
             error: {
               code: "VALIDATION_ERROR",
-              message: `Contact name is required and must be at least 2 characters for address ${
-                i + 1
-              }, contact ${j + 1}`,
+              message: ERROR_MESSAGES.CONTACT_NAME_REQUIRED,
               field: `addresses[${i}].contacts[${j}].name`,
             },
           });
@@ -214,14 +304,8 @@ const createTransporter = async (req, res) => {
             success: false,
             error: {
               code: "VALIDATION_ERROR",
-              message: `Invalid phone number format for address ${
-                i + 1
-              }, contact ${j + 1}. Use format: +[country code][number]`,
+              message: ERROR_MESSAGES.PHONE_NUMBER_INVALID,
               field: `addresses[${i}].contacts[${j}].phoneNumber`,
-              details: {
-                provided: contact.phoneNumber,
-                expected: "+[country code][number]",
-              },
             },
           });
         }
@@ -234,9 +318,7 @@ const createTransporter = async (req, res) => {
             success: false,
             error: {
               code: "VALIDATION_ERROR",
-              message: `Invalid alternate phone number format for address ${
-                i + 1
-              }, contact ${j + 1}`,
+              message: ERROR_MESSAGES.ALTERNATE_PHONE_INVALID,
               field: `addresses[${i}].contacts[${j}].alternatePhoneNumber`,
             },
           });
@@ -247,14 +329,8 @@ const createTransporter = async (req, res) => {
             success: false,
             error: {
               code: "VALIDATION_ERROR",
-              message: `Invalid email format for address ${i + 1}, contact ${
-                j + 1
-              }. Use format: example@domain.com`,
+              message: ERROR_MESSAGES.EMAIL_INVALID,
               field: `addresses[${i}].contacts[${j}].email`,
-              details: {
-                provided: contact.email,
-                expected: "example@domain.com",
-              },
             },
           });
         }
@@ -267,7 +343,7 @@ const createTransporter = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "At least one serviceable area must be provided",
+          message: ERROR_MESSAGES.SERVICEABLE_AREA_REQUIRED,
           field: "serviceableAreas",
         },
       });
@@ -281,7 +357,7 @@ const createTransporter = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Duplicate countries found in serviceable areas",
+          message: ERROR_MESSAGES.SERVICEABLE_AREA_DUPLICATE,
           field: "serviceableAreas",
         },
       });
@@ -314,6 +390,37 @@ const createTransporter = async (req, res) => {
           },
         });
       }
+
+      // Validate that states belong to the specified country
+      const country = Country.getAllCountries().find(
+        (c) => c.name === area.country
+      );
+      if (!country) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Invalid country: ${area.country}`,
+            field: `serviceableAreas[${i}].country`,
+          },
+        });
+      }
+
+      const validStates = State.getStatesOfCountry(country.isoCode);
+      const validStateNames = validStates.map((s) => s.name);
+
+      for (const stateName of area.states) {
+        if (!validStateNames.includes(stateName)) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `State "${stateName}" does not belong to country "${area.country}". Please select valid states for this country.`,
+              field: `serviceableAreas[${i}].states`,
+            },
+          });
+        }
+      }
     }
 
     // Validate documents
@@ -322,7 +429,7 @@ const createTransporter = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "At least one document must be provided",
+          message: ERROR_MESSAGES.DOCUMENT_REQUIRED,
           field: "documents",
         },
       });
@@ -337,7 +444,7 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Document type is required for document ${i + 1}`,
+            message: ERROR_MESSAGES.DOCUMENT_TYPE_REQUIRED,
             field: `documents[${i}].documentType`,
           },
         });
@@ -348,8 +455,55 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Document number is required for document ${i + 1}`,
+            message: ERROR_MESSAGES.DOCUMENT_NUMBER_REQUIRED,
             field: `documents[${i}].documentNumber`,
+          },
+        });
+      }
+
+      // Validate document number format based on document type
+      // First, get the document type name from the document_name_master
+      const docTypeInfo = await knex("document_name_master")
+        .where(function () {
+          // Check if documentType is an ID (like "DN003") or a name (like "TAN")
+          this.where("doc_name_master_id", doc.documentType).orWhere(
+            "document_name",
+            doc.documentType
+          );
+        })
+        .first();
+
+      if (docTypeInfo) {
+        // Store the resolved document type ID for database insertion
+        doc.documentTypeId = docTypeInfo.doc_name_master_id;
+
+        const validation = validateDocumentNumber(
+          doc.documentNumber,
+          docTypeInfo.document_name
+        );
+
+        if (!validation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: validation.message,
+              field: `documents[${i}].documentNumber`,
+              expectedFormat: validation.format,
+            },
+          });
+        }
+
+        // Clean and normalize document number after validation
+        doc.documentNumber = doc.documentNumber.trim().toUpperCase();
+      } else {
+        // Document type not found in master table
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Invalid document type: ${doc.documentType}`,
+            field: `documents[${i}].documentType`,
           },
         });
       }
@@ -359,7 +513,7 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Country is required for document ${i + 1}`,
+            message: ERROR_MESSAGES.DOCUMENT_COUNTRY_REQUIRED,
             field: `documents[${i}].country`,
           },
         });
@@ -370,7 +524,7 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Valid from date is required for document ${i + 1}`,
+            message: ERROR_MESSAGES.DOCUMENT_VALID_FROM_REQUIRED,
             field: `documents[${i}].validFrom`,
           },
         });
@@ -381,7 +535,7 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Valid to date is required for document ${i + 1}`,
+            message: ERROR_MESSAGES.DOCUMENT_VALID_TO_REQUIRED,
             field: `documents[${i}].validTo`,
           },
         });
@@ -396,149 +550,154 @@ const createTransporter = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Valid to date must be after valid from date for document ${
-              i + 1
-            }`,
+            message: ERROR_MESSAGES.DOCUMENT_DATE_INVALID,
             field: `documents[${i}].validTo`,
           },
         });
       }
     }
 
-    // Check for duplicate VAT numbers
+    // Check for duplicate VAT numbers (uses transaction for consistent reads)
     const vatNumbers = addresses.map((addr) => addr.vatNumber);
-    const existingVATCheck = await trx("tms_address")
+    const existingVATCheck = await knex("tms_address")
       .whereIn("vat_number", vatNumbers)
       .andWhere("status", "ACTIVE");
 
     if (existingVATCheck.length > 0) {
+      const duplicateVAT = existingVATCheck[0].vat_number;
       return res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: `VAT Number ${existingVATCheck[0].vat_number} already exists`,
+          message: `VAT number ${duplicateVAT} already exists. Please use a unique VAT number`,
           field: "vatNumber",
+          value: duplicateVAT,
         },
       });
     }
 
     // Check for duplicate document numbers
-    const docNumbers = documents.map((doc) => ({
-      number: doc.documentNumber,
-      type: doc.documentType,
-    }));
-    for (const docInfo of docNumbers) {
-      const existingDoc = await trx("transporter_documents")
-        .where("document_number", docInfo.number)
-        .andWhere("document_type_id", docInfo.type)
+    for (let i = 0; i < documents.length; i++) {
+      const doc = documents[i];
+      const documentTypeId = doc.documentTypeId || doc.documentType; // Use resolved ID
+
+      const existingDoc = await knex("transporter_documents")
+        .where("document_number", doc.documentNumber)
+        .andWhere("document_type_id", documentTypeId)
         .andWhere("status", "ACTIVE")
         .first();
 
       if (existingDoc) {
+        // Get document type name for better error message
+        const docTypeInfo = await knex("document_name_master")
+          .where("doc_name_master_id", documentTypeId)
+          .first();
+
+        const docTypeName = docTypeInfo
+          ? docTypeInfo.document_name
+          : "this document type";
+
         return res.status(400).json({
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Document number ${docInfo.number} already exists for this document type`,
-            field: "documentNumber",
+            message: `Document number ${doc.documentNumber} already exists for ${docTypeName}. Please use a unique document number`,
+            field: `documents[${i}].documentNumber`,
+            value: doc.documentNumber,
           },
         });
       }
     }
 
-    // All validations passed, start creating the transporter
-    const transporterId = await generateTransporterId();
-    const currentUser = req.user?.userId || "SYSTEM";
-    const currentTimestamp = new Date();
+    console.log("✅ ALL VALIDATIONS PASSED - Starting transaction");
 
-    // 1. Create transporter general info
-    await trx("transporter_general_info").insert({
-      transporter_id: transporterId,
-      user_type: "TRANSPORTER",
-      business_name: generalDetails.businessName.trim(),
-      trans_mode_road: generalDetails.transMode.road || false,
-      trans_mode_rail: generalDetails.transMode.rail || false,
-      trans_mode_air: generalDetails.transMode.air || false,
-      trans_mode_sea: generalDetails.transMode.sea || false,
-      active_flag:
-        generalDetails.activeFlag !== undefined
-          ? generalDetails.activeFlag
-          : true,
-      from_date: generalDetails.fromDate,
-      to_date: generalDetails.toDate || null,
-      avg_rating: generalDetails.avgRating || 0,
-      created_by: currentUser,
-      updated_by: currentUser,
-      created_at: currentTimestamp,
-      updated_at: currentTimestamp,
-      created_on: currentTimestamp,
-      updated_on: currentTimestamp,
-      status: "ACTIVE",
-    });
+    // ========================================
+    // PHASE 2: DATABASE OPERATIONS (WITH TRANSACTION)
+    // ========================================
 
-    // 2. Create addresses and contacts
-    for (const address of addresses) {
-      const addressId = await generateAddressId();
+    const trx = await knex.transaction();
 
-      // Insert address
-      await trx("tms_address").insert({
-        address_id: addressId,
-        user_reference_id: transporterId,
-        user_type: "TRANSPORTER",
-        country: address.country,
-        vat_number: address.vatNumber,
-        street_1: address.street1 || null,
-        street_2: address.street2 || null,
-        city: address.city,
-        district: address.district || null,
-        state: address.state,
-        postal_code: address.postalCode || null,
-        is_primary: address.isPrimary || false,
-        address_type_id: "AT001", // Default address type
-        created_by: currentUser,
-        updated_by: currentUser,
-        created_at: currentTimestamp,
-        updated_at: currentTimestamp,
-        created_on: currentTimestamp,
-        updated_on: currentTimestamp,
-        status: "ACTIVE",
-      });
+    try {
+      // All validations passed, start creating the transporter
+      const transporterId = await generateTransporterId();
+      const currentUser = req.user?.userId || "SYSTEM";
+      const currentTimestamp = new Date();
 
-      // Insert contacts for this address
-      for (const contact of address.contacts) {
-        const contactId = await generateContactId();
-
-        await trx("transporter_contact").insert({
-          tcontact_id: contactId,
-          transporter_id: transporterId,
-          contact_person_name: contact.name.trim(),
-          role: contact.role || null,
-          phone_number: contact.phoneNumber,
-          alternate_phone_number: contact.alternatePhoneNumber || null,
-          whats_app_number: contact.whatsappNumber || null,
-          email_id: contact.email,
-          alternate_email_id: contact.alternateEmail || null,
-          address_id: addressId,
-          created_by: currentUser,
-          updated_by: currentUser,
-          created_at: currentTimestamp,
-          updated_at: currentTimestamp,
-          created_on: currentTimestamp,
-          updated_on: currentTimestamp,
-          status: "ACTIVE",
-        });
+      // Pre-generate all IDs to avoid race conditions
+      console.log("🔑 Generating unique IDs...");
+      const addressIds = [];
+      for (let i = 0; i < addresses.length; i++) {
+        const newAddressId = await generateAddressId(trx);
+        console.log(`  📍 Generated address ID ${i + 1}: ${newAddressId}`);
+        addressIds.push(newAddressId);
       }
-    }
 
-    // 3. Create serviceable areas
-    for (const area of serviceableAreas) {
-      const serviceAreaHeaderId = await generateServiceAreaHeaderId();
+      const contactIds = [];
+      let contactIndex = 0;
+      for (const address of addresses) {
+        for (const contact of address.contacts) {
+          contactIds.push(await generateContactId(trx));
+          contactIndex++;
+        }
+      }
 
-      // Insert service area header
-      await trx("transporter_service_area_hdr").insert({
-        service_area_hdr_id: serviceAreaHeaderId,
+      const serviceAreaHeaderIds = [];
+      const baseServiceAreaHeaderCount =
+        parseInt(
+          (
+            await trx("transporter_service_area_hdr")
+              .count("* as count")
+              .first()
+          ).count
+        ) + 1;
+      for (let i = 0; i < serviceableAreas.length; i++) {
+        serviceAreaHeaderIds.push(
+          `SAH${(baseServiceAreaHeaderCount + i).toString().padStart(4, "0")}`
+        );
+      }
+
+      const serviceAreaItemIds = [];
+      const baseServiceAreaItemCount =
+        parseInt(
+          (
+            await trx("transporter_service_area_itm")
+              .count("* as count")
+              .first()
+          ).count
+        ) + 1;
+      let itemIdOffset = 0;
+      for (const area of serviceableAreas) {
+        for (const state of area.states) {
+          serviceAreaItemIds.push(
+            `SAI${(baseServiceAreaItemCount + itemIdOffset)
+              .toString()
+              .padStart(4, "0")}`
+          );
+          itemIdOffset++;
+        }
+      }
+
+      const documentIds = [];
+      for (let i = 0; i < documents.length; i++) {
+        documentIds.push(await generateDocumentId(trx));
+      }
+
+      // 1. Create transporter general info
+      await trx("transporter_general_info").insert({
         transporter_id: transporterId,
-        service_country: area.country,
+        user_type: "TRANSPORTER",
+        business_name: generalDetails.businessName.trim(),
+        trans_mode_road: generalDetails.transMode.road || false,
+        trans_mode_rail: generalDetails.transMode.rail || false,
+        trans_mode_air: generalDetails.transMode.air || false,
+        trans_mode_sea: generalDetails.transMode.sea || false,
+        active_flag:
+          generalDetails.activeFlag !== undefined
+            ? generalDetails.activeFlag
+            : true,
+        from_date: generalDetails.fromDate,
+        to_date: generalDetails.toDate || null,
+        avg_rating: generalDetails.avgRating || 0,
         created_by: currentUser,
         updated_by: currentUser,
         created_at: currentTimestamp,
@@ -548,14 +707,28 @@ const createTransporter = async (req, res) => {
         status: "ACTIVE",
       });
 
-      // Insert service area items (states)
-      for (const state of area.states) {
-        const serviceAreaItemId = await generateServiceAreaItemId();
+      // 2. Create addresses and contacts
+      let addressIndex = 0;
+      let globalContactIndex = 0;
 
-        await trx("transporter_service_area_itm").insert({
-          service_area_itm_id: serviceAreaItemId,
-          service_area_hdr_id: serviceAreaHeaderId,
-          service_state: state,
+      for (const address of addresses) {
+        const addressId = addressIds[addressIndex];
+
+        // Insert address
+        await trx("tms_address").insert({
+          address_id: addressId,
+          user_reference_id: transporterId,
+          user_type: "TRANSPORTER",
+          country: address.country,
+          vat_number: address.vatNumber,
+          street_1: address.street1 || null,
+          street_2: address.street2 || null,
+          city: address.city,
+          district: address.district || null,
+          state: address.state,
+          postal_code: address.postalCode || null,
+          is_primary: address.isPrimary || false,
+          address_type_id: "AT001", // Default address type
           created_by: currentUser,
           updated_by: currentUser,
           created_at: currentTimestamp,
@@ -564,48 +737,109 @@ const createTransporter = async (req, res) => {
           updated_on: currentTimestamp,
           status: "ACTIVE",
         });
+
+        // Insert contacts for this address
+        for (const contact of address.contacts) {
+          const contactId = contactIds[globalContactIndex];
+
+          await trx("transporter_contact").insert({
+            tcontact_id: contactId,
+            transporter_id: transporterId,
+            contact_person_name: contact.name.trim(),
+            role: contact.role || null,
+            phone_number: contact.phoneNumber,
+            alternate_phone_number: contact.alternatePhoneNumber || null,
+            whats_app_number: contact.whatsappNumber || null,
+            email_id: contact.email,
+            alternate_email_id: contact.alternateEmail || null,
+            address_id: addressId,
+            created_by: currentUser,
+            updated_by: currentUser,
+            created_at: currentTimestamp,
+            updated_at: currentTimestamp,
+            created_on: currentTimestamp,
+            updated_on: currentTimestamp,
+            status: "ACTIVE",
+          });
+
+          globalContactIndex++;
+        }
+
+        addressIndex++;
       }
-    }
 
-    // 4. Create documents and file uploads
-    for (const doc of documents) {
-      const documentId = await generateDocumentId();
-      const documentUniqueId = `${transporterId}_${documentId}`;
+      // 3. Create serviceable areas
+      let serviceAreaHeaderIndex = 0;
+      let serviceAreaItemIndex = 0;
 
-      // Insert transporter document
-      await trx("transporter_documents").insert({
-        document_unique_id: documentUniqueId,
-        document_id: documentId,
-        document_type_id: doc.documentType,
-        document_number: doc.documentNumber,
-        reference_number: doc.referenceNumber || null,
-        country: doc.country,
-        valid_from: doc.validFrom,
-        valid_to: doc.validTo,
-        active: doc.status !== undefined ? doc.status : true,
-        user_type: "TRANSPORTER",
-        created_by: currentUser,
-        updated_by: currentUser,
-        created_at: currentTimestamp,
-        updated_at: currentTimestamp,
-        created_on: currentTimestamp,
-        updated_on: currentTimestamp,
-        status: "ACTIVE",
-      });
+      for (const area of serviceableAreas) {
+        const serviceAreaHeaderId =
+          serviceAreaHeaderIds[serviceAreaHeaderIndex];
 
-      // If file is uploaded, save to document_upload table
-      if (doc.fileData) {
-        const docUploadId = await generateDocumentUploadId();
+        console.log(
+          `Creating service area header for country: ${area.country}, header ID: ${serviceAreaHeaderId}`
+        );
 
-        await trx("document_upload").insert({
-          document_id: docUploadId,
-          file_name: doc.fileName,
-          file_type: doc.fileType,
-          file_xstring_value: doc.fileData, // base64 encoded file data
-          system_reference_id: documentUniqueId,
-          is_verified: false,
+        // Insert service area header
+        await trx("transporter_service_area_hdr").insert({
+          service_area_hdr_id: serviceAreaHeaderId,
+          transporter_id: transporterId,
+          service_country: area.country,
+          created_by: currentUser,
+          updated_by: currentUser,
+          created_at: currentTimestamp,
+          updated_at: currentTimestamp,
+          created_on: currentTimestamp,
+          updated_on: currentTimestamp,
+          status: "ACTIVE",
+        });
+
+        // Insert service area items (states)
+        for (const state of area.states) {
+          const serviceAreaItemId = serviceAreaItemIds[serviceAreaItemIndex];
+
+          console.log(
+            `  - Creating service area item for state: ${state}, item ID: ${serviceAreaItemId}, linked to header: ${serviceAreaHeaderId}`
+          );
+
+          await trx("transporter_service_area_itm").insert({
+            service_area_itm_id: serviceAreaItemId,
+            service_area_hdr_id: serviceAreaHeaderId,
+            service_state: state,
+            created_by: currentUser,
+            updated_by: currentUser,
+            created_at: currentTimestamp,
+            updated_at: currentTimestamp,
+            created_on: currentTimestamp,
+            updated_on: currentTimestamp,
+            status: "ACTIVE",
+          });
+
+          serviceAreaItemIndex++;
+        }
+
+        serviceAreaHeaderIndex++;
+      }
+
+      // 4. Create documents and file uploads
+      let documentIndex = 0;
+
+      for (const doc of documents) {
+        const documentId = documentIds[documentIndex];
+        const documentUniqueId = `${transporterId}_${documentId}`;
+
+        // Insert transporter document - use resolved documentTypeId
+        await trx("transporter_documents").insert({
+          document_unique_id: documentUniqueId,
+          document_id: documentId,
+          document_type_id: doc.documentTypeId || doc.documentType, // Use resolved ID
+          document_number: doc.documentNumber,
+          reference_number: doc.referenceNumber || null,
+          country: doc.country,
           valid_from: doc.validFrom,
           valid_to: doc.validTo,
+          active: doc.status !== undefined ? doc.status : true,
+          user_type: "TRANSPORTER",
           created_by: currentUser,
           updated_by: currentUser,
           created_at: currentTimestamp,
@@ -614,30 +848,883 @@ const createTransporter = async (req, res) => {
           updated_on: currentTimestamp,
           status: "ACTIVE",
         });
+
+        // If file is uploaded, save to document_upload table
+        if (doc.fileData) {
+          const docUploadId = await generateDocumentUploadId();
+
+          await trx("document_upload").insert({
+            document_id: docUploadId,
+            file_name: doc.fileName,
+            file_type: doc.fileType,
+            file_xstring_value: doc.fileData, // base64 encoded file data
+            system_reference_id: documentUniqueId,
+            is_verified: false,
+            valid_from: doc.validFrom,
+            valid_to: doc.validTo,
+            created_by: currentUser,
+            updated_by: currentUser,
+            created_at: currentTimestamp,
+            updated_at: currentTimestamp,
+            created_on: currentTimestamp,
+            updated_on: currentTimestamp,
+            status: "ACTIVE",
+          });
+        }
+
+        documentIndex++;
       }
+
+      // Commit the transaction
+      await trx.commit();
+
+      console.log("✅ Transaction committed successfully");
+
+      res.status(201).json({
+        success: true,
+        data: {
+          transporterId: transporterId,
+          message: "Transporter created successfully",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (transactionError) {
+      // Rollback the transaction on any database error
+      await trx.rollback();
+      console.error(
+        "❌ Transaction rolled back due to error:",
+        transactionError
+      );
+      throw transactionError; // Re-throw to outer catch
     }
-
-    // Commit the transaction
-    await trx.commit();
-
-    res.status(201).json({
-      success: true,
-      data: {
-        transporterId: transporterId,
-        message: "Transporter created successfully",
-      },
-      timestamp: new Date().toISOString(),
-    });
   } catch (error) {
-    // Rollback the transaction
-    await trx.rollback();
-
     console.error("Error creating transporter:", error);
     res.status(500).json({
       success: false,
       error: {
         code: "INTERNAL_ERROR",
         message: "Failed to create transporter",
+        details:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+// Update Transporter Controller
+const updateTransporter = async (req, res) => {
+  const trx = await knex.transaction();
+
+  try {
+    const { id } = req.params;
+    const { generalDetails, addresses, serviceableAreas, documents } = req.body;
+
+    // Validate transporter exists
+    const existingTransporter = await trx("transporter_general_info")
+      .where("transporter_id", id)
+      .first();
+
+    if (!existingTransporter) {
+      await trx.rollback();
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Transporter not found",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Validate general details (only if provided)
+    if (generalDetails) {
+      if (
+        generalDetails.businessName &&
+        generalDetails.businessName.trim().length < 2
+      ) {
+        await trx.rollback();
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Business name must be at least 2 characters long",
+            field: "businessName",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      if (!generalDetails.fromDate) {
+        await trx.rollback();
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "From date is required",
+            field: "fromDate",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate transport modes - at least one must be selected
+      const transportModes = [
+        generalDetails.transMode?.road,
+        generalDetails.transMode?.rail,
+        generalDetails.transMode?.air,
+        generalDetails.transMode?.sea,
+      ];
+
+      if (!transportModes.some((mode) => mode)) {
+        await trx.rollback();
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "At least one transport mode must be selected",
+            field: "transMode",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Validate addresses (only if provided)
+    if (addresses && addresses.length > 0) {
+      for (let i = 0; i < addresses.length; i++) {
+        const address = addresses[i];
+
+        if (!address.vatNumber || address.vatNumber.trim().length === 0) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `VAT number is required for address ${i + 1}`,
+              field: `addresses[${i}].vatNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (!address.country || address.country.trim().length === 0) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Country is required for address ${i + 1}`,
+              field: `addresses[${i}].country`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate VAT number format
+        const countryCode = Country.getAllCountries().find(
+          (c) => c.name === address.country
+        )?.isoCode;
+        if (countryCode && !validateVATNumber(address.vatNumber, countryCode)) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Invalid VAT number format for ${address.country}`,
+              field: `addresses[${i}].vatNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate contacts
+        if (!address.contacts || address.contacts.length === 0) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `At least one contact is required for address ${i + 1}`,
+              field: `addresses[${i}].contacts`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        for (let j = 0; j < address.contacts.length; j++) {
+          const contact = address.contacts[j];
+
+          if (
+            !contact.phoneNumber ||
+            !validatePhoneNumber(contact.phoneNumber)
+          ) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: `Valid phone number is required for contact ${
+                  j + 1
+                } in address ${i + 1}`,
+                field: `addresses[${i}].contacts[${j}].phoneNumber`,
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          if (!contact.email || !validateEmail(contact.email)) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: `Valid email is required for contact ${
+                  j + 1
+                } in address ${i + 1}`,
+                field: `addresses[${i}].contacts[${j}].email`,
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    // Validate serviceable areas (only if provided)
+    if (serviceableAreas && serviceableAreas.length > 0) {
+      const countries = serviceableAreas.map((area) => area.country);
+      const uniqueCountries = [...new Set(countries)];
+      if (countries.length !== uniqueCountries.length) {
+        await trx.rollback();
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Duplicate countries found in serviceable areas",
+            field: "serviceableAreas",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      for (let i = 0; i < serviceableAreas.length; i++) {
+        const area = serviceableAreas[i];
+
+        if (!area.country || area.country.trim().length === 0) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Country is required for serviceable area ${i + 1}`,
+              field: `serviceableAreas[${i}].country`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (!area.states || area.states.length === 0) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `At least one state is required for ${area.country}`,
+              field: `serviceableAreas[${i}].states`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate states belong to the country
+        const countryData = Country.getAllCountries().find(
+          (c) => c.name === area.country
+        );
+        if (!countryData) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Invalid country: ${area.country}`,
+              field: `serviceableAreas[${i}].country`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        const validStates = State.getStatesOfCountry(countryData.isoCode).map(
+          (s) => s.name
+        );
+        const invalidStates = area.states.filter(
+          (state) => !validStates.includes(state)
+        );
+
+        if (invalidStates.length > 0) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Invalid states for ${
+                area.country
+              }: ${invalidStates.join(", ")}`,
+              field: `serviceableAreas[${i}].states`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // Validate documents (only if provided)
+    if (documents && documents.length > 0) {
+      for (let i = 0; i < documents.length; i++) {
+        const document = documents[i];
+
+        if (
+          !document.documentType ||
+          document.documentType.trim().length === 0
+        ) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document type is required for document ${i + 1}`,
+              field: `documents[${i}].documentType`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (
+          !document.documentNumber ||
+          document.documentNumber.trim().length === 0
+        ) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document number is required for document ${i + 1}`,
+              field: `documents[${i}].documentNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate document number format based on document type
+        const docTypeInfo = await trx("document_name_master")
+          .where(function () {
+            // Check if documentType is an ID (like "DN003") or a name (like "TAN")
+            this.where("doc_name_master_id", document.documentType).orWhere(
+              "document_name",
+              document.documentType
+            );
+          })
+          .first();
+
+        console.log(`\n🔍 DOCUMENT VALIDATION DEBUG - Document ${i + 1}:`);
+        console.log(`Document Type from payload: ${document.documentType}`);
+        console.log(`Document Number from payload: ${document.documentNumber}`);
+        console.log(`DocTypeInfo found:`, docTypeInfo);
+
+        if (docTypeInfo) {
+          // Store the resolved document type ID for database insertion
+          document.documentTypeId = docTypeInfo.doc_name_master_id;
+
+          console.log(`Resolved Document Type ID: ${document.documentTypeId}`);
+          console.log(
+            `Document Type Name for validation: ${docTypeInfo.document_name}`
+          );
+
+          const validation = validateDocumentNumber(
+            document.documentNumber,
+            docTypeInfo.document_name
+          );
+
+          console.log(`Validation result:`, validation);
+
+          if (!validation.isValid) {
+            console.log(`❌ VALIDATION FAILED: ${validation.message}`);
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: validation.message,
+                field: `documents[${i}].documentNumber`,
+                expectedFormat: validation.format,
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Clean and normalize document number after validation
+          document.documentNumber = document.documentNumber
+            .trim()
+            .toUpperCase();
+          console.log(`✅ VALIDATION PASSED for document ${i + 1}`);
+        } else {
+          // Document type not found in master table
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Invalid document type: ${document.documentType}`,
+              field: `documents[${i}].documentType`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (!document.validFrom) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Valid from date is required for document ${i + 1}`,
+              field: `documents[${i}].validFrom`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        if (!document.validTo) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Valid to date is required for document ${i + 1}`,
+              field: `documents[${i}].validTo`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        const validFrom = new Date(document.validFrom);
+        const validTo = new Date(document.validTo);
+        if (validTo <= validFrom) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Valid to date must be after valid from date for document ${
+                i + 1
+              }`,
+              field: `documents[${i}].validTo`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      // Check for duplicate document numbers (excluding current transporter's documents)
+      for (let i = 0; i < documents.length; i++) {
+        const document = documents[i];
+        const documentTypeId = document.documentTypeId || document.documentType;
+
+        const existingDoc = await trx("transporter_documents")
+          .where("document_number", document.documentNumber)
+          .andWhere("document_type_id", documentTypeId)
+          .andWhere("status", "ACTIVE")
+          .andWhereNot("document_unique_id", "like", `${id}_%`) // Exclude current transporter's docs
+          .first();
+
+        if (existingDoc) {
+          // Get document type name for better error message
+          const docTypeInfo = await trx("document_name_master")
+            .where("doc_name_master_id", documentTypeId)
+            .first();
+
+          const docTypeName = docTypeInfo
+            ? docTypeInfo.document_name
+            : "this document type";
+
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document number ${document.documentNumber} already exists for ${docTypeName}. Please use a unique document number`,
+              field: `documents[${i}].documentNumber`,
+              value: document.documentNumber,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    const currentUser = req.user?.userId || "SYSTEM";
+    const currentTimestamp = new Date();
+
+    // Update general details if provided
+    if (generalDetails) {
+      await trx("transporter_general_info")
+        .where("transporter_id", id)
+        .update({
+          business_name: generalDetails.businessName,
+          from_date: generalDetails.fromDate,
+          to_date: generalDetails.toDate || null,
+          avg_rating: generalDetails.avgRating || 0,
+          trans_mode_road: generalDetails.transMode.road ? 1 : 0,
+          trans_mode_rail: generalDetails.transMode.rail ? 1 : 0,
+          trans_mode_air: generalDetails.transMode.air ? 1 : 0,
+          trans_mode_sea: generalDetails.transMode.sea ? 1 : 0,
+          active_flag: generalDetails.activeFlag !== false ? 1 : 0,
+          updated_at: currentTimestamp,
+          updated_on: currentTimestamp,
+          updated_by: currentUser,
+        });
+    }
+
+    // Update addresses if provided
+    if (addresses && addresses.length > 0) {
+      // Get existing addresses
+      const existingAddresses = await trx("tms_address")
+        .where("user_reference_id", id)
+        .where("user_type", "TRANSPORTER")
+        .select("address_id");
+
+      const existingAddressIds = existingAddresses.map((a) => a.address_id);
+
+      // Track which addresses are being updated
+      const updatedAddressIds = [];
+
+      // Process each address from the request
+      for (const address of addresses) {
+        const countryCode = Country.getAllCountries().find(
+          (c) => c.name === address.country
+        )?.isoCode;
+
+        const addressData = {
+          address_type_id: address.addressType || "AT001",
+          vat_number: address.vatNumber,
+          country: countryCode,
+          state: address.state,
+          city: address.city,
+          district: address.district,
+          street_1: address.street1,
+          street_2: address.street2,
+          postal_code: address.postalCode,
+          is_primary: address.isPrimary ? 1 : 0,
+          updated_at: currentTimestamp,
+          updated_on: currentTimestamp,
+          updated_by: currentUser,
+        };
+
+        // If address has an ID and it exists, UPDATE it
+        if (
+          address.addressId &&
+          existingAddressIds.includes(address.addressId)
+        ) {
+          await trx("tms_address")
+            .where("address_id", address.addressId)
+            .update(addressData);
+
+          updatedAddressIds.push(address.addressId);
+
+          // Handle contacts for this address
+          const existingContacts = await trx("transporter_contact")
+            .where("address_id", address.addressId)
+            .select("tcontact_id");
+
+          const existingContactIds = existingContacts.map((c) => c.tcontact_id);
+          const updatedContactIds = [];
+
+          // Process each contact
+          for (const contact of address.contacts) {
+            const contactData = {
+              contact_person_name: contact.name,
+              role: contact.role,
+              phone_number: contact.phoneNumber,
+              alternate_phone_number: contact.alternatePhoneNumber,
+              email_id: contact.email,
+              alternate_email_id: contact.alternateEmail,
+              whats_app_number: contact.whatsappNumber,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: currentUser,
+            };
+
+            // If contact has an ID and it exists, UPDATE it
+            if (
+              contact.contactId &&
+              existingContactIds.includes(contact.contactId)
+            ) {
+              await trx("transporter_contact")
+                .where("tcontact_id", contact.contactId)
+                .update(contactData);
+
+              updatedContactIds.push(contact.contactId);
+            } else {
+              // INSERT new contact
+              const contactId = await generateContactId(trx);
+
+              await trx("transporter_contact").insert({
+                tcontact_id: contactId,
+                transporter_id: id,
+                address_id: address.addressId,
+                ...contactData,
+                created_at: currentTimestamp,
+                created_on: currentTimestamp,
+                created_by: currentUser,
+                status: "ACTIVE",
+              });
+
+              updatedContactIds.push(contactId);
+            }
+          }
+
+          // Delete contacts that were removed
+          const contactsToDelete = existingContactIds.filter(
+            (cid) => !updatedContactIds.includes(cid)
+          );
+          if (contactsToDelete.length > 0) {
+            await trx("transporter_contact")
+              .whereIn("tcontact_id", contactsToDelete)
+              .del();
+          }
+        } else {
+          // INSERT new address
+          const addressId = await generateAddressId(trx);
+
+          await trx("tms_address").insert({
+            address_id: addressId,
+            user_reference_id: id,
+            user_type: "TRANSPORTER",
+            ...addressData,
+            created_at: currentTimestamp,
+            created_on: currentTimestamp,
+            created_by: currentUser,
+            status: "ACTIVE",
+          });
+
+          updatedAddressIds.push(addressId);
+
+          // Insert contacts for new address
+          for (const contact of address.contacts) {
+            const contactId = await generateContactId(trx);
+
+            await trx("transporter_contact").insert({
+              tcontact_id: contactId,
+              transporter_id: id,
+              address_id: addressId,
+              contact_person_name: contact.name,
+              role: contact.role,
+              phone_number: contact.phoneNumber,
+              alternate_phone_number: contact.alternatePhoneNumber,
+              email_id: contact.email,
+              alternate_email_id: contact.alternateEmail,
+              whats_app_number: contact.whatsappNumber,
+              created_at: currentTimestamp,
+              created_on: currentTimestamp,
+              created_by: currentUser,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: currentUser,
+              status: "ACTIVE",
+            });
+          }
+        }
+      }
+
+      // Delete addresses that were removed (not in the updated list)
+      const addressesToDelete = existingAddressIds.filter(
+        (aid) => !updatedAddressIds.includes(aid)
+      );
+      if (addressesToDelete.length > 0) {
+        // Delete contacts first
+        await trx("transporter_contact")
+          .whereIn("address_id", addressesToDelete)
+          .del();
+
+        // Then delete addresses
+        await trx("tms_address").whereIn("address_id", addressesToDelete).del();
+      }
+    }
+
+    // Update serviceable areas if provided
+    if (serviceableAreas && serviceableAreas.length > 0) {
+      // Delete existing serviceable areas
+      const existingHeaders = await trx("transporter_service_area_hdr")
+        .where("transporter_id", id)
+        .select("service_area_hdr_id");
+
+      for (const header of existingHeaders) {
+        await trx("transporter_service_area_itm")
+          .where("service_area_hdr_id", header.service_area_hdr_id)
+          .del();
+      }
+
+      await trx("transporter_service_area_hdr")
+        .where("transporter_id", id)
+        .del();
+
+      // Insert new serviceable areas
+      const baseHeaderCount =
+        parseInt(
+          (
+            await trx("transporter_service_area_hdr")
+              .count("* as count")
+              .first()
+          ).count
+        ) + 1;
+      const baseItemCount =
+        parseInt(
+          (
+            await trx("transporter_service_area_itm")
+              .count("* as count")
+              .first()
+          ).count
+        ) + 1;
+
+      let headerCount = baseHeaderCount;
+      let itemCount = baseItemCount;
+
+      for (const area of serviceableAreas) {
+        const headerIdNum = headerCount++;
+        const serviceAreaHeaderId = `SAH${headerIdNum
+          .toString()
+          .padStart(4, "0")}`;
+        const countryCode = Country.getAllCountries().find(
+          (c) => c.name === area.country
+        )?.isoCode;
+
+        await trx("transporter_service_area_hdr").insert({
+          service_area_hdr_id: serviceAreaHeaderId,
+          transporter_id: id,
+          service_country: countryCode,
+          created_at: currentTimestamp,
+          created_on: currentTimestamp,
+          created_by: currentUser,
+          updated_at: currentTimestamp,
+          updated_on: currentTimestamp,
+          updated_by: currentUser,
+          status: "ACTIVE",
+        });
+
+        for (const state of area.states) {
+          const itemIdNum = itemCount++;
+          const serviceAreaItemId = `SAI${itemIdNum
+            .toString()
+            .padStart(4, "0")}`;
+          const stateCode = State.getStatesOfCountry(countryCode).find(
+            (s) => s.name === state
+          )?.isoCode;
+
+          await trx("transporter_service_area_itm").insert({
+            service_area_itm_id: serviceAreaItemId,
+            service_area_hdr_id: serviceAreaHeaderId,
+            service_state: stateCode,
+            created_at: currentTimestamp,
+            created_on: currentTimestamp,
+            created_by: currentUser,
+            updated_at: currentTimestamp,
+            updated_on: currentTimestamp,
+            updated_by: currentUser,
+            status: "ACTIVE",
+          });
+        }
+      }
+    }
+
+    // Update documents if provided
+    if (documents && documents.length > 0) {
+      // Delete existing documents and file uploads
+      // First get the document_unique_ids for this transporter
+      const existingDocs = await trx("transporter_documents")
+        .where("document_unique_id", "like", `${id}_%`)
+        .select("document_unique_id");
+
+      // Delete associated file uploads
+      for (const doc of existingDocs) {
+        await trx("document_upload")
+          .where("system_reference_id", doc.document_unique_id)
+          .del();
+      }
+
+      // Delete transporter documents
+      await trx("transporter_documents")
+        .where("document_unique_id", "like", `${id}_%`)
+        .del();
+
+      // Insert new documents
+      for (const document of documents) {
+        const documentId = await generateDocumentId(trx);
+        const documentUniqueId = `${id}_${documentId}`;
+
+        await trx("transporter_documents").insert({
+          document_unique_id: documentUniqueId,
+          document_id: documentId,
+          document_type_id: document.documentTypeId || document.documentType, // Use resolved ID
+          document_number: document.documentNumber,
+          reference_number: document.referenceNumber || null,
+          country: document.country,
+          valid_from: document.validFrom,
+          valid_to: document.validTo,
+          active: document.status !== false ? 1 : 0,
+          user_type: "TRANSPORTER",
+          created_at: currentTimestamp,
+          created_on: currentTimestamp,
+          created_by: currentUser,
+          updated_at: currentTimestamp,
+          updated_on: currentTimestamp,
+          updated_by: currentUser,
+          status: "ACTIVE",
+        });
+
+        // Handle file upload if present
+        if (document.fileData) {
+          const docUploadId = await generateDocumentUploadId();
+
+          await trx("document_upload").insert({
+            document_id: docUploadId,
+            file_name: document.fileName,
+            file_type: document.fileType,
+            file_xstring_value: document.fileData, // base64 encoded file data
+            system_reference_id: documentUniqueId,
+            is_verified: false,
+            valid_from: document.validFrom,
+            valid_to: document.validTo,
+            created_at: currentTimestamp,
+            created_on: currentTimestamp,
+            created_by: currentUser,
+            updated_at: currentTimestamp,
+            updated_on: currentTimestamp,
+            updated_by: currentUser,
+            status: "ACTIVE",
+          });
+        }
+      }
+    }
+
+    await trx.commit();
+
+    res.status(200).json({
+      success: true,
+      message: "Transporter updated successfully",
+      data: {
+        transporterId: id,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    await trx.rollback();
+
+    console.error("Error updating transporter:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Failed to update transporter",
         details:
           process.env.NODE_ENV === "development" ? error.message : undefined,
       },
@@ -797,13 +1884,19 @@ const getTransporters = async (req, res) => {
 
     // Build base query with contacts
     let query = knex("transporter_general_info as tgi")
-      .leftJoin("tms_address as addr", function() {
-        this.on("tgi.transporter_id", "=", "addr.user_reference_id")
-            .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"));
+      .leftJoin("tms_address as addr", function () {
+        this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
+          "addr.user_type",
+          "=",
+          knex.raw("'TRANSPORTER'")
+        );
       })
-      .leftJoin("transporter_contact as tc", function() {
-        this.on("tgi.transporter_id", "=", "tc.transporter_id")
-            .andOn("tc.status", "=", knex.raw("'ACTIVE'"));
+      .leftJoin("transporter_contact as tc", function () {
+        this.on("tgi.transporter_id", "=", "tc.transporter_id").andOn(
+          "tc.status",
+          "=",
+          knex.raw("'ACTIVE'")
+        );
       })
       .select(
         "tgi.transporter_id",
@@ -928,13 +2021,19 @@ const getTransporters = async (req, res) => {
 
     // Get total count for pagination - create a fresh query without SELECT fields
     let countQuery = knex("transporter_general_info as tgi")
-      .leftJoin("tms_address as addr", function() {
-        this.on("tgi.transporter_id", "=", "addr.user_reference_id")
-            .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"));
+      .leftJoin("tms_address as addr", function () {
+        this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
+          "addr.user_type",
+          "=",
+          knex.raw("'TRANSPORTER'")
+        );
       })
-      .leftJoin("transporter_contact as tc", function() {
-        this.on("tgi.transporter_id", "=", "tc.transporter_id")
-            .andOn("tc.status", "=", knex.raw("'ACTIVE'"));
+      .leftJoin("transporter_contact as tc", function () {
+        this.on("tgi.transporter_id", "=", "tc.transporter_id").andOn(
+          "tc.status",
+          "=",
+          knex.raw("'ACTIVE'")
+        );
       });
 
     // Apply the same filters to count query
@@ -1010,7 +2109,9 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    const totalResult = await countQuery.countDistinct("tgi.transporter_id as count").first();
+    const totalResult = await countQuery
+      .countDistinct("tgi.transporter_id as count")
+      .first();
     const total = parseInt(totalResult.count);
 
     // Apply pagination
@@ -1087,23 +2188,9 @@ const getTransporterById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get general info with address
-    const transporter = await knex("transporter_general_info as tgi")
-      .leftJoin("tms_address as addr", "tgi.address_id", "addr.address_id")
-      .select(
-        "tgi.*",
-        "addr.street_1 as street1",
-        "addr.street_2 as street2",
-        "addr.city",
-        "addr.state",
-        "addr.country",
-        "addr.district",
-        "addr.postal_code",
-        "addr.tin_pan as tinPan",
-        "addr.tan",
-        "addr.vat_number as vatNumber"
-      )
-      .where("tgi.transporter_id", id)
+    // Get general info
+    const transporter = await knex("transporter_general_info")
+      .where("transporter_id", id)
       .first();
 
     if (!transporter) {
@@ -1117,42 +2204,144 @@ const getTransporterById = async (req, res) => {
       });
     }
 
-    // Get contacts
-    const contacts = await knex("transporter_contact")
-      .where("transporter_id", id)
+    // Get addresses for this transporter
+    const addresses = await knex("tms_address")
+      .where("user_reference_id", id)
+      .where("user_type", "TRANSPORTER")
+      .where("status", "ACTIVE")
       .select("*");
 
-    // Get serviceable areas
+    // Get contacts for this transporter
+    const contacts = await knex("transporter_contact")
+      .where("transporter_id", id)
+      .where("status", "ACTIVE")
+      .select("*");
+
+    // Get serviceable areas with proper filtering
     const serviceableAreas = await knex("transporter_service_area_hdr as hdr")
-      .leftJoin(
-        "transporter_service_area_itm as itm",
-        "hdr.service_area_hdr_id",
-        "itm.service_area_hdr_id"
-      )
+      .leftJoin("transporter_service_area_itm as itm", function () {
+        this.on(
+          "hdr.service_area_hdr_id",
+          "=",
+          "itm.service_area_hdr_id"
+        ).andOn("itm.status", "=", knex.raw("?", ["ACTIVE"]));
+      })
       .where("hdr.transporter_id", id)
-      .select("hdr.service_country as country", "itm.service_state as state");
+      .where("hdr.status", "ACTIVE")
+      .select(
+        "hdr.service_area_hdr_id as header_id",
+        "hdr.service_country as country",
+        "itm.service_area_itm_id as item_id",
+        "itm.service_state as state"
+      );
 
-    // Group serviceable areas by country
-    const groupedServiceableAreas = serviceableAreas.reduce((acc, area) => {
-      const existingCountry = acc.find((item) => item.country === area.country);
-      if (existingCountry) {
-        if (area.state && !existingCountry.states.includes(area.state)) {
-          existingCountry.states.push(area.state);
+    // Debug logging
+    console.log(
+      "Raw serviceable areas from DB:",
+      JSON.stringify(serviceableAreas, null, 2)
+    );
+
+    // Group serviceable areas by header_id first, then by country
+    // This ensures states stay with their correct country header
+    const groupedByHeader = serviceableAreas.reduce((acc, area) => {
+      if (!area.header_id || !area.country) return acc; // Skip invalid entries
+
+      // Initialize header if not already done
+      if (!acc[area.header_id]) {
+        // Database stores country ISO code
+        const countryFromDB = area.country; // This is the ISO code from service_country
+
+        // Find country data by ISO code
+        let countryData = Country.getAllCountries().find(
+          (c) => c.isoCode === countryFromDB
+        );
+
+        // If not found by ISO code, search by name (fallback)
+        if (!countryData) {
+          countryData = Country.getAllCountries().find(
+            (c) => c.name === countryFromDB
+          );
         }
-      } else {
-        acc.push({
-          country: area.country,
-          states: area.state ? [area.state] : [],
-        });
-      }
-      return acc;
-    }, []);
 
-    // Get documents
-    // Note: transporter_documents table doesn't have transporter_id column in current schema
-    // Documents are linked via document_id which is created during transporter creation
-    // For now, return empty array until proper document linking is implemented
-    const documents = [];
+        const countryIsoCode = countryData
+          ? countryData.isoCode
+          : countryFromDB;
+        const countryName = countryData ? countryData.name : countryFromDB;
+
+        acc[area.header_id] = {
+          country: countryName, // Store the country name for display
+          countryCode: countryIsoCode, // Store the ISO code (e.g., "IN", "AL")
+          states: [],
+        };
+      }
+
+      // Convert state ISO code to state name and add it
+      // Only process if we have a state value
+      if (area.state) {
+        // Get the country ISO code from the already processed header
+        const countryIsoCode = acc[area.header_id].countryCode;
+
+        const stateFromDB = area.state; // This is the ISO code from service_state
+
+        // Try to find state by ISO code using the HEADER's country
+        let stateData = State.getStatesOfCountry(countryIsoCode).find(
+          (s) => s.isoCode === stateFromDB
+        );
+
+        // If not found by ISO code, search by name (fallback)
+        if (!stateData) {
+          stateData = State.getStatesOfCountry(countryIsoCode).find(
+            (s) => s.name === stateFromDB
+          );
+        }
+
+        const stateName = stateData ? stateData.name : stateFromDB;
+
+        // Add state name only if it isn't already in the array
+        if (!acc[area.header_id].states.includes(stateName)) {
+          acc[area.header_id].states.push(stateName);
+        }
+      }
+
+      return acc;
+    }, {});
+
+    // Convert grouped object to array
+    const groupedServiceableAreas = Object.values(groupedByHeader);
+
+    // Debug logging
+    console.log(
+      "Grouped serviceable areas:",
+      JSON.stringify(groupedServiceableAreas, null, 2)
+    );
+
+    // Get documents with document type names - documents are linked via document_unique_id which contains transporterId
+    const documents = await knex("transporter_documents as td")
+      .leftJoin(
+        "document_upload as du",
+        "td.document_unique_id",
+        "du.system_reference_id"
+      )
+      .leftJoin(
+        "document_name_master as dnm",
+        "td.document_type_id",
+        "dnm.doc_name_master_id"
+      )
+      .where("td.document_unique_id", "like", `${id}_%`)
+      .where("td.status", "ACTIVE")
+      .select(
+        "td.document_type_id",
+        "dnm.document_name as documentTypeName",
+        "td.document_number",
+        "td.reference_number",
+        "td.country",
+        "td.valid_from",
+        "td.valid_to",
+        "td.active",
+        "du.file_name",
+        "du.file_type",
+        "du.file_xstring_value as file_data"
+      );
 
     // Transform transport modes
     const transportModes = {
@@ -1162,60 +2351,94 @@ const getTransporterById = async (req, res) => {
       sea: transporter.trans_mode_sea,
     };
 
+    // Group contacts by address_id
+    const contactsByAddress = contacts.reduce((acc, contact) => {
+      if (!acc[contact.address_id]) {
+        acc[contact.address_id] = [];
+      }
+      acc[contact.address_id].push({
+        contactId: contact.tcontact_id, // Include contact ID for updates
+        name: contact.contact_person_name,
+        role: contact.role,
+        phoneNumber: contact.phone_number,
+        alternatePhoneNumber: contact.alternate_phone_number,
+        email: contact.email_id,
+        alternateEmail: contact.alternate_email_id,
+        whatsappNumber: contact.whats_app_number,
+      });
+      return acc;
+    }, {});
+
+    // Build addresses with their contacts - convert country ISO codes to country names
+    const addressesWithContacts = addresses.map((address) => {
+      // Convert country ISO code to country name
+      let countryName = address.country;
+      if (address.country && address.country.length <= 3) {
+        // It's an ISO code, convert to name
+        const countryData = Country.getAllCountries().find(
+          (c) => c.isoCode === address.country
+        );
+        if (countryData) {
+          countryName = countryData.name;
+        }
+      }
+
+      return {
+        addressId: address.address_id, // Include address ID for updates
+        vatNumber: address.vat_number,
+        country: countryName,
+        state: address.state,
+        city: address.city,
+        street1: address.street_1,
+        street2: address.street_2,
+        district: address.district,
+        postalCode: address.postal_code,
+        isPrimary: address.is_primary,
+        addressType: address.address_type_id || "",
+        contacts: contactsByAddress[address.address_id] || [],
+      };
+    });
+
+    // Helper function to format date to YYYY-MM-DD
+    const formatDateForInput = (dateValue) => {
+      if (!dateValue) return null;
+      const date = new Date(dateValue);
+      // Check if date is valid
+      if (isNaN(date.getTime())) return null;
+      return date.toISOString().split("T")[0];
+    };
+
     // Build response
     const response = {
       transporterId: transporter.transporter_id,
       generalDetails: {
         businessName: transporter.business_name,
-        fromDate: transporter.from_date,
-        toDate: transporter.to_date,
+        fromDate: formatDateForInput(transporter.from_date),
+        toDate: formatDateForInput(transporter.to_date),
         avgRating: transporter.avg_rating || 0,
         transMode: transportModes,
         activeFlag: transporter.active_flag,
         createdBy: transporter.created_by,
-        createdOn: transporter.created_on
-          ? new Date(transporter.created_on).toISOString().split("T")[0]
-          : null,
+        createdOn: formatDateForInput(transporter.created_on),
         updatedBy: transporter.updated_by,
-        updatedOn: transporter.updated_on
-          ? new Date(transporter.updated_on).toISOString().split("T")[0]
-          : null,
+        updatedOn: formatDateForInput(transporter.updated_on),
         status: transporter.status,
       },
-      addresses: [
-        {
-          vatNumber: transporter.vatNumber,
-          country: transporter.country,
-          state: transporter.state,
-          city: transporter.city,
-          street1: transporter.street1,
-          street2: transporter.street2,
-          district: transporter.district,
-          postalCode: transporter.postal_code,
-          isPrimary: true,
-          contacts: contacts.map((contact) => ({
-            name: contact.contact_person_name,
-            role: contact.designation,
-            phoneNumber: contact.phone_number,
-            alternatePhoneNumber: contact.alternate_phone_number,
-            email: contact.email_id,
-            alternateEmail: contact.alternate_email_id,
-            whatsappNumber: contact.whatsapp_number,
-          })),
-        },
-      ],
+      addresses: addressesWithContacts,
       serviceableAreas: groupedServiceableAreas,
       documents: documents.map((doc) => ({
-        documentType: doc.document_type,
+        documentType: doc.documentTypeName || doc.document_type_id,
+        documentTypeId: doc.document_type_id,
         documentNumber: doc.document_number,
         referenceNumber: doc.reference_number,
         country: doc.country,
-        validFrom: doc.valid_from,
-        validTo: doc.valid_to,
-        status: doc.status,
+        validFrom: formatDateForInput(doc.valid_from),
+        validTo: formatDateForInput(doc.valid_to),
+        status: doc.active,
         fileName: doc.file_name,
         fileType: doc.file_type,
-        fileData: doc.file_data,
+        // Don't send file data in the list to reduce response size
+        // fileData: doc.file_data,
       })),
     };
 
@@ -1240,6 +2463,7 @@ const getTransporterById = async (req, res) => {
 
 module.exports = {
   createTransporter,
+  updateTransporter,
   getMasterData,
   getStatesByCountry,
   getCitiesByCountryAndState,

@@ -1,12 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const knex = require("knex")(require("../knexfile").development);
+const { authenticateToken } = require("../middleware/auth");
 
 // Get all vehicles with basic information
-router.get("/", async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
     const vehicles = await knex("vehicle_basic_information_hdr as vh")
-      .leftJoin("vehicle_type_master as vt", "vh.vehicle_type_id", "vt.vehicle_type_id")
+      .leftJoin(
+        "vehicle_type_master as vt",
+        "vh.vehicle_type_id",
+        "vt.vehicle_type_id"
+      )
       .select([
         "vh.vehicle_unique_id",
         "vh.vehicle_id_code_hdr",
@@ -18,33 +23,37 @@ router.get("/", async (req, res) => {
         "vh.fuel_type",
         "vh.vehicle_colour",
         "vh.gps_tracker_active_flag",
-        "vh.status"
+        "vh.status",
       ])
       .where("vh.status", "ACTIVE");
 
     res.json({
       success: true,
       data: vehicles,
-      count: vehicles.length
+      count: vehicles.length,
     });
   } catch (error) {
     console.error("Error fetching vehicles:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching vehicles",
-      error: error.message
+      error: error.message,
     });
   }
 });
 
 // Get vehicle by ID with full details
-router.get("/:vehicleId", async (req, res) => {
+router.get("/:vehicleId", authenticateToken, async (req, res) => {
   try {
     const { vehicleId } = req.params;
 
     // Get basic vehicle information
     const vehicle = await knex("vehicle_basic_information_hdr as vh")
-      .leftJoin("vehicle_type_master as vt", "vh.vehicle_type_id", "vt.vehicle_type_id")
+      .leftJoin(
+        "vehicle_type_master as vt",
+        "vh.vehicle_type_id",
+        "vt.vehicle_type_id"
+      )
       .select("vh.*", "vt.vehicle_type_description")
       .where("vh.vehicle_id_code_hdr", vehicleId)
       .andWhere("vh.status", "ACTIVE")
@@ -53,7 +62,7 @@ router.get("/:vehicleId", async (req, res) => {
     if (!vehicle) {
       return res.status(404).json({
         success: false,
-        message: "Vehicle not found"
+        message: "Vehicle not found",
       });
     }
 
@@ -86,31 +95,31 @@ router.get("/:vehicleId", async (req, res) => {
         insurance,
         ownership,
         maintenance,
-        permits
-      }
+        permits,
+      },
     });
   } catch (error) {
     console.error("Error fetching vehicle details:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching vehicle details",
-      error: error.message
+      error: error.message,
     });
   }
 });
 
 // Get vehicle maintenance history
-router.get("/:vehicleId/maintenance", async (req, res) => {
+router.get("/:vehicleId/maintenance", authenticateToken, async (req, res) => {
   try {
     const { vehicleId } = req.params;
 
     const maintenance = await knex("vehicle_maintenance_service_history as vm")
-      .join("vehicle_basic_information_hdr as vh", "vm.vehicle_id_code", "vh.vehicle_id_code_hdr")
-      .select([
-        "vm.*",
-        "vh.maker_brand_description",
-        "vh.maker_model"
-      ])
+      .join(
+        "vehicle_basic_information_hdr as vh",
+        "vm.vehicle_id_code",
+        "vh.vehicle_id_code_hdr"
+      )
+      .select(["vm.*", "vh.maker_brand_description", "vh.maker_model"])
       .where("vm.vehicle_id_code", vehicleId)
       .andWhere("vm.status", "ACTIVE")
       .orderBy("vm.service_date", "desc");
@@ -118,33 +127,37 @@ router.get("/:vehicleId/maintenance", async (req, res) => {
     res.json({
       success: true,
       data: maintenance,
-      count: maintenance.length
+      count: maintenance.length,
     });
   } catch (error) {
     console.error("Error fetching maintenance history:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching maintenance history",
-      error: error.message
+      error: error.message,
     });
   }
 });
 
 // Get vehicles due for maintenance
-router.get("/maintenance/due", async (req, res) => {
+router.get("/maintenance/due", authenticateToken, async (req, res) => {
   try {
     const today = new Date();
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(today.getDate() + 30);
 
     const vehiclesDue = await knex("vehicle_maintenance_service_history as vm")
-      .join("vehicle_basic_information_hdr as vh", "vm.vehicle_id_code", "vh.vehicle_id_code_hdr")
+      .join(
+        "vehicle_basic_information_hdr as vh",
+        "vm.vehicle_id_code",
+        "vh.vehicle_id_code_hdr"
+      )
       .select([
         "vh.vehicle_id_code_hdr",
         "vh.maker_brand_description",
         "vh.maker_model",
         "vm.upcoming_service_date",
-        "vm.type_of_service"
+        "vm.type_of_service",
       ])
       .where("vm.upcoming_service_date", "<=", thirtyDaysFromNow)
       .andWhere("vm.status", "ACTIVE")
@@ -154,14 +167,14 @@ router.get("/maintenance/due", async (req, res) => {
     res.json({
       success: true,
       data: vehiclesDue,
-      count: vehiclesDue.length
+      count: vehiclesDue.length,
     });
   } catch (error) {
     console.error("Error fetching vehicles due for maintenance:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching vehicles due for maintenance",
-      error: error.message
+      error: error.message,
     });
   }
 });

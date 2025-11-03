@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
+const { authenticateToken } = require("../middleware/auth");
 
 // GET all warehouses
-router.get("/", async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
     const warehouses = await db("warehouse_basic_information").select("*");
     res.json(warehouses);
@@ -14,7 +15,7 @@ router.get("/", async (req, res) => {
 });
 
 // GET warehouse by ID
-router.get("/:id", async (req, res) => {
+router.get("/:id", authenticateToken, async (req, res) => {
   try {
     const warehouse = await db("warehouse_basic_information")
       .where("warehouse_id", req.params.id)
@@ -32,7 +33,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // POST create new warehouse
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
   try {
     const [id] = await db("warehouse_basic_information").insert(req.body);
     const newWarehouse = await db("warehouse_basic_information")
@@ -47,7 +48,7 @@ router.post("/", async (req, res) => {
 });
 
 // PUT update warehouse
-router.put("/:id", async (req, res) => {
+router.put("/:id", authenticateToken, async (req, res) => {
   try {
     const updated = await db("warehouse_basic_information")
       .where("warehouse_id", req.params.id)
@@ -69,7 +70,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // DELETE warehouse
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const deleted = await db("warehouse_basic_information")
       .where("warehouse_id", req.params.id)

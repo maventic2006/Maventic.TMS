@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const knex = require("knex")(require("../knexfile").development);
+const { authenticateToken } = require("../middleware/auth");
 
 // Get all users with their roles and addresses
-router.get("/", async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   try {
     const users = await knex("user_master as u")
       .leftJoin("user_role_hdr as ur", "u.user_id", "ur.user_id")
@@ -20,27 +21,27 @@ router.get("/", async (req, res) => {
         "ur.warehouse_id",
         "a.city",
         "a.state",
-        "a.country"
+        "a.country",
       ])
       .where("u.status", "ACTIVE");
 
     res.json({
       success: true,
       data: users,
-      count: users.length
+      count: users.length,
     });
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching users",
-      error: error.message
+      error: error.message,
     });
   }
 });
 
 // Get user by ID with complete details
-router.get("/:userId", async (req, res) => {
+router.get("/:userId", authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -53,7 +54,7 @@ router.get("/:userId", async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found"
+        message: "User not found",
       });
     }
 
@@ -80,31 +81,31 @@ router.get("/:userId", async (req, res) => {
         user,
         roles,
         addresses,
-        appAccess
-      }
+        appAccess,
+      },
     });
   } catch (error) {
     console.error("Error fetching user details:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching user details",
-      error: error.message
+      error: error.message,
     });
   }
 });
 
 // Get approval workflow status
-router.get("/:userId/approvals", async (req, res) => {
+router.get("/:userId/approvals", authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
 
     const approvals = await knex("approval_flow_trans as aft")
-      .join("approval_configuration as ac", "aft.approval_config_id", "ac.approval_config_id")
-      .select([
-        "aft.*",
-        "ac.approval_type",
-        "ac.role as approver_role"
-      ])
+      .join(
+        "approval_configuration as ac",
+        "aft.approval_config_id",
+        "ac.approval_config_id"
+      )
+      .select(["aft.*", "ac.approval_type", "ac.role as approver_role"])
       .where("aft.user_id_reference_id", userId)
       .orWhere("aft.pending_with_id", userId)
       .orWhere("aft.actioned_by_id", userId)
@@ -114,14 +115,14 @@ router.get("/:userId/approvals", async (req, res) => {
     res.json({
       success: true,
       data: approvals,
-      count: approvals.length
+      count: approvals.length,
     });
   } catch (error) {
     console.error("Error fetching approval details:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching approval details",
-      error: error.message
+      error: error.message,
     });
   }
 });

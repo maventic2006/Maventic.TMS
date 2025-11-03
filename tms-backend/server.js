@@ -18,8 +18,9 @@ app.use(
 );
 app.use(cookieParser());
 app.use(morgan("combined"));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase payload size limit to handle file uploads (default is 100kb)
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Import routes
 const warehouseRoutes = require("./routes/warehouse");
@@ -29,6 +30,7 @@ const vehicleRoutes = require("./routes/vehicles");
 const userRoutes = require("./routes/users");
 const materialRoutes = require("./routes/materials");
 const transporterRoutes = require("./routes/transporter");
+const driverRoutes = require("./routes/driver");
 
 // Routes
 app.use("/api/warehouses", warehouseRoutes);
@@ -39,6 +41,8 @@ app.use("/api/materials", materialRoutes);
 app.use("/api/transporters", transporterRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/transporter", transporterRoutes);
+app.use("/api/driver", driverRoutes);
+app.use("/api/drivers", driverRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

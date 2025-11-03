@@ -514,7 +514,7 @@ const CustomSelect = ({
         ref={triggerRef}
         type="button"
         className={clsx(
-          "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-sm shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-0",
+          "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-xs transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-0 border-gray-300",
           disabled
             ? "bg-gray-50 text-gray-500 cursor-not-allowed border-gray-200"
             : error

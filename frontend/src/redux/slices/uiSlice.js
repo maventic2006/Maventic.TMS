@@ -43,6 +43,7 @@ const uiSlice = createSlice({
         id: Date.now(),
         type: action.payload.type || "info",
         message: action.payload.message,
+        details: action.payload.details || null,
         duration: action.payload.duration || 5000,
       };
       state.toasts.push(toast);

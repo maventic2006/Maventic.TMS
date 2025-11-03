@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
+const { authenticateToken } = require("../middleware/auth");
 
 // GET all consignor configurations
-router.get("/config", async (req, res) => {
+router.get("/config", authenticateToken, async (req, res) => {
   try {
     const configs = await db("consignor_general_config_master").select("*");
     res.json(configs);
@@ -14,7 +15,7 @@ router.get("/config", async (req, res) => {
 });
 
 // GET consignor material master information
-router.get("/materials", async (req, res) => {
+router.get("/materials", authenticateToken, async (req, res) => {
   try {
     const materials = await db("consignor_material_master_information").select(
       "*"
@@ -27,7 +28,7 @@ router.get("/materials", async (req, res) => {
 });
 
 // GET e-bidding configurations
-router.get("/ebidding-config", async (req, res) => {
+router.get("/ebidding-config", authenticateToken, async (req, res) => {
   try {
     const configs = await db("e_bidding_config").select("*");
     res.json(configs);
@@ -38,7 +39,7 @@ router.get("/ebidding-config", async (req, res) => {
 });
 
 // POST create new material
-router.post("/materials", async (req, res) => {
+router.post("/materials", authenticateToken, async (req, res) => {
   try {
     const [id] = await db("consignor_material_master_information").insert(
       req.body

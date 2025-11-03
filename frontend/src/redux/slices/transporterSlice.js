@@ -30,6 +30,33 @@ export const createTransporter = createAsyncThunk(
   }
 );
 
+export const updateTransporter = createAsyncThunk(
+  "transporter/updateTransporter",
+  async ({ transporterId, transporterData }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(
+        `${API_ENDPOINTS.TRANSPORTER.UPDATE}/${transporterId}`,
+        transporterData
+      );
+
+      if (response.data.success) {
+        return response.data;
+      } else {
+        return rejectWithValue(
+          response.data.error || "Failed to update transporter"
+        );
+      }
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "NETWORK_ERROR",
+          message: "Failed to update transporter",
+        }
+      );
+    }
+  }
+);
+
 export const fetchMasterData = createAsyncThunk(
   "transporter/fetchMasterData",
   async (_, { rejectWithValue }) => {
@@ -304,6 +331,7 @@ const initialState = {
   // UI state
   isLoading: false,
   isCreating: false,
+  isUpdating: false,
   isFetching: false,
   isFetchingDetails: false,
   error: null,
@@ -340,6 +368,29 @@ const transporterSlice = createSlice({
       })
       .addCase(createTransporter.rejected, (state, action) => {
         state.isCreating = false;
+        state.error = action.payload;
+      })
+
+      // Update Transporter
+      .addCase(updateTransporter.pending, (state) => {
+        state.isUpdating = true;
+        state.error = null;
+      })
+      .addCase(updateTransporter.fulfilled, (state, action) => {
+        state.isUpdating = false;
+        state.error = null;
+
+        // Update the selected transporter in state if it's currently loaded
+        if (
+          state.selectedTransporter &&
+          state.selectedTransporter.transporterId ===
+            action.payload.data.transporterId
+        ) {
+          // Refresh will be done by re-fetching the transporter
+        }
+      })
+      .addCase(updateTransporter.rejected, (state, action) => {
+        state.isUpdating = false;
         state.error = action.payload;
       })
 

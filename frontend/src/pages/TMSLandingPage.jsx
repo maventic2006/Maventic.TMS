@@ -322,6 +322,9 @@ const TMSLandingPage = () => {
         //   // Redirect to login if not authenticated
         //   navigate('/login', { state: { from: '/transporters' } });
         // }
+      } else if (item.title === "Driver Maintenance") {
+        console.log("Navigating to /drivers");
+        navigate("/drivers");
       }
       // Add more navigation handlers for other menu items as needed
     } catch (error) {

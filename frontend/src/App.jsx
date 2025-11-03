@@ -18,6 +18,9 @@ import TMSLandingPage from "./pages/TMSLandingPage";
 import TransporterMaintenance from "./pages/TransporterMaintenance";
 import CreateTransporterPage from "./features/transporter/CreateTransporterPage";
 import TransporterDetailsPage from "./features/transporter/TransporterDetailsPage";
+import DriverMaintenance from "./pages/DriverMaintenance";
+import DriverCreatePage from "./features/driver/pages/DriverCreatePage";
+import DriverDetailsPage from "./features/driver/pages/DriverDetailsPage";
 import {
   verifyToken,
   logoutUser,
@@ -313,7 +316,9 @@ function App() {
                   path="/transporters"
                   element={
                     <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <TransporterMaintenance />
+                      <Layout>
+                        <TransporterMaintenance />
+                      </Layout>
                     </PrivateRoute>
                   }
                 />
@@ -322,7 +327,9 @@ function App() {
                   path="/transporter/create"
                   element={
                     <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <CreateTransporterPage />
+                      <Layout>
+                        <CreateTransporterPage />
+                      </Layout>
                     </PrivateRoute>
                   }
                 />
@@ -331,7 +338,43 @@ function App() {
                   path="/transporter/:id"
                   element={
                     <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <TransporterDetailsPage />
+                      <Layout>
+                        <TransporterDetailsPage />
+                      </Layout>
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Driver Management Routes */}
+                <Route
+                  path="/drivers"
+                  element={
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                      <Layout>
+                        <DriverMaintenance />
+                      </Layout>
+                    </PrivateRoute>
+                  }
+                />
+
+                <Route
+                  path="/driver/create"
+                  element={
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                      <Layout>
+                        <DriverCreatePage />
+                      </Layout>
+                    </PrivateRoute>
+                  }
+                />
+
+                <Route
+                  path="/driver/:id"
+                  element={
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                      <Layout>
+                        <DriverDetailsPage />
+                      </Layout>
                     </PrivateRoute>
                   }
                 />

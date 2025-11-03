@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchTransporterById } from "../../redux/slices/transporterSlice";
+import {
+  fetchTransporterById,
+  updateTransporter,
+  fetchMasterData,
+  clearError,
+} from "../../redux/slices/transporterSlice";
+import { addToast } from "../../redux/slices/uiSlice";
 import {
   ArrowLeft,
   Edit,
@@ -19,6 +25,8 @@ import {
 } from "lucide-react";
 
 import { getComponentTheme } from "../../utils/theme";
+import { validateFormSection } from "./validation";
+import { TOAST_TYPES } from "../../utils/constants";
 
 // Import tab components (we'll create view versions)
 import GeneralDetailsViewTab from "./components/GeneralDetailsViewTab";
@@ -38,13 +46,20 @@ const TransporterDetailsPage = () => {
   const dispatch = useDispatch();
 
   const { user, role } = useSelector((state) => state.auth);
-  const { selectedTransporter, isFetchingDetails, error } = useSelector(
-    (state) => state.transporter
-  );
+  const { selectedTransporter, isFetchingDetails, isUpdating, error } =
+    useSelector((state) => state.transporter);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [editFormData, setEditFormData] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
+  const [tabErrors, setTabErrors] = useState({
+    0: false, // General Details
+    1: false, // Address & Contacts
+    2: false, // Serviceable Area
+    3: false, // Documents
+  });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const actionButtonTheme = getComponentTheme("actionButton");
   const tabButtonTheme = getComponentTheme("tabButton");
@@ -87,6 +102,11 @@ const TransporterDetailsPage = () => {
     }
   }, [id, dispatch]);
 
+  // Fetch master data on component mount
+  useEffect(() => {
+    dispatch(fetchMasterData());
+  }, [dispatch]);
+
   // Set edit form data when transporter data is loaded
   useEffect(() => {
     if (selectedTransporter && !editFormData) {
@@ -94,26 +114,258 @@ const TransporterDetailsPage = () => {
     }
   }, [selectedTransporter, editFormData]);
 
+  // Track unsaved changes
+  useEffect(() => {
+    if (isEditMode && editFormData && selectedTransporter) {
+      const hasChanges =
+        JSON.stringify(editFormData) !== JSON.stringify(selectedTransporter);
+      setHasUnsavedChanges(hasChanges);
+    }
+  }, [editFormData, selectedTransporter, isEditMode]);
+
+  // Clear errors when switching tabs
+  useEffect(() => {
+    if (!isEditMode) {
+      setValidationErrors({});
+    }
+  }, [activeTab, isEditMode]);
+
   const handleEditToggle = () => {
+    if (isEditMode && hasUnsavedChanges) {
+      // Show confirmation dialog for unsaved changes
+      const confirmCancel = window.confirm(
+        "You have unsaved changes. Are you sure you want to cancel? All changes will be lost."
+      );
+
+      if (!confirmCancel) {
+        return;
+      }
+    }
+
     if (isEditMode) {
       // Cancel edit mode - reset form data
       setEditFormData(selectedTransporter);
+      setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+      });
+      setHasUnsavedChanges(false);
     }
     setIsEditMode(!isEditMode);
   };
 
+  const validateAllSections = (formData) => {
+    const errors = {};
+
+    // Validate general details
+    const generalErrors = validateFormSection("generalDetails", formData);
+    if (Object.keys(generalErrors).length > 0) {
+      errors.generalDetails = generalErrors;
+    }
+
+    // Validate addresses
+    const addressErrors = validateFormSection("addresses", formData);
+    if (Object.keys(addressErrors).length > 0) {
+      errors.addresses = addressErrors;
+    }
+
+    // Validate serviceable areas
+    const serviceableAreaErrors = validateFormSection(
+      "serviceableAreas",
+      formData
+    );
+    if (Object.keys(serviceableAreaErrors).length > 0) {
+      errors.serviceableAreas = serviceableAreaErrors;
+    }
+
+    // Validate documents
+    const documentErrors = validateFormSection("documents", formData);
+    if (Object.keys(documentErrors).length > 0) {
+      errors.documents = documentErrors;
+    }
+
+    return errors;
+  };
+
   const handleSaveChanges = async () => {
     try {
-      // TODO: Implement actual save functionality
-      // await dispatch(updateTransporter(id, editFormData));
+      // Clear previous errors
+      setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+      });
 
-      // For now, just show success message
+      // Validate all sections
+      const errors = validateAllSections(editFormData);
+
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+
+        // Update tab errors to show which tabs have issues
+        const newTabErrors = {
+          0:
+            errors.generalDetails &&
+            Object.keys(errors.generalDetails).length > 0,
+          1: errors.addresses && Object.keys(errors.addresses).length > 0,
+          2:
+            errors.serviceableAreas &&
+            Object.keys(errors.serviceableAreas).length > 0,
+          3: errors.documents && Object.keys(errors.documents).length > 0,
+        };
+        setTabErrors(newTabErrors);
+
+        // Find the first tab with errors and switch to it
+        if (newTabErrors[0]) {
+          setActiveTab(0);
+        } else if (newTabErrors[1]) {
+          setActiveTab(1);
+        } else if (newTabErrors[2]) {
+          setActiveTab(2);
+        } else if (newTabErrors[3]) {
+          setActiveTab(3);
+        }
+
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "Please fix all validation errors before saving.",
+          })
+        );
+        return;
+      }
+
+      // Clear any previous errors
+      setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+      });
+      dispatch(clearError());
+
+      // Call the update API
+      const result = await dispatch(
+        updateTransporter({
+          transporterId: id,
+          transporterData: {
+            generalDetails: editFormData.generalDetails,
+            addresses: editFormData.addresses,
+            serviceableAreas: editFormData.serviceableAreas,
+            documents: editFormData.documents,
+          },
+        })
+      ).unwrap();
+
+      // Success - show toast notification
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Transporter updated successfully!",
+        })
+      );
+
+      // Refresh the transporter data
+      await dispatch(fetchTransporterById(id));
+
+      // Switch to view mode
       setIsEditMode(false);
-
-      // Show success message (you can replace with toast)
-      alert("Transporter updated successfully!");
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
     } catch (err) {
       console.error("Error saving transporter:", err);
+
+      // IMPORTANT: Clear Redux error state immediately to prevent "Error Loading Data" page
+      dispatch(clearError());
+
+      // Check if it's a validation error from backend (400 Bad Request)
+      if (
+        err.code === "VALIDATION_ERROR" ||
+        err.message?.includes("required")
+      ) {
+        // Backend validation error - show inline errors and stay in edit mode
+
+        // Try to map backend error to tab and field
+        let tabWithError = null;
+        const backendErrors = {};
+
+        if (err.field) {
+          // Parse field path like "documents[0].documentNumber"
+          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+
+          if (fieldMatch) {
+            const [, section, index, field] = fieldMatch;
+
+            // Map section to tab index
+            const tabMapping = {
+              generalDetails: 0,
+              addresses: 1,
+              serviceableAreas: 2,
+              documents: 3,
+            };
+
+            tabWithError = tabMapping[section];
+
+            if (index !== undefined) {
+              // Array field error (e.g., documents[0].documentNumber)
+              if (!backendErrors[section]) backendErrors[section] = {};
+              if (!backendErrors[section][index])
+                backendErrors[section][index] = {};
+              if (field) {
+                backendErrors[section][index][field] = err.message;
+              }
+            } else if (field) {
+              // Object field error (e.g., generalDetails.businessName)
+              if (!backendErrors[section]) backendErrors[section] = {};
+              backendErrors[section][field] = err.message;
+            }
+          }
+        }
+
+        // Set validation errors
+        setValidationErrors(backendErrors);
+
+        // Update tab errors
+        const newTabErrors = {
+          0: tabWithError === 0,
+          1: tabWithError === 1,
+          2: tabWithError === 2,
+          3: tabWithError === 3,
+        };
+        setTabErrors(newTabErrors);
+
+        // Switch to tab with error
+        if (tabWithError !== null) {
+          setActiveTab(tabWithError);
+        }
+
+        // Show error toast
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message:
+              err.message || "Please fix validation errors before saving.",
+          })
+        );
+
+        // STAY IN EDIT MODE - do not switch to view mode
+        return;
+      }
+
+      // Other errors (network, server, etc.) - show generic error toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message:
+            err.message || "Failed to update transporter. Please try again.",
+        })
+      );
     }
   };
 
@@ -134,7 +386,7 @@ const TransporterDetailsPage = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#14B8A6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-[#10B981] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading transporter details...</p>
         </div>
       </div>
@@ -154,7 +406,7 @@ const TransporterDetailsPage = () => {
           </p>
           <button
             onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-[#14B8A6] text-white rounded-lg hover:bg-[#0891B2] transition-colors"
+            className="px-4 py-2 bg-[#10B981] text-white rounded-lg hover:bg-[#059669] transition-colors"
           >
             Go Back
           </button>
@@ -176,7 +428,7 @@ const TransporterDetailsPage = () => {
           </p>
           <button
             onClick={() => navigate("/transporters")}
-            className="px-4 py-2 bg-[#14B8A6] text-white rounded-lg hover:bg-[#0891B2] transition-colors"
+            className="px-4 py-2 bg-[#10B981] text-white rounded-lg hover:bg-[#059669] transition-colors"
           >
             Back to Transporters
           </button>
@@ -188,24 +440,24 @@ const TransporterDetailsPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
       {/* Modern Header Bar with glassmorphism */}
-      <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-6 shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
         {/* Background decoration */}
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-transparent to-teal-600/10"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-transparent to-blue-800/10"></div>
         <div className="absolute -top-4 -right-4 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl"></div>
-        <div className="absolute -bottom-4 -left-4 w-40 h-40 bg-gradient-to-tr from-teal-400/10 to-transparent rounded-full blur-2xl"></div>
+        <div className="absolute -bottom-4 -left-4 w-40 h-40 bg-gradient-to-tr from-blue-400/10 to-transparent rounded-full blur-2xl"></div>
 
         <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => navigate(-1)}
-              className="group p-3 bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-all duration-300 hover:scale-105 border border-white/20"
+              className="group p-2 bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-all duration-300 hover:scale-105 border border-white/20"
             >
               <ArrowLeft className="w-5 h-5 text-white group-hover:text-white transition-colors" />
             </button>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-4">
-                <h1 className="text-3xl font-bold text-white tracking-tight">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-white tracking-tight">
                   {selectedTransporter.generalDetails.businessName}
                 </h1>
                 <span
@@ -216,19 +468,19 @@ const TransporterDetailsPage = () => {
                   {selectedTransporter.generalDetails.status}
                 </span>
               </div>
-              <div className="flex items-center gap-6 text-blue-100/80 text-sm">
+              <div className="flex items-center gap-4 text-blue-100/80 text-xs">
                 <div className="flex items-center gap-2">
-                  <Hash className="w-4 h-4" />
+                  <Hash className="w-3 h-3" />
                   <span>ID: {selectedTransporter.transporterId}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
+                  <User className="w-3 h-3" />
                   <span>
                     Created by: {selectedTransporter.generalDetails.createdBy}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
+                  <Calendar className="w-3 h-3" />
                   <span>
                     Created: {selectedTransporter.generalDetails.createdOn}
                   </span>
@@ -237,12 +489,12 @@ const TransporterDetailsPage = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {isEditMode ? (
               <>
                 <button
                   onClick={handleEditToggle}
-                  className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium hover:bg-white/20 transition-all duration-300 hover:scale-105"
+                  className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105"
                 >
                   <X className="w-4 h-4" />
                   Cancel
@@ -250,16 +502,26 @@ const TransporterDetailsPage = () => {
 
                 <button
                   onClick={handleSaveChanges}
-                  className="group inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#14B8A6] to-[#0891B2] text-white rounded-xl font-medium hover:from-[#0891B2] hover:to-[#14B8A6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-teal-500/25"
+                  disabled={isUpdating}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
-                  <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                  Save Changes
+                  {isUpdating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </>
             ) : (
               <button
                 onClick={handleEditToggle}
-                className="group inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#14B8A6] to-[#0891B2] text-white rounded-xl font-medium hover:from-[#0891B2] hover:to-[#14B8A6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-teal-500/25"
+                className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
               >
                 <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
                 Edit Details
@@ -274,10 +536,11 @@ const TransporterDetailsPage = () => {
         {/* Tab backdrop blur effect */}
         <div className="absolute inset-0 bg-black/20 backdrop-blur-sm"></div>
 
-        <div className="relative flex space-x-1 py-2">
+        <div className="relative flex space-x-2 py-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const hasError = isEditMode && tabErrors[tab.id];
 
             return (
               <button
@@ -291,20 +554,25 @@ const TransporterDetailsPage = () => {
               >
                 {/* Active tab decoration */}
                 {isActive && (
-                  <div className="absolute inset-x-0 -bottom-0 h-1 bg-gradient-to-r from-[#14B8A6] to-[#0891B2] rounded-t-full"></div>
+                  <div className="absolute inset-x-0 -bottom-0 h-1 bg-gradient-to-r from-[#10B981] to-[#059669] rounded-t-full"></div>
                 )}
 
                 <Icon
                   className={`w-5 h-5 transition-all duration-300 ${
                     isActive
-                      ? "text-[#14B8A6] scale-110"
+                      ? "text-[#10B981] scale-110"
                       : "text-blue-200/70 group-hover:text-white group-hover:scale-105"
                   }`}
                 />
                 <span className="font-semibold tracking-wide">{tab.name}</span>
 
-                {/* Mode indicator */}
-                {isActive && (
+                {/* Error indicator dot (like create page) */}
+                {hasError && (
+                  <div className="ml-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                )}
+
+                {/* Mode indicator (only show when no errors) */}
+                {isActive && !hasError && (
                   <div className="ml-2">
                     {isEditMode ? (
                       <Edit className="w-3 h-3 text-orange-500" />
@@ -325,7 +593,7 @@ const TransporterDetailsPage = () => {
       </div>
 
       {/* Modern Content Area */}
-      <div className="px-6 py-8 space-y-8">
+      <div className="px-0 py-0 space-y-8">
         {/* Enhanced Tab Content Container */}
         <div className="relative">
           {tabs.map((tab) => {
@@ -344,9 +612,9 @@ const TransporterDetailsPage = () => {
                 }`}
               >
                 {/* Content wrapper with modern styling */}
-                <div className="bg-white/60 backdrop-blur-sm rounded-3xl shadow-xl border border-white/40 overflow-hidden">
+                <div className="bg-white/60 backdrop-blur-sm rounded-b-3xl shadow-xl border border-white/40 overflow-hidden">
                   {/* Tab content header with gradient */}
-                  <div className="bg-gradient-to-r from-gray-50/80 to-white/80 backdrop-blur-sm px-8 py-6 border-b border-gray-200/50">
+                  {/* <div className="bg-gradient-to-r from-gray-50/80 to-white/80 backdrop-blur-sm px-8 py-6 border-b border-gray-200/50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-[#14B8A6] to-[#0891B2] rounded-xl flex items-center justify-center shadow-lg">
@@ -366,7 +634,7 @@ const TransporterDetailsPage = () => {
                         </div>
                       </div>
 
-                      {/* Mode indicator badge */}
+                      
                       <div
                         className={`px-3 py-1 rounded-full text-xs font-medium ${
                           isEditMode
@@ -377,14 +645,26 @@ const TransporterDetailsPage = () => {
                         {isEditMode ? "Edit Mode" : "View Mode"}
                       </div>
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* Tab content */}
-                  <div className="p-8">
+                  <div className="p-4">
                     <TabComponent
                       formData={isEditMode ? editFormData : selectedTransporter}
                       setFormData={isEditMode ? setEditFormData : undefined}
-                      errors={{}}
+                      errors={
+                        isEditMode
+                          ? tab.id === 0
+                            ? validationErrors.generalDetails || {}
+                            : tab.id === 1
+                            ? validationErrors.addresses || {}
+                            : tab.id === 2
+                            ? validationErrors.serviceableAreas || {}
+                            : tab.id === 3
+                            ? validationErrors.documents || {}
+                            : {}
+                          : {}
+                      }
                       isEditMode={isEditMode}
                       transporterData={selectedTransporter}
                     />

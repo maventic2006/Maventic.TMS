@@ -17,6 +17,7 @@ export const API_ENDPOINTS = {
   DASHBOARD: "/dashboard",
   TRANSPORTER: {
     CREATE: "/transporter",
+    UPDATE: "/transporter",
     MASTER_DATA: "/transporter/master-data",
     STATES: "/transporter/states",
     CITIES: "/transporter/cities",
@@ -90,6 +91,83 @@ export const TOAST_TYPES = {
   ERROR: "error",
   WARNING: "warning",
   INFO: "info",
+};
+
+// Centralized Error Messages
+export const ERROR_MESSAGES = {
+  // General Details Errors
+  BUSINESS_NAME_REQUIRED: "Please enter the business name",
+  BUSINESS_NAME_TOO_SHORT: "Business name must be at least 2 characters long",
+  BUSINESS_NAME_TOO_LONG: "Business name cannot exceed 100 characters",
+  FROM_DATE_REQUIRED: "Please select a start date",
+  FROM_DATE_FUTURE: "Start date cannot be in the future",
+  TO_DATE_FUTURE: "End date must be in the future",
+  TO_DATE_BEFORE_FROM: "End date must be after the start date",
+  TRANSPORT_MODE_REQUIRED:
+    "Please select at least one transport mode (Road, Rail, Air, or Sea)",
+  RATING_INVALID: "Rating must be between 0 and 5",
+
+  // Address & Contact Errors
+  VAT_NUMBER_REQUIRED: "Please enter the VAT/Tax number",
+  VAT_NUMBER_TOO_SHORT: "VAT/Tax number must be at least 8 characters",
+  VAT_NUMBER_TOO_LONG: "VAT/Tax number cannot exceed 15 characters",
+  VAT_NUMBER_INVALID:
+    "VAT/Tax number must contain only uppercase letters and numbers",
+  VAT_NUMBER_DUPLICATE:
+    "This VAT/Tax number is already used. Please enter a unique number",
+  COUNTRY_REQUIRED: "Please select a country",
+  STATE_REQUIRED: "Please select a state",
+  CITY_REQUIRED: "Please select a city",
+  ADDRESS_REQUIRED: "Please provide at least one address",
+  CONTACT_REQUIRED:
+    "Please provide at least one contact person for each address",
+
+  // Contact Person Errors
+  CONTACT_NAME_REQUIRED: "Please enter the contact person's name",
+  CONTACT_NAME_TOO_SHORT: "Name must be at least 2 characters long",
+  CONTACT_NAME_TOO_LONG: "Name cannot exceed 50 characters",
+  CONTACT_NAME_INVALID: "Name can only contain letters and spaces",
+  PHONE_NUMBER_REQUIRED: "Please enter a phone number",
+  PHONE_NUMBER_INVALID:
+    "Please enter a valid 10-digit phone number (e.g., 9876543210)",
+  ALTERNATE_PHONE_INVALID:
+    "Please enter a valid 10-digit alternate phone number",
+  EMAIL_REQUIRED: "Please enter an email address",
+  EMAIL_INVALID:
+    "Please enter a valid email address (e.g., example@domain.com)",
+  ALTERNATE_EMAIL_INVALID: "Please enter a valid alternate email address",
+  WHATSAPP_NUMBER_INVALID: "Please enter a valid 10-digit WhatsApp number",
+
+  // Serviceable Area Errors
+  SERVICEABLE_AREA_REQUIRED: "Please add at least one serviceable area",
+  SERVICEABLE_COUNTRY_REQUIRED:
+    "Please select a country for the serviceable area",
+  SERVICEABLE_STATES_REQUIRED: "Please select at least one state",
+  SERVICEABLE_AREA_DUPLICATE:
+    "This country is already added. Please select a different country",
+
+  // Document Errors
+  DOCUMENT_REQUIRED: "Please add at least one document",
+  DOCUMENT_TYPE_REQUIRED: "Please select the document type",
+  DOCUMENT_NUMBER_REQUIRED: "Please enter the document number",
+  DOCUMENT_NUMBER_INVALID:
+    "Document number can only contain uppercase letters, numbers, hyphens, and forward slashes",
+  DOCUMENT_COUNTRY_REQUIRED: "Please select the issuing country",
+  DOCUMENT_VALID_FROM_REQUIRED: "Please select the start date",
+  DOCUMENT_VALID_FROM_FUTURE: "Start date cannot be in the future",
+  DOCUMENT_VALID_TO_REQUIRED: "Please select the expiry date",
+  DOCUMENT_VALID_TO_BEFORE_FROM: "Expiry date must be after the start date",
+  DOCUMENT_DUPLICATE:
+    "This document number already exists for this document type",
+  FILE_SIZE_TOO_LARGE: "File size must be less than 5MB",
+  FILE_TYPE_NOT_ALLOWED:
+    "Please upload a file in JPG, PNG, GIF, PDF, DOC, or DOCX format",
+
+  // General Errors
+  VALIDATION_ERROR: "Please check the form and fix the errors",
+  SUBMISSION_ERROR: "Unable to submit the form. Please try again",
+  NETWORK_ERROR: "Network error. Please check your internet connection",
+  SERVER_ERROR: "Server error. Please try again later",
 };
 
 // Theme Constants

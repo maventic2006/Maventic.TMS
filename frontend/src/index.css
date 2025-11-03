@@ -1,41 +1,126 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap");
 @import "tailwindcss";
+
+/* ============================================ */
+/* TMS THEME CSS VARIABLES */
+/* Auto-generated from theme.config.js */
+/* ============================================ */
+
+:root {
+  /* General Pages Theme - Colors */
+  --primary-background: #f5f7fa;
+  --primary-text: #0d1a33;
+
+  --card-background: #ffffff;
+  --card-border: #e5e7eb;
+  --card-shadow: 0px 2px 6px rgba(0, 0, 0, 0.05);
+
+  --text-primary: #0d1a33;
+  --text-secondary: #4a5568;
+  --text-disabled: #9ca3af;
+
+  --header-background: #0d1a33;
+  --header-text: #ffffff;
+
+  --input-background: #ffffff;
+  --input-border-default: #e5e7eb;
+  --input-border-focus: #3b82f6;
+  --input-border-error: #dc2626;
+  --input-text: #0d1a33;
+  --input-placeholder: #9ca3af;
+
+  /* Status Colors */
+  --status-pending-bg: #fde68a;
+  --status-pending-text: #92400e;
+  --status-approve-bg: #10b981;
+  --status-approve-text: #ffffff;
+  --status-reject-text: #dc2626;
+  --status-reject-border: #dc2626;
+  --status-success-bg: #d1fae5;
+  --status-success-text: #10b981;
+  --status-warning-bg: #fef3c7;
+  --status-warning-text: #f59e0b;
+  --status-error-bg: #fee2e2;
+  --status-error-text: #dc2626;
+
+  /* Button Colors */
+  --button-primary-bg: #10b981;
+  --button-primary-hover: #059669;
+  --button-primary-text: #ffffff;
+  --button-secondary-bg: transparent;
+  --button-secondary-hover: #f5f7fa;
+  --button-secondary-text: #0d1a33;
+  --button-secondary-border: #e5e7eb;
+  --button-danger-text: #dc2626;
+  --button-danger-border: #dc2626;
+  --button-danger-hover: #fee2e2;
+
+  /* Field Colors */
+  --field-requested-bg: #eff6ff;
+  --field-requested-border: #bfdbfe;
+  --field-requested-text: #2563eb;
+  --field-approved-bg: #ecfdf5;
+  --field-approved-border: #a7f3d0;
+  --field-approved-text: #059669;
+
+  /* Typography */
+  --font-family: "Poppins", "Inter", system-ui, sans-serif;
+  --font-size-main-title: 24px;
+  --font-size-subtitle: 14px;
+  --font-size-section-label: 12px;
+  --font-size-input: 14px;
+  --font-size-button: 14px;
+  --font-size-pill: 12px;
+
+  /* Layout */
+  --card-border-radius: 12px;
+  --card-padding: 24px;
+  --button-border-radius: 8px;
+  --button-padding: 10px 16px;
+  --pill-border-radius: 9999px;
+  --pill-padding: 4px 12px;
+  --input-border-radius: 8px;
+  --input-padding: 10px 14px;
+  --input-height: 40px;
+  --button-height: 40px;
+}
 
 /* Global Styles */
 body {
-  background-color: #F8FAFC; /* primary.background */
-  color: #0F172A; /* text.primary */
-  font-family: "Poppins", sans-serif;
+  background-color: var(--primary-background);
+  color: var(--text-primary);
+  font-family: var(--font-family);
 }
 
 /* Apply Poppins font to all elements */
 * {
-  font-family: "Poppins", sans-serif;
+  font-family: var(--font-family);
 }
 
 /* Custom component classes for consistent styling */
 .tms-card {
-  background-color: white;
-  border: 1px solid rgb(229 231 235);
-  border-radius: 0.75rem;
-  box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.05);
-  padding: 1.5rem;
+  background-color: var(--card-background);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-border-radius);
+  box-shadow: var(--card-shadow);
+  padding: var(--card-padding);
 }
 
 .tms-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.5rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
+  border-radius: var(--button-border-radius);
+  padding: var(--button-padding);
+  font-size: var(--font-size-button);
+  font-weight: 600;
   transition: all 0.2s;
+  height: var(--button-height);
 }
 
 .tms-button:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgb(59 130 246);
+  box-shadow: 0 0 0 2px var(--input-border-focus);
 }
 
 .tms-button:disabled {
@@ -44,46 +129,68 @@ body {
 }
 
 .tms-button-primary {
-  background-color: rgb(255 165 0);
-  color: white;
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border: 1px solid var(--button-primary-bg);
 }
 
 .tms-button-primary:hover {
-  background-color: rgb(255 165 0 / 0.9);
+  background-color: var(--button-primary-hover);
 }
 
 .tms-button-secondary {
-  background-color: rgb(229 231 235);
-  color: rgb(13 26 51);
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border: 1px solid var(--button-secondary-border);
 }
 
 .tms-button-secondary:hover {
-  background-color: rgb(229 231 235 / 0.8);
+  background-color: var(--button-secondary-hover);
+}
+
+.tms-button-danger {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-danger-text);
+  border: 1px solid var(--button-danger-border);
+}
+
+.tms-button-danger:hover {
+  background-color: var(--button-danger-hover);
 }
 
 .tms-input {
   display: flex;
-  height: 2.5rem;
+  height: var(--input-height);
   width: 100%;
-  border-radius: 0.5rem;
-  border: 1px solid rgb(229 231 235);
-  background-color: rgb(245 247 250);
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  border-radius: var(--input-border-radius);
+  border: 1px solid var(--input-border-default);
+  background-color: var(--input-background);
+  padding: var(--input-padding);
+  font-size: var(--font-size-input);
+  color: var(--input-text);
 }
 
 .tms-input::placeholder {
-  color: rgb(107 114 128);
+  color: var(--input-placeholder);
 }
 
 .tms-input:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgb(59 130 246);
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .tms-input:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.tms-input-error {
+  border-color: var(--input-border-error);
+}
+
+.tms-input-error:focus {
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);
 }
 
 /* Animations */
@@ -102,6 +209,20 @@ body {
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Custom Switch Component Styling */
+/* Override Radix UI Switch to use green for active state */
+button[role="switch"][data-state="checked"] {
+  background-color: #10b981 !important; /* Green when active */
+}
+
+button[role="switch"][data-state="unchecked"] {
+  background-color: #d1d5db !important; /* Gray when inactive */
+}
+
+button[role="switch"] span {
+  background-color: #ffffff !important; /* White slider button */
+}
+
 /* shadcn/ui theme variables */
 
 :root {
@@ -112,7 +233,8 @@ body {
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /* Using TMS theme primary color #0D1A33 (Navy Blue) */
+  --primary: oklch(0.145 0.02 255);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -123,7 +245,7 @@ body {
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.145 0.02 255);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);

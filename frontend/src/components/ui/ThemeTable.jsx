@@ -149,7 +149,7 @@ const ThemeTable = ({
           ) : (
             <button
               onClick={() => fileInputRefs.current[rowIndex]?.click()}
-              className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg hover:border-[#FFA500] hover:bg-[#FFF4E6] transition-colors w-full"
+              className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg hover:border-[#10B981] hover:bg-[#FFF4E6] transition-colors w-full"
             >
               <Upload className="w-4 h-4 text-gray-400" />
               <span className="text-sm text-gray-500">Upload File</span>
@@ -170,6 +170,7 @@ const ThemeTable = ({
           options={column.options || []}
           placeholder={column.placeholder || `Select ${column.label}`}
           disabled={column.disabled}
+          searchable={column.searchable || false}
           getOptionLabel={(option) => option.label}
           getOptionValue={(option) => option.value}
           className={`min-w-[200px] ${hasError ? "border-red-500" : ""}`}
@@ -198,8 +199,7 @@ const ThemeTable = ({
           onChange={(e) =>
             handleCellChange(rowIndex, column.key, e.target.value)
           }
-          className={`w-full min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${errorClass}`}
-          placeholder={column.placeholder}
+          className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${errorClass}`}
           {...dateConstraints}
         />
       );
@@ -224,7 +224,7 @@ const ThemeTable = ({
           type="radio"
           checked={selectedRowIndex === rowIndex}
           onChange={() => onRowSelect && onRowSelect(rowIndex)}
-          className="w-5 h-5 text-[#FFA500] border-gray-300 focus:ring-[#FFA500]"
+          className="w-5 h-5 text-[#10B981] border-gray-300 focus:ring-[#10B981]"
         />
       );
     }
@@ -236,7 +236,7 @@ const ThemeTable = ({
         value={value}
         onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
         placeholder={column.placeholder}
-        className={`w-full min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${errorClass}`}
+        className={`w-full min-w-[200px] px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent ${errorClass}`}
         disabled={column.disabled}
       />
     );
@@ -253,7 +253,7 @@ const ThemeTable = ({
         {canAddRows && (
           <button
             onClick={onAddRow}
-            className="bg-[#FFA500] text-white h-10 px-4 rounded-lg flex items-center gap-2 hover:bg-[#e6940a] transition-colors"
+            className="bg-[#10B981] text-white h-9 px-3 rounded-lg flex items-center gap-2 text-sm hover:bg-[#059669] transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add
@@ -267,12 +267,12 @@ const ThemeTable = ({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
               <thead>
-                <tr className="text-left text-sm font-medium text-gray-600 border-b border-gray-200">
+                <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
                   {hasRowSelection && <th className="pb-3 w-12"></th>}
                   {columns.map((column) => (
                     <th
                       key={column.key}
-                      className={`pb-3 min-w-[200px] ${
+                      className={`pb-3 pl-4 min-w-[200px] ${
                         column.width || "w-auto"
                       }`}
                     >
@@ -286,13 +286,13 @@ const ThemeTable = ({
                 {data.map((row, rowIndex) => {
                   const isSelected = selectedRowIndex === rowIndex;
                   const rowClass = isSelected
-                    ? "bg-[#FFF4E6] border-l-4 border-l-[#FFA500]"
+                    ? "bg-[#FFF4E6] border-l-4 border-l-[#10B981]"
                     : "bg-white";
 
                   return (
                     <tr
                       key={rowIndex}
-                      className={`${rowClass} border-b border-gray-100`}
+                      className={`${rowClass} border-b border-gray-100 text-xs`}
                       style={{ height: "60px" }}
                     >
                       {hasRowSelection && (

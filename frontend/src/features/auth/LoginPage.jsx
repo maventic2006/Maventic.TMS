@@ -195,7 +195,7 @@ const LoginPage = () => {
             {/* User Id Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+                User ID
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -203,7 +203,7 @@ const LoginPage = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="johndesign@mail.com"
+                  placeholder="POWNER001"
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg 
                            focus:ring-2 focus:ring-[#0D1A33] focus:border-[#0D1A33] 
                            focus:outline-none transition-all duration-200"

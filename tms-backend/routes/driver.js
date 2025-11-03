@@ -1,14 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const {
-  createTransporter,
-  updateTransporter,
+  createDriver,
+  updateDriver,
   getMasterData,
   getStatesByCountry,
   getCitiesByCountryAndState,
-  getTransporters,
-  getTransporterById,
-} = require("../controllers/transporterController");
+  getDrivers,
+  getDriverById,
+} = require("../controllers/driverController");
 const { authenticateToken } = require("../middleware/auth");
 
 // Middleware to check if user is product owner (admin/owner role)
@@ -31,23 +31,10 @@ const checkProductOwnerAccess = (req, res, next) => {
 };
 
 // Routes - All routes require product owner access
-router.get("/", authenticateToken, checkProductOwnerAccess, getTransporters);
-console.log(
-  "✅ Transporter GET / route registered with authenticateToken middleware"
-);
-router.get(
-  "/:id",
-  authenticateToken,
-  checkProductOwnerAccess,
-  getTransporterById
-);
-router.post("/", authenticateToken, checkProductOwnerAccess, createTransporter);
-router.put(
-  "/:id",
-  authenticateToken,
-  checkProductOwnerAccess,
-  updateTransporter
-);
+router.get("/", authenticateToken, checkProductOwnerAccess, getDrivers);
+router.get("/:id", authenticateToken, checkProductOwnerAccess, getDriverById);
+router.post("/", authenticateToken, checkProductOwnerAccess, createDriver);
+router.put("/:id", authenticateToken, checkProductOwnerAccess, updateDriver);
 router.get(
   "/master-data",
   authenticateToken,

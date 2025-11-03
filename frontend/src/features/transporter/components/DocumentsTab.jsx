@@ -18,7 +18,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   // Country options from country-state-city package (convert to value/label format)
   const countryOptions = React.useMemo(() => {
     return allCountries.map((country) => ({
-      value: country.isoCode,
+      value: country.name,
       label: country.name,
     }));
   }, []);
@@ -31,6 +31,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       type: "select",
       options: documentTypes,
       placeholder: "Select Document Type",
+      searchable: true,
       width: "min-w-[200px]",
     },
     {
@@ -46,6 +47,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       type: "select",
       options: countryOptions,
       placeholder: "Select Country",
+      searchable: true,
       width: "min-w-[200px]",
     },
     {
@@ -116,7 +118,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
         onDataChange={handleDataChange}
         onAddRow={handleAddDocument}
         onRemoveRow={handleRemoveDocument}
-        errors={errors.documents || {}}
+        errors={errors || {}}
         hasRowSelection={false}
         canRemoveRows={true}
         canAddRows={true}
@@ -124,10 +126,18 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       />
 
       {/* Validation Error Summary */}
-      {errors.documents && typeof errors.documents === "string" && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-700 flex items-center gap-2">
-            {errors.documents}
+      {errors && typeof errors === "string" && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-xs text-red-700 flex items-center gap-2">
+            {errors}
+          </p>
+        </div>
+      )}
+
+      {errors && errors._general && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-xs text-red-700 flex items-center gap-2">
+            {errors._general}
           </p>
         </div>
       )}

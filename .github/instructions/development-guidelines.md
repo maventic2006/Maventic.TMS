@@ -60,234 +60,176 @@ frontend/
 - `TmsStatusPill` - Status indicators
 - `TmsToast` - Notification system
 
+#### ⚠️ CRITICAL: Theme Configuration System
+
+**The TMS application uses a centralized theme configuration system. ALL components MUST use theme values - NO HARDCODED COLORS ALLOWED.**
+
+##### Theme File Location
+
+- **Configuration File**: `/src/theme.config.js`
+- **CSS Variables**: `/src/index.css` (auto-generated CSS variables)
+- **Tailwind Integration**: `tailwind.config.js` (imports theme values)
+
+##### Theme Usage Rules
+
+**❌ NEVER DO THIS:**
+
+```javascript
+// ❌ WRONG - Hardcoded colors
+<div className="bg-white text-gray-800 border-gray-200">
+<button style={{ backgroundColor: "#10B981", color: "#FFFFFF" }}>
+```
+
+**✅ ALWAYS DO THIS:**
+
+```javascript
+// ✅ CORRECT - Use theme utilities
+import { getPageTheme, getComponentTheme } from '../theme.config.js';
+
+const theme = getPageTheme('general'); // or 'list', 'tab'
+const buttonTheme = getComponentTheme('actionButton');
+
+// Use Tailwind classes with theme colors
+<div className="bg-primary-background text-text-primary border-card-border">
+
+// Or use CSS variables
+<div style={{
+  backgroundColor: 'var(--primary-background)',
+  color: 'var(--text-primary)'
+}}>
+
+// Or use theme object directly
+<button style={{
+  backgroundColor: buttonTheme.primary.background,
+  color: buttonTheme.primary.text
+}}>
+```
+
+##### Theme Structure
+
+The theme is organized by:
+
+1. **Page Types**: `general`, `list`, `tab`
+2. **Component Types**: `actionButton`, `tabButton`, `statusPill`, `formInput`, etc.
+
+```javascript
+// Get page-specific theme
+const generalTheme = getPageTheme("general");
+const listTheme = getPageTheme("list");
+const tabTheme = getPageTheme("tab");
+
+// Get component-specific theme
+const actionButtonTheme = getComponentTheme("actionButton");
+const statusPillTheme = getComponentTheme("statusPill");
+const transportModeTheme = getComponentTheme("transportModeCard");
+```
+
+##### Available Theme Tokens
+
+**Colors:**
+
+- `primary.background`, `primary.text`
+- `card.background`, `card.border`, `card.shadow`
+- `text.primary`, `text.secondary`, `text.disabled`
+- `header.background`, `header.text`
+- `input.background`, `input.border.default`, `input.border.focus`, `input.border.error`
+- `status.pending`, `status.approve`, `status.reject`, `status.success`, `status.warning`, `status.error`
+- `button.primary`, `button.secondary`, `button.danger`
+- `fields.requested`, `fields.approved`
+
+**Typography:**
+
+- `fontFamily`, `fontSize.*`, `fontWeight.*`, `lineHeight`
+
+**Layout:**
+
+- `card.borderRadius`, `card.padding`, `button.borderRadius`, `input.borderRadius`
+
+##### Tailwind Class Mapping
+
+Theme values are automatically mapped to Tailwind classes:
+
+```javascript
+// Background colors
+bg-primary-background → #F5F7FA
+bg-card-background → #FFFFFF
+
+// Text colors
+text-text-primary → #0D1A33
+text-text-secondary → #4A5568
+
+// Button colors
+bg-button-primary-background → #10B981
+bg-button-secondary-border → #E5E7EB
+
+// Status colors
+bg-status-success-background → #D1FAE5
+text-status-success-text → #10B981
+```
+
+##### CSS Variables
+
+All theme values are available as CSS variables:
+
+```css
+/* Use in component styles */
+.my-component {
+  background-color: var(--primary-background);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-border-radius);
+  padding: var(--card-padding);
+}
+```
+
+##### Theme Enforcement Checklist
+
+Before committing any component, verify:
+
+- [ ] No hex color codes in JSX/JS files (e.g., `#FFFFFF`, `#10B981`)
+- [ ] No RGB/RGBA values (e.g., `rgb(255, 255, 255)`)
+- [ ] Uses `getPageTheme()` or `getComponentTheme()` for dynamic values
+- [ ] Uses Tailwind theme classes (e.g., `bg-primary-background`)
+- [ ] Uses CSS variables (e.g., `var(--primary-background)`)
+- [ ] No inline style objects with hardcoded colors
+
+##### Updating the Theme
+
+To modify colors or design tokens:
+
+1. **Edit**: `src/theme.config.js` (single source of truth)
+2. **Rebuild**: CSS variables auto-update on save
+3. **Test**: All components using theme automatically reflect changes
+
+**NEVER edit colors in:**
+
+- ❌ Individual component files
+- ❌ `tailwind.config.js` (imports from theme.config.js)
+- ❌ `index.css` variables (auto-generated)
+
 #### Design Tokens & Theme Specifications
 
-##### Base Theme Configuration
+**✅ All theme specifications are now centralized in `/src/theme.config.js`**
 
-```javascript
-// Universal Colors
-const baseColors = {
-  background: "#F5F7FA",
-  card: "#FFFFFF",
-  textPrimary: "#0D1A33",
-  textSecondary: "#4A5568",
-  inputBorderDefault: "#E5E7EB",
-  inputFocusBorder: "#3B82F6",
-};
+The application uses three main theme configurations:
 
-// Universal Typography
-const baseTypography = {
-  fontFamily: "Inter, Poppins, system-ui, sans-serif",
-  lineHeight: "1.5",
-  weights: {
-    regular: "400",
-    medium: "500",
-    semibold: "600",
-    bold: "700",
-  },
-};
+1. **General Pages Theme** - Default theme for most pages (forms, details, etc.)
+2. **List Pages Theme** - For list/table views with filters and pagination
+3. **Tab Pages Theme** - For tabbed interfaces with navigation
 
-// Universal Layout
-const baseLayout = {
-  cardRadius: "12px",
-  buttonRadius: "8px",
-  pillRadius: "9999px",
-  cardPadding: "24px",
-  cardShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)",
-  sectionGap: "24px",
-};
-```
+**To view or modify theme specifications:**
 
-##### List View Pages Theme
+- See `/src/theme.config.js` for complete theme definitions
+- All color palettes, typography, layout values, and UI element specifications are defined there
 
-```javascript
-const listViewTheme = {
-  colors: {
-    ...baseColors,
-    accentText: "#F59E0B",
-    tableHeaderBg: "#0D1A33",
-    tableHeaderText: "#FFFFFF",
-    primaryActionBg: "#FFA500",
-    primaryActionText: "#FFFFFF",
+**Key Theme Features:**
 
-    // Status Pills
-    status: {
-      delivered: { bg: "#D1FAE5", text: "#10B981" },
-      processing: { bg: "#E0E7FF", text: "#6366F1" },
-      cancelled: { bg: "#FEE2E2", text: "#EF4444" },
-      draft: { bg: "#E5E7EB", text: "#6B7280" },
-      delayed: { bg: "#FEF3C7", text: "#F97316" },
-    },
-
-    // Progress Bar
-    progress: {
-      completed: "#10B981",
-      inProgress: "#3B82F6",
-      lowProgress: "#EF4444", // or #F97316, #9CA3AF based on status
-    },
-  },
-
-  typography: {
-    ...baseTypography,
-    sizes: {
-      heading: "24px-28px",
-      subheading: "14px-16px",
-      tableHeader: "13px-14px",
-      tableContent: "14px",
-      statusText: "12px",
-    },
-  },
-
-  layout: {
-    ...baseLayout,
-    rowHeight: "56px-60px",
-    columnGaps: "16px-24px",
-    verticalSpacing: "32px",
-    progressBarHeight: "6px",
-  },
-};
-```
-
-##### Tab View Pages Theme
-
-```javascript
-const tabViewTheme = {
-  colors: {
-    ...baseColors,
-    accentText: "#1D4ED8", // or #0F172A
-    sectionHeaders: "#0D1A33",
-    tabBarBg: "#0D1A33",
-    activeTabBg: "#FFFFFF",
-    activeTabText: "#0D1A33",
-    inactiveTabText: "#FFFFFF",
-
-    // Status Pills
-    status: {
-      approved: { bg: "#D1FAE5", text: "#10B981" },
-      backToEdit: { border: "#F97316", text: "#F97316", bg: "transparent" },
-      approve: { bg: "#10B981", text: "#FFFFFF" },
-      edit: { border: "#E5E7EB", text: "#0D1A33", bg: "transparent" },
-    },
-
-    // Progress Bar
-    progress: {
-      fill: "#1E3A8A", // dark navy blue
-      track: "#E5E7EB",
-    },
-  },
-
-  typography: {
-    ...baseTypography,
-    sizes: {
-      header: "24px-28px",
-      sectionLabels: "12px-14px",
-      values: "14px",
-      pills: "12px",
-    },
-    letterSpacing: "slight positive for labels",
-  },
-
-  layout: {
-    ...baseLayout,
-    headerPadding: "24px",
-    tabHeight: "48px",
-    activeTabRadius: "12px", // top corners only
-    gridColumns: "3",
-    columnGap: "24px",
-    rowGap: "16px",
-    progressBarHeight: "8px",
-    buttonHeight: "40px-44px",
-  },
-};
-```
-
-##### General Pages Theme
-
-```javascript
-const generalPagesTheme = {
-  colors: {
-    ...baseColors,
-    headerBg: "#0D1A33",
-    headerText: "#FFFFFF",
-
-    // Status Colors
-    status: {
-      pending: { bg: "#FDE68A", text: "#92400E" },
-      approve: { bg: "#10B981", text: "#FFFFFF" },
-      reject: { border: "#DC2626", text: "#DC2626", bg: "transparent" },
-    },
-
-    // Special Input Fields
-    requestedQty: { border: "#BFDBFE", bg: "#EFF6FF", text: "#2563EB" },
-    approvedQty: { border: "#A7F3D0", bg: "#ECFDF5", text: "#059669" },
-  },
-
-  typography: {
-    ...baseTypography,
-    sizes: {
-      mainTitle: "24px-28px",
-      sectionLabels: "12px-14px",
-      values: "14px",
-      commentTimestamp: "12px",
-      inputFields: "14px",
-    },
-  },
-
-  layout: {
-    ...baseLayout,
-    headerPadding: "24px",
-    cardGap: "24px",
-    columnGap: "24px",
-    textAreaPadding: "12px-16px",
-    buttonHeight: "40px-44px",
-    commentBubbleRadius: "12px",
-    commentBubbleBg: "#F9FAFB",
-    userInitialsBg: "#0D1A33",
-  },
-};
-```
-
-##### Theme Implementation Helper
-
-```javascript
-// Theme selector utility
-export const getTheme = (pageType) => {
-  switch (pageType) {
-    case "list":
-      return listViewTheme;
-    case "tabs":
-      return tabViewTheme;
-    case "general":
-      return generalPagesTheme;
-    default:
-      return {
-        colors: baseColors,
-        typography: baseTypography,
-        layout: baseLayout,
-      };
-  }
-};
-
-// Tailwind CSS class generator
-export const generateTailwindClasses = (theme) => ({
-  // Background colors
-  primaryBg: `bg-[${theme.colors.background}]`,
-  cardBg: `bg-[${theme.colors.card}]`,
-
-  // Text colors
-  textPrimary: `text-[${theme.colors.textPrimary}]`,
-  textSecondary: `text-[${theme.colors.textSecondary}]`,
-
-  // Layout
-  cardShadow: "shadow-[0px_2px_6px_rgba(0,0,0,0.05)]",
-  cardRadius: "rounded-xl",
-  buttonRadius: "rounded-lg",
-  pillRadius: "rounded-full",
-
-  // Transitions
-  transition: "transition-all duration-200",
-});
-```
+- Centralized color management
+- Consistent typography across all pages
+- Standardized spacing and layout values
+- Component-specific theme tokens
+- CSS variable support for runtime access
+- Tailwind integration for utility classes
 
 #### Motion & Animations
 

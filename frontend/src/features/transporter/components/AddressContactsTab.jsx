@@ -45,9 +45,9 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
       country: "",
       state: "",
       city: "",
+      district: "",
       street1: "",
       street2: "",
-      district: "",
       postalCode: "",
       isPrimary: addresses.length === 0, // Automatically primary if it's the first address
       addressType: "",
@@ -184,32 +184,41 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
     }));
   };
 
-  const getStatesForCountry = (countryCode) => {
-    if (!countryCode) return [];
-    return State.getStatesOfCountry(countryCode);
+  const getStatesForCountry = (countryName) => {
+    if (!countryName) return [];
+    // Find country by name and get its isoCode
+    const country = allCountries.find((c) => c.name === countryName);
+    if (!country) return [];
+    return State.getStatesOfCountry(country.isoCode);
   };
 
-  const getCitiesForCountryState = (countryCode, stateCode) => {
-    if (!countryCode || !stateCode) return [];
-    return City.getCitiesOfState(countryCode, stateCode);
+  const getCitiesForCountryState = (countryName, stateName) => {
+    if (!countryName || !stateName) return [];
+    // Find country and state by name
+    const country = allCountries.find((c) => c.name === countryName);
+    if (!country) return [];
+    const states = State.getStatesOfCountry(country.isoCode);
+    const state = states.find((s) => s.name === stateName);
+    if (!state) return [];
+    return City.getCitiesOfState(country.isoCode, state.isoCode);
   };
 
   return (
-    <div className="bg-[#F5F7FA]">
-      <div className="grid grid-cols-2 gap-6">
-        {/* Left Section - Transporter Addresses */}
+    <div className="">
+      <div className="grid grid-cols-1 gap-4">
+        {/* Address Section */}
         <div className="bg-white rounded-lg shadow-sm">
-          <div className="bg-[#0D1A33] text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <MapPin className="w-6 h-6" />
-              <h2 className="text-xl font-bold">Transporter Addresses</h2>
+          <div className="bg-[#0D1A33] text-white px-4 py-3 rounded-t-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              <h2 className="text-lg font-bold">Transporter's Addresses</h2>
             </div>
             <button
               onClick={addAddress}
-              className="bg-[#FFA500] text-white h-10 px-4 rounded-lg flex items-center gap-2 hover:bg-[#e6940a] transition-colors"
+              className="bg-[#10B981] text-white h-9 px-3 rounded-lg flex items-center gap-2 text-sm hover:bg-[#059669] transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Add Address
+              Add
             </button>
           </div>
 
@@ -218,16 +227,18 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[800px]">
                   <thead>
-                    <tr className="text-left text-sm font-medium text-gray-600 border-b border-gray-200">
+                    <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
                       <th className="pb-3 w-12"></th>
-                      <th className="pb-3 min-w-[200px]">VAT Number</th>
-                      <th className="pb-3 min-w-[200px]">Country</th>
-                      <th className="pb-3 min-w-[200px]">State</th>
-                      <th className="pb-3 min-w-[200px]">City</th>
-                      <th className="pb-3 min-w-[200px]">District</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">VAT Number</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">Country</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">State</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">City</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">District</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">Street 1</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">Street 2</th>
                       <th className="pb-3 min-w-[150px]">Pincode</th>
                       <th className="pb-3 min-w-[150px]">Is Primary</th>
-                      <th className="pb-3 min-w-[200px]">Address Type</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">Address Type</th>
                       <th className="pb-3 w-12"></th>
                     </tr>
                   </thead>
@@ -240,7 +251,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           key={index}
                           className={`${
                             isSelected
-                              ? "bg-[#FFF4E6] border-l-4 border-l-[#FFA500]"
+                              ? "bg-gray-100 border-l-4 border-l-[#10B981]"
                               : "bg-white"
                           } border-b border-gray-100`}
                           style={{ height: "60px" }}
@@ -250,7 +261,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               type="radio"
                               checked={isSelected}
                               onChange={() => setSelectedAddressIndex(index)}
-                              className="w-5 h-5 text-[#FFA500] border-gray-300 focus:ring-[#FFA500]"
+                              className="w-5 h-5 text-[#10B981] border-gray-300 focus:ring-[#10B981]"
                             />
                           </td>
                           <td className="px-3">
@@ -264,8 +275,8 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                                   e.target.value
                                 )
                               }
-                              placeholder="VAT Number"
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter VAT Number"
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[index]?.vatNumber
                                   ? "border-red-500"
                                   : "border-gray-300"
@@ -280,11 +291,11 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                                 updateAddress(index, "country", value)
                               }
                               options={allCountries}
-                              placeholder="Country"
+                              placeholder="Select Country"
                               searchable
                               getOptionLabel={(option) => option.name}
-                              getOptionValue={(option) => option.isoCode}
-                              className={`min-w-[200px] ${
+                              getOptionValue={(option) => option.name}
+                              className={`min-w-[200px] text-xs ${
                                 errors.addresses?.[index]?.country
                                   ? "border-red-500"
                                   : ""
@@ -300,12 +311,12 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                                 updateAddress(index, "state", value)
                               }
                               options={getStatesForCountry(address.country)}
-                              placeholder="State"
+                              placeholder="Select State"
                               searchable
                               disabled={!address.country}
                               getOptionLabel={(option) => option.name}
-                              getOptionValue={(option) => option.isoCode}
-                              className={`min-w-[200px] ${
+                              getOptionValue={(option) => option.name}
+                              className={`min-w-[200px] text-xs ${
                                 errors.addresses?.[index]?.state
                                   ? "border-red-500"
                                   : ""
@@ -324,12 +335,12 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                                 address.country,
                                 address.state
                               )}
-                              placeholder="City"
+                              placeholder="Select City"
                               searchable
                               disabled={!address.state}
                               getOptionLabel={(option) => option.name}
                               getOptionValue={(option) => option.name}
-                              className={`min-w-[200px] ${
+                              className={`min-w-[200px] text-xs ${
                                 errors.addresses?.[index]?.city
                                   ? "border-red-500"
                                   : ""
@@ -344,8 +355,8 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               onChange={(e) =>
                                 updateAddress(index, "district", e.target.value)
                               }
-                              placeholder="District"
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter district"
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[index]?.district
                                   ? "border-red-500"
                                   : "border-gray-300"
@@ -355,16 +366,46 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           <td className="px-3">
                             <input
                               type="text"
-                              value={address.postalCode || ""}
+                              value={address.street1 || ""}
                               onChange={(e) =>
-                                updateAddress(
-                                  index,
-                                  "postalCode",
-                                  e.target.value
-                                )
+                                updateAddress(index, "street1", e.target.value)
                               }
-                              placeholder="Pincode"
-                              className={`min-w-[150px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter street 1"
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
+                                errors.addresses?.[index]?.street1
+                                  ? "border-red-500"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                          </td>
+                          <td className="px-3">
+                            <input
+                              type="text"
+                              value={address.street2 || ""}
+                              onChange={(e) =>
+                                updateAddress(index, "street2", e.target.value)
+                              }
+                              placeholder="Enter street 2"
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
+                                errors.addresses?.[index]?.street2
+                                  ? "border-red-500"
+                                  : "border-gray-300"
+                              }`}
+                            />
+                          </td>
+                          <td className="px-3">
+                            <input
+                              type="text"
+                              value={address.postalCode || ""}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Only allow numeric values
+                                if (value === "" || /^\d+$/.test(value)) {
+                                  updateAddress(index, "postalCode", value);
+                                }
+                              }}
+                              placeholder="Enter pincode"
+                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[index]?.postalCode
                                   ? "border-red-500"
                                   : "border-gray-300"
@@ -379,7 +420,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               onChange={() =>
                                 updateAddress(index, "isPrimary", true)
                               }
-                              className="w-5 h-5 text-[#FFA500] border-gray-300 focus:ring-[#FFA500]"
+                              className="w-5 h-5 text-[#10B981] border-gray-300 focus:ring-[#10B981]"
                             />
                           </td>
                           <td className="px-3">
@@ -393,7 +434,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               placeholder="Select Type"
                               getOptionLabel={(option) => option.label}
                               getOptionValue={(option) => option.value}
-                              className={`min-w-[200px] ${
+                              className={`min-w-[200px] text-xs ${
                                 errors.addresses?.[index]?.addressType
                                   ? "border-red-500"
                                   : ""
@@ -426,41 +467,45 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
           </div>
         </div>
 
-        {/* Right Section - Transporter Contacts */}
+        {/* Contacts Section */}
         <div className="bg-white rounded-lg shadow-sm">
-          <div className="bg-[#0D1A33] text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Phone className="w-6 h-6" />
+          <div className="bg-[#0D1A33] text-white px-4 py-3 rounded-t-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Phone className="w-5 h-5" />
               <div>
-                <h2 className="text-xl font-bold">Transporter Contacts</h2>
-                <p className="text-sm text-gray-300">(for selected address)</p>
+                <h2 className="text-lg font-bold">Contact details</h2>
+                <p className="text-xs text-gray-300">(for selected address)</p>
               </div>
             </div>
             <button
               onClick={addContact}
               disabled={!selectedAddress}
-              className="bg-[#FFA500] text-white h-10 px-4 rounded-lg flex items-center gap-2 hover:bg-[#e6940a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-[#10B981] text-white h-9 px-3 rounded-lg flex items-center gap-2 text-sm hover:bg-[#059669] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
-              Add Contact
+              Add
             </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-4">
             {selectedAddress ? (
               contacts.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[600px]">
                     <thead>
-                      <tr className="text-left text-sm font-medium text-gray-600 border-b border-gray-200">
-                        <th className="pb-3 min-w-[200px]">Name</th>
-                        <th className="pb-3 min-w-[200px]">Role</th>
-                        <th className="pb-3 min-w-[200px]">Phone Number</th>
-                        <th className="pb-3 min-w-[200px]">
+                      <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
+                        <th className="pl-4 pb-3 min-w-[200px]">Name</th>
+                        <th className="pl-4 pb-3 min-w-[200px]">Role</th>
+                        <th className="pl-4 pb-3 min-w-[200px]">
+                          Phone Number
+                        </th>
+                        <th className="pl-4 pb-3 min-w-[200px]">
                           Alternate Phone Number
                         </th>
-                        <th className="pb-3 min-w-[250px]">Email</th>
-                        <th className="pb-3 min-w-[250px]">Alternate Email</th>
+                        <th className="pl-4 pb-3 min-w-[250px]">Email</th>
+                        <th className="pl-4 pb-3 min-w-[250px]">
+                          Alternate Email
+                        </th>
                         <th className="pb-3 w-12"></th>
                       </tr>
                     </thead>
@@ -478,8 +523,8 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               onChange={(e) =>
                                 updateContact(index, "name", e.target.value)
                               }
-                              placeholder="Name"
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter the name"
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[selectedAddressIndex]
                                   ?.contacts?.[index]?.name
                                   ? "border-red-500"
@@ -494,8 +539,8 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               onChange={(e) =>
                                 updateContact(index, "role", e.target.value)
                               }
-                              placeholder="Role"
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter the role"
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[selectedAddressIndex]
                                   ?.contacts?.[index]?.role
                                   ? "border-red-500"
@@ -514,8 +559,8 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                                   e.target.value
                                 )
                               }
-                              placeholder="Phone Number"
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter the phone number"
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[selectedAddressIndex]
                                   ?.contacts?.[index]?.phoneNumber
                                   ? "border-red-500"
@@ -534,8 +579,8 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                                   e.target.value
                                 )
                               }
-                              placeholder="Alternate Phone"
-                              className={`min-w-[200px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter the alternate phone"
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[selectedAddressIndex]
                                   ?.contacts?.[index]?.alternatePhoneNumber
                                   ? "border-red-500"
@@ -550,8 +595,8 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                               onChange={(e) =>
                                 updateContact(index, "email", e.target.value)
                               }
-                              placeholder="Email"
-                              className={`min-w-[250px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter email"
+                              className={`min-w-[250px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[selectedAddressIndex]
                                   ?.contacts?.[index]?.email
                                   ? "border-red-500"
@@ -570,8 +615,8 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                                   e.target.value
                                 )
                               }
-                              placeholder="Alternate Email"
-                              className={`min-w-[250px] px-3 py-2 bg-gray-50 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:border-transparent ${
+                              placeholder="Enter the alternate email"
+                              className={`min-w-[250px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[selectedAddressIndex]
                                   ?.contacts?.[index]?.alternateEmail
                                   ? "border-red-500"

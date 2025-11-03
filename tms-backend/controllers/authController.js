@@ -51,13 +51,16 @@ const login = async (req, res) => {
     }
 
     // Determine user role based on user_id or user_type
-    let userRole = 'admin'; // Default to admin for development/testing
-    if (user.user_id === 'admin' || user.user_id.toLowerCase().includes('admin')) {
-      userRole = 'admin';
-    } else if (user.user_type_id === 'UT002') {
-      userRole = 'manager';
-    } else if (user.user_id.toLowerCase().includes('test')) {
-      userRole = 'admin'; // Give test users admin access for development
+    let userRole = "admin"; // Default to admin for development/testing
+    if (
+      user.user_id === "admin" ||
+      user.user_id.toLowerCase().includes("admin")
+    ) {
+      userRole = "admin";
+    } else if (user.user_type_id === "UT002") {
+      userRole = "manager";
+    } else if (user.user_id.toLowerCase().includes("test")) {
+      userRole = "admin"; // Give test users admin access for development
     }
 
     // Generate JWT token
@@ -72,14 +75,21 @@ const login = async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    // Set JWT token in HTTP-only cookie (expires when browser closes)
-    const isProduction = process.env.NODE_ENV === "production";
-    res.cookie("authToken", token, {
-      httpOnly: true,
-      secure: isProduction, // Use secure cookies in production
-      sameSite: "strict",
-      // No maxAge - cookie expires when browser closes (session cookie)
-    });
+    // Check if password reset is required (initial password)
+    const requirePasswordReset =
+      user.password_type === "initial" || !user.password_type;
+
+    // Only generate and send token if using actual password (not initial)
+    if (!requirePasswordReset) {
+      // Set JWT token in HTTP-only cookie (expires when browser closes)
+      const isProduction = process.env.NODE_ENV === "production";
+      res.cookie("authToken", token, {
+        httpOnly: true,
+        secure: isProduction, // Use secure cookies in production
+        sameSite: "strict",
+        // No maxAge - cookie expires when browser closes (session cookie)
+      });
+    }
 
     // Return user data (excluding password)
     const { password: _, ...userWithoutPassword } = user;
@@ -88,8 +98,8 @@ const login = async (req, res) => {
       success: true,
       message: "Login successful",
       user: userWithoutPassword,
-      requirePasswordReset:
-        user.password_type === "initial" || !user.password_type,
+      token: requirePasswordReset ? null : token, // Only return token if not requiring reset
+      requirePasswordReset: requirePasswordReset,
     });
   } catch (error) {
     console.error("Login error:", error);
