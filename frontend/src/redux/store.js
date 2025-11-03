@@ -7,6 +7,7 @@ import contractSlice from "./slices/contractSlice";
 import trackingSlice from "./slices/trackingSlice";
 import dashboardSlice from "./slices/dashboardSlice";
 import transporterSlice from "./slices/transporterSlice";
+import bulkUploadSlice from "./slices/bulkUploadSlice";
 import driverSlice from "./slices/driverSlice";
 
 export const store = configureStore({
@@ -19,6 +20,7 @@ export const store = configureStore({
     tracking: trackingSlice,
     dashboard: dashboardSlice,
     transporter: transporterSlice,
+    bulkUpload: bulkUploadSlice,
     driver: driverSlice,
   },
   middleware: (getDefaultMiddleware) =>

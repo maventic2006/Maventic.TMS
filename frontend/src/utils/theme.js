@@ -1,23 +1,30 @@
 // Theme utilities following development guidelines
 
-// Universal Colors
+// Universal Colors - Exact Specification Match
 export const baseColors = {
   background: "#F5F7FA",
   card: "#FFFFFF",
   textPrimary: "#0D1A33",
   textSecondary: "#4A5568",
+  accentText: "#1D4ED8", // Links / Highlights (Blue)
+  accentTextAlt: "#0F172A", // Alternative accent text (Dark Navy)
   inputBorderDefault: "#E5E7EB",
-  inputFocusBorder: "#3B82F6",
+  inputFocusBorder: "#1D4ED8",
   headerBg: "#0D1A33",
   headerText: "#FFFFFF",
-  accentOrange: "#FFA500",
+  tabBarBg: "#0D1A33",
+  activeTabBg: "#FFFFFF",
+  activeTabText: "#0D1A33",
+  inactiveTabText: "#FFFFFF",
+  primaryAction: "#10B981", // Approve Button (Green)
+  secondaryAction: "#F97316", // Back to Edit Button (Orange)
   accentTeal: "#14B8A6",
   error: "#DC2626",
   success: "#10B981",
-  warning: "#F59E0B",
+  warning: "#F97316",
 };
 
-// Universal Typography
+// Universal Typography - Exact Specification Match
 export const baseTypography = {
   fontFamily: "Inter, Poppins, system-ui, sans-serif",
   lineHeight: "1.5",
@@ -28,37 +35,56 @@ export const baseTypography = {
     bold: "700",
   },
   sizes: {
-    xs: "12px",
-    sm: "14px",
-    base: "16px",
+    xs: "12px", // Status Text
+    sm: "14px", // Table Content, Subheading (14-16px)
+    base: "16px", // Subheading (14-16px)
     lg: "18px",
     xl: "20px",
-    "2xl": "24px",
-    "3xl": "28px",
+    "2xl": "24px", // Heading (24-28px)
+    "3xl": "28px", // Heading max (24-28px)
+    tableHeader: "13px", // Table Header (13-14px)
   },
 };
 
-// Universal Layout
+// Progress Bar Colors - Exact Specification Match
+export const progressBarColors = {
+  fill: "#1E3A8A", // Dark Navy Blue
+  track: "#E5E7EB",
+  height: "8px",
+  borderRadius: "4px",
+};
+
+// Universal Layout - Exact Specification Match
 export const baseLayout = {
   cardRadius: "12px",
   buttonRadius: "8px",
   pillRadius: "9999px",
   cardPadding: "24px",
   cardShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)",
-  sectionGap: "24px",
+  sectionGap: "32px", // Vertical Spacing Between Sections
   headerPadding: "24px",
   tabHeight: "48px",
   buttonHeight: "44px",
+  buttonPadding: "10px 20px", // py-2.5 px-5
+  rowHeight: "56px", // Table row height
+  columnGap: "16px", // Minimum column gap
 };
 
-// Status Pills
+// Status Pills - Exact Specification Match
 export const statusPills = {
+  yes: { bg: "#D1FAE5", text: "#10B981" },
+  approved: { bg: "#D1FAE5", text: "#10B981" },
+  verified: { bg: "#D1FAE5", text: "#10B981" },
+  delivered: { bg: "#D1FAE5", text: "#10B981" },
   active: { bg: "#D1FAE5", text: "#10B981" },
+  // Legacy support
+  processing: { bg: "#E0E7FF", text: "#6366F1" },
+  cancelled: { bg: "#FEE2E2", text: "#EF4444" },
+  draft: { bg: "#E5E7EB", text: "#6B7280" },
+  delayed: { bg: "#FEF3C7", text: "#F97316" },
   inactive: { bg: "#FEE2E2", text: "#EF4444" },
   pending: { bg: "#FDE68A", text: "#92400E" },
-  approved: { bg: "#D1FAE5", text: "#10B981" },
   rejected: { bg: "#FEE2E2", text: "#EF4444" },
-  draft: { bg: "#E5E7EB", text: "#6B7280" },
 };
 
 // Transport Mode Colors

@@ -7,22 +7,29 @@ const StatusPill = ({ status }) => {
     
     switch (normalizedStatus) {
       case 'active':
-        // Green theme color for success/active state
-        return 'bg-green-100 text-green-800 border border-green-300';
+      case 'delivered':
+        // Delivered: Green theme from specification
+        return 'bg-[#D1FAE5] text-[#10B981]';
       case 'approved':
-        // Blue theme color for approved state
-        return 'bg-blue-100 text-blue-800 border border-blue-300';
+      case 'processing':
+        // Processing: Blue/Indigo theme from specification
+        return 'bg-[#E0E7FF] text-[#6366F1]';
       case 'pending':
-        // Yellow/Amber theme color for warning/pending state
-        return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+        // Use Draft styling for pending
+        return 'bg-[#E5E7EB] text-[#6B7280]';
       case 'inactive':
-        // Red theme color for error/inactive state
-        return 'bg-red-100 text-red-800 border border-red-300';
       case 'rejected':
-        // Darker red for rejected state
-        return 'bg-red-100 text-red-900 border border-red-400';
+      case 'cancelled':
+        // Cancelled: Red theme from specification
+        return 'bg-[#FEE2E2] text-[#EF4444]';
+      case 'delayed':
+        // Delayed: Orange/Amber theme from specification
+        return 'bg-[#FEF3C7] text-[#F97316]';
+      case 'draft':
+        // Draft: Gray theme from specification
+        return 'bg-[#E5E7EB] text-[#6B7280]';
       default:
-        return 'bg-gray-100 text-gray-800 border border-gray-300';
+        return 'bg-[#E5E7EB] text-[#6B7280]';
     }
   };
 
@@ -32,11 +39,16 @@ const StatusPill = ({ status }) => {
     switch (normalizedStatus) {
       case 'active':
       case 'approved':
+      case 'delivered':
         return <CheckCircle className="h-3 w-3" />;
       case 'pending':
+      case 'processing':
+      case 'draft':
         return <Clock className="h-3 w-3" />;
       case 'inactive':
       case 'rejected':
+      case 'cancelled':
+      case 'delayed':
         return <XCircle className="h-3 w-3" />;
       default:
         return null;
@@ -46,7 +58,7 @@ const StatusPill = ({ status }) => {
   const icon = getStatusIcon(status);
 
   return (
-    <span className={`inline-flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm transition-all duration-200 ${getStatusStyles(status)}`}>
+    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 ${getStatusStyles(status)}`}>
       {icon}
       <span className="capitalize">{status || 'Unknown'}</span>
     </span>

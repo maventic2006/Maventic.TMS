@@ -198,8 +198,8 @@ const TransporterMaintenance = () => {
   }, [showFilters]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-background via-gray-50 to-blue-50/30 p-4 lg:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-[#F5F7FA] p-4 lg:p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
         <TopActionBar
           onCreateNew={handleCreateNew}
           onLogout={handleLogout}
@@ -234,9 +234,9 @@ const TransporterMaintenance = () => {
         />
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-            <p className="font-medium">Error loading transporters:</p>
-            <p className="text-sm">{error.message || "Something went wrong"}</p>
+          <div className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]" style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}>
+            <p className="font-semibold text-sm">Error loading transporters:</p>
+            <p className="text-sm mt-1">{error.message || "Something went wrong"}</p>
           </div>
         )}
       </div>

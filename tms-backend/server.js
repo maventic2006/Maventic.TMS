@@ -3,10 +3,23 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
+const http = require("http");
+const socketIO = require("socket.io");
 require("dotenv").config();
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIO(server, {
+  cors: {
+    origin: ["http://localhost:5173", "http://localhost:5174"],
+    credentials: true,
+  },
+});
+
 const PORT = process.env.PORT || 5000;
+
+// Make io accessible to routes
+app.set("io", io);
 
 // Middleware
 app.use(helmet());
@@ -30,6 +43,14 @@ const vehicleRoutes = require("./routes/vehicles");
 const userRoutes = require("./routes/users");
 const materialRoutes = require("./routes/materials");
 const transporterRoutes = require("./routes/transporter");
+const bulkUploadRoutes = require("./routes/bulkUploadRoutes");
+const bulkUploadQueue = require("./queues/bulkUploadQueue");
+const { processBulkUpload } = require("./queues/bulkUploadProcessor");
+
+// Setup bulk upload queue processor
+bulkUploadQueue.process(async (job) => {
+  return await processBulkUpload(job, io);
+});
 const driverRoutes = require("./routes/driver");
 
 // Routes
@@ -41,6 +62,7 @@ app.use("/api/materials", materialRoutes);
 app.use("/api/transporters", transporterRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/transporter", transporterRoutes);
+app.use("/api/bulk-upload", bulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
 
@@ -60,6 +82,28 @@ app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-app.listen(PORT, () => {
+// Socket.IO connection handling
+io.on("connection", (socket) => {
+  console.log("✅ Client connected:", socket.id);
+
+  // Handle joining batch rooms
+  socket.on("joinBatchRoom", ({ batchId }) => {
+    socket.join(`batch:${batchId}`);
+    console.log(`Client ${socket.id} joined batch room: ${batchId}`);
+  });
+
+  // Handle leaving batch rooms
+  socket.on("leaveBatchRoom", ({ batchId }) => {
+    socket.leave(`batch:${batchId}`);
+    console.log(`Client ${socket.id} left batch room: ${batchId}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ Client disconnected:", socket.id);
+  });
+});
+
+server.listen(PORT, () => {
   console.log(`🚀 TMS Backend server running on port ${PORT}`);
+  console.log(`📡 Socket.IO server running`);
 });

@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   RefreshCw,
   Save,
-  Share,
   Building2,
   MapPin,
   Globe,
   FileText,
   AlertTriangle,
+  Upload,
   AlertCircle,
 } from "lucide-react";
 
@@ -20,6 +20,9 @@ import {
   clearError,
   clearLastCreated,
 } from "../../redux/slices/transporterSlice";
+import { openModal } from "../../redux/slices/bulkUploadSlice";
+import BulkUploadModal from "./components/BulkUploadModal";
+import BulkUploadHistory from "./components/BulkUploadHistory";
 import { createTransporterSchema, validateFormSection } from "./validation";
 import { getComponentTheme } from "../../utils/theme";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../utils/constants";
@@ -351,123 +354,12 @@ const CreateTransporterPage = () => {
     }
 
     // Submit valid data
-    try {
-      const result = await dispatch(createTransporter(formData)).unwrap();
-
-      // Clear any previous errors
-      dispatch(clearError());
-
-      // Show success toast
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.SUCCESS,
-          message: "Transporter created successfully!",
-          duration: 5000,
-        })
-      );
-
-      // Navigate to transporter list page after short delay
-      setTimeout(() => {
-        navigate("/transporters");
-      }, 1500);
-    } catch (error) {
-      console.error("Error creating transporter:", error);
-
-      // IMPORTANT: Clear Redux error state immediately to prevent "Error Loading Data" page
-      dispatch(clearError());
-
-      // Check if it's a validation error from backend
-      if (error.code === "VALIDATION_ERROR") {
-        // Parse field path to determine which tab has the error
-        const field = error.field || "";
-        let tabName = "Unknown";
-        let tabIndex = 0;
-
-        if (
-          field.includes("generalDetails") ||
-          field.includes("businessName") ||
-          field.includes("transMode")
-        ) {
-          tabName = "General Details";
-          tabIndex = 0;
-        } else if (
-          field.includes("addresses") ||
-          field.includes("vatNumber") ||
-          field.includes("contacts") ||
-          field.includes("phoneNumber")
-        ) {
-          tabName = "Address & Contacts";
-          tabIndex = 1;
-        } else if (field.includes("serviceableAreas")) {
-          tabName = "Serviceable Area";
-          tabIndex = 2;
-        } else if (field.includes("documents")) {
-          tabName = "Documents";
-          tabIndex = 3;
-        }
-
-        // Switch to the tab with error
-        setActiveTab(tabIndex);
-
-        // Set tab errors
-        setTabErrors({
-          0: tabIndex === 0,
-          1: tabIndex === 1,
-          2: tabIndex === 2,
-          3: tabIndex === 3,
-        });
-
-        // Show toast with tab name
-        dispatch(
-          addToast({
-            type: TOAST_TYPES.ERROR,
-            message: `Error in ${tabName} tab: ${error.message}`,
-            duration: 8000,
-          })
-        );
-      } else {
-        // Generic error
-        dispatch(
-          addToast({
-            type: TOAST_TYPES.ERROR,
-            message: error.message || ERROR_MESSAGES.SUBMISSION_ERROR,
-            duration: 6000,
-          })
-        );
-      }
-    }
+    dispatch(createTransporter(formData));
   };
 
-  const handleExport = () => {
-    // Generate a summary of the form data for export/sharing
-    const summary = {
-      businessName: formData.generalDetails.businessName,
-      transportModes: Object.keys(formData.generalDetails.transMode).filter(
-        (mode) => formData.generalDetails.transMode[mode]
-      ),
-      addressCount: formData.addresses.length,
-      contactCount: formData.addresses.reduce(
-        (total, addr) => total + (addr.contacts?.length || 0),
-        0
-      ),
-      serviceableCountries: formData.serviceableAreas
-        .map((area) => area.country)
-        .filter(Boolean).length,
-      documentCount: formData.documents.length,
-      completionStatus: "Ready for submission",
-    };
-
-    const exportData = JSON.stringify(summary, null, 2);
-    const blob = new Blob([exportData], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `transporter-summary-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  const handleBulkUpload = useCallback(() => {
+    dispatch(openModal());
+  }, [dispatch]);
 
   const canSubmit = true; // Always allow submission
 
@@ -512,6 +404,15 @@ const CreateTransporterPage = () => {
             >
               <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
               Clear
+            </button>
+
+            <button
+              onClick={handleBulkUpload}
+              disabled={isCreating}
+              className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              <Upload className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+              Bulk Upload
             </button>
 
             <button
@@ -676,6 +577,10 @@ const CreateTransporterPage = () => {
           })}
         </div>
       </div>
+
+      {/* Bulk Upload Modal and History */}
+      <BulkUploadModal />
+      <BulkUploadHistory />
     </div>
   );
 };
