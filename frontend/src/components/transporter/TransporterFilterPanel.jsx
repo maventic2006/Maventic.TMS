@@ -33,64 +33,68 @@ const TransporterFilterPanel = ({ filters, onFilterChange, onApplyFilters, onCle
           transition={{ duration: 0.15 }}
           className="mb-6"
         >
-          <Card className="bg-white border border-gray-200 shadow-md rounded-2xl">
-            <CardContent className="p-4 relative">
+          <Card className="bg-white border border-[#E5E7EB] rounded-xl" style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}>
+            <CardContent className="p-6 relative">
             {/* Filter Input Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-              <div className="space-y-1.5 group">
-                <Label htmlFor="transporterId" className="text-sm text-gray-700 font-semibold">Transporter ID:</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="space-y-2 group">
+                <Label htmlFor="transporterId" className="text-sm text-[#0D1A33] font-semibold">Transporter ID:</Label>
                 <Input
                   id="transporterId"
                   type="text"
                   value={filters.transporterId}
                   onChange={(e) => onFilterChange('transporterId', e.target.value)}
                   placeholder="Enter transporter ID"
-                  className="bg-white border-gray-200 hover:border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all duration-200 group-hover:shadow-md rounded-xl h-9"
+                  className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
+                  style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}
                 />
               </div>
 
-              <div className="space-y-1.5 group">
-                <Label htmlFor="tan" className="text-sm text-gray-700 font-semibold">TAN:</Label>
+              <div className="space-y-2 group">
+                <Label htmlFor="tan" className="text-sm text-[#0D1A33] font-semibold">TAN:</Label>
                 <Input
                   id="tan"
                   type="text"
                   value={filters.tan}
                   onChange={(e) => onFilterChange('tan', e.target.value)}
                   placeholder="Enter TAN"
-                  className="bg-white border-gray-200 hover:border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all duration-200 group-hover:shadow-md rounded-xl h-9"
+                  className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
+                  style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}
                 />
               </div>
 
-              <div className="space-y-1.5 group">
-                <Label htmlFor="tinPan" className="text-sm text-gray-700 font-semibold">TIN/PAN:</Label>
+              <div className="space-y-2 group">
+                <Label htmlFor="tinPan" className="text-sm text-[#0D1A33] font-semibold">TIN/PAN:</Label>
                 <Input
                   id="tinPan"
                   type="text"
                   value={filters.tinPan}
                   onChange={(e) => onFilterChange('tinPan', e.target.value)}
                   placeholder="Enter TIN/PAN"
-                  className="bg-white border-gray-200 hover:border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all duration-200 group-hover:shadow-md rounded-xl h-9"
+                  className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
+                  style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}
                 />
               </div>
 
-              <div className="space-y-1.5 group">
-                <Label htmlFor="vatGst" className="text-sm text-gray-700 font-semibold">VAT/GST:</Label>
+              <div className="space-y-2 group">
+                <Label htmlFor="vatGst" className="text-sm text-[#0D1A33] font-semibold">VAT/GST:</Label>
                 <Input
                   id="vatGst"
                   type="text"
                   value={filters.vatGst}
                   onChange={(e) => onFilterChange('vatGst', e.target.value)}
                   placeholder="Enter VAT/GST"
-                  className="bg-white border-gray-200 hover:border-orange-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all duration-200 group-hover:shadow-md rounded-xl h-9"
+                  className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
+                  style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}
                 />
               </div>
             </div>
 
             {/* Status and Transport Mode Row */}
-            <div className="flex flex-col sm:flex-row sm:items-start lg:items-end gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-start lg:items-end gap-6 mb-6">
               {/* Status Section */}
               <div className="space-y-2 group flex-shrink-0">
-                <Label className="text-sm text-gray-700 font-semibold">Status:</Label>
+                <Label className="text-sm text-[#0D1A33] font-semibold">Status:</Label>
                 <div className="w-full sm:w-48">
                   <StatusSelect
                     value={filters.status}
@@ -104,19 +108,21 @@ const TransporterFilterPanel = ({ filters, onFilterChange, onApplyFilters, onCle
 
               {/* Transport Mode Section */}
               <div className="space-y-2 group flex-1 min-w-0">
-                <Label className="text-sm text-gray-700 font-semibold">Transport Mode:</Label>
-                <div className="flex flex-wrap items-center gap-2">
+                <Label className="text-sm text-[#0D1A33] font-semibold">Transport Mode:</Label>
+                <div className="flex flex-wrap items-center gap-3">
                   {transportModes.map(mode => {
                     const Icon = mode.icon;
                     const isSelected = filters.transportMode.includes(mode.value);
                     return (
                       <label key={mode.value} className={`
-                        flex items-center space-x-1 sm:space-x-2 cursor-pointer px-2 sm:px-3 py-2 rounded-xl transition-all duration-200 font-medium text-xs sm:text-sm
+                        flex items-center gap-2 cursor-pointer py-2.5 px-5 rounded-lg transition-all duration-200 font-semibold text-sm
                         ${isSelected 
-                          ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105' 
-                          : 'bg-white hover:bg-gray-50 hover:shadow-md border border-gray-200 hover:border-orange-300 text-gray-700'
+                          ? 'bg-[#10B981] text-white hover:bg-[#059669]' 
+                          : 'bg-white hover:bg-[#F5F7FA] border border-[#E5E7EB] hover:border-[#1D4ED8] text-[#0D1A33]'
                         }
-                      `}>
+                      `}
+                      style={!isSelected ? { boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' } : {}}
+                      >
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -128,11 +134,11 @@ const TransporterFilterPanel = ({ filters, onFilterChange, onApplyFilters, onCle
                           }}
                           className="sr-only"
                         />
-                        <Icon className={`h-3 w-3 sm:h-4 sm:w-4 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
-                        <span className={`font-medium ${isSelected ? 'text-white' : 'text-gray-700'} hidden sm:inline`}>
+                        <Icon className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-[#4A5568]'}`} />
+                        <span className={`font-semibold ${isSelected ? 'text-white' : 'text-[#0D1A33]'} hidden sm:inline`}>
                           {mode.value === 'R' ? 'Road' : mode.value === 'A' ? 'Air' : mode.value === 'RL' ? 'Rail' : 'Sea'}
                         </span>
-                        <span className={`font-medium ${isSelected ? 'text-white' : 'text-gray-700'} sm:hidden`}>
+                        <span className={`font-semibold ${isSelected ? 'text-white' : 'text-[#0D1A33]'} sm:hidden`}>
                           {mode.value}
                         </span>
                       </label>
@@ -141,11 +147,11 @@ const TransporterFilterPanel = ({ filters, onFilterChange, onApplyFilters, onCle
                 </div>
               </div>
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 pt-6 border-t border-[#E5E7EB]">
               <Button
                 variant="outline"
                 onClick={onClearFilters}
-                className="bg-white/60 backdrop-blur-sm hover:bg-white hover:shadow-lg hover:scale-105 transition-all duration-200 border-gray-200 hover:border-red-300 rounded-xl w-full sm:w-auto"
+                className="bg-white hover:bg-[#F5F7FA] hover:border-[#F97316] hover:text-[#F97316] transition-all duration-200 border-[#E5E7EB] rounded-lg py-2.5 px-5 w-full sm:w-auto"
               >
                 <X className="h-4 w-4 mr-2" />
                 Clear All
@@ -153,7 +159,7 @@ const TransporterFilterPanel = ({ filters, onFilterChange, onApplyFilters, onCle
               <Button
                 variant="default"
                 onClick={onApplyFilters}
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 hover:scale-105 hover:shadow-lg transition-all duration-200 rounded-xl w-full sm:w-auto"
+                className="bg-[#10B981] hover:bg-[#059669] text-white transition-all duration-200 rounded-lg py-2.5 px-5 w-full sm:w-auto font-semibold"
               >
                 <Search className="h-4 w-4 mr-2" />
                 Apply Filters

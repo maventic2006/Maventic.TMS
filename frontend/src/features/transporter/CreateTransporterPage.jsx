@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   RefreshCw,
   Save,
-  Share,
   Building2,
   MapPin,
   Globe,
   FileText,
   AlertTriangle,
+  Upload,
 } from "lucide-react";
 
 import {
@@ -19,6 +19,9 @@ import {
   clearError,
   clearLastCreated,
 } from "../../redux/slices/transporterSlice";
+import { openModal } from "../../redux/slices/bulkUploadSlice";
+import BulkUploadModal from "./components/BulkUploadModal";
+import BulkUploadHistory from "./components/BulkUploadHistory";
 import { createTransporterSchema, validateFormSection } from "./validation";
 import { getComponentTheme } from "../../utils/theme";
 import { TOAST_TYPES } from "../../utils/constants";
@@ -302,36 +305,9 @@ const CreateTransporterPage = () => {
     dispatch(createTransporter(formData));
   };
 
-  const handleExport = () => {
-    // Generate a summary of the form data for export/sharing
-    const summary = {
-      businessName: formData.generalDetails.businessName,
-      transportModes: Object.keys(formData.generalDetails.transMode).filter(
-        (mode) => formData.generalDetails.transMode[mode]
-      ),
-      addressCount: formData.addresses.length,
-      contactCount: formData.addresses.reduce(
-        (total, addr) => total + (addr.contacts?.length || 0),
-        0
-      ),
-      serviceableCountries: formData.serviceableAreas
-        .map((area) => area.country)
-        .filter(Boolean).length,
-      documentCount: formData.documents.length,
-      completionStatus: "Ready for submission",
-    };
-
-    const exportData = JSON.stringify(summary, null, 2);
-    const blob = new Blob([exportData], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `transporter-summary-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  const handleBulkUpload = useCallback(() => {
+    dispatch(openModal());
+  }, [dispatch]);
 
   const canSubmit = true; // Always allow submission
 
@@ -379,6 +355,15 @@ const CreateTransporterPage = () => {
             </button>
 
             <button
+              onClick={handleBulkUpload}
+              disabled={isCreating}
+              className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              <Upload className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+              Bulk Upload
+            </button>
+
+            <button
               onClick={handleSubmit}
               disabled={isCreating}
               className="group inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#14B8A6] to-[#0891B2] text-white rounded-xl font-medium hover:from-[#0891B2] hover:to-[#14B8A6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-teal-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
@@ -394,15 +379,6 @@ const CreateTransporterPage = () => {
                   Submit
                 </>
               )}
-            </button>
-
-            <button
-              onClick={handleExport}
-              disabled={isCreating}
-              className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              <Share className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-              Export
             </button>
           </div>
         </div>
@@ -558,6 +534,10 @@ const CreateTransporterPage = () => {
           })}
         </div>
       </div>
+
+      {/* Bulk Upload Modal and History */}
+      <BulkUploadModal />
+      <BulkUploadHistory />
     </div>
   );
 };

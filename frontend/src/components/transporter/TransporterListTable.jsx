@@ -62,30 +62,31 @@ const TransporterListTable = ({
   const showNoResults = !loading && transporters.length === 0;
 
   return (
-    <Card className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-md hover:shadow-lg transition-shadow duration-300">
+    <Card className="overflow-hidden rounded-xl border border-gray-200 bg-white" style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}>
       {/* Results Count Section - Always visible */}
-      <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+      <div className="px-6 py-6 border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between">
           {/* Left side - Results count */}
-          <p className="text-sm text-text-primary font-semibold">
-            <span className="text-orange-600 font-bold">{filteredCount}</span> Transporters Found
+          <p className="text-sm text-[#0D1A33] font-semibold">
+            <span className="text-[#1D4ED8] font-bold">{filteredCount}</span> Transporters Found
           </p>
           
           {/* Right side - Search bar - Always visible */}
-          <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex items-center gap-4">
             {searchText && (
-              <div className="text-xs text-gray-500 hidden sm:block">
+              <div className="text-xs text-[#4A5568] hidden sm:block">
                 Searching in {filteredCount} transporters
               </div>
             )}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#4A5568] pointer-events-none z-10" />
               <input
                 type="text"
                 value={searchText}
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="Search transporters..."
-                className="pl-10 pr-4 py-2 w-48 sm:w-64 lg:w-72 border border-gray-200 rounded-xl focus:border-orange-400 focus:ring-2 focus:ring-orange-200 focus:outline-none transition-all duration-200 text-sm bg-white shadow-sm hover:shadow-md"
+                className="pl-10 pr-4 py-2 w-48 sm:w-64 lg:w-72 border border-[#E5E7EB] rounded-lg focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 focus:outline-none transition-all duration-200 text-sm bg-white"
+                style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}
               />
             </div>
           </div>
@@ -95,16 +96,16 @@ const TransporterListTable = ({
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-16">
-          <div className="flex flex-col items-center space-y-4 text-gray-600">
+          <div className="flex flex-col items-center space-y-4 text-[#4A5568]">
             <div className="relative">
-              <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-              <div className="absolute inset-0 h-8 w-8 border-2 border-orange-200 rounded-full animate-pulse"></div>
+              <Loader2 className="h-8 w-8 animate-spin text-[#1D4ED8]" />
+              <div className="absolute inset-0 h-8 w-8 border-2 border-[#1D4ED8]/20 rounded-full animate-pulse"></div>
             </div>
-            <span className="text-sm font-medium">Loading transporters...</span>
-            <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            <span className="text-sm font-semibold">Loading transporters...</span>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-[#1D4ED8] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-[#1D4ED8] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-[#1D4ED8] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
             </div>
           </div>
         </div>
@@ -112,24 +113,24 @@ const TransporterListTable = ({
       
       {/* No Results State */}
       {showNoResults && (
-        <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-white">
-          <div className="flex flex-col items-center space-y-6 text-gray-500">
+        <div className="text-center py-16 bg-white">
+          <div className="flex flex-col items-center space-y-6 text-[#4A5568]">
             <div className="relative">
-              <Building className="h-20 w-20 text-gray-300" />
-              <div className="absolute -top-2 -right-2 h-6 w-6 bg-orange-100 rounded-full flex items-center justify-center">
-                <div className="h-3 w-3 bg-orange-400 rounded-full"></div>
+              <Building className="h-20 w-20 text-[#E5E7EB]" />
+              <div className="absolute -top-2 -right-2 h-6 w-6 bg-[#1D4ED8]/10 rounded-full flex items-center justify-center">
+                <div className="h-3 w-3 bg-[#1D4ED8] rounded-full"></div>
               </div>
             </div>
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-gray-700">No Transporters Found</h3>
-              <p className="text-sm text-gray-500 max-w-md">
+              <h3 className="text-lg font-bold text-[#0D1A33]">No Transporters Found</h3>
+              <p className="text-sm text-[#4A5568] max-w-md">
                 {searchText 
                   ? `No results found for "${searchText}". Try adjusting your search or use different keywords.`
                   : "Try adjusting your filters, or create a new transporter to get started."
                 }
               </p>
             </div>
-            <div className="flex space-x-2 text-xs text-gray-400">
+            <div className="flex gap-2 text-xs text-[#4A5568]">
               <span>• Check spelling</span>
               <span>• Clear filters</span>
               <span>• Try different keywords</span>
@@ -140,21 +141,22 @@ const TransporterListTable = ({
       
       {/* Mobile Card Layout - Only show when there are results */}
       {!loading && !showNoResults && (
-        <div className="block lg:hidden p-4 space-y-4">
+        <div className="block lg:hidden p-6 space-y-4">
           {transporters.map((transporter, index) => (
           <motion.div
             key={transporter.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            className="bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all duration-300"
+            className="bg-white border border-[#E5E7EB] rounded-xl p-6 hover:shadow-md transition-all duration-300"
+            style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}
           >
             {/* Header row with ID and Status */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-2">
-                <Hash className="h-4 w-4 text-orange-500" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Hash className="h-4 w-4 text-[#1D4ED8]" />
                 <span 
-                  className="font-bold text-orange-600 text-sm hover:text-orange-700 hover:underline cursor-pointer transition-all duration-200"
+                  className="font-bold text-[#1D4ED8] text-sm hover:text-[#0F172A] hover:underline cursor-pointer transition-all duration-200"
                   onClick={() => onTransporterClick(transporter.id)}
                 >
                   {transporter.id}
@@ -164,75 +166,75 @@ const TransporterListTable = ({
             </div>
             
             {/* Business Name */}
-            <div className="mb-3">
-              <div className="flex items-center space-x-2 mb-1">
-                <Building className="h-4 w-4 text-gray-500" />
-                <span className="text-xs text-gray-500 font-medium">Business Name</span>
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Building className="h-4 w-4 text-[#4A5568]" />
+                <span className="text-xs text-[#4A5568] font-semibold">Business Name</span>
               </div>
-              <p className="font-semibold text-gray-900 text-sm truncate">
+              <p className="font-semibold text-[#0D1A33] text-sm truncate">
                 {transporter.businessName}
               </p>
             </div>
             
             {/* Contact Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <div className="flex items-center space-x-1 mb-1">
-                  <Phone className="h-3 w-3 text-gray-400" />
-                  <span className="text-xs text-gray-500">Phone</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <Phone className="h-3 w-3 text-[#4A5568]" />
+                  <span className="text-xs text-[#4A5568] font-semibold">Phone</span>
                 </div>
-                <p className="text-sm text-gray-700">{displayValue(transporter.mobileNumber)}</p>
+                <p className="text-sm text-[#0D1A33]">{displayValue(transporter.mobileNumber)}</p>
               </div>
               <div>
-                <div className="flex items-center space-x-1 mb-1">
-                  <Mail className="h-3 w-3 text-gray-400" />
-                  <span className="text-xs text-gray-500">Email</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <Mail className="h-3 w-3 text-[#4A5568]" />
+                  <span className="text-xs text-[#4A5568] font-semibold">Email</span>
                 </div>
-                <p className="text-sm text-gray-700 truncate">{displayValue(transporter.emailId)}</p>
+                <p className="text-sm text-[#0D1A33] truncate">{displayValue(transporter.emailId)}</p>
               </div>
             </div>
             
             {/* Tax Information */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div>
-                <div className="flex items-center space-x-1 mb-1">
-                  <Hash className="h-3 w-3 text-gray-400" />
-                  <span className="text-xs text-gray-500">TIN/PAN</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <Hash className="h-3 w-3 text-[#4A5568]" />
+                  <span className="text-xs text-[#4A5568] font-semibold">TIN/PAN</span>
                 </div>
-                <p className="text-sm text-gray-700">{displayValue(transporter.tinPan)}</p>
+                <p className="text-sm text-[#0D1A33]">{displayValue(transporter.tinPan)}</p>
               </div>
               <div>
-                <div className="flex items-center space-x-1 mb-1">
-                  <Hash className="h-3 w-3 text-gray-400" />
-                  <span className="text-xs text-gray-500">TAN</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <Hash className="h-3 w-3 text-[#4A5568]" />
+                  <span className="text-xs text-[#4A5568] font-semibold">TAN</span>
                 </div>
-                <p className="text-sm text-gray-700">{displayValue(transporter.tan)}</p>
+                <p className="text-sm text-[#0D1A33]">{displayValue(transporter.tan)}</p>
               </div>
               <div>
-                <div className="flex items-center space-x-1 mb-1">
-                  <Hash className="h-3 w-3 text-gray-400" />
-                  <span className="text-xs text-gray-500">VAT/GST</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <Hash className="h-3 w-3 text-[#4A5568]" />
+                  <span className="text-xs text-[#4A5568] font-semibold">VAT/GST</span>
                 </div>
-                <p className="text-sm text-gray-700">{displayValue(transporter.vatGst)}</p>
+                <p className="text-sm text-[#0D1A33]">{displayValue(transporter.vatGst)}</p>
               </div>
             </div>
             
             {/* Transport Mode */}
-            <div className="mb-3">
-              <div className="flex items-center space-x-1 mb-1">
-                <Truck className="h-3 w-3 text-gray-400" />
-                <span className="text-xs text-gray-500">Transport Mode</span>
+            <div className="mb-4">
+              <div className="flex items-center gap-1 mb-1">
+                <Truck className="h-3 w-3 text-[#4A5568]" />
+                <span className="text-xs text-[#4A5568] font-semibold">Transport Mode</span>
               </div>
               <TransportModeIcons modes={transporter.transportMode} />
             </div>
             
             {/* Address */}
-            <div className="mb-3">
-              <div className="flex items-center space-x-1 mb-1">
-                <MapPin className="h-3 w-3 text-gray-400" />
-                <span className="text-xs text-gray-500">Address</span>
+            <div className="mb-4">
+              <div className="flex items-center gap-1 mb-1">
+                <MapPin className="h-3 w-3 text-[#4A5568]" />
+                <span className="text-xs text-[#4A5568] font-semibold">Address</span>
               </div>
-              <p className="text-sm text-gray-700 overflow-hidden" style={{
+              <p className="text-sm text-[#0D1A33] overflow-hidden" style={{
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical'
@@ -240,16 +242,16 @@ const TransporterListTable = ({
             </div>
             
             {/* Footer with additional info */}
-            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-              <div className="flex items-center space-x-1">
-                <User className="h-3 w-3 text-gray-400" />
-                <span className="text-xs text-gray-500">
+            <div className="flex items-center justify-between pt-4 border-t border-[#E5E7EB]">
+              <div className="flex items-center gap-1">
+                <User className="h-3 w-3 text-[#4A5568]" />
+                <span className="text-xs text-[#4A5568] font-semibold">
                   By {displayValue(transporter.createdBy)}
                 </span>
               </div>
-              <div className="flex items-center space-x-1">
-                <Calendar className="h-3 w-3 text-gray-400" />
-                <span className="text-xs text-gray-500">
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3 text-[#4A5568]" />
+                <span className="text-xs text-[#4A5568] font-semibold">
                   {displayValue(transporter.createdOn)}
                 </span>
               </div>
@@ -264,8 +266,8 @@ const TransporterListTable = ({
         <div className="hidden lg:block">
       <Table>
         <TableHeader>
-          <TableRow className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 hover:from-gray-700 hover:via-gray-800 hover:to-gray-700 transition-all duration-300">
-            <TableHead className="text-white w-16 font-semibold">
+          <TableRow className="bg-[#0D1A33] hover:bg-[#0D1A33]/90 transition-all duration-300">
+            <TableHead className="text-white w-16 text-sm font-semibold h-14">
               <div className="flex items-center">
                 Transporter ID
                 <svg className="ml-2 h-4 w-4 opacity-70" fill="currentColor" viewBox="0 0 20 20">
@@ -273,7 +275,7 @@ const TransporterListTable = ({
                 </svg>
               </div>
             </TableHead>
-            <TableHead className="text-white w-40 font-semibold">
+            <TableHead className="text-white w-40 text-sm font-semibold h-14">
               <div className="flex items-center">
                 Business Name
                 <svg className="ml-2 h-4 w-4 opacity-70" fill="currentColor" viewBox="0 0 20 20">
@@ -281,84 +283,84 @@ const TransporterListTable = ({
                 </svg>
               </div>
             </TableHead>
-            <TableHead className="text-white w-32 font-semibold">Transport Mode</TableHead>
-            <TableHead className="text-white w-28 font-semibold">Mobile Number</TableHead>
-            <TableHead className="text-white w-40 font-semibold">Email ID</TableHead>
-            <TableHead className="text-white w-32 font-semibold">TIN/PAN</TableHead>
-            <TableHead className="text-white w-28 font-semibold">TAN</TableHead>
-            <TableHead className="text-white w-32 font-semibold">VAT/GST</TableHead>
-            <TableHead className="text-white w-48 font-semibold">Address</TableHead>
-            <TableHead className="text-white w-28 font-semibold">Created By</TableHead>
-            <TableHead className="text-white w-24 font-semibold">Created On</TableHead>
-            <TableHead className="text-white w-24 font-semibold">Status</TableHead>
-            <TableHead className="text-white w-32 font-semibold">Approver</TableHead>
-            <TableHead className="text-white w-24 font-semibold">Approved On</TableHead>
+            <TableHead className="text-white w-32 text-sm font-semibold h-14">Transport Mode</TableHead>
+            <TableHead className="text-white w-28 text-sm font-semibold h-14">Mobile Number</TableHead>
+            <TableHead className="text-white w-40 text-sm font-semibold h-14">Email ID</TableHead>
+            <TableHead className="text-white w-32 text-sm font-semibold h-14">TIN/PAN</TableHead>
+            <TableHead className="text-white w-28 text-sm font-semibold h-14">TAN</TableHead>
+            <TableHead className="text-white w-32 text-sm font-semibold h-14">VAT/GST</TableHead>
+            <TableHead className="text-white w-48 text-sm font-semibold h-14">Address</TableHead>
+            <TableHead className="text-white w-28 text-sm font-semibold h-14">Created By</TableHead>
+            <TableHead className="text-white w-24 text-sm font-semibold h-14">Created On</TableHead>
+            <TableHead className="text-white w-24 text-sm font-semibold h-14">Status</TableHead>
+            <TableHead className="text-white w-32 text-sm font-semibold h-14">Approver</TableHead>
+            <TableHead className="text-white w-24 text-sm font-semibold h-14">Approved On</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {transporters.map((transporter, index) => (
             <TableRow
               key={transporter.id}
-              className="hover:bg-gradient-to-r hover:from-orange-50 hover:to-blue-50 transition-all duration-300 border-b border-gray-100 group hover:shadow-sm"
+              className="hover:bg-[#F5F7FA] transition-all duration-300 border-b border-[#E5E7EB] group h-14"
             >
-              <TableCell className="px-3 py-3 whitespace-nowrap">
+              <TableCell className="px-4 py-3 whitespace-nowrap">
                 <span 
-                  className="text-orange-600 font-bold text-sm hover:text-orange-700 hover:underline cursor-pointer transition-all duration-200 group-hover:scale-105"
+                  className="text-[#1D4ED8] font-bold text-sm hover:text-[#0F172A] hover:underline cursor-pointer transition-all duration-200"
                   onClick={() => onTransporterClick(transporter.id)}
                 >
                   {transporter.id}
                 </span>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
+              <TableCell className="px-4 py-3 whitespace-nowrap">
                 <div className="max-w-xs">
-                  <span className="text-sm text-gray-900 truncate block font-semibold group-hover:text-gray-800" title={transporter.businessName}>
+                  <span className="text-sm text-[#0D1A33] truncate block font-semibold" title={transporter.businessName}>
                     {displayValue(transporter.businessName)}
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
+              <TableCell className="px-4 py-3 whitespace-nowrap">
                 <TransportModeIcons modes={transporter.transportMode} />
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{displayValue(transporter.mobileNumber)}</span>
+              <TableCell className="px-4 py-3 whitespace-nowrap">
+                <span className="text-sm text-[#4A5568]">{displayValue(transporter.mobileNumber)}</span>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
+              <TableCell className="px-4 py-3 whitespace-nowrap">
                 <div className="max-w-xs">
-                  <span className="text-sm text-gray-600 truncate block" title={transporter.emailId}>
+                  <span className="text-sm text-[#4A5568] truncate block" title={transporter.emailId}>
                     {displayValue(transporter.emailId)}
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{displayValue(transporter.tinPan)}</span>
+              <TableCell className="px-4 py-3 whitespace-nowrap">
+                <span className="text-sm text-[#4A5568]">{displayValue(transporter.tinPan)}</span>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{displayValue(transporter.tan)}</span>
+              <TableCell className="px-4 py-3 whitespace-nowrap">
+                <span className="text-sm text-[#4A5568]">{displayValue(transporter.tan)}</span>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{displayValue(transporter.vatGst)}</span>
+              <TableCell className="px-4 py-3 whitespace-nowrap">
+                <span className="text-sm text-[#4A5568]">{displayValue(transporter.vatGst)}</span>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
+              <TableCell className="px-4 py-3 whitespace-nowrap">
                 <div className="max-w-48">
-                  <span className="text-sm text-gray-600 truncate block" title={transporter.address}>
+                  <span className="text-sm text-[#4A5568] truncate block" title={transporter.address}>
                     {displayValue(transporter.address)}
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{displayValue(transporter.createdBy)}</span>
+              <TableCell className="px-4 py-3 whitespace-nowrap">
+                <span className="text-sm text-[#4A5568]">{displayValue(transporter.createdBy)}</span>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{displayValue(transporter.createdOn)}</span>
+              <TableCell className="px-4 py-3 whitespace-nowrap">
+                <span className="text-sm text-[#4A5568]">{displayValue(transporter.createdOn)}</span>
               </TableCell>
-              <TableCell className="px-3 py-3">
+              <TableCell className="px-4 py-3">
                 <StatusPill status={transporter.status} />
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{displayValue(transporter.approver)}</span>
+              <TableCell className="px-4 py-3 whitespace-nowrap">
+                <span className="text-sm text-[#4A5568]">{displayValue(transporter.approver)}</span>
               </TableCell>
-              <TableCell className="px-3 py-3 whitespace-nowrap">
-                <span className="text-sm text-gray-600">{displayValue(transporter.approvedOn)}</span>
+              <TableCell className="px-4 py-3 whitespace-nowrap">
+                <span className="text-sm text-[#4A5568]">{displayValue(transporter.approvedOn)}</span>
               </TableCell>
             </TableRow>
           ))}
@@ -369,35 +371,35 @@ const TransporterListTable = ({
       
       {/* Pagination Section */}
       {totalItems > 0 && (
-        <div className="px-3 sm:px-4 py-3 border-t border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0">
+        <div className="px-6 py-6 border-t border-[#E5E7EB] bg-white">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             {/* Left side - Results info */}
-            <span className="text-xs sm:text-sm text-gray-600 font-medium">
+            <span className="text-xs sm:text-sm text-[#4A5568] font-semibold">
               <span className="hidden sm:inline">Showing </span>
-              <span className="text-gray-900 font-semibold">{startItem}</span>-<span className="text-gray-900 font-semibold">{endItem}</span> 
+              <span className="text-[#0D1A33] font-bold">{startItem}</span>-<span className="text-[#0D1A33] font-bold">{endItem}</span> 
               <span className="hidden sm:inline"> of </span>
               <span className="sm:hidden">/</span>
-              <span className="text-orange-600 font-bold">{totalItems}</span>
+              <span className="text-[#1D4ED8] font-bold">{totalItems}</span>
               <span className="hidden sm:inline"> transporters</span>
             </span>
             
             {/* Right side - Pagination controls */}
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center gap-4">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="hover:bg-orange-50 hover:border-orange-200 hover:text-orange-700 rounded-lg transition-all duration-200 disabled:opacity-50 px-2 sm:px-3"
+                className="hover:bg-[#1D4ED8]/10 hover:border-[#1D4ED8] hover:text-[#1D4ED8] rounded-lg transition-all duration-200 disabled:opacity-50 py-2.5 px-5"
               >
                 <ChevronLeft className="h-4 w-4 sm:mr-1" />
                 <span className="hidden sm:inline">Previous</span>
               </Button>
 
-              <span className="text-xs sm:text-sm text-gray-700 px-2 sm:px-3 py-2 bg-white rounded-lg shadow-sm border font-medium">
-                <span className="text-orange-600 font-bold">{currentPage}</span>
-                <span className="text-gray-500">/</span>
-                <span className="text-gray-900">{totalPages}</span>
+              <span className="text-xs sm:text-sm text-[#0D1A33] px-5 py-2.5 bg-white rounded-lg border border-[#E5E7EB] font-semibold" style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}>
+                <span className="text-[#1D4ED8] font-bold">{currentPage}</span>
+                <span className="text-[#4A5568]">/</span>
+                <span className="text-[#0D1A33]">{totalPages}</span>
               </span>
 
               <Button
@@ -405,7 +407,7 @@ const TransporterListTable = ({
                 size="sm"
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="hover:bg-orange-50 hover:border-orange-200 hover:text-orange-700 rounded-lg transition-all duration-200 disabled:opacity-50 px-2 sm:px-3"
+                className="hover:bg-[#1D4ED8]/10 hover:border-[#1D4ED8] hover:text-[#1D4ED8] rounded-lg transition-all duration-200 disabled:opacity-50 py-2.5 px-5"
               >
                 <span className="hidden sm:inline">Next</span>
                 <ChevronRight className="h-4 w-4 sm:ml-1" />

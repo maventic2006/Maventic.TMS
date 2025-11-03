@@ -7,6 +7,7 @@ import contractSlice from "./slices/contractSlice";
 import trackingSlice from "./slices/trackingSlice";
 import dashboardSlice from "./slices/dashboardSlice";
 import transporterSlice from "./slices/transporterSlice";
+import bulkUploadSlice from "./slices/bulkUploadSlice";
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +19,7 @@ export const store = configureStore({
     tracking: trackingSlice,
     dashboard: dashboardSlice,
     transporter: transporterSlice,
+    bulkUpload: bulkUploadSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

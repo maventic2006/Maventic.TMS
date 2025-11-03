@@ -21,6 +21,13 @@ export const API_ENDPOINTS = {
     STATES: "/transporter/states",
     CITIES: "/transporter/cities",
   },
+  BULK_UPLOAD: {
+    TEMPLATE: "/bulk-upload/template",
+    UPLOAD: "/bulk-upload/upload",
+    STATUS: "/bulk-upload/status",
+    HISTORY: "/bulk-upload/history",
+    ERROR_REPORT: "/bulk-upload/error-report",
+  },
 };
 
 // User Roles
