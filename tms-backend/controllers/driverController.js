@@ -937,6 +937,44 @@ const getDriverById = async (req, res) => {
       .where("dd.status", "ACTIVE")
       .select("dd.*", "dnm.document_name as documentTypeName");
 
+    // Get history information
+    const history = await knex("driver_history_information")
+      .where("driver_id", id)
+      .where("status", "ACTIVE")
+      .orderBy("from_date", "desc")
+      .select("*");
+
+    // Get accident/violation records
+    const accidents = await knex("driver_accident_violation")
+      .where("driver_id", id)
+      .where("status", "ACTIVE")
+      .orderBy("date", "desc")
+      .select("*");
+
+    // Get transporter mappings
+    const transporterMappings = await knex("transporter_driver_mapping as tdm")
+      .leftJoin(
+        "transporter_general_info as tgi",
+        "tdm.transporter_id",
+        "tgi.transporter_id"
+      )
+      .where("tdm.driver_id", id)
+      .where("tdm.status", "ACTIVE")
+      .select("tdm.*", "tgi.business_name as transporterName");
+
+    // Get vehicle mappings
+    const vehicleMappings = await knex("vehicle_driver_mapping as vdm")
+      .where("vdm.driver_id", id)
+      .where("vdm.status", "ACTIVE")
+      .select("vdm.*");
+
+    // Get blacklist mappings (where driver is blacklisted)
+    const blacklistMappings = await knex("blacklist_mapping")
+      .where("user_type", "DRIVER")
+      .where("user_id", id)
+      .where("status", "ACTIVE")
+      .select("*");
+
     // Format response
     const response = {
       driverId: driver.driver_id,
@@ -969,6 +1007,7 @@ const getDriverById = async (req, res) => {
         isPrimary: addr.is_primary,
       })),
       documents: documents.map((doc) => ({
+        documentId: doc.document_id,
         documentType: doc.documentTypeName || doc.document_type_id,
         documentTypeId: doc.document_type_id,
         documentNumber: doc.document_number,
@@ -978,6 +1017,48 @@ const getDriverById = async (req, res) => {
         validTo: formatDateForInput(doc.valid_to),
         status: doc.active_flag,
         remarks: doc.remarks,
+      })),
+      history: history.map((hist) => ({
+        historyId: hist.driver_history_id,
+        employer: hist.employer,
+        fromDate: formatDateForInput(hist.from_date),
+        toDate: formatDateForInput(hist.to_date),
+        employmentStatus: hist.employment_status,
+        jobTitle: hist.job_title,
+        createdOn: formatDateForInput(hist.created_on),
+      })),
+      accidents: accidents.map((acc) => ({
+        violationId: acc.driver_violation_id,
+        type: acc.type,
+        description: acc.description,
+        date: formatDateForInput(acc.date),
+        vehicleRegnNumber: acc.vehicle_regn_number,
+        createdOn: formatDateForInput(acc.created_on),
+      })),
+      transporterMappings: transporterMappings.map((tm) => ({
+        mappingId: tm.td_mapping_id,
+        transporterId: tm.transporter_id,
+        transporterName: tm.transporterName,
+        validFrom: formatDateForInput(tm.valid_from),
+        validTo: formatDateForInput(tm.valid_to),
+        activeFlag: tm.active_flag,
+        remark: tm.remark,
+      })),
+      vehicleMappings: vehicleMappings.map((vm) => ({
+        mappingId: vm.vd_mapping_id,
+        vehicleId: vm.vehicle_id,
+        validFrom: formatDateForInput(vm.valid_from),
+        validTo: formatDateForInput(vm.valid_to),
+        activeFlag: vm.active_flag,
+        remark: vm.remark,
+      })),
+      blacklistMappings: blacklistMappings.map((bm) => ({
+        mappingId: bm.blacklist_mapping_id,
+        blacklistedBy: bm.blacklisted_by,
+        blacklistedById: bm.blacklisted_by_id,
+        validFrom: formatDateForInput(bm.valid_from),
+        validTo: formatDateForInput(bm.valid_to),
+        remark: bm.remark,
       })),
     };
 
@@ -1009,41 +1090,85 @@ const getMasterData = async (req, res) => {
       name: country.name,
     }));
 
-    // Get document types (driver-specific)
-    const documentTypes = await knex("document_type_master")
-      .select("document_type_id as value", "document_type as label")
-      .where("status", "ACTIVE")
-      .orderBy("document_type");
+    // Get document types (driver-specific) with fallback
+    let documentTypes = [];
+    try {
+      documentTypes = await knex("document_type_master")
+        .select("document_type_id as value", "document_type as label")
+        .where("status", "ACTIVE")
+        .orderBy("document_type");
+    } catch (err) {
+      console.warn("document_type_master table error:", err.message);
+      documentTypes = [
+        { value: "DT001", label: "License" },
+        { value: "DT002", label: "ID Proof" },
+      ];
+    }
 
-    // Get document names (driver-specific: licenses, ID proofs)
-    const documentNames = await knex("document_name_master")
-      .select("doc_name_master_id as value", "document_name as label")
-      .where("status", "ACTIVE")
-      .whereIn("doc_name_master_id", [
-        "LIC001",
-        "LIC002",
-        "LIC003",
-        "LIC004",
-        "LIC005",
-        "LIC006",
-        "ID001",
-        "ID002",
-      ])
-      .orderBy("document_name");
+    // Get document names (driver-specific: licenses, ID proofs) with fallback
+    let documentNames = [];
+    try {
+      documentNames = await knex("document_name_master")
+        .select("doc_name_master_id as value", "document_name as label")
+        .where("status", "ACTIVE")
+        .whereIn("doc_name_master_id", [
+          "LIC001",
+          "LIC002",
+          "LIC003",
+          "LIC004",
+          "LIC005",
+          "LIC006",
+          "ID001",
+          "ID002",
+        ])
+        .orderBy("document_name");
+    } catch (err) {
+      console.warn("document_name_master table error:", err.message);
+      documentNames = [
+        { value: "LIC001", label: "LMV" },
+        { value: "LIC002", label: "TRANS" },
+        { value: "LIC003", label: "HGMV" },
+        { value: "LIC004", label: "HMV" },
+        { value: "LIC005", label: "HPMV" },
+        { value: "LIC006", label: "LDRXCV" },
+        { value: "ID001", label: "Pan" },
+        { value: "ID002", label: "Aadhar" },
+      ];
+    }
 
-    // Get address types
-    const addressTypes = await knex("address_type_master")
-      .select("address_type_id as value", "address as label")
-      .where("status", "ACTIVE")
-      .orderBy("address");
+    // Get address types with fallback
+    let addressTypes = [];
+    try {
+      addressTypes = await knex("address_type_master")
+        .select("address_type_id as value", "address as label")
+        .where("status", "ACTIVE")
+        .orderBy("address");
+    } catch (err) {
+      console.warn("address_type_master table error:", err.message);
+      addressTypes = [
+        { value: "PERM", label: "Permanent" },
+        { value: "CURR", label: "Current" },
+        { value: "TEMP", label: "Temporary" },
+      ];
+    }
 
-    // Get gender options
-    const genderOptions = await knex("gender_master")
-      .select("gender_id as value", "gender_name as label")
-      .where("status", "ACTIVE")
-      .orderBy("gender_name");
+    // Get gender options with fallback
+    let genderOptions = [];
+    try {
+      genderOptions = await knex("gender_master")
+        .select("gender_id as value", "gender_name as label")
+        .where("status", "ACTIVE")
+        .orderBy("gender_name");
+    } catch (err) {
+      console.warn("gender_master table error:", err.message);
+      genderOptions = [
+        { value: "M", label: "Male" },
+        { value: "F", label: "Female" },
+        { value: "O", label: "Others" },
+      ];
+    }
 
-    // Get blood group options (if you have a master table, otherwise return static)
+    // Get blood group options (static fallback)
     const bloodGroupOptions = [
       { value: "A+", label: "A+" },
       { value: "A-", label: "A-" },
@@ -1069,11 +1194,18 @@ const getMasterData = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching master data:", error);
+    console.error("Error stack:", error.stack);
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      sqlMessage: error.sqlMessage,
+    });
     res.status(500).json({
       success: false,
       error: {
         code: "INTERNAL_ERROR",
         message: "Failed to fetch master data",
+        details: error.message, // Include error message for debugging
       },
       timestamp: new Date().toISOString(),
     });

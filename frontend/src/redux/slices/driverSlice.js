@@ -161,7 +161,24 @@ export const fetchDriverById = createAsyncThunk(
       const response = await api.get(`/driver/${driverId}`);
 
       if (response.data.success) {
-        return response.data.data;
+        const data = response.data.data;
+
+        // Flatten the nested structure for easier component access
+        const flattenedData = {
+          driverId: data.driverId,
+          // Flatten basicInfo fields to top level
+          ...data.basicInfo,
+          // Keep nested data as-is for tabs
+          addresses: data.addresses || [],
+          documents: data.documents || [],
+          history: data.history || [],
+          accidents: data.accidents || [],
+          transporterMappings: data.transporterMappings || [],
+          vehicleMappings: data.vehicleMappings || [],
+          blacklistMappings: data.blacklistMappings || [],
+        };
+
+        return flattenedData;
       } else {
         return rejectWithValue(
           response.data.error || "Failed to fetch driver details"

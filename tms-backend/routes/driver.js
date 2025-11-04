@@ -31,10 +31,10 @@ const checkProductOwnerAccess = (req, res, next) => {
 };
 
 // Routes - All routes require product owner access
-router.get("/", authenticateToken, checkProductOwnerAccess, getDrivers);
-router.get("/:id", authenticateToken, checkProductOwnerAccess, getDriverById);
-router.post("/", authenticateToken, checkProductOwnerAccess, createDriver);
-router.put("/:id", authenticateToken, checkProductOwnerAccess, updateDriver);
+// IMPORTANT: Specific routes must come BEFORE parameterized routes
+// Otherwise Express will match specific paths like "/master-data" to "/:id"
+
+// Specific GET routes (must be first)
 router.get(
   "/master-data",
   authenticateToken,
@@ -53,5 +53,13 @@ router.get(
   checkProductOwnerAccess,
   getCitiesByCountryAndState
 );
+
+// List and detail routes
+router.get("/", authenticateToken, checkProductOwnerAccess, getDrivers);
+router.get("/:id", authenticateToken, checkProductOwnerAccess, getDriverById);
+
+// Mutation routes
+router.post("/", authenticateToken, checkProductOwnerAccess, createDriver);
+router.put("/:id", authenticateToken, checkProductOwnerAccess, updateDriver);
 
 module.exports = router;

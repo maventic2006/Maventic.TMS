@@ -14,7 +14,7 @@ const fuzzySearch = (searchText, transporters) => {
   }
 
   const searchLower = searchText.toLowerCase().trim();
-  
+
   return transporters.filter((transporter) => {
     // Search across multiple fields
     const searchableFields = [
@@ -28,7 +28,7 @@ const fuzzySearch = (searchText, transporters) => {
       transporter.address,
       transporter.status,
       transporter.createdBy,
-      ...(transporter.transportMode || [])
+      ...(transporter.transportMode || []),
     ];
 
     // Check if any field contains the search text (case-insensitive partial match)
@@ -146,9 +146,12 @@ const TransporterMaintenance = () => {
     return fuzzySearch(searchText, transporters);
   }, [searchText, transporters]);
 
-  const handleTransporterClick = useCallback((transporterId) => {
-    navigate(`/transporter/${transporterId}`);
-  }, [navigate]);
+  const handleTransporterClick = useCallback(
+    (transporterId) => {
+      navigate(`/transporter/${transporterId}`);
+    },
+    [navigate]
+  );
 
   const handleCreateNew = useCallback(() => {
     navigate("/transporter/create");
@@ -164,42 +167,45 @@ const TransporterMaintenance = () => {
     navigate("/tms-portal");
   }, [navigate]);
 
-  const handlePageChange = useCallback((page) => {
-    // Build params using only appliedFilters (not search or unapplied filters)
-    const params = {
-      page,
-      limit: pagination.limit || 25,
-    };
+  const handlePageChange = useCallback(
+    (page) => {
+      // Build params using only appliedFilters (not search or unapplied filters)
+      const params = {
+        page,
+        limit: pagination.limit || 25,
+      };
 
-    if (appliedFilters.transporterId) {
-      params.transporterId = appliedFilters.transporterId;
-    }
-    if (appliedFilters.status) {
-      params.status = appliedFilters.status;
-    }
-    if (appliedFilters.tinPan) {
-      params.businessName = appliedFilters.tinPan;
-    }
-    if (appliedFilters.tan) {
-      params.tan = appliedFilters.tan;
-    }
-    if (appliedFilters.vatGst) {
-      params.vatGst = appliedFilters.vatGst;
-    }
-    if (appliedFilters.transportMode.length > 0) {
-      params.transportMode = appliedFilters.transportMode.join(",");
-    }
+      if (appliedFilters.transporterId) {
+        params.transporterId = appliedFilters.transporterId;
+      }
+      if (appliedFilters.status) {
+        params.status = appliedFilters.status;
+      }
+      if (appliedFilters.tinPan) {
+        params.businessName = appliedFilters.tinPan;
+      }
+      if (appliedFilters.tan) {
+        params.tan = appliedFilters.tan;
+      }
+      if (appliedFilters.vatGst) {
+        params.vatGst = appliedFilters.vatGst;
+      }
+      if (appliedFilters.transportMode.length > 0) {
+        params.transportMode = appliedFilters.transportMode.join(",");
+      }
 
-    dispatch(fetchTransporters(params));
-  }, [dispatch, pagination.limit, appliedFilters]);
+      dispatch(fetchTransporters(params));
+    },
+    [dispatch, pagination.limit, appliedFilters]
+  );
 
   const handleToggleFilters = useCallback(() => {
     setShowFilters(!showFilters);
   }, [showFilters]);
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] p-4 lg:p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#F5F7FA] px-4 py-1 lg:px-6 lg:py-1">
+      <div className="max-w-7xl mx-auto space-y-0">
         <TopActionBar
           onCreateNew={handleCreateNew}
           onLogout={handleLogout}
@@ -234,9 +240,14 @@ const TransporterMaintenance = () => {
         />
 
         {error && (
-          <div className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]" style={{ boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)' }}>
+          <div
+            className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]"
+            style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+          >
             <p className="font-semibold text-sm">Error loading transporters:</p>
-            <p className="text-sm mt-1">{error.message || "Something went wrong"}</p>
+            <p className="text-sm mt-1">
+              {error.message || "Something went wrong"}
+            </p>
           </div>
         )}
       </div>

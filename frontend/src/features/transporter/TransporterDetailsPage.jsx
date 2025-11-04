@@ -22,6 +22,7 @@ import {
   User,
   Calendar,
   Hash,
+  Caravan,
 } from "lucide-react";
 
 import { getComponentTheme } from "../../utils/theme";
@@ -93,6 +94,41 @@ const TransporterDetailsPage = () => {
       viewComponent: DocumentsViewTab,
       editComponent: DocumentsTab,
     },
+    // {
+    //   id: 4,
+    //   name: "Transporter and Consignor Mapping",
+    //   icon: User,
+    //   viewComponent: null,
+    //   editComponent: null,
+    // },
+    // {
+    //   id: 5,
+    //   name: "Transporter and Vehicle Mapping",
+    //   icon: Caravan,
+    //   viewComponent: null,
+    //   editComponent: null,
+    // },
+    // {
+    //   id: 6,
+    //   name: "Transporter and Driver Mapping",
+    //   icon: User,
+    //   viewComponent: null,
+    //   editComponent: null,
+    // },
+    // {
+    //   id: 7,
+    //   name: "Transporter and Vehicle Owner Mapping",
+    //   icon: User,
+    //   viewComponent: null,
+    //   editComponent: null,
+    // },
+    // {
+    //   id: 8,
+    //   name: "Blacklist Mapping",
+    //   icon: User,
+    //   viewComponent: null,
+    //   editComponent: null,
+    // },
   ];
 
   // Load transporter data from API

@@ -1,17 +1,14 @@
-import React, { memo } from "react";
-import { ArrowLeft, Plus, Filter, Upload } from "lucide-react";
+﻿import React, { memo } from "react";
+import { ArrowLeft, Plus, Filter, User } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Card, CardContent } from "../ui/Card";
 
-const TopActionBar = ({
+const DriverTopActionBar = ({
   onCreateNew,
   totalCount,
   onBack,
   showFilters,
   onToggleFilters,
-  searchText,
-  onSearchChange,
-  onBulkUpload,
 }) => {
   return (
     <Card
@@ -30,32 +27,18 @@ const TopActionBar = ({
             >
               <ArrowLeft className="h-5 w-5 text-[#0D1A33]" />
             </Button>
-            <div className="flex flex-col min-w-0 flex-1">
-              <h1 className="text-2xl font-bold text-[#0D1A33] font-poppins truncate">
-                Transporter Maintenance
-              </h1>
-              {/* {totalCount > 0 && (
-                <p className="text-xs sm:text-sm text-gray-600 font-medium">
-                  <span className="text-orange-600 font-bold">{totalCount}</span> transporters
-                </p>
-              )} */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <User className="h-8 w-8 text-[#10B981] flex-shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <h1 className="text-2xl font-bold text-[#0D1A33] font-poppins truncate">
+                  Driver Maintenance
+                </h1>
+              </div>
             </div>
           </div>
 
           {/* Right Section - Action Buttons */}
           <div className="flex items-center gap-4 flex-shrink-0">
-            {onBulkUpload && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={onBulkUpload}
-                className="bg-[#10B981] hover:bg-[#059669] text-white font-semibold rounded-lg transition-all duration-200 py-2.5 px-5"
-              >
-                <Upload className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Bulk Upload</span>
-              </Button>
-            )}
-
             <Button
               variant="default"
               size="sm"
@@ -63,7 +46,7 @@ const TopActionBar = ({
               className="bg-[#10B981] hover:bg-[#059669] text-white font-semibold rounded-lg transition-all duration-200 py-2.5 px-5"
             >
               <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Create New</span>
+              <span className="hidden sm:inline">Create Driver</span>
             </Button>
 
             <Button
@@ -91,4 +74,4 @@ const TopActionBar = ({
   );
 };
 
-export default memo(TopActionBar);
+export default memo(DriverTopActionBar);
