@@ -21,10 +21,15 @@ const fuzzySearch = (searchText, drivers) => {
       driver.fullName,
       driver.phoneNumber,
       driver.emailId,
+      driver.licenseNumbers,
+      driver.country,
+      driver.state,
+      driver.city,
+      driver.postalCode,
       driver.gender,
       driver.bloodGroup,
-      driver.city,
       driver.status,
+      driver.avgRating?.toString(),
     ];
 
     // Check if any field contains the search text (case-insensitive partial match)
@@ -65,16 +70,32 @@ const DriverMaintenance = () => {
   // Filter state
   const [filters, setFilters] = useState({
     driverId: "",
+    fullName: "",
+    phoneNumber: "",
+    licenseNumber: "",
+    country: "",
+    state: "",
+    city: "",
+    postalCode: "",
     status: "",
     gender: "",
     bloodGroup: "",
+    avgRating: "",
   });
 
   const [appliedFilters, setAppliedFilters] = useState({
     driverId: "",
+    fullName: "",
+    phoneNumber: "",
+    licenseNumber: "",
+    country: "",
+    state: "",
+    city: "",
+    postalCode: "",
     status: "",
     gender: "",
     bloodGroup: "",
+    avgRating: "",
   });
 
   // Fetch drivers when component mounts or when appliedFilters change
@@ -85,19 +106,23 @@ const DriverMaintenance = () => {
         limit: pagination.limit || 25,
       };
 
-      // Only add applied filter parameters
-      if (appliedFilters.driverId) {
-        params.driverId = appliedFilters.driverId;
-      }
-      if (appliedFilters.status) {
-        params.status = appliedFilters.status;
-      }
-      if (appliedFilters.gender) {
-        params.gender = appliedFilters.gender;
-      }
-      if (appliedFilters.bloodGroup) {
+      // Add all applied filter parameters
+      if (appliedFilters.driverId) params.driverId = appliedFilters.driverId;
+      if (appliedFilters.fullName) params.fullName = appliedFilters.fullName;
+      if (appliedFilters.phoneNumber)
+        params.phoneNumber = appliedFilters.phoneNumber;
+      if (appliedFilters.licenseNumber)
+        params.licenseNumber = appliedFilters.licenseNumber;
+      if (appliedFilters.country) params.country = appliedFilters.country;
+      if (appliedFilters.state) params.state = appliedFilters.state;
+      if (appliedFilters.city) params.city = appliedFilters.city;
+      if (appliedFilters.postalCode)
+        params.postalCode = appliedFilters.postalCode;
+      if (appliedFilters.status) params.status = appliedFilters.status;
+      if (appliedFilters.gender) params.gender = appliedFilters.gender;
+      if (appliedFilters.bloodGroup)
         params.bloodGroup = appliedFilters.bloodGroup;
-      }
+      if (appliedFilters.avgRating) params.avgRating = appliedFilters.avgRating;
 
       dispatch(fetchDrivers(params));
     };
@@ -124,9 +149,17 @@ const DriverMaintenance = () => {
   const handleClearFilters = useCallback(() => {
     const emptyFilters = {
       driverId: "",
+      fullName: "",
+      phoneNumber: "",
+      licenseNumber: "",
+      country: "",
+      state: "",
+      city: "",
+      postalCode: "",
       status: "",
       gender: "",
       bloodGroup: "",
+      avgRating: "",
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
@@ -163,18 +196,23 @@ const DriverMaintenance = () => {
         limit: pagination.limit || 25,
       };
 
-      if (appliedFilters.driverId) {
-        params.driverId = appliedFilters.driverId;
-      }
-      if (appliedFilters.status) {
-        params.status = appliedFilters.status;
-      }
-      if (appliedFilters.gender) {
-        params.gender = appliedFilters.gender;
-      }
-      if (appliedFilters.bloodGroup) {
+      // Add all applied filters to page change
+      if (appliedFilters.driverId) params.driverId = appliedFilters.driverId;
+      if (appliedFilters.fullName) params.fullName = appliedFilters.fullName;
+      if (appliedFilters.phoneNumber)
+        params.phoneNumber = appliedFilters.phoneNumber;
+      if (appliedFilters.licenseNumber)
+        params.licenseNumber = appliedFilters.licenseNumber;
+      if (appliedFilters.country) params.country = appliedFilters.country;
+      if (appliedFilters.state) params.state = appliedFilters.state;
+      if (appliedFilters.city) params.city = appliedFilters.city;
+      if (appliedFilters.postalCode)
+        params.postalCode = appliedFilters.postalCode;
+      if (appliedFilters.status) params.status = appliedFilters.status;
+      if (appliedFilters.gender) params.gender = appliedFilters.gender;
+      if (appliedFilters.bloodGroup)
         params.bloodGroup = appliedFilters.bloodGroup;
-      }
+      if (appliedFilters.avgRating) params.avgRating = appliedFilters.avgRating;
 
       dispatch(fetchDrivers(params));
     },

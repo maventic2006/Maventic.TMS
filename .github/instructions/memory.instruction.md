@@ -98,6 +98,115 @@ applyTo: "**"
 - Prioritize maintainable, scalable solutions over quick fixes
 - Consider performance implications in all architectural decisions
 
+## Module Architecture Pattern (Standard for All Features)
+
+### Dual Component Pattern
+
+All feature modules MUST follow the dual component pattern:
+
+- **Edit Mode Components**: Named `[Section]Tab.jsx` - Used in create/edit pages with form inputs
+- **View Mode Components**: Named `[Section]ViewTab.jsx` - Used in details page view mode with read-only display
+
+### Standard Module Structure
+
+```
+features/[module]/
+├── components/
+│   ├── [Section]Tab.jsx           # Edit mode - form inputs, validation
+│   ├── [Section]ViewTab.jsx       # View mode - read-only, collapsible
+│   ├── [Section2]Tab.jsx
+│   ├── [Section2]ViewTab.jsx
+│   └── ... (all sections follow this pattern)
+├── pages/
+│   ├── [Module]CreatePage.jsx     # Uses Edit tabs
+│   └── [Module]DetailsPage.jsx    # Uses View tabs (with edit mode toggle)
+└── validation.js                  # Zod schema for module
+```
+
+### Implementation Examples
+
+**Transporter Module**: 4 Edit + 4 View tabs
+
+- GeneralTab / GeneralViewTab
+- AddressTab / AddressViewTab
+- ServiceableAreasTab / ServiceableAreasViewTab
+- DocumentsTab / DocumentsViewTab
+
+**Driver Module**: 8 Edit + 8 View tabs
+
+- BasicInfoTab / BasicInfoViewTab
+- DocumentsTab / DocumentsViewTab
+- HistoryTab / HistoryViewTab
+- AccidentViolationTab / AccidentViolationViewTab
+- TransporterMappingTab / TransporterMappingViewTab
+- VehicleMappingTab / VehicleMappingViewTab
+- BlacklistMappingTab / BlacklistMappingViewTab
+- AdditionalTab / AdditionalViewTab
+
+## Collapsible Sections Pattern (Required for All View Tabs)
+
+### Mandatory Implementation
+
+ALL view mode components (`*ViewTab.jsx`) MUST implement collapsible sections for better UX.
+
+### Required Components
+
+```javascript
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown, ChevronUp } from "lucide-react";
+```
+
+### Standard Animation Pattern
+
+```javascript
+const [isExpanded, setIsExpanded] = useState(true);
+
+<div>
+  {/* Header with toggle */}
+  <div
+    className="flex items-center justify-between cursor-pointer"
+    onClick={() => setIsExpanded(!isExpanded)}
+  >
+    <h3 className="text-lg font-semibold">Section Title</h3>
+    {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+  </div>
+
+  {/* Collapsible content */}
+  <AnimatePresence>
+    {isExpanded && (
+      <motion.div
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: "auto", opacity: 1 }}
+        exit={{ height: 0, opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="overflow-hidden"
+      >
+        {/* Content goes here */}
+      </motion.div>
+    )}
+  </AnimatePresence>
+</div>;
+```
+
+### Benefits
+
+- **Cleaner UI**: Reduces visual clutter on details pages
+- **Better Performance**: Only renders visible content
+- **Improved UX**: Users can focus on relevant sections
+- **Consistency**: Standard pattern across all modules
+- **Accessibility**: Keyboard navigation and screen reader support
+
+### Documentation Location
+
+All feature implementation documentation moved to `/docs` folder for better project organization:
+
+- DRIVER_CREATE_PAGE_COMPLETION.md
+- DRIVER_DETAILS_COLLAPSIBLE_UPDATE.md
+- TRANSPORTER_FIX.md
+- VAT_GST_FILTER_FIX.md
+- And all other implementation fix documents
+
 ### Theme Configuration System
 
 **CRITICAL RULE: NO HARDCODED COLORS IN ANY COMPONENT**

@@ -296,3 +296,17 @@ button[role="switch"] span {
 }
 
 /* Base styles handled by Tailwind */
+
+/* ============================================ */
+/* SCROLLABLE TABS UTILITY */
+/* ============================================ */
+/* Hide scrollbar but allow scrolling for tab navigation */
+.scrollable-tabs {
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.scrollable-tabs::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

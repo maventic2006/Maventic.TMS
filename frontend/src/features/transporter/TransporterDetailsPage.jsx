@@ -28,6 +28,7 @@ import {
 import { getComponentTheme } from "../../utils/theme";
 import { validateFormSection } from "./validation";
 import { TOAST_TYPES } from "../../utils/constants";
+import EmptyState from "../../components/ui/EmptyState";
 
 // Import tab components (we'll create view versions)
 import GeneralDetailsViewTab from "./components/GeneralDetailsViewTab";
@@ -94,41 +95,31 @@ const TransporterDetailsPage = () => {
       viewComponent: DocumentsViewTab,
       editComponent: DocumentsTab,
     },
-    // {
-    //   id: 4,
-    //   name: "Transporter and Consignor Mapping",
-    //   icon: User,
-    //   viewComponent: null,
-    //   editComponent: null,
-    // },
-    // {
-    //   id: 5,
-    //   name: "Transporter and Vehicle Mapping",
-    //   icon: Caravan,
-    //   viewComponent: null,
-    //   editComponent: null,
-    // },
-    // {
-    //   id: 6,
-    //   name: "Transporter and Driver Mapping",
-    //   icon: User,
-    //   viewComponent: null,
-    //   editComponent: null,
-    // },
-    // {
-    //   id: 7,
-    //   name: "Transporter and Vehicle Owner Mapping",
-    //   icon: User,
-    //   viewComponent: null,
-    //   editComponent: null,
-    // },
-    // {
-    //   id: 8,
-    //   name: "Blacklist Mapping",
-    //   icon: User,
-    //   viewComponent: null,
-    //   editComponent: null,
-    // },
+    {
+      id: 4,
+      name: "Transporter and Consignor Mapping",
+      icon: User,
+    },
+    {
+      id: 5,
+      name: "Transporter and Vehicle Mapping",
+      icon: Caravan,
+    },
+    {
+      id: 6,
+      name: "Transporter and Driver Mapping",
+      icon: User,
+    },
+    {
+      id: 7,
+      name: "Transporter and Vehicle Owner Mapping",
+      icon: User,
+    },
+    {
+      id: 8,
+      name: "Blacklist Mapping",
+      icon: User,
+    },
   ];
 
   // Load transporter data from API
@@ -572,7 +563,7 @@ const TransporterDetailsPage = () => {
         {/* Tab backdrop blur effect */}
         <div className="absolute inset-0 bg-black/20 backdrop-blur-sm"></div>
 
-        <div className="relative flex space-x-2 py-2">
+        <div className="relative flex flex-nowrap gap-2 py-2 scrollable-tabs px-2">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -582,7 +573,7 @@ const TransporterDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`group relative px-6 py-4 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-3 ${
+                className={`text-nowrap group relative px-6 py-4 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-3 ${
                   isActive
                     ? "bg-gradient-to-br from-white via-white to-gray-50 text-[#0D1A33] shadow-lg transform -translate-y-1 scale-105"
                     : "bg-white/5 backdrop-blur-sm text-blue-100/80 hover:bg-white/10 hover:text-white border border-white/10 hover:border-white/20"
@@ -649,62 +640,34 @@ const TransporterDetailsPage = () => {
               >
                 {/* Content wrapper with modern styling */}
                 <div className="bg-white/60 backdrop-blur-sm rounded-b-3xl shadow-xl border border-white/40 overflow-hidden">
-                  {/* Tab content header with gradient */}
-                  {/* <div className="bg-gradient-to-r from-gray-50/80 to-white/80 backdrop-blur-sm px-8 py-6 border-b border-gray-200/50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-[#14B8A6] to-[#0891B2] rounded-xl flex items-center justify-center shadow-lg">
-                          {React.createElement(tab.icon, {
-                            className: "w-5 h-5 text-white",
-                          })}
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-bold text-[#0D1A33] tracking-tight">
-                            {tab.name}
-                          </h2>
-                          <p className="text-sm text-gray-600">
-                            {isEditMode
-                              ? "Edit the information below"
-                              : "View detailed information"}
-                          </p>
-                        </div>
-                      </div>
-
-                      
-                      <div
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  {/* Render EmptyState if no component available, otherwise render the component */}
+                  {!TabComponent ? (
+                    <EmptyState message="No mapping data available" />
+                  ) : (
+                    <div className="p-4">
+                      <TabComponent
+                        formData={
+                          isEditMode ? editFormData : selectedTransporter
+                        }
+                        setFormData={isEditMode ? setEditFormData : undefined}
+                        errors={
                           isEditMode
-                            ? "bg-orange-100 text-orange-800"
-                            : "bg-green-100 text-green-800"
-                        }`}
-                      >
-                        {isEditMode ? "Edit Mode" : "View Mode"}
-                      </div>
-                    </div>
-                  </div> */}
-
-                  {/* Tab content */}
-                  <div className="p-4">
-                    <TabComponent
-                      formData={isEditMode ? editFormData : selectedTransporter}
-                      setFormData={isEditMode ? setEditFormData : undefined}
-                      errors={
-                        isEditMode
-                          ? tab.id === 0
-                            ? validationErrors.generalDetails || {}
-                            : tab.id === 1
-                            ? validationErrors.addresses || {}
-                            : tab.id === 2
-                            ? validationErrors.serviceableAreas || {}
-                            : tab.id === 3
-                            ? validationErrors.documents || {}
+                            ? tab.id === 0
+                              ? validationErrors.generalDetails || {}
+                              : tab.id === 1
+                              ? validationErrors.addresses || {}
+                              : tab.id === 2
+                              ? validationErrors.serviceableAreas || {}
+                              : tab.id === 3
+                              ? validationErrors.documents || {}
+                              : {}
                             : {}
-                          : {}
-                      }
-                      isEditMode={isEditMode}
-                      transporterData={selectedTransporter}
-                    />
-                  </div>
+                        }
+                        isEditMode={isEditMode}
+                        transporterData={selectedTransporter}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             );

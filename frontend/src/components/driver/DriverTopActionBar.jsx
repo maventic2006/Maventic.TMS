@@ -46,7 +46,7 @@ const DriverTopActionBar = ({
               className="bg-[#10B981] hover:bg-[#059669] text-white font-semibold rounded-lg transition-all duration-200 py-2.5 px-5"
             >
               <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Create Driver</span>
+              <span className="hidden sm:inline">Create New</span>
             </Button>
 
             <Button

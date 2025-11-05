@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import {
   User,
   Phone,
-  Mail,
   Hash,
   MapPin,
   Loader2,
@@ -11,8 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Heart,
-  Droplet,
+  CreditCard,
+  Star,
 } from "lucide-react";
 import {
   Table,
@@ -220,38 +219,39 @@ const DriverListTable = ({
                 </div>
                 <div>
                   <div className="flex items-center gap-1 mb-1">
-                    <Mail className="h-3 w-3 text-[#4A5568]" />
+                    <CreditCard className="h-3 w-3 text-[#4A5568]" />
                     <span className="text-xs text-[#4A5568] font-semibold">
-                      Email
+                      License
                     </span>
                   </div>
                   <p className="text-sm text-[#0D1A33] truncate">
-                    {displayValue(driver.emailId)}
+                    {displayValue(driver.licenseNumbers)}
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              {/* Address Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <div className="flex items-center gap-1 mb-1">
-                    <User className="h-3 w-3 text-[#4A5568]" />
+                    <MapPin className="h-3 w-3 text-[#4A5568]" />
                     <span className="text-xs text-[#4A5568] font-semibold">
-                      Gender
+                      Country
                     </span>
                   </div>
                   <p className="text-sm text-[#0D1A33]">
-                    {displayValue(driver.gender)}
+                    {displayValue(driver.country)}
                   </p>
                 </div>
                 <div>
                   <div className="flex items-center gap-1 mb-1">
-                    <Droplet className="h-3 w-3 text-[#4A5568]" />
+                    <MapPin className="h-3 w-3 text-[#4A5568]" />
                     <span className="text-xs text-[#4A5568] font-semibold">
-                      Blood Group
+                      State
                     </span>
                   </div>
                   <p className="text-sm text-[#0D1A33]">
-                    {displayValue(driver.bloodGroup)}
+                    {displayValue(driver.state)}
                   </p>
                 </div>
                 <div>
@@ -265,19 +265,60 @@ const DriverListTable = ({
                     {displayValue(driver.city)}
                   </p>
                 </div>
+                <div>
+                  <div className="flex items-center gap-1 mb-1">
+                    <MapPin className="h-3 w-3 text-[#4A5568]" />
+                    <span className="text-xs text-[#4A5568] font-semibold">
+                      Postal Code
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#0D1A33]">
+                    {displayValue(driver.postalCode)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <div className="flex items-center gap-1 mb-1">
+                    <User className="h-3 w-3 text-[#4A5568]" />
+                    <span className="text-xs text-[#4A5568] font-semibold">
+                      Status
+                    </span>
+                  </div>
+                  <StatusPill status={driver.status} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 mb-1">
+                    <Star className="h-3 w-3 text-[#F59E0B]" />
+                    <span className="text-xs text-[#4A5568] font-semibold">
+                      Rating
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#0D1A33]">
+                    {driver.avgRating
+                      ? `${Number(driver.avgRating).toFixed(1)} ⭐`
+                      : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1 mb-1">
+                    <User className="h-3 w-3 text-[#4A5568]" />
+                    <span className="text-xs text-[#4A5568] font-semibold">
+                      Approver
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#0D1A33]">
+                    {displayValue(driver.createdBy)}
+                  </p>
+                </div>
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-[#E5E7EB]">
                 <div className="flex items-center gap-1">
-                  <User className="h-3 w-3 text-[#4A5568]" />
-                  <span className="text-xs text-[#4A5568] font-semibold">
-                    By {displayValue(driver.createdBy)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
                   <Calendar className="h-3 w-3 text-[#4A5568]" />
                   <span className="text-xs text-[#4A5568] font-semibold">
-                    {displayValue(driver.createdOn)}
+                    Approved on: {displayValue(driver.createdOn)}
                   </span>
                 </div>
               </div>
@@ -296,25 +337,37 @@ const DriverListTable = ({
                   Driver ID
                 </TableHead>
                 <TableHead className="text-white w-48 text-sm font-semibold h-14">
+                  License Numbers
+                </TableHead>
+                <TableHead className="text-white w-48 text-sm font-semibold h-14">
                   Full Name
                 </TableHead>
                 <TableHead className="text-white w-32 text-sm font-semibold h-14">
                   Phone Number
                 </TableHead>
-                <TableHead className="text-white w-48 text-sm font-semibold h-14">
-                  Email
+                <TableHead className="text-white w-32 text-sm font-semibold h-14">
+                  State
                 </TableHead>
-                <TableHead className="text-white w-24 text-sm font-semibold h-14">
-                  Gender
-                </TableHead>
-                <TableHead className="text-white w-28 text-sm font-semibold h-14">
-                  Blood Group
+                <TableHead className="text-white w-32 text-sm font-semibold h-14">
+                  Country
                 </TableHead>
                 <TableHead className="text-white w-32 text-sm font-semibold h-14">
                   City
                 </TableHead>
+                <TableHead className="text-white w-28 text-sm font-semibold h-14">
+                  Postal Code
+                </TableHead>
                 <TableHead className="text-white w-24 text-sm font-semibold h-14">
                   Status
+                </TableHead>
+                <TableHead className="text-white w-24 text-sm font-semibold h-14">
+                  Rating
+                </TableHead>
+                <TableHead className="text-white w-32 text-sm font-semibold h-14">
+                  Approver
+                </TableHead>
+                <TableHead className="text-white w-32 text-sm font-semibold h-14">
+                  Approved On
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -335,6 +388,16 @@ const DriverListTable = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap">
                     <div className="max-w-xs">
                       <span
+                        className="text-sm text-[#4A5568] truncate block"
+                        title={driver.licenseNumbers}
+                      >
+                        {displayValue(driver.licenseNumbers)}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                    <div className="max-w-xs">
+                      <span
                         className="text-sm text-[#0D1A33] truncate block font-semibold"
                         title={driver.fullName}
                       >
@@ -348,37 +411,47 @@ const DriverListTable = ({
                     </span>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">
-                    <div className="max-w-xs">
-                      <span
-                        className="text-sm text-[#4A5568] truncate block"
-                        title={driver.emailId}
-                      >
-                        {displayValue(driver.emailId)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-[#4A5568]">
-                      {displayValue(driver.gender)}
+                      {displayValue(driver.state)}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-[#4A5568]">
-                      {displayValue(driver.bloodGroup)}
+                      {displayValue(driver.country)}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">
-                    <div className="max-w-32">
-                      <span
-                        className="text-sm text-[#4A5568] truncate block"
-                        title={driver.city}
-                      >
-                        {displayValue(driver.city)}
-                      </span>
-                    </div>
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(driver.city)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(driver.postalCode)}
+                    </span>
                   </TableCell>
                   <TableCell className="px-4 py-3">
                     <StatusPill status={driver.status} />
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 text-[#F59E0B] fill-[#F59E0B]" />
+                      <span className="text-sm text-[#0D1A33] font-semibold">
+                        {driver.avgRating
+                          ? Number(driver.avgRating).toFixed(1)
+                          : "N/A"}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(driver.createdBy)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(driver.createdOn)}
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}

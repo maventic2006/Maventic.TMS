@@ -423,7 +423,7 @@ const TransporterListTable = ({
                   key={transporter.id}
                   className="hover:bg-[#F5F7FA] transition-all duration-300 border-b border-[#E5E7EB] group h-14"
                 >
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span
                       className="text-[#1D4ED8] font-bold text-sm hover:text-[#0F172A] hover:underline cursor-pointer transition-all duration-200"
                       onClick={() => onTransporterClick(transporter.id)}
@@ -431,7 +431,7 @@ const TransporterListTable = ({
                       {transporter.id}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <div className="max-w-xs">
                       <span
                         className="text-sm text-[#0D1A33] truncate block font-semibold"
@@ -441,15 +441,15 @@ const TransporterListTable = ({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <TransportModeIcons modes={transporter.transportMode} />
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.mobileNumber)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <div className="max-w-xs">
                       <span
                         className="text-sm text-[#4A5568] truncate block"
@@ -459,22 +459,22 @@ const TransporterListTable = ({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.tinPan)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.tan)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.vatGst)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <div className="max-w-48">
                       <span
                         className="text-sm text-[#4A5568] truncate block"
@@ -484,12 +484,12 @@ const TransporterListTable = ({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.createdBy)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.createdOn)}
                     </span>
@@ -497,12 +497,12 @@ const TransporterListTable = ({
                   <TableCell className="px-4 py-3">
                     <StatusPill status={transporter.status} />
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.approver)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.approvedOn)}
                     </span>

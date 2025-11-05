@@ -17,11 +17,46 @@ TMS-Dev-2 is an AI-agent-driven development project in its initial phase. Curren
 │   └── development-guidelines.md # Frontend/Backend development standards
 └── copilot-instructions.md       # Project architecture documentation (this file)
 
+docs/                             # All implementation documentation
+├── DRIVER_CREATE_PAGE_COMPLETION.md
+├── DRIVER_DETAILS_COLLAPSIBLE_UPDATE.md
+├── TRANSPORTER_FIX.md
+├── VAT_GST_FILTER_FIX.md
+├── TRANSPORTER_LIST_NAVIGATION_FIX.md
+├── FUZZY_SEARCH_FIX.md
+└── TRANSPORTER_LIST_TAN_NA_UPDATE.md
+
 frontend/                         # React + Vite frontend application
 ├── src/
 │   ├── components/               # Reusable UI components
-│   ├── features/                 # Feature-based modules (auth, dashboard, etc.)
+│   │   ├── ui/                   # Base UI components
+│   │   ├── layout/               # Layout components
+│   │   ├── forms/                # Form components
+│   │   ├── charts/               # Chart components
+│   │   ├── transporter/          # Transporter-specific list components
+│   │   └── driver/               # Driver-specific list components
+│   ├── features/                 # Feature-based modules
+│   │   ├── auth/                 # Authentication module
+│   │   ├── transporter/          # Transporter CRUD module
+│   │   │   ├── components/       # 4 Edit + 4 View tabs
+│   │   │   ├── pages/            # Create & Details pages
+│   │   │   └── validation.js
+│   │   ├── driver/               # Driver CRUD module
+│   │   │   ├── components/       # 8 Edit + 8 View tabs
+│   │   │   ├── pages/            # Create & Details pages
+│   │   │   └── validation.js
+│   │   ├── dashboard/
+│   │   ├── indent/
+│   │   ├── rfq/
+│   │   ├── contract/
+│   │   ├── tracking/
+│   │   └── epod/
+│   ├── pages/                    # Top-level maintenance/list pages
+│   │   ├── TransporterMaintenance.jsx
+│   │   └── DriverMaintenance.jsx
 │   ├── redux/                    # State management with RTK
+│   │   ├── slices/               # Feature slices
+│   │   └── store.js
 │   ├── routes/                   # App routing configuration
 │   └── utils/                    # API client and utilities
 ├── .env                          # Environment configuration
@@ -29,9 +64,18 @@ frontend/                         # React + Vite frontend application
 
 tms-backend/                      # Node.js + Express backend API
 ├── controllers/                  # Business logic layer
+│   ├── authController.js
+│   ├── transporterController.js
+│   └── driverController.js
 ├── routes/                       # REST API endpoints
+│   ├── auth.js
+│   ├── transporter.js
+│   └── driver.js
 ├── middleware/                   # Authentication & error handling
-├── migrations/                   # Database schema migrations
+│   └── auth.js
+├── migrations/                   # Database schema migrations (140+ files)
+├── seeds/                        # Test data population
+├── utils/                        # Helper functions
 ├── config/                       # Database and environment config
 ├── .env                          # Backend environment variables
 └── server.js                     # Application entry point
@@ -43,6 +87,8 @@ tms-backend/                      # Node.js + Express backend API
 - **Memory-Persistent AI Interactions**: Leverages instruction files for maintaining context across sessions
 - **Research-Integrated Development**: Architecture supports extensive web research before implementation
 - **Autonomous Workflow Management**: Built for complete problem resolution without manual intervention
+- **Dual Component Pattern**: All feature modules use Edit + View component pairs for create/view modes
+- **Collapsible Sections**: All view tabs implement collapsible sections for better UX
 
 ## Current Existing Functionalities
 
@@ -90,6 +136,23 @@ tms-backend/                      # Node.js + Express backend API
   - Details Page with view/edit modes and tab-based interface
   - List/Maintenance page with filters, search, and pagination
   - Validation error handling with inline errors and toast notifications
+  - **Components**: 4 Edit tabs + 4 View tabs (General, Address, Serviceable Areas, Documents)
+  - All view tabs have collapsible sections for better UX
+- **Driver Management** (`features/driver/`) - Complete CRUD with validation
+  - Create Driver Page with multi-step form (8 tabs)
+  - Details Page with view/edit modes and tab-based interface
+  - List/Maintenance page with filters, search, and pagination
+  - Validation error handling with inline errors and toast notifications
+  - **Components**: 8 Edit tabs + 8 View tabs
+    - BasicInfoTab / BasicInfoViewTab
+    - DocumentsTab / DocumentsViewTab
+    - HistoryTab / HistoryViewTab
+    - AccidentViolationTab / AccidentViolationViewTab
+    - TransporterMappingTab / TransporterMappingViewTab
+    - VehicleMappingTab / VehicleMappingViewTab
+    - BlacklistMappingTab / BlacklistMappingViewTab
+    - AdditionalTab / AdditionalViewTab
+  - All view tabs have collapsible sections with framer-motion animations
 - **Dashboard** (`features/dashboard/`) - KPI cards and analytics
 - **Indent** (`features/indent/`) - Indent management module
 - **RFQ** (`features/rfq/`) - Request for quotation module
@@ -105,11 +168,13 @@ tms-backend/                      # Node.js + Express backend API
 - **Form Components** (`forms/`) - Reusable form elements
 - **Chart Components** (`charts/`) - Data visualization
 - **Transporter Components** (`transporter/`) - SearchBar, FilterPanel, ListTable, TopActionBar, PaginationBar, StatusPill
+- **Driver Components** (`driver/`) - SearchBar, FilterPanel, ListTable, TopActionBar, PaginationBar, StatusPill (shared list components)
 
 #### State Management (Redux)
 
 - **authSlice** - JWT tokens, user info, role-based permissions
 - **transporterSlice** - Transporter CRUD, master data, validation state
+- **driverSlice** - Driver CRUD, master data, validation state
 - **uiSlice** - Sidebar state, toast notifications, theme preferences
 - **dashboardSlice** - Dashboard data and KPIs
 - **indentSlice** - Indent management state
@@ -125,6 +190,8 @@ tms-backend/                      # Node.js + Express backend API
 - ✅ VAT/GST filter fix - now searches VAT numbers instead of state names
 - ✅ Transporter list navigation - only ID clickable, not entire row
 - ✅ Toast notification system for success/error messages
+- ✅ Driver details page collapsible sections - All view tabs implement collapsible sections with framer-motion
+- ✅ Driver create page completion - All 8 tabs have complete input fields for data entry
 
 ### Backend API (Node.js + Express)
 
@@ -159,7 +226,15 @@ tms-backend/                      # Node.js + Express backend API
   - GET `/api/transporter/master-data` - Document types, address types, etc.
   - GET `/api/transporter/states/:country` - States by country
   - GET `/api/transporter/cities/:country/:state` - Cities by country and state
-- **Route Modules**: auth, consignor, materials, transporter, users, vehicles, warehouse
+- **Driver Management** (`controllers/driverController.js`, `routes/driver.js`)
+  - GET `/api/driver` - List with pagination, filters, search
+  - POST `/api/driver` - Create with comprehensive validation
+  - GET `/api/driver/:id` - Get details with ISO code to name conversion
+  - PUT `/api/driver/:id` - Update with validation
+  - GET `/api/driver/master-data` - Gender, blood group, license types, document types, etc.
+  - GET `/api/driver/states/:countryCode` - States by country
+  - GET `/api/driver/cities/:countryCode/:stateCode` - Cities by country and state
+- **Route Modules**: auth, transporter, driver, consignor, materials, users, vehicles, warehouse
 
 #### Database Architecture
 
@@ -173,19 +248,22 @@ tms-backend/                      # Node.js + Express backend API
 
 #### Key Features
 
-- Comprehensive validation for all transporter data (business name, addresses, contacts, documents, serviceable areas)
-- Duplicate checking (VAT numbers, document numbers, phone numbers, emails)
+- Comprehensive validation for all transporter and driver data (business name, personal info, addresses, contacts, documents, mappings)
+- Duplicate checking (VAT numbers, document numbers, phone numbers, emails, license numbers)
 - Field-level validation with specific error messages (`field: "documents[0].documentNumber"`)
 - ISO code to readable name conversion in API responses
 - Transaction support for multi-table operations
+- Auto-generated IDs (DRV0001, DRV0002 for drivers; ADDR, DDOC for addresses/documents)
 - Audit fields (created_by, created_at, updated_by, updated_at)
 
 #### Recent Backend Updates
 
-- ✅ ISO code conversion in `getTransporterById` for serviceable areas
+- ✅ ISO code conversion in `getTransporterById` and `getDriverById` for serviceable areas and addresses
 - ✅ VAT/GST filter parameter addition
 - ✅ Validation error response format with field path parsing
 - ✅ Country-state-city integration for geographic data
+- ✅ Driver ID auto-generation system (DRV0001 format)
+- ✅ Collision-resistant address and document ID generation
 
 ### Documentation Architecture
 

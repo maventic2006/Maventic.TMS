@@ -749,6 +749,12 @@ const getDrivers = async (req, res) => {
       emailId = "",
       gender = "",
       bloodGroup = "",
+      licenseNumber = "",
+      country = "",
+      state = "",
+      city = "",
+      postalCode = "",
+      avgRating = "",
     } = req.query;
 
     // Convert page and limit to integers
@@ -756,7 +762,7 @@ const getDrivers = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Build base query
+    // Build base query with address and primary license
     let query = knex("driver_basic_information as dbi")
       .leftJoin("tms_address as addr", function () {
         this.on("dbi.driver_id", "=", "addr.user_reference_id")
@@ -764,6 +770,20 @@ const getDrivers = async (req, res) => {
           .andOn("addr.status", "=", knex.raw("'ACTIVE'"))
           .andOn("addr.is_primary", "=", knex.raw("true"));
       })
+      .leftJoin(
+        knex("driver_documents")
+          .select(
+            "driver_id",
+            knex.raw(
+              "GROUP_CONCAT(document_number SEPARATOR ', ') as license_numbers"
+            )
+          )
+          .where("status", "ACTIVE")
+          .groupBy("driver_id")
+          .as("dd"),
+        "dbi.driver_id",
+        "dd.driver_id"
+      )
       .select(
         "dbi.driver_id",
         "dbi.full_name",
@@ -783,7 +803,8 @@ const getDrivers = async (req, res) => {
         "addr.state",
         "addr.city",
         "addr.district",
-        "addr.postal_code"
+        "addr.postal_code",
+        "dd.license_numbers"
       );
 
     // Count query for total records
@@ -841,6 +862,95 @@ const getDrivers = async (req, res) => {
       countQuery.where("dbi.blood_group", bloodGroup);
     }
 
+    // New filters for license number and address fields
+    if (licenseNumber) {
+      query.whereRaw(
+        `dbi.driver_id IN (SELECT driver_id FROM driver_documents WHERE document_number LIKE ? AND status = 'ACTIVE')`,
+        [`%${licenseNumber}%`]
+      );
+      countQuery.whereRaw(
+        `dbi.driver_id IN (SELECT driver_id FROM driver_documents WHERE document_number LIKE ? AND status = 'ACTIVE')`,
+        [`%${licenseNumber}%`]
+      );
+    }
+
+    if (country) {
+      // Convert ISO code to country name if it's a code (2 characters)
+      let countryValue = country;
+      if (country.length === 2) {
+        const countryObj = Country.getCountryByCode(country);
+        countryValue = countryObj ? countryObj.name : country;
+      }
+
+      query.whereRaw(
+        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND country LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+        [`%${countryValue}%`]
+      );
+      countQuery.whereRaw(
+        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND country LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+        [`%${countryValue}%`]
+      );
+    }
+
+    if (state) {
+      // Convert ISO code to state name if we have country context
+      let stateValue = state;
+      if (country && state.length <= 3) {
+        // Get country code for state lookup
+        let countryCode = country;
+        if (country.length !== 2) {
+          // If country is a name, try to find its code
+          const countryObj = Country.getAllCountries().find(
+            (c) => c.name.toLowerCase() === country.toLowerCase()
+          );
+          countryCode = countryObj ? countryObj.isoCode : country;
+        }
+
+        // Get state name from ISO code
+        const stateObj = State.getStateByCodeAndCountry(state, countryCode);
+        stateValue = stateObj ? stateObj.name : state;
+      }
+
+      query.whereRaw(
+        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND state LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+        [`%${stateValue}%`]
+      );
+      countQuery.whereRaw(
+        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND state LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+        [`%${stateValue}%`]
+      );
+    }
+
+    if (city) {
+      query.whereRaw(
+        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND city LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+        [`%${city}%`]
+      );
+      countQuery.whereRaw(
+        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND city LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+        [`%${city}%`]
+      );
+    }
+
+    if (postalCode) {
+      query.whereRaw(
+        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND postal_code LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+        [`%${postalCode}%`]
+      );
+      countQuery.whereRaw(
+        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND postal_code LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+        [`%${postalCode}%`]
+      );
+    }
+
+    if (avgRating) {
+      const rating = parseFloat(avgRating);
+      if (!isNaN(rating)) {
+        query.where("dbi.avg_rating", ">=", rating);
+        countQuery.where("dbi.avg_rating", ">=", rating);
+      }
+    }
+
     // Get total count
     const [{ count: total }] = await countQuery.count("* as count");
 
@@ -861,8 +971,9 @@ const getDrivers = async (req, res) => {
       emailId: driver.email_id,
       whatsAppNumber: driver.whats_app_number,
       alternatePhoneNumber: driver.alternate_phone_number,
-      avgRating: driver.avg_rating,
+      avgRating: driver.avg_rating || 0,
       status: driver.status,
+      licenseNumbers: driver.license_numbers || "N/A",
       country: driver.country,
       state: driver.state,
       city: driver.city,

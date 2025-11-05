@@ -295,12 +295,12 @@ const DriverDetailsPage = () => {
 
   return (
     <div
-      className="min-h-screen p-4 lg:p-6"
+      className="min-h-screen px-4 py-2 lg:px-4"
       style={{
         background: `linear-gradient(to bottom right, ${safeTheme.colors.primary.background}, #f0f4f8, #e6f0ff)`,
       }}
     >
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-3">
         {/* Header */}
         <Card
           className="overflow-hidden border shadow-md"
@@ -464,7 +464,7 @@ const DriverDetailsPage = () => {
               {/* Tab backdrop blur effect */}
               <div className="absolute inset-0 bg-black/20 backdrop-blur-sm rounded-t-2xl"></div>
 
-              <div className="relative flex flex-nowrap overflow-auto gap-2 py-2">
+              <div className="relative flex flex-nowrap gap-2 py-2 scrollable-tabs px-2">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;

@@ -1,10 +1,11 @@
-﻿import React, { memo } from "react";
+﻿import React, { memo, useEffect, useState } from "react";
 import { X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../ui/Card";
 import { Input, Label } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { StatusSelect } from "../ui/Select";
+import { Country, State, City } from "country-state-city";
 
 const DriverFilterPanel = ({
   filters,
@@ -13,6 +14,65 @@ const DriverFilterPanel = ({
   onClearFilters,
   showFilters,
 }) => {
+  // Local state for cascading dropdowns
+  const [countries, setCountries] = useState([]);
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+
+  // Initialize countries on mount
+  useEffect(() => {
+    const allCountries = Country.getAllCountries().map((country) => ({
+      value: country.isoCode,
+      label: country.name,
+    }));
+    setCountries([{ value: "", label: "All Countries" }, ...allCountries]);
+  }, []);
+
+  // Update states when country changes
+  useEffect(() => {
+    if (filters.country) {
+      const countryStates = State.getStatesOfCountry(filters.country).map(
+        (state) => ({
+          value: state.isoCode,
+          label: state.name,
+        })
+      );
+      setStates([{ value: "", label: "All States" }, ...countryStates]);
+    } else {
+      setStates([{ value: "", label: "All States" }]);
+      setCities([{ value: "", label: "All Cities" }]);
+    }
+  }, [filters.country]);
+
+  // Update cities when state changes
+  useEffect(() => {
+    if (filters.country && filters.state) {
+      const stateCities = City.getCitiesOfState(
+        filters.country,
+        filters.state
+      ).map((city) => ({
+        value: city.name,
+        label: city.name,
+      }));
+      setCities([{ value: "", label: "All Cities" }, ...stateCities]);
+    } else {
+      setCities([{ value: "", label: "All Cities" }]);
+    }
+  }, [filters.country, filters.state]);
+
+  // Handle country change - reset state and city
+  const handleCountryChange = (value) => {
+    onFilterChange("country", value);
+    onFilterChange("state", "");
+    onFilterChange("city", "");
+  };
+
+  // Handle state change - reset city
+  const handleStateChange = (value) => {
+    onFilterChange("state", value);
+    onFilterChange("city", "");
+  };
+
   const statusOptions = [
     { value: "", label: "All Status" },
     { value: "ACTIVE", label: "Active" },
@@ -53,9 +113,9 @@ const DriverFilterPanel = ({
             className="bg-white border border-[#E5E7EB] rounded-xl"
             style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
           >
-            <CardContent className="p-0 relative">
-              {/* Filter Input Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <CardContent className="p-6 relative">
+              {/* Filter Input Grid - Row 1 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div className="space-y-2 group">
                   <Label
                     htmlFor="driverId"
@@ -75,6 +135,26 @@ const DriverFilterPanel = ({
                 </div>
 
                 <div className="space-y-2 group">
+                  <Label
+                    htmlFor="licenseNumber"
+                    className="text-sm text-[#0D1A33] font-semibold"
+                  >
+                    License Number:
+                  </Label>
+                  <Input
+                    id="licenseNumber"
+                    type="text"
+                    value={filters.licenseNumber}
+                    onChange={(e) =>
+                      onFilterChange("licenseNumber", e.target.value)
+                    }
+                    placeholder="Enter license"
+                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
+                    style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+                  />
+                </div>
+
+                <div className="space-y-2 group">
                   <Label className="text-sm text-[#0D1A33] font-semibold">
                     Status:
                   </Label>
@@ -88,28 +168,101 @@ const DriverFilterPanel = ({
                 </div>
 
                 <div className="space-y-2 group">
-                  <Label className="text-sm text-[#0D1A33] font-semibold">
-                    Gender:
+                  <Label
+                    htmlFor="avgRating"
+                    className="text-sm text-[#0D1A33] font-semibold"
+                  >
+                    Min Rating:
                   </Label>
-                  <StatusSelect
-                    value={filters.gender}
-                    onChange={(value) => onFilterChange("gender", value)}
-                    options={genderOptions}
-                    placeholder="All Genders"
-                    className="w-full transition-all duration-200"
+                  <Input
+                    id="avgRating"
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={filters.avgRating}
+                    onChange={(e) =>
+                      onFilterChange("avgRating", e.target.value)
+                    }
+                    placeholder="0.0"
+                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
+                    style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
                   />
                 </div>
 
                 <div className="space-y-2 group">
-                  <Label className="text-sm text-[#0D1A33] font-semibold">
-                    Blood Group:
+                  <Label
+                    htmlFor="country"
+                    className="text-sm text-[#0D1A33] font-semibold"
+                  >
+                    Country:
                   </Label>
                   <StatusSelect
-                    value={filters.bloodGroup}
-                    onChange={(value) => onFilterChange("bloodGroup", value)}
-                    options={bloodGroupOptions}
-                    placeholder="All Blood Groups"
-                    className="w-full transition-all duration-200"
+                    id="country"
+                    value={filters.country}
+                    onChange={handleCountryChange}
+                    options={countries}
+                    searchable
+                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
+                    style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+                  />
+                </div>
+
+                <div className="space-y-2 group">
+                  <Label
+                    htmlFor="state"
+                    className="text-sm text-[#0D1A33] font-semibold"
+                  >
+                    State:
+                  </Label>
+                  <StatusSelect
+                    id="state"
+                    value={filters.state}
+                    onChange={handleStateChange}
+                    options={states}
+                    disabled={!filters.country}
+                    searchable
+                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+                  />
+                </div>
+
+                <div className="space-y-2 group">
+                  <Label
+                    htmlFor="city"
+                    className="text-sm text-[#0D1A33] font-semibold"
+                  >
+                    City:
+                  </Label>
+                  <StatusSelect
+                    id="city"
+                    value={filters.city}
+                    onChange={(value) => onFilterChange("city", value)}
+                    options={cities}
+                    disabled={!filters.state}
+                    searchable
+                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+                  />
+                </div>
+
+                <div className="space-y-2 group">
+                  <Label
+                    htmlFor="postalCode"
+                    className="text-sm text-[#0D1A33] font-semibold"
+                  >
+                    Postal Code:
+                  </Label>
+                  <Input
+                    id="postalCode"
+                    type="text"
+                    value={filters.postalCode}
+                    onChange={(e) =>
+                      onFilterChange("postalCode", e.target.value)
+                    }
+                    placeholder="Enter postal code"
+                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
+                    style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
                   />
                 </div>
               </div>

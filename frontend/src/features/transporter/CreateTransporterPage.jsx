@@ -172,18 +172,85 @@ const CreateTransporterPage = () => {
     dispatch(clearLastCreated());
   }, [dispatch]);
 
-  // Handle successful creation
-  // useEffect(() => {
-  //   if (lastCreatedTransporter) {
-  //     // Show success message
-  //     alert(
-  //       `Transporter created successfully! ID: ${lastCreatedTransporter.transporterId}`
-  //     );
+  // Handle backend validation errors
+  useEffect(() => {
+    if (error && !isCreating) {
+      // Backend returned an error
+      let errorMessage = "Failed to create transporter";
+      let errorDetails = [];
 
-  //     // Navigate to transporter list (or dashboard for now)
-  //     navigate("/dashboard");
-  //   }
-  // }, [lastCreatedTransporter, navigate]);
+      if (typeof error === "object") {
+        // Handle structured error response
+        if (error.message) {
+          errorMessage = error.message;
+        }
+
+        // Check if it's a validation error with field information
+        if (error.code === "VALIDATION_ERROR" && error.field) {
+          errorDetails.push(`${error.field}: ${error.message}`);
+        }
+
+        // Handle multiple validation errors if they exist in details array
+        if (error.details && Array.isArray(error.details)) {
+          errorDetails = error.details.map((detail) => {
+            if (typeof detail === "string") {
+              return detail;
+            } else if (detail.field && detail.message) {
+              return `${detail.field}: ${detail.message}`;
+            } else if (detail.message) {
+              return detail.message;
+            }
+            return "Validation error";
+          });
+        }
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      }
+
+      // Show error toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: errorMessage,
+          details: errorDetails.length > 0 ? errorDetails : null,
+          duration: 8000,
+        })
+      );
+
+      // Clear error after showing toast to prevent re-triggering
+      dispatch(clearError());
+    }
+  }, [error, isCreating, dispatch]);
+
+  // Handle successful creation
+  useEffect(() => {
+    if (lastCreatedTransporter && !isCreating) {
+      // Show success toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Transporter created successfully!",
+          details: [
+            `Transporter ID: ${
+              lastCreatedTransporter.transporterId ||
+              lastCreatedTransporter.transporter_id ||
+              "Generated"
+            }`,
+          ],
+          duration: 3000,
+        })
+      );
+
+      // Navigate to transporter list after 2 seconds
+      const timer = setTimeout(() => {
+        dispatch(clearLastCreated());
+        navigate("/transporters");
+      }, 2000);
+
+      // Cleanup timer if component unmounts
+      return () => clearTimeout(timer);
+    }
+  }, [lastCreatedTransporter, isCreating, dispatch, navigate]);
 
   const handleClear = () => {
     if (
@@ -409,7 +476,7 @@ const CreateTransporterPage = () => {
             <button
               onClick={handleBulkUpload}
               disabled={isCreating}
-              className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <Upload className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
               Bulk Upload

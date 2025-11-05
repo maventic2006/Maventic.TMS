@@ -14,28 +14,170 @@ This document establishes the mandatory development patterns, architectural deci
 frontend/
 ├── public/
 ├── src/
-│   ├── assets/
+│   ├── assets/                 # Images, fonts, static files
 │   ├── components/
 │   │   ├── ui/                 # Design system (Buttons, Cards, Inputs, Pills)
-│   │   ├── layout/             # Navbar, Tabs, Footer, etc.
+│   │   ├── layout/             # Navbar, Sidebar, Footer, TabNavigation, Header
 │   │   ├── forms/              # Reusable form elements
-│   │   └── charts/             # Graphs & analytics components
-│   ├── features/
-│   │   ├── auth/               # Login, role-based routing
-│   │   ├── dashboard/          # KPI Cards, Graphs, Tiles
-│   │   ├── indent/
-│   │   ├── rfq/
-│   │   ├── contract/
-│   │   ├── tracking/
-│   │   └── epod/
+│   │   ├── charts/             # Graphs & analytics components
+│   │   ├── transporter/        # Transporter-specific list components
+│   │   └── driver/             # Driver-specific list components
+│   ├── features/               # Feature-based modules (one per domain)
+│   │   ├── auth/               # Login, JWT management, role-based access
+│   │   ├── dashboard/          # KPI Cards, Graphs, Analytics
+│   │   ├── transporter/        # Transporter CRUD operations
+│   │   │   ├── components/     # Tab components (Edit mode)
+│   │   │   │   ├── GeneralDetailsTab.jsx
+│   │   │   │   ├── AddressContactsTab.jsx
+│   │   │   │   ├── ServiceableAreaTab.jsx
+│   │   │   │   ├── DocumentsTab.jsx
+│   │   │   │   ├── GeneralDetailsViewTab.jsx  # View mode
+│   │   │   │   ├── AddressContactsViewTab.jsx # View mode
+│   │   │   │   └── ... (View tabs for all edit tabs)
+│   │   │   ├── pages/
+│   │   │   │   ├── CreateTransporterPage.jsx
+│   │   │   │   └── TransporterDetailsPage.jsx
+│   │   │   └── validation.js   # Zod validation schemas
+│   │   ├── driver/             # Driver CRUD operations
+│   │   │   ├── components/     # Tab components (Edit & View modes)
+│   │   │   │   ├── BasicInfoTab.jsx          # Edit mode
+│   │   │   │   ├── BasicInfoViewTab.jsx      # View mode (collapsible)
+│   │   │   │   ├── DocumentsTab.jsx
+│   │   │   │   ├── DocumentsViewTab.jsx
+│   │   │   │   ├── HistoryTab.jsx
+│   │   │   │   ├── HistoryViewTab.jsx
+│   │   │   │   ├── AccidentViolationTab.jsx
+│   │   │   │   └── AccidentViolationViewTab.jsx
+│   │   │   ├── pages/
+│   │   │   │   ├── DriverCreatePage.jsx
+│   │   │   │   └── DriverDetailsPage.jsx
+│   │   │   └── validation.js   # Zod validation schemas
+│   │   ├── indent/             # Indent management
+│   │   ├── rfq/                # Request for quotation
+│   │   ├── contract/           # Contract management
+│   │   ├── tracking/           # Shipment tracking
+│   │   └── epod/               # Electronic proof of delivery
 │   ├── hooks/                  # Custom hooks (e.g., useFetch, useSocket)
-│   ├── redux/                  # Store, slices, and middleware
+│   ├── pages/                  # Top-level pages (not feature-specific)
+│   │   ├── TMSLandingPage.jsx
+│   │   ├── TransporterMaintenance.jsx  # List/table view
+│   │   └── DriverMaintenance.jsx       # List/table view
+│   ├── redux/                  # State management with RTK
+│   │   ├── store.js            # Root store configuration
+│   │   └── slices/             # Redux slices (one per feature)
+│   │       ├── authSlice.js
+│   │       ├── uiSlice.js
+│   │       ├── transporterSlice.js
+│   │       ├── driverSlice.js
+│   │       ├── dashboardSlice.js
+│   │       ├── indentSlice.js
+│   │       ├── rfqSlice.js
+│   │       └── contractSlice.js
+│   ├── routes/                 # App routing configuration
+│   │   ├── AppRoutes.jsx       # Main route definitions
+│   │   └── ProtectedRoute.jsx  # Role-based route protection
 │   ├── utils/                  # Constants, helpers, formatters
-│   ├── routes/                 # App route configuration
+│   │   └── api.js              # Axios instance & API calls
+│   ├── theme.config.js         # Centralized theme configuration
 │   ├── App.jsx
+│   ├── index.css               # Global styles & CSS variables
 │   └── main.jsx
+├── .env                        # Environment configuration
 └── package.json
 ```
+
+**Key Folder Organization Principles:**
+
+1. **`features/[module]`** - Complete feature modules with components, pages, and validation
+2. **`components/[module]`** - Shared list/table components used across pages
+3. **`pages/`** - Top-level maintenance/list pages that use feature components
+4. **Dual Component Pattern** - Every edit tab has a corresponding view tab with `ViewTab` suffix
+5. **`validation.js`** - Each feature module has its own Zod schemas
+
+### 1.1 Module Architecture Pattern (Standard for All Features)
+
+Each feature module follows this consistent structure:
+
+```
+features/[module]/
+├── components/           # Tab components for create/edit/view pages
+│   ├── [SectionName]Tab.jsx       # Edit mode component
+│   ├── [SectionName]ViewTab.jsx   # View mode component (read-only)
+│   └── ... (additional tabs)
+├── pages/
+│   ├── [Module]CreatePage.jsx     # Create new record page
+│   └── [Module]DetailsPage.jsx    # View/edit existing record page
+└── validation.js         # Zod validation schemas for the module
+```
+
+**Dual Component Pattern (Edit + View):**
+
+- **Edit Components** (e.g., `BasicInfoTab.jsx`) - Used in create and edit modes with input fields
+- **View Components** (e.g., `BasicInfoViewTab.jsx`) - Read-only display with collapsible sections
+- All view components implement collapsible sections using Framer Motion for smooth animations
+- View components use `ChevronUp`/`ChevronDown` icons to indicate expand/collapse state
+
+**Example Implementation:**
+
+```javascript
+// Edit Mode Component (BasicInfoTab.jsx)
+const BasicInfoTab = ({ formData, onFormDataChange, validationErrors, ... }) => {
+  return (
+    <div>
+      <input value={formData.fullName} onChange={...} />
+      <input value={formData.phoneNumber} onChange={...} />
+      {/* Editable form fields */}
+    </div>
+  );
+};
+
+// View Mode Component (BasicInfoViewTab.jsx)
+const BasicInfoViewTab = ({ driver }) => {
+  const [expandedSections, setExpandedSections] = useState({ basic: true, address: true });
+
+  return (
+    <CollapsibleSection title="Basic Information" isExpanded={expandedSections.basic}>
+      <InfoItem label="Full Name" value={driver.fullName} />
+      <InfoItem label="Phone Number" value={driver.phoneNumber} />
+      {/* Read-only display fields */}
+    </CollapsibleSection>
+  );
+};
+```
+
+### 1.2 Collapsible Sections Implementation
+
+All view tabs MUST implement collapsible sections for better UX:
+
+**Required Components:**
+
+- `useState` for managing expansion state
+- `framer-motion` for smooth animations (AnimatePresence, motion.div)
+- `ChevronUp` and `ChevronDown` icons from lucide-react
+
+**Animation Pattern:**
+
+```javascript
+<AnimatePresence>
+  {isExpanded && (
+    <motion.div
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: "auto", opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      {/* Content */}
+    </motion.div>
+  )}
+</AnimatePresence>
+```
+
+**Benefits:**
+
+- Cleaner UI - users can focus on relevant sections
+- Performance - only visible content is rendered
+- Consistency - matches design across all detail pages
+- Accessibility - proper button elements with hover states
 
 ### 2. Design System Rules
 
@@ -402,19 +544,26 @@ className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4";
 ### 1. Folder Structure
 
 ```
-backend/
-├── src/
-│   ├── config/           # Database, environment, JWT configuration
-│   ├── db/               # Knex instance, migrations, seeds
-│   ├── models/           # Data access layer via Knex
-│   ├── routes/           # REST endpoints per module
-│   ├── controllers/      # Business logic layer
-│   ├── services/         # External integrations & complex business logic
-│   ├── middlewares/      # Authentication, validation, error handling
-│   ├── validations/      # Zod schemas for request validation
-│   ├── sockets/          # Socket.io event handlers
-│   ├── utils/            # Helper functions and constants
-│   └── server.js         # Application entry point
+tms-backend/
+├── config/               # Database, environment, JWT configuration
+│   └── database.js       # Knex database connection
+├── controllers/          # Business logic layer
+│   ├── authController.js
+│   ├── transporterController.js
+│   └── driverController.js
+├── routes/               # REST endpoints per module
+│   ├── auth.js
+│   ├── transporter.js
+│   └── driver.js
+├── middleware/           # Authentication, validation, error handling
+│   └── auth.js           # JWT authentication middleware
+├── migrations/           # Database schema migrations (140+ files)
+├── seeds/                # Test data population scripts
+├── utils/                # Helper functions and constants
+│   ├── errorMessages.js
+│   └── documentValidation.js
+├── .env                  # Backend environment variables
+├── server.js             # Application entry point
 └── package.json
 ```
 
@@ -527,6 +676,479 @@ const validate = (schema) => (req, res, next) => {
   }
 };
 ```
+
+### 4.1. Transporter Management API
+
+#### Base Route: `/api/transporter`
+
+All transporter endpoints require:
+
+- **Authentication**: `authenticateToken` middleware (JWT verification)
+- **Authorization**: `checkProductOwnerAccess` middleware (UT001 only)
+
+#### Endpoints
+
+**1. GET `/api/transporter/master-data`**
+
+- **Purpose**: Get dropdown data (document types, address types, etc.)
+- **Response**: Master data objects for form dropdowns
+- **Authentication**: Required
+
+**2. GET `/api/transporter/states/:country`**
+
+- **Purpose**: Get states/provinces for a country
+- **Parameters**:
+  - `country` (path) - Country code (e.g., "IN", "US")
+- **Response**: Array of state objects with ISO codes and names
+- **Authentication**: Required
+
+**3. GET `/api/transporter/cities/:country/:state`**
+
+- **Purpose**: Get cities for a state/province
+- **Parameters**:
+  - `country` (path) - Country code
+  - `state` (path) - State code
+- **Response**: Array of city objects
+- **Authentication**: Required
+
+**4. GET `/api/transporter`**
+
+- **Purpose**: List transporters with pagination, filtering, and search
+- **Query Parameters**:
+  - `page` (number) - Page number (default: 1)
+  - `limit` (number) - Items per page (default: 10)
+  - `search` (string) - Search term for business name
+  - `status` (string) - Filter by status
+  - `country` (string) - Filter by country
+  - `state` (string) - Filter by state
+  - `vat` (string) - Filter by VAT/GST number
+- **Response**: Paginated list with total count
+- **Authentication**: Required
+
+**5. GET `/api/transporter/:id`**
+
+- **Purpose**: Get single transporter details
+- **Parameters**:
+  - `id` (path) - Transporter ID
+- **Response**: Complete transporter object with:
+  - ISO codes converted to readable names (countries, states, cities)
+  - All addresses, contacts, documents, serviceable areas
+- **Authentication**: Required
+
+**6. POST `/api/transporter`**
+
+- **Purpose**: Create new transporter
+- **Body**: Complete transporter object with validation
+- **Validation**:
+  - Business name (required, unique)
+  - VAT numbers (unique per country)
+  - Phone numbers (10-digit Indian format `/^[6-9]\d{9}$/`)
+  - Email addresses (standard email validation)
+  - Document numbers (unique)
+  - Addresses (at least one required)
+- **Response**: Created transporter with auto-generated ID
+- **Authentication**: Required
+
+**7. PUT `/api/transporter/:id`**
+
+- **Purpose**: Update existing transporter
+- **Parameters**:
+  - `id` (path) - Transporter ID
+- **Body**: Partial or complete transporter object
+- **Validation**: Same as POST, checks uniqueness excluding current record
+- **Response**: Updated transporter object
+- **Authentication**: Required
+
+#### Validation Patterns
+
+```javascript
+// Phone validation (Indian 10-digit)
+const validatePhoneNumber = (phone) => {
+  const phoneRegex = /^[6-9]\d{9}$/;
+  return phoneRegex.test(phone);
+};
+
+// Email validation
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+// Duplicate checking
+const checkDuplicateVAT = async (vat, country, excludeId = null) => {
+  const query = db("transporter_vat_details").where({
+    vat_number: vat,
+    country_code: country,
+  });
+  if (excludeId) query.whereNot("transporter_id", excludeId);
+  return await query.first();
+};
+```
+
+#### Error Response Format
+
+```javascript
+// Field-level validation errors
+{
+  "error": "Validation failed",
+  "details": [
+    {
+      "field": "documents[0].documentNumber",
+      "message": "Document number already exists"
+    },
+    {
+      "field": "contacts[0].phoneNumber",
+      "message": "Invalid phone number format"
+    }
+  ]
+}
+
+// General errors
+{
+  "error": "Transporter not found"
+}
+```
+
+### 4.2. Driver Management API
+
+#### Base Route: `/api/driver`
+
+All driver endpoints require:
+
+- **Authentication**: `authenticateToken` middleware (JWT verification)
+- **Authorization**: `checkProductOwnerAccess` middleware (UT001 only)
+
+#### Endpoints
+
+**1. GET `/api/driver/master-data`**
+
+- **Purpose**: Get dropdown data for driver forms
+- **Response**: Master data objects including:
+  - Gender types
+  - Blood group types
+  - License types
+  - Document types
+  - Address types
+- **Authentication**: Required
+- **Usage**: Populates dropdowns in create/edit forms
+
+**2. GET `/api/driver/states/:countryCode`**
+
+- **Purpose**: Get states/provinces for a country
+- **Parameters**:
+  - `countryCode` (path) - Country code (e.g., "IN", "US")
+- **Response**: Array of state objects with ISO codes and names
+- **Authentication**: Required
+- **Usage**: Cascading dropdown for address selection
+
+**3. GET `/api/driver/cities/:countryCode/:stateCode`**
+
+- **Purpose**: Get cities for a state/province
+- **Parameters**:
+  - `countryCode` (path) - Country code (e.g., "IN")
+  - `stateCode` (path) - State code (e.g., "AS" for Assam)
+- **Response**: Array of city objects
+- **Authentication**: Required
+- **Usage**: Cascading dropdown for address selection
+
+**4. GET `/api/driver`**
+
+- **Purpose**: List drivers with pagination, filtering, and search
+- **Query Parameters**:
+  - `page` (number) - Page number (default: 1)
+  - `limit` (number) - Items per page (default: 10)
+  - `search` (string) - Search term for driver name, ID, or license number
+  - `status` (string) - Filter by status (active, inactive)
+  - `licenseType` (string) - Filter by license type
+  - `transporter` (string) - Filter by transporter mapping
+  - `bloodGroup` (string) - Filter by blood group
+- **Response**: Paginated list with total count
+  ```javascript
+  {
+    "drivers": [
+      {
+        "driver_id": "DRV0001",
+        "driver_name": "John Doe",
+        "license_number": "DL1234567890",
+        "phone_number": "9876543210",
+        "status": "active",
+        // ... other fields
+      }
+    ],
+    "pagination": {
+      "total": 150,
+      "page": 1,
+      "limit": 10,
+      "totalPages": 15
+    }
+  }
+  ```
+- **Authentication**: Required
+
+**5. GET `/api/driver/:id`**
+
+- **Purpose**: Get single driver details with all related data
+- **Parameters**:
+  - `id` (path) - Driver ID (e.g., "DRV0001")
+- **Response**: Complete driver object including:
+  - Basic information (name, DOB, gender, blood group, etc.)
+  - ISO codes converted to readable names (countries, states, cities)
+  - All addresses with full location names
+  - All documents (license, Aadhaar, PAN, medical certificates, etc.)
+  - Historical data
+  - Accident and violation records
+  - Transporter mappings
+  - Vehicle mappings
+  - Blacklist mappings
+- **Authentication**: Required
+- **Example Response**:
+  ```javascript
+  {
+    "driver_id": "DRV0001",
+    "driver_name": "John Doe",
+    "date_of_birth": "1990-05-15",
+    "gender": "Male",
+    "blood_group": "O+",
+    "phone_number": "9876543210",
+    "email": "john.doe@example.com",
+    "addresses": [
+      {
+        "address_id": "ADDR001",
+        "address_type": "Permanent",
+        "country": "India",  // Converted from ISO
+        "state": "Assam",    // Converted from ISO
+        "city": "Guwahati",  // Converted from ISO
+        // ... other address fields
+      }
+    ],
+    "documents": [...],
+    "history": [...],
+    "accidents": [...],
+    "violations": [...],
+    "transporters": [...],
+    "vehicles": [...]
+  }
+  ```
+
+**6. POST `/api/driver`**
+
+- **Purpose**: Create new driver
+- **Body**: Complete driver object with validation
+  ```javascript
+  {
+    "driver_name": "John Doe",
+    "date_of_birth": "1990-05-15",
+    "gender": "Male",
+    "blood_group": "O+",
+    "phone_number": "9876543210",
+    "email": "john.doe@example.com",
+    "addresses": [
+      {
+        "address_type": "Permanent",
+        "address_line1": "123 Main St",
+        "country_code": "IN",
+        "state_code": "AS",
+        "city": "Guwahati",
+        "pincode": "781001"
+      }
+    ],
+    "documents": [
+      {
+        "document_type": "Driving License",
+        "document_number": "DL1234567890",
+        "issue_date": "2020-01-01",
+        "expiry_date": "2030-01-01"
+      }
+    ]
+    // ... other sections
+  }
+  ```
+- **Validation**:
+  - Driver name (required, 3-100 characters)
+  - Date of birth (required, must be 18+ years old)
+  - Phone number (required, 10-digit Indian format `/^[6-9]\d{9}$/`, unique)
+  - Email (required, valid email format, unique)
+  - License number (required, unique)
+  - At least one address required
+  - Document numbers (unique)
+  - Document expiry dates (future dates for licenses/medical certs)
+- **Auto-generation**:
+  - `driver_id` - Auto-generated (DRV0001, DRV0002, etc.)
+  - `address_id` - Auto-generated with collision resistance (100 attempts)
+  - `document_id` - Auto-generated with collision resistance (100 attempts)
+- **Response**: Created driver with all generated IDs
+- **Authentication**: Required
+
+**7. PUT `/api/driver/:id`**
+
+- **Purpose**: Update existing driver
+- **Parameters**:
+  - `id` (path) - Driver ID (e.g., "DRV0001")
+- **Body**: Partial or complete driver object
+- **Validation**: Same as POST, checks uniqueness excluding current record
+  - Phone/email uniqueness checks exclude current driver
+  - License number uniqueness check excludes current driver
+  - Document number uniqueness checks within driver's documents
+- **Response**: Updated driver object with all related data
+- **Authentication**: Required
+
+#### ID Generation Patterns
+
+```javascript
+// Driver ID generation (DRV0001, DRV0002, etc.)
+const generateDriverId = async () => {
+  const lastDriver = await db("driver_master")
+    .orderBy("driver_id", "desc")
+    .first();
+
+  if (!lastDriver) return "DRV0001";
+
+  const lastNumber = parseInt(lastDriver.driver_id.replace("DRV", ""));
+  const newNumber = (lastNumber + 1).toString().padStart(4, "0");
+  return `DRV${newNumber}`;
+};
+
+// Address ID generation (collision-resistant)
+const generateAddressId = async () => {
+  let attempts = 0;
+  while (attempts < 100) {
+    const id = `ADDR${Date.now()}${Math.random().toString(36).substr(2, 5)}`;
+    const exists = await db("driver_address").where("address_id", id).first();
+    if (!exists) return id;
+    attempts++;
+  }
+  throw new Error("Failed to generate unique address ID");
+};
+
+// Document ID generation (collision-resistant)
+const generateDocumentId = async () => {
+  let attempts = 0;
+  while (attempts < 100) {
+    const id = `DDOC${Date.now()}${Math.random().toString(36).substr(2, 5)}`;
+    const exists = await db("driver_documents")
+      .where("document_id", id)
+      .first();
+    if (!exists) return id;
+    attempts++;
+  }
+  throw new Error("Failed to generate unique document ID");
+};
+```
+
+#### Validation Functions
+
+```javascript
+// Phone validation (Indian 10-digit, starts with 6-9)
+const validatePhoneNumber = (phone) => {
+  const phoneRegex = /^[6-9]\d{9}$/;
+  return phoneRegex.test(phone);
+};
+
+// Email validation
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+// Age validation (must be 18+)
+const validateAge = (dob) => {
+  const today = new Date();
+  const birthDate = new Date(dob);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age--;
+  }
+  return age >= 18;
+};
+
+// Duplicate phone check
+const checkDuplicatePhone = async (phone, excludeId = null) => {
+  const query = db("driver_master").where("phone_number", phone);
+  if (excludeId) query.whereNot("driver_id", excludeId);
+  return await query.first();
+};
+
+// Duplicate email check
+const checkDuplicateEmail = async (email, excludeId = null) => {
+  const query = db("driver_master").where("email", email);
+  if (excludeId) query.whereNot("driver_id", excludeId);
+  return await query.first();
+};
+
+// Duplicate license check
+const checkDuplicateLicense = async (licenseNumber, excludeId = null) => {
+  const query = db("driver_documents")
+    .where("document_type", "Driving License")
+    .where("document_number", licenseNumber);
+  if (excludeId) {
+    query.whereNot("driver_id", excludeId);
+  }
+  return await query.first();
+};
+```
+
+#### Error Response Format
+
+```javascript
+// Field-level validation errors
+{
+  "error": "Validation failed",
+  "details": [
+    {
+      "field": "phone_number",
+      "message": "Phone number already exists"
+    },
+    {
+      "field": "documents[0].document_number",
+      "message": "License number already exists"
+    },
+    {
+      "field": "date_of_birth",
+      "message": "Driver must be at least 18 years old"
+    }
+  ]
+}
+
+// General errors
+{
+  "error": "Driver not found"
+}
+
+// Success response
+{
+  "message": "Driver created successfully",
+  "driver": { /* driver object */ }
+}
+```
+
+#### Transaction Support
+
+All create/update operations use database transactions:
+
+```javascript
+await db.transaction(async (trx) => {
+  // Insert driver_master
+  await trx("driver_master").insert(driverData);
+
+  // Insert addresses
+  for (const address of addresses) {
+    await trx("driver_address").insert(address);
+  }
+
+  // Insert documents
+  for (const document of documents) {
+    await trx("driver_documents").insert(document);
+  }
+
+  // Commit transaction
+});
+```
+
+This ensures data consistency - if any operation fails, all changes are rolled back.
 
 ### 5. Database Layer (Knex + MySQL)
 
