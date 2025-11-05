@@ -21,6 +21,9 @@ import TransporterDetailsPage from "./features/transporter/TransporterDetailsPag
 import DriverMaintenance from "./pages/DriverMaintenance";
 import DriverCreatePage from "./features/driver/pages/DriverCreatePage";
 import DriverDetailsPage from "./features/driver/pages/DriverDetailsPage";
+import VehicleMaintenance from "./pages/VehicleMaintenance";
+import VehicleDetailsPage from "./features/vehicle/VehicleDetailsPage";
+import CreateVehiclePage from "./features/vehicle/CreateVehiclePage";
 import {
   verifyToken,
   logoutUser,
@@ -374,6 +377,40 @@ function App() {
                     <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                       <Layout>
                         <DriverDetailsPage />
+                      </Layout>
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Vehicle Management Routes */}
+                <Route
+                  path="/vehicles"
+                  element={
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                      <Layout>
+                        <VehicleMaintenance />
+                      </Layout>
+                    </PrivateRoute>
+                  }
+                />
+
+                <Route
+                  path="/vehicle/create"
+                  element={
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                      <Layout>
+                        <CreateVehiclePage />
+                      </Layout>
+                    </PrivateRoute>
+                  }
+                />
+
+                <Route
+                  path="/vehicle/:id"
+                  element={
+                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                      <Layout>
+                        <VehicleDetailsPage />
                       </Layout>
                     </PrivateRoute>
                   }

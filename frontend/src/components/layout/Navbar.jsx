@@ -29,7 +29,7 @@ const Navbar = () => {
         {/* Logo and App Name */}
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">TMS</span>
+            <span className="text-white font-bold text-sm">TS</span>
           </div>
           <h1 className="text-xl font-semibold">{APP_NAME}</h1>
         </div>

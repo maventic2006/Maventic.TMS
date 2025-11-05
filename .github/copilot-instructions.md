@@ -136,6 +136,7 @@ tms-backend/                      # Node.js + Express backend API
   - Details Page with view/edit modes and tab-based interface
   - List/Maintenance page with filters, search, and pagination
   - Validation error handling with inline errors and toast notifications
+<<<<<<< Updated upstream
   - **Components**: 4 Edit tabs + 4 View tabs (General, Address, Serviceable Areas, Documents)
   - All view tabs have collapsible sections for better UX
 - **Driver Management** (`features/driver/`) - Complete CRUD with validation
@@ -153,6 +154,20 @@ tms-backend/                      # Node.js + Express backend API
     - BlacklistMappingTab / BlacklistMappingViewTab
     - AdditionalTab / AdditionalViewTab
   - All view tabs have collapsible sections with framer-motion animations
+=======
+- **Vehicle Management** (`features/vehicle/`) - Complete vehicle master maintenance (Phase 1A-C COMPLETED + UI Modernization)
+  - List Page with modern UI, proper table headers, and full pagination (25 vehicles per page)
+  - Smart pagination with First/Previous/Next/Last controls and page number display
+  - Professional table headers with uppercase, bold styling
+  - Smooth animations on table rows (stagger effect, hover with transform and shadow)
+  - Modern filter panel with slide-in animation and theme-compliant inputs
+  - Enhanced top action bar with total count badge and animated buttons
+  - Details Page with 9 tabs: Basic Info, Specifications, Capacity, Ownership, Maintenance, Documents, Mappings, Performance, GPS
+  - Create Page with 4-step form: Basic Information, Capacity & Ownership, GPS & Operational, Review & Submit
+  - Responsive design with mobile cards and desktop table views
+  - Status tracking (Active, Maintenance, Blacklisted, Pending Approval, etc.)
+  - Multi-step form with validation and progress indicator
+>>>>>>> Stashed changes
 - **Dashboard** (`features/dashboard/`) - KPI cards and analytics
 - **Indent** (`features/indent/`) - Indent management module
 - **RFQ** (`features/rfq/`) - Request for quotation module
@@ -168,7 +183,11 @@ tms-backend/                      # Node.js + Express backend API
 - **Form Components** (`forms/`) - Reusable form elements
 - **Chart Components** (`charts/`) - Data visualization
 - **Transporter Components** (`transporter/`) - SearchBar, FilterPanel, ListTable, TopActionBar, PaginationBar, StatusPill
+<<<<<<< Updated upstream
 - **Driver Components** (`driver/`) - SearchBar, FilterPanel, ListTable, TopActionBar, PaginationBar, StatusPill (shared list components)
+=======
+- **Vehicle Components** (`vehicle/`) - VehicleListTable (with headers), VehicleFilterPanel (animated), TopActionBar (modernized), PaginationBar (smart display), VehicleStatusPill
+>>>>>>> Stashed changes
 
 #### State Management (Redux)
 

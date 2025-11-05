@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import TMSHeader from "../components/layout/TMSHeader";
+import { getPageTheme } from "../theme.config";
 import { fetchDrivers } from "../redux/slices/driverSlice";
 import DriverTopActionBar from "../components/driver/DriverTopActionBar";
 import DriverFilterPanel from "../components/driver/DriverFilterPanel";
@@ -57,6 +59,7 @@ const displayValue = (value) => {
 const DriverMaintenance = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const theme = getPageTheme("list");
 
   // Redux state
   const { drivers, pagination, isFetching, error } = useSelector(
@@ -224,9 +227,11 @@ const DriverMaintenance = () => {
   }, [showFilters]);
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] px-4 py-1 lg:px-6 lg:py-1">
-      <div className="max-w-7xl mx-auto space-y-0">
-        <DriverTopActionBar
+    <div className="min-h-screen bg-[#F5F7FA]">
+      <TMSHeader theme={theme} />
+      <div className="px-4 py-1 lg:px-6 lg:py-1">
+        <div className="max-w-7xl mx-auto space-y-0">
+          <DriverTopActionBar
           onCreateNew={handleCreateNew}
           onBack={handleBack}
           totalCount={pagination.total || 0}
@@ -267,6 +272,7 @@ const DriverMaintenance = () => {
             </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

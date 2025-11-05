@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import TMSHeader from "../../../components/layout/TMSHeader";
 import {
   ArrowLeft,
   RefreshCw,
@@ -274,6 +275,7 @@ const DriverCreatePage = () => {
   const canSubmit = true; // Always allow submission
 
   return (
+<<<<<<< Updated upstream
     <div className="bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
       {/* Modern Header Bar with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
@@ -423,12 +425,65 @@ const DriverCreatePage = () => {
                       masterData={masterData}
                       isLoading={isLoading}
                     />
+=======
+    <div
+      className="min-h-screen"
+      style={{
+        background: `linear-gradient(to bottom right, ${safeTheme.colors.primary.background}, #f0f4f8, #e6f0ff)`,
+      }}
+    >
+      <TMSHeader theme={safeTheme} />
+      <div className="p-4 lg:p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <Card
+          className="overflow-hidden border shadow-md"
+          style={{
+            backgroundColor: safeTheme.colors.card.background,
+            borderColor: safeTheme.colors.card.border,
+          }}
+        >
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Button
+                  onClick={handleBack}
+                  style={{
+                    backgroundColor: safeActionButtonTheme.secondary.background,
+                    color: safeActionButtonTheme.secondary.text,
+                    borderColor: safeActionButtonTheme.secondary.border,
+                  }}
+                  className="flex items-center space-x-2 border hover:opacity-90 transition-opacity"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back</span>
+                </Button>
+                <div className="flex items-center space-x-3">
+                  <User
+                    className="h-8 w-8"
+                    style={{ color: safeActionButtonTheme.primary.background }}
+                  />
+                  <div>
+                    <h1
+                      className="text-2xl font-bold"
+                      style={{ color: safeTheme.colors.text.primary }}
+                    >
+                      Create Driver
+                    </h1>
+                    <p
+                      className="text-sm"
+                      style={{ color: safeTheme.colors.text.secondary }}
+                    >
+                      Add a new driver to the system
+                    </p>
+>>>>>>> Stashed changes
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
+      </div>
       </div>
     </div>
   );

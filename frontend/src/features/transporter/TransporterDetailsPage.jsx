@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import TMSHeader from "../../components/layout/TMSHeader";
+import { getPageTheme } from "../../theme.config";
 import {
   fetchTransporterById,
   updateTransporter,
@@ -65,6 +67,7 @@ const TransporterDetailsPage = () => {
 
   const actionButtonTheme = getComponentTheme("actionButton");
   const tabButtonTheme = getComponentTheme("tabButton");
+  const theme = getPageTheme("tab");
 
   const tabs = [
     {
@@ -466,6 +469,8 @@ const TransporterDetailsPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
+      <TMSHeader theme={theme} />
+      
       {/* Modern Header Bar with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
         {/* Background decoration */}

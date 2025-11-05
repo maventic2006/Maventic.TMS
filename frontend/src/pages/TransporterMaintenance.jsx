@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import TMSHeader from "../components/layout/TMSHeader";
+import { getPageTheme } from "../theme.config";
 import TopActionBar from "../components/transporter/TopActionBar";
 import TransporterFilterPanel from "../components/transporter/TransporterFilterPanel";
 import TransporterListTable from "../components/transporter/TransporterListTable";
@@ -43,6 +45,7 @@ const fuzzySearch = (searchText, transporters) => {
 const TransporterMaintenance = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const theme = getPageTheme("list");
 
   // Redux state
   const { transporters, pagination, isFetching, error } = useSelector(
@@ -204,9 +207,11 @@ const TransporterMaintenance = () => {
   }, [showFilters]);
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] px-4 py-1 lg:px-6 lg:py-1">
-      <div className="max-w-7xl mx-auto space-y-0">
-        <TopActionBar
+    <div className="min-h-screen bg-[#F5F7FA]">
+      <TMSHeader theme={theme} />
+      <div className="px-4 py-1 lg:px-6 lg:py-1">
+        <div className="max-w-7xl mx-auto space-y-0">
+          <TopActionBar
           onCreateNew={handleCreateNew}
           onLogout={handleLogout}
           onBack={handleBack}
@@ -250,6 +255,7 @@ const TransporterMaintenance = () => {
             </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

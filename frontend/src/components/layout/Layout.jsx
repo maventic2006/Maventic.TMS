@@ -11,7 +11,7 @@ const Layout = ({ children }) => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Navigation */}
-      <Navbar />
+      {/* <Navbar /> */}
       <TabNavigation />
 
       {/* Main Content */}

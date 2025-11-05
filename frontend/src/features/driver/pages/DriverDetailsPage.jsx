@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import TMSHeader from "../../../components/layout/TMSHeader";
 import {
   ArrowLeft,
   User,
@@ -295,12 +296,22 @@ const DriverDetailsPage = () => {
 
   return (
     <div
+<<<<<<< Updated upstream
       className="min-h-screen px-4 py-2 lg:px-4"
+=======
+      className="min-h-screen"
+>>>>>>> Stashed changes
       style={{
         background: `linear-gradient(to bottom right, ${safeTheme.colors.primary.background}, #f0f4f8, #e6f0ff)`,
       }}
     >
+<<<<<<< Updated upstream
       <div className="max-w-7xl mx-auto space-y-3">
+=======
+      <TMSHeader theme={safeTheme} />
+      <div className="p-4 lg:p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+>>>>>>> Stashed changes
         {/* Header */}
         <Card
           className="overflow-hidden border shadow-md"
@@ -539,6 +550,7 @@ const DriverDetailsPage = () => {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );
