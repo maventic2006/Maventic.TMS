@@ -1,5 +1,7 @@
 ﻿import React, { useState } from "react";
 import { Wrench, Calendar, DollarSign, MapPin, Plus, X, FileText, User, Hash, Edit, Trash2 } from "lucide-react";
+import { CustomSelect } from "../../../components/ui/Select";
+import CollapsibleSection from "../../../components/ui/CollapsibleSection";
 
 const InfoField = ({ label, value }) => (
   <div className="space-y-1">
@@ -31,7 +33,8 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
     );
   }
 
-  const maintenanceHistory = vehicle.maintenanceHistory || [];
+  // Get maintenance history array from vehicle object
+  const maintenanceHistory = vehicle?.maintenanceHistory || [];
 
   const handleAddService = () => {
     // TODO: Implement API call to add service record
@@ -69,7 +72,7 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
         </button>
       </div>
 
-      {/* Service Records List */}
+      {/* Service Records List with Collapsible Sections */}
       {maintenanceHistory.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-lg border border-[#E5E7EB]">
           <Wrench className="h-16 w-16 text-[#E5E7EB] mx-auto mb-4" />
@@ -78,67 +81,101 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
         </div>
       ) : (
         <div className="space-y-4">
-          {maintenanceHistory.map((record, index) => (
-            <div key={index} className="bg-white rounded-lg border border-[#E5E7EB] p-6 hover:shadow-md transition-all duration-200">
-              {/* Header */}
-              <div className="flex items-start justify-between mb-5 pb-4 border-b border-[#E5E7EB]">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-[#E0E7FF] rounded-lg">
-                    <Wrench className="h-5 w-5 text-[#6366F1]" />
+          {maintenanceHistory.map((record, index) => {
+            const formattedServiceDate = record.serviceDate 
+              ? new Date(record.serviceDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
+              : 'N/A';
+            const formattedUpcomingDate = record.upcomingServiceDate
+              ? new Date(record.upcomingServiceDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
+              : 'N/A';
+            
+            return (
+              <CollapsibleSection
+                key={index}
+                defaultOpen={index === 0}
+                gradientFrom="green-50/50"
+                gradientTo="emerald-50/50"
+                borderColor="green-100/50"
+                header={
+                  <div className="flex items-center justify-between w-full text-left">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                        <Wrench className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800">
+                          {record.typeOfService || `Service Record ${index + 1}`}
+                        </h3>
+                        <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {formattedServiceDate}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right mr-8">
+                      <p className="text-xs text-gray-600 uppercase tracking-wide">Cost</p>
+                      <p className="text-lg font-bold text-gray-800">
+                        ₹ {record.serviceExpense ? parseFloat(record.serviceExpense).toLocaleString() : "0"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-[#0D1A33] text-base">{record.type}</h4>
-                    <p className="text-sm text-[#4A5568] flex items-center gap-1.5 mt-1">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {record.date}
-                    </p>
+                }
+              >
+                {/* Service Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-600">Maintenance ID</label>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                      <p className="text-gray-800">{record.vehicleMaintenanceId || "N/A"}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-xs text-[#4A5568] uppercase tracking-wide">Total Cost</p>
-                    <p className="font-bold text-[#0D1A33] text-lg flex items-center gap-1 mt-1">
-                      ₹ {record.cost?.toLocaleString() || "0"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button className="p-2 hover:bg-[#F5F7FA] rounded-lg transition-colors">
-                      <Edit className="h-4 w-4 text-[#6366F1]" />
-                    </button>
-                    <button className="p-2 hover:bg-[#FEE2E2] rounded-lg transition-colors">
-                      <Trash2 className="h-4 w-4 text-[#EF4444]" />
-                    </button>
-                  </div>
-                </div>
-              </div>
 
-              {/* Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                <InfoField label="Service Type" value={record.type} />
-                <InfoField label="Odometer Reading" value={`${record.odometerReading || "N/A"} km`} />
-                <InfoField label="Service Center" value={record.serviceCenter} />
-                <InfoField label="Technician" value={record.technician} />
-                <InfoField label="Invoice Number" value={record.invoiceNumber} />
-                <InfoField label="Next Service Due" value={record.nextServiceDue} />
-              </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-600">Service Type</label>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                      <p className="text-gray-800 font-semibold">{record.typeOfService || "N/A"}</p>
+                    </div>
+                  </div>
 
-              {/* Description */}
-              {record.description && (
-                <div className="mt-4 pt-4 border-t border-[#E5E7EB]">
-                  <p className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide mb-2">Description</p>
-                  <p className="text-sm text-[#0D1A33]">{record.description}</p>
-                </div>
-              )}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-600">Service Date</label>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <p className="text-gray-800">{formattedServiceDate}</p>
+                    </div>
+                  </div>
 
-              {/* Parts Replaced */}
-              {record.partsReplaced && (
-                <div className="mt-4 pt-4 border-t border-[#E5E7EB]">
-                  <p className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide mb-2">Parts Replaced</p>
-                  <p className="text-sm text-[#0D1A33]">{record.partsReplaced}</p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-600">Next Service Due</label>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-500" />
+                      <p className="text-gray-800">{formattedUpcomingDate}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-600">Service Expense</label>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-gray-500" />
+                      <p className="text-gray-800 font-semibold">
+                        ₹ {record.serviceExpense ? parseFloat(record.serviceExpense).toLocaleString() : "0"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Service Remark */}
+                {record.serviceRemark && (
+                  <div className="mt-4 pt-4 border-t border-gray-200/50">
+                    <label className="text-sm font-medium text-gray-600 block mb-2">Service Remarks</label>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                      <p className="text-gray-800">{record.serviceRemark}</p>
+                    </div>
+                  </div>
+                )}
+              </CollapsibleSection>
+            );
+          })}
         </div>
       )}
 
@@ -172,17 +209,18 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <label className="block text-xs font-bold text-[#0D1A33] uppercase tracking-wide mb-2">
                     Service Type *
                   </label>
-                  <select
+                  <CustomSelect
                     value={newService.serviceType}
-                    onChange={(e) => setNewService({ ...newService, serviceType: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
-                  >
-                    <option value="">Select Service Type</option>
-                    <option value="Routine Maintenance">Routine Maintenance</option>
-                    <option value="Preventive Maintenance">Preventive Maintenance</option>
-                    <option value="Corrective Maintenance">Corrective Maintenance</option>
-                    <option value="Emergency Repair">Emergency Repair</option>
-                  </select>
+                    onChange={(value) => setNewService({ ...newService, serviceType: value })}
+                    options={[
+                      { value: "Routine Maintenance", label: "Routine Maintenance" },
+                      { value: "Preventive Maintenance", label: "Preventive Maintenance" },
+                      { value: "Corrective Maintenance", label: "Corrective Maintenance" },
+                      { value: "Emergency Repair", label: "Emergency Repair" },
+                    ]}
+                    placeholder="Select Service Type"
+                    className="w-full"
+                  />
                 </div>
 
                 <div>

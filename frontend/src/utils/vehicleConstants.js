@@ -12,6 +12,13 @@ export const VEHICLE_TYPES = [
   { value: "FLATBED", label: "Flatbed Truck" },
 ];
 
+// Usage Types
+export const USAGE_TYPES = [
+  { value: "PASSENGER", label: "Passenger" },
+  { value: "CARGO", label: "Cargo" },
+  { value: "SPECIAL_EQUIPMENT", label: "Special Equipment" },
+];
+
 // Vehicle Status
 export const VEHICLE_STATUS = {
   ACTIVE: "Active",
@@ -163,6 +170,23 @@ export const EMISSION_STANDARDS = [
   { value: "EURO_VI", label: "Euro-VI" },
 ];
 
+// Suspension Types
+export const SUSPENSION_TYPES = [
+  { value: "LEAF_SPRING", label: "Leaf Spring" },
+  { value: "AIR_SUSPENSION", label: "Air Suspension" },
+  { value: "COIL_SPRING", label: "Coil Spring" },
+  { value: "TORSION_BAR", label: "Torsion Bar" },
+  { value: "HYDRAULIC", label: "Hydraulic" },
+];
+
+// Vehicle Condition
+export const VEHICLE_CONDITIONS = [
+  { value: "EXCELLENT", label: "Excellent" },
+  { value: "GOOD", label: "Good" },
+  { value: "FAIR", label: "Fair" },
+  { value: "POOR", label: "Poor" },
+];
+
 // Permit Types
 export const PERMIT_TYPES = [
   { value: "NATIONAL", label: "National Permit" },
@@ -268,4 +292,7 @@ export default {
   VEHICLE_TABS,
   VEHICLE_TABLE_COLUMNS,
   VEHICLE_ERROR_MESSAGES,
+  USAGE_TYPES,
+  SUSPENSION_TYPES,
+  VEHICLE_CONDITIONS,
 };

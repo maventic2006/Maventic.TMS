@@ -1,5 +1,6 @@
 ﻿import React, { useState } from "react";
 import { FileText, Calendar, Building, CheckCircle, XCircle, Upload, Plus, Download, Eye, Trash2, AlertTriangle, X } from "lucide-react";
+import { CustomSelect } from "../../../components/ui/Select";
 
 const InfoField = ({ label, value }) => (
   <div className="space-y-1">
@@ -11,6 +12,7 @@ const InfoField = ({ label, value }) => (
 const DocumentsViewTab = ({ vehicle, isEditMode }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [previewDocument, setPreviewDocument] = useState(null);
   const [newDocument, setNewDocument] = useState({
     documentType: "",
     documentNumber: "",
@@ -64,6 +66,43 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
       remarks: "",
     });
     setSelectedFile(null);
+  };
+
+  const handlePreviewDocument = (doc) => {
+    if (doc.fileData && doc.fileType) {
+      setPreviewDocument({
+        fileName: doc.fileName || doc.documentType,
+        fileType: doc.fileType,
+        fileData: doc.fileData,
+      });
+    }
+  };
+
+  const handleDownloadDocument = (doc) => {
+    if (doc.fileData && doc.fileType) {
+      // Convert base64 to blob
+      const byteCharacters = atob(doc.fileData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: doc.fileType });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = doc.fileName || `${doc.documentType}_${doc.documentNumber}.${doc.fileType.split('/')[1]}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
   };
 
   // Mock statistics
@@ -163,11 +202,17 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 pt-4 border-t border-[#E5E7EB]">
-                  <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#F5F7FA] hover:bg-[#E5E7EB] rounded-lg transition-colors text-sm font-medium text-[#0D1A33]">
+                  <button 
+                    onClick={() => handlePreviewDocument(doc)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#F5F7FA] hover:bg-[#E5E7EB] rounded-lg transition-colors text-sm font-medium text-[#0D1A33]"
+                  >
                     <Eye className="h-4 w-4" />
                     View
                   </button>
-                  <button className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#F5F7FA] hover:bg-[#E5E7EB] rounded-lg transition-colors text-sm font-medium text-[#0D1A33]">
+                  <button 
+                    onClick={() => handleDownloadDocument(doc)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#F5F7FA] hover:bg-[#E5E7EB] rounded-lg transition-colors text-sm font-medium text-[#0D1A33]"
+                  >
                     <Download className="h-4 w-4" />
                     Download
                   </button>
@@ -235,21 +280,22 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                   <label className="block text-xs font-bold text-[#0D1A33] uppercase tracking-wide mb-2">
                     Document Type *
                   </label>
-                  <select
+                  <CustomSelect
                     value={newDocument.documentType}
-                    onChange={(e) => setNewDocument({ ...newDocument, documentType: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
-                  >
-                    <option value="">Select Document Type</option>
-                    <option value="RC">Registration Certificate (RC)</option>
-                    <option value="Insurance">Insurance Certificate</option>
-                    <option value="Permit">Permit</option>
-                    <option value="Fitness">Fitness Certificate</option>
-                    <option value="PUC">Pollution Under Control (PUC)</option>
-                    <option value="Road Tax">Road Tax Receipt</option>
-                    <option value="Loan">Loan Agreement</option>
-                    <option value="Lease">Lease Agreement</option>
-                  </select>
+                    onChange={(value) => setNewDocument({ ...newDocument, documentType: value })}
+                    options={[
+                      { value: "RC", label: "Registration Certificate (RC)" },
+                      { value: "Insurance", label: "Insurance Certificate" },
+                      { value: "Permit", label: "Permit" },
+                      { value: "Fitness", label: "Fitness Certificate" },
+                      { value: "PUC", label: "Pollution Under Control (PUC)" },
+                      { value: "Road Tax", label: "Road Tax Receipt" },
+                      { value: "Loan", label: "Loan Agreement" },
+                      { value: "Lease", label: "Lease Agreement" },
+                    ]}
+                    placeholder="Select Document Type"
+                    className="w-full"
+                  />
                 </div>
 
                 <div>
@@ -330,6 +376,64 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                 className="px-6 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white rounded-lg transition-colors text-sm font-semibold"
               >
                 Upload Document
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#E0E7FF] rounded-lg">
+                  <FileText className="h-5 w-5 text-[#6366F1]" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {previewDocument.fileName}
+                </h3>
+              </div>
+              <button 
+                onClick={closePreview}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-4">
+              {previewDocument.fileType?.startsWith("image/") ? (
+                <img
+                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  alt={previewDocument.fileName}
+                  className="max-w-full h-auto mx-auto"
+                />
+              ) : previewDocument.fileType === "application/pdf" ? (
+                <iframe
+                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  className="w-full h-[600px] border-0"
+                  title={previewDocument.fileName}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">Preview not available for this file type</p>
+                  <p className="text-sm text-gray-400 mt-2">You can still download the file</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={closePreview}
+                className="px-6 py-2.5 border border-[#E5E7EB] text-[#4A5568] rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
+              >
+                Close
               </button>
             </div>
           </div>

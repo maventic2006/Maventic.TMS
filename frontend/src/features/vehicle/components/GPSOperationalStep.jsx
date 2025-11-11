@@ -1,6 +1,7 @@
 ﻿import React from "react";
 import { Satellite, Info } from "lucide-react";
 import { GPS_PROVIDER_OPTIONS } from "../../../utils/vehicleConstants";
+import { CustomSelect } from "../../../components/ui/Select";
 
 const GPSOperationalStep = ({ formData, setFormData, errors }) => {
   const handleChange = (field, value) => {
@@ -71,20 +72,14 @@ const GPSOperationalStep = ({ formData, setFormData, errors }) => {
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 GPS Provider <span className="text-red-500">*</span>
               </label>
-              <select
+              <CustomSelect
                 value={formData.gpsProvider}
-                onChange={(e) => handleChange("gpsProvider", e.target.value)}
-                className={`w-full px-4 py-2.5 border ${
-                  errors.gpsProvider ? "border-red-500" : "border-gray-300"
-                } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
-              >
-                <option value="">Select GPS Provider</option>
-                {GPS_PROVIDER_OPTIONS.map((provider) => (
-                  <option key={provider.value} value={provider.value}>
-                    {provider.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => handleChange("gpsProvider", value)}
+                options={GPS_PROVIDER_OPTIONS}
+                placeholder="Select GPS Provider"
+                error={errors.gpsProvider}
+                className="w-full"
+              />
               {errors.gpsProvider && <p className="mt-1 text-sm text-red-600">{errors.gpsProvider}</p>}
             </div>
           </div>

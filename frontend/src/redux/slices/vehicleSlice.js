@@ -1,6 +1,7 @@
 ﻿import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { vehicleAPI } from "../../utils/api";
 
-// Mock data for development
+// Mock data for development (keeping for fallback)
 const MOCK_VEHICLES = [
   {
     vehicleId: "VH001",
@@ -236,133 +237,239 @@ const MOCK_VEHICLES = [
   },
 ];
 
-// Async thunks (using mock data for Phase 1A-C)
+// Async thunks (using real backend API)
+// Transform backend vehicle data to frontend format
+const transformVehicleData = (backendData) => {
+  return {
+    vehicleId: backendData.vehicle_id_code_hdr,
+    registrationNumber: backendData.vehicle_registration_number || backendData.registration_number,
+    vehicleType: backendData.vehicle_type_description || backendData.vehicle_type_id,
+    make: backendData.maker_brand_description,
+    model: backendData.maker_model,
+    year: backendData.manufacturing_month_year ? new Date(backendData.manufacturing_month_year).getFullYear() : null,
+    fuelType: backendData.fuel_type_id,
+    transmission: backendData.transmission_type,
+    engineNumber: backendData.engine_number || null,
+    chassisNumber: backendData.vin_chassis_no,
+    status: backendData.vehicle_status,
+    ownership: backendData.ownership_name || 'N/A',
+    ownerName: backendData.ownership_name,
+    transporterId: null, // Not in current backend response
+    transporterName: null, // Not in current backend response
+    gpsEnabled: backendData.gps_tracker_active_flag === 1,
+    gpsDeviceId: backendData.gps_tracker_imei_number,
+    currentDriver: null, // Not in current backend response
+    capacity: {
+      weight: parseFloat(backendData.gross_vehicle_weight_kg) || 0,
+      unit: 'TON'
+    },
+    createdAt: backendData.created_at,
+    createdBy: backendData.created_by || 'N/A',
+    blacklistStatus: backendData.blacklist_status === 1,
+  };
+};
+
 export const fetchVehicles = createAsyncThunk(
   "vehicle/fetchVehicles",
   async (params = {}, { rejectWithValue }) => {
     try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log("🚗 Fetching vehicles with params:", params);
 
-      console.log(" Fetching vehicles with params:", params);
+      const response = await vehicleAPI.getVehicles(params);
+      
+      console.log("✅ Vehicles fetched successfully:", response.data);
 
-      let filtered = [...MOCK_VEHICLES];
-
-      // Apply filters
-      if (params.vehicleId) {
-        filtered = filtered.filter((v) =>
-          v.vehicleId.toLowerCase().includes(params.vehicleId.toLowerCase())
-        );
-      }
-      if (params.status) {
-        filtered = filtered.filter((v) => v.status === params.status);
-      }
-      if (params.vehicleType) {
-        filtered = filtered.filter((v) => v.vehicleType === params.vehicleType);
-      }
-      if (params.ownership) {
-        filtered = filtered.filter((v) => v.ownership === params.ownership);
-      }
-      if (params.transporterId) {
-        filtered = filtered.filter((v) => v.transporterId === params.transporterId);
-      }
-      if (params.registrationNumber) {
-        filtered = filtered.filter((v) =>
-          v.registrationNumber
-            .toLowerCase()
-            .includes(params.registrationNumber.toLowerCase())
-        );
-      }
-
-      // Pagination
-      const page = params.page || 1;
-      const limit = params.limit || 25;
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedVehicles = filtered.slice(startIndex, endIndex);
+      // Transform backend data to frontend format
+      const transformedVehicles = (response.data.data || []).map(transformVehicleData);
 
       return {
-        vehicles: paginatedVehicles,
-        pagination: {
-          page,
-          limit,
-          total: filtered.length,
-          pages: Math.ceil(filtered.length / limit),
+        vehicles: transformedVehicles,
+        pagination: response.data.pagination || {
+          page: params.page || 1,
+          limit: params.limit || 25,
+          total: 0,
+          pages: 0,
         },
       };
     } catch (error) {
+      console.error("❌ Error fetching vehicles:", error);
       return rejectWithValue({
-        code: "FETCH_ERROR",
-        message: "Failed to fetch vehicles",
+        code: error.response?.data?.code || "FETCH_ERROR",
+        message: error.response?.data?.message || "Failed to fetch vehicles",
       });
     }
   }
 );
 
+// Transform detailed vehicle data from backend to flat frontend format
+const transformVehicleDetails = (backendData) => {
+  const basic = backendData.basicInformation || {};
+  const specs = backendData.specifications || {};
+  const capacity = backendData.capacityDetails || {};
+  const ownershipRecords = backendData.ownershipDetails || [];
+  const maintenanceRecords = backendData.maintenanceHistory || [];
+  const serviceFreqRecords = backendData.serviceFrequency || [];
+  
+  // For backward compatibility, get the first record of each array for legacy fields
+  const ownership = ownershipRecords[0] || {};
+  const maintenance = maintenanceRecords[0] || {};
+  const serviceFreq = serviceFreqRecords[0] || {};
+
+  return {
+    // Vehicle ID and Status
+    vehicleId: backendData.vehicleId,
+    status: backendData.status,
+    blacklistStatus: backendData.blacklistStatus === 1,
+    
+    // Basic Information
+    make: basic.make,
+    model: basic.model,
+    vin: basic.vin,
+    chassisNumber: basic.vin,
+    vehicleType: basic.vehicleTypeDescription || basic.vehicleType,
+    vehicleCategory: basic.vehicleCategory,
+    year: basic.manufacturingMonthYear ? new Date(basic.manufacturingMonthYear).getFullYear() : null,
+    manufacturingMonthYear: basic.manufacturingMonthYear,
+    
+    // GPS & Tracking
+    gpsIMEI: basic.gpsIMEI,
+    gpsDeviceId: basic.gpsIMEI,
+    gpsEnabled: basic.gpsActive === 1,
+    gpsActive: basic.gpsActive,
+    
+    // Usage
+    usageType: basic.usageType,
+    leasingFlag: basic.leasingFlag === 1,
+    avgRunningSpeed: basic.avgRunningSpeed,
+    maxRunningSpeed: basic.maxRunningSpeed,
+    safetyInspectionDate: basic.safetyInspectionDate,
+    taxesAndFees: basic.taxesAndFees,
+    
+    // Specifications
+    engineType: specs.engineType,
+    engineNumber: specs.engineNumber,
+    fuelType: specs.fuelType,
+    transmission: specs.transmission,
+    color: specs.color,
+    emissionStandard: specs.emissionStandard,
+    financer: specs.financer,
+    suspensionType: specs.suspensionType,
+    bodyTypeDescription: specs.bodyTypeDescription,
+    
+    // Capacity Details
+    unloadingWeight: capacity.unloadingWeight,
+    gvw: capacity.gvw,
+    grossVehicleWeight: capacity.gvw,
+    payloadCapacity: capacity.payloadCapacity,
+    volumeCapacity: capacity.volumeCapacity,
+    cargoWidth: capacity.cargoWidth,
+    cargoHeight: capacity.cargoHeight,
+    cargoLength: capacity.cargoLength,
+    towingCapacity: capacity.towingCapacity,
+    tireLoadRating: capacity.tireLoadRating,
+    vehicleCondition: capacity.vehicleCondition,
+    fuelTankCapacity: capacity.fuelTankCapacity,
+    fuelCapacity: capacity.fuelTankCapacity,
+    seatingCapacity: capacity.seatingCapacity,
+    capacity: {
+      weight: parseFloat(capacity.gvw) || 0,
+      unit: 'TON'
+    },
+    
+    // Ownership Details
+    ownerId: ownership.ownerId,
+    ownershipName: ownership.ownershipName,
+    ownerName: ownership.ownershipName,
+    ownership: ownership.ownershipName || 'N/A',
+    registrationNumber: ownership.registrationNumber,
+    registrationDate: ownership.registrationDate,
+    registrationUpto: ownership.registrationUpto,
+    rcExpiryDate: ownership.registrationUpto,
+    purchaseDate: ownership.purchaseDate,
+    ownerSrNumber: ownership.ownerSrNumber,
+    stateCode: ownership.stateCode,
+    registrationState: ownership.stateCode,
+    rtoCode: ownership.rtoCode,
+    presentAddressId: ownership.presentAddressId,
+    permanentAddressId: ownership.permanentAddressId,
+    saleAmount: ownership.saleAmount,
+    
+    // Maintenance History
+    vehicleMaintenanceId: maintenance.vehicleMaintenanceId,
+    serviceDate: maintenance.serviceDate,
+    lastServiceDate: maintenance.serviceDate,
+    serviceRemark: maintenance.serviceRemark,
+    upcomingServiceDate: maintenance.upcomingServiceDate,
+    nextServiceDate: maintenance.upcomingServiceDate,
+    typeOfService: maintenance.typeOfService,
+    serviceExpense: maintenance.serviceExpense,
+    
+    // Service Frequency
+    sequenceNumber: serviceFreq.sequenceNumber,
+    timePeriod: serviceFreq.timePeriod,
+    kmDrove: serviceFreq.kmDrove,
+    
+    // Documents
+    documents: backendData.documents || [],
+    
+    // Array data for view tabs (NEW - for accordion display)
+    ownershipDetails: ownershipRecords.map(record => ({
+      ownerId: record.ownerId,
+      ownershipName: record.ownershipName,
+      validFrom: record.validFrom,
+      validTo: record.validTo,
+      registrationNumber: record.registrationNumber,
+      registrationDate: record.registrationDate,
+      registrationUpto: record.registrationUpto,
+      purchaseDate: record.purchaseDate,
+      ownerSrNumber: record.ownerSrNumber,
+      stateCode: record.stateCode,
+      rtoCode: record.rtoCode,
+      presentAddressId: record.presentAddressId,
+      permanentAddressId: record.permanentAddressId,
+      saleAmount: record.saleAmount,
+    })),
+    maintenanceHistory: maintenanceRecords.map(record => ({
+      vehicleMaintenanceId: record.vehicleMaintenanceId,
+      serviceDate: record.serviceDate,
+      serviceRemark: record.serviceRemark,
+      upcomingServiceDate: record.upcomingServiceDate,
+      typeOfService: record.typeOfService,
+      serviceExpense: record.serviceExpense,
+    })),
+    serviceFrequency: serviceFreqRecords.map(record => ({
+      sequenceNumber: record.sequenceNumber,
+      timePeriod: record.timePeriod,
+      kmDrove: record.kmDrove,
+    })),
+    
+    // Timestamps
+    createdAt: backendData.createdAt,
+    updatedAt: backendData.updatedAt,
+  };
+};
+
 export const fetchVehicleById = createAsyncThunk(
   "vehicle/fetchVehicleById",
   async (vehicleId, { rejectWithValue }) => {
     try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      console.log("🚗 Fetching vehicle by ID:", vehicleId);
 
-      const vehicle = MOCK_VEHICLES.find((v) => v.vehicleId === vehicleId);
+      const response = await vehicleAPI.getVehicleById(vehicleId);
+      
+      console.log("✅ Vehicle details fetched successfully:", response.data);
 
-      if (!vehicle) {
-        return rejectWithValue({
-          code: "NOT_FOUND",
-          message: "Vehicle not found",
-        });
-      }
+      // Transform nested backend structure to flat frontend format
+      const transformedData = transformVehicleDetails(response.data.data);
+      
+      console.log("✅ Vehicle details transformed:", transformedData);
 
-      // Add additional details for details page
-      const detailedVehicle = {
-        ...vehicle,
-        documents: [
-          {
-            documentType: "RC",
-            documentNumber: "RC123456789",
-            issuedDate: "2022-01-15",
-            expiryDate: "2032-01-15",
-            issuingAuthority: "RTO Mumbai",
-          },
-          {
-            documentType: "INSURANCE",
-            documentNumber: "INS987654321",
-            issuedDate: "2024-01-01",
-            expiryDate: "2025-01-01",
-            issuingAuthority: "ABC Insurance",
-          },
-        ],
-        maintenanceHistory: [
-          {
-            date: "2024-10-01",
-            type: "ROUTINE",
-            description: "Regular servicing",
-            cost: 5000,
-            serviceCenter: "ABC Service Center",
-          },
-          {
-            date: "2024-07-15",
-            type: "PREVENTIVE",
-            description: "Oil change and filter replacement",
-            cost: 3000,
-            serviceCenter: "XYZ Auto Works",
-          },
-        ],
-        gpsTracker: {
-          deviceId: vehicle.gpsDeviceId,
-          provider: "GPS Provider 1",
-          installationDate: "2022-01-20",
-          lastLocation: { lat: 19.076, lng: 72.8777, timestamp: "2024-11-03 14:30" },
-        },
-      };
-
-      return detailedVehicle;
+      return transformedData;
     } catch (error) {
+      console.error("❌ Error fetching vehicle details:", error);
       return rejectWithValue({
-        code: "FETCH_ERROR",
-        message: "Failed to fetch vehicle details",
+        code: error.response?.data?.code || error.response?.status === 404 ? "NOT_FOUND" : "FETCH_ERROR",
+        message: error.response?.data?.message || "Failed to fetch vehicle details",
       });
     }
   }
@@ -372,29 +479,23 @@ export const createVehicle = createAsyncThunk(
   "vehicle/createVehicle",
   async (vehicleData, { rejectWithValue }) => {
     try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("🚗 Creating vehicle with data:", vehicleData);
 
-      console.log(" Creating vehicle with data:", vehicleData);
-
-      // Simulate success response
-      const newVehicle = {
-        ...vehicleData,
-        vehicleId: `VH${String(MOCK_VEHICLES.length + 1).padStart(3, "0")}`,
-        createdAt: new Date().toISOString().split("T")[0],
-        createdBy: "ADMIN001",
-        status: "PENDING_APPROVAL",
-      };
+      const response = await vehicleAPI.createVehicle(vehicleData);
+      
+      console.log("✅ Vehicle created successfully:", response.data);
 
       return {
-        success: true,
-        vehicle: newVehicle,
-        message: "Vehicle created successfully",
+        success: response.data.success,
+        vehicleId: response.data.data?.vehicleId,
+        message: response.data.message || "Vehicle created successfully",
       };
     } catch (error) {
+      console.error("❌ Error creating vehicle:", error);
       return rejectWithValue({
-        code: "CREATE_ERROR",
-        message: "Failed to create vehicle",
+        code: error.response?.data?.code || "CREATE_ERROR",
+        message: error.response?.data?.message || "Failed to create vehicle",
+        errors: error.response?.data?.errors || [],
       });
     }
   }
@@ -404,20 +505,45 @@ export const updateVehicle = createAsyncThunk(
   "vehicle/updateVehicle",
   async ({ vehicleId, vehicleData }, { rejectWithValue }) => {
     try {
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      console.log("🚗 Updating vehicle:", vehicleId, vehicleData);
 
-      console.log(" Updating vehicle:", vehicleId, vehicleData);
+      const response = await vehicleAPI.updateVehicle(vehicleId, vehicleData);
+      
+      console.log("✅ Vehicle updated successfully:", response.data);
 
       return {
-        success: true,
-        vehicle: { vehicleId, ...vehicleData },
-        message: "Vehicle updated successfully",
+        success: response.data.success,
+        vehicleId: response.data.data?.vehicleId,
+        message: response.data.message || "Vehicle updated successfully",
       };
     } catch (error) {
+      console.error("❌ Error updating vehicle:", error);
       return rejectWithValue({
-        code: "UPDATE_ERROR",
-        message: "Failed to update vehicle",
+        code: error.response?.data?.code || "UPDATE_ERROR",
+        message: error.response?.data?.message || "Failed to update vehicle",
+        errors: error.response?.data?.errors || [],
+      });
+    }
+  }
+);
+
+// Get master data
+export const fetchMasterData = createAsyncThunk(
+  "vehicle/fetchMasterData",
+  async (_, { rejectWithValue }) => {
+    try {
+      console.log("🚗 Fetching vehicle master data");
+
+      const response = await vehicleAPI.getMasterData();
+      
+      console.log("✅ Master data fetched successfully:", response.data);
+
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ Error fetching master data:", error);
+      return rejectWithValue({
+        code: error.response?.data?.code || "FETCH_ERROR",
+        message: error.response?.data?.message || "Failed to fetch master data",
       });
     }
   }
@@ -429,6 +555,20 @@ const vehicleSlice = createSlice({
   initialState: {
     vehicles: [],
     currentVehicle: null,
+    masterData: {
+      vehicleTypes: [],
+      documentTypes: [],
+      fuelTypes: [],
+      transmissionTypes: [],
+      emissionStandards: [],
+      usageTypes: [],
+      suspensionTypes: [],
+      vehicleConditions: [],
+      loadingCapacityUnits: [],
+      doorTypes: [],
+      coverageTypes: [], // ✅ Added coverage types
+      engineTypes: [], // ✅ Added engine types (was missing)
+    },
     pagination: {
       page: 1,
       limit: 25,
@@ -438,6 +578,7 @@ const vehicleSlice = createSlice({
     isFetching: false,
     isCreating: false,
     isUpdating: false,
+    isFetchingMasterData: false,
     error: null,
     successMessage: null,
   },
@@ -503,10 +644,26 @@ const vehicleSlice = createSlice({
       .addCase(updateVehicle.fulfilled, (state, action) => {
         state.isUpdating = false;
         state.successMessage = action.payload.message;
-        state.currentVehicle = action.payload.vehicle;
+        // Refresh the current vehicle after update
+        if (state.currentVehicle?.vehicleId === action.payload.vehicleId) {
+          state.currentVehicle = { ...state.currentVehicle, ...action.payload };
+        }
       })
       .addCase(updateVehicle.rejected, (state, action) => {
         state.isUpdating = false;
+        state.error = action.payload;
+      })
+      // Fetch master data
+      .addCase(fetchMasterData.pending, (state) => {
+        state.isFetchingMasterData = true;
+        state.error = null;
+      })
+      .addCase(fetchMasterData.fulfilled, (state, action) => {
+        state.isFetchingMasterData = false;
+        state.masterData = action.payload;
+      })
+      .addCase(fetchMasterData.rejected, (state, action) => {
+        state.isFetchingMasterData = false;
         state.error = action.payload;
       });
   },

@@ -5,7 +5,10 @@ import TMSHeader from "../components/layout/TMSHeader";
 import TopActionBar from "../components/vehicle/TopActionBar";
 import VehicleFilterPanel from "../components/vehicle/VehicleFilterPanel";
 import VehicleListTable from "../components/vehicle/VehicleListTable";
+import VehicleBulkUploadModal from "../features/vehicle/components/VehicleBulkUploadModal";
+import VehicleBulkUploadHistory from "../features/vehicle/components/VehicleBulkUploadHistory";
 import { fetchVehicles } from "../redux/slices/vehicleSlice";
+import { openVehicleBulkUploadModal } from "../redux/slices/vehicleBulkUploadSlice";
 import { getPageTheme } from "../theme.config";
 
 // Fuzzy search utility
@@ -206,6 +209,10 @@ const VehicleMaintenance = () => {
     setShowFilters(!showFilters);
   }, [showFilters]);
 
+  const handleBulkUpload = useCallback(() => {
+    dispatch(openVehicleBulkUploadModal());
+  }, [dispatch]);
+
   const theme = getPageTheme("list");
 
   return (
@@ -215,6 +222,7 @@ const VehicleMaintenance = () => {
       <div className="max-w-7xl mx-auto px-2 lg:px-6 space-y-4">
         <TopActionBar
           onCreateNew={handleCreateNew}
+          onBulkUpload={handleBulkUpload}
           onBack={handleBack}
           totalCount={pagination.total || 0}
           showFilters={showFilters}
@@ -250,6 +258,10 @@ const VehicleMaintenance = () => {
           </div>
         )}
       </div>
+
+      {/* Bulk Upload Modals */}
+      <VehicleBulkUploadModal />
+      <VehicleBulkUploadHistory />
     </div>
   );
 };

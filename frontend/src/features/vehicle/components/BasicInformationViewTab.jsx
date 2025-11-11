@@ -70,7 +70,6 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
           <InfoField label="Fuel Type" value={vehicle.fuelType} />
           <InfoField label="Transmission" value={vehicle.transmission} />
-          <InfoField label="Engine Capacity (cc)" value={vehicle.engineCapacity} />
           <InfoField label="Fuel Capacity (L)" value={vehicle.fuelCapacity} />
           <InfoField label="Mileage (km/l)" value={vehicle.mileage} />
           <InfoField label="Seating Capacity" value={vehicle.seatingCapacity} />

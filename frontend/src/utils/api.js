@@ -32,7 +32,7 @@ if (import.meta.env.NODE_ENV === "development") {
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // 30 seconds (increased from 10s for file uploads and bulk operations)
   withCredentials: true, // Include cookies in requests
   headers: {
     "Content-Type": "application/json",
@@ -93,9 +93,14 @@ api.interceptors.response.use(
     } else if (error.response?.status >= 500) {
       // Server error
       console.error("Server error:", error.response.data.message);
-    } else if (error.code === "ECONNABORTED") {
-      // Timeout error
-      console.error("Request timeout");
+    } else if (error.code === "ECONNABORTED" || error.message?.includes('timeout')) {
+      // Timeout error - provide helpful message
+      console.error("⏱️ Request timeout error:", {
+        url: error.config?.url,
+        timeout: error.config?.timeout || 'default (30s)',
+        message: error.message,
+        suggestion: 'The request took too long. For file uploads, this may indicate a large file or slow network.'
+      });
     } else if (!error.response) {
       // Network error
       console.error("🔥 Network error details:", {
@@ -176,6 +181,55 @@ export const transporterAPI = {
   // Alias for getTransporterById (used in TransporterDetails component)
   getTransporter: (id) => {
     return api.get(`/transporters/${id}`);
+  }
+};
+
+// Vehicle API functions
+export const vehicleAPI = {
+  // Get all vehicles with filtering and pagination
+  getVehicles: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    
+    // Add parameters if they exist
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.search) queryParams.append('search', params.search);
+    if (params.vehicleType) queryParams.append('vehicleType', params.vehicleType);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.fuelType) queryParams.append('fuelType', params.fuelType);
+    if (params.ownership) queryParams.append('ownership', params.ownership);
+    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    
+    const queryString = queryParams.toString();
+    const url = `/vehicles${queryString ? `?${queryString}` : ''}`;
+    
+    return api.get(url);
+  },
+  
+  // Get single vehicle by ID
+  getVehicleById: (id) => {
+    return api.get(`/vehicles/${id}`);
+  },
+
+  // Create new vehicle
+  createVehicle: (vehicleData) => {
+    return api.post('/vehicles', vehicleData);
+  },
+
+  // Update existing vehicle
+  updateVehicle: (id, vehicleData) => {
+    return api.put(`/vehicles/${id}`, vehicleData);
+  },
+
+  // Delete vehicle (soft delete)
+  deleteVehicle: (id) => {
+    return api.delete(`/vehicles/${id}`);
+  },
+
+  // Get master data for dropdowns
+  getMasterData: () => {
+    return api.get('/vehicles/master-data');
   }
 };
 

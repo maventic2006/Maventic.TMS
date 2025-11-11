@@ -1,6 +1,7 @@
 ﻿import React from "react";
 import { Package, Info } from "lucide-react";
 import { OWNERSHIP_TYPES, CAPACITY_UNITS } from "../../../utils/vehicleConstants";
+import { CustomSelect } from "../../../components/ui/Select";
 
 const CapacityOwnershipStep = ({ formData, setFormData, errors }) => {
   const handleChange = (field, value) => {
@@ -53,17 +54,13 @@ const CapacityOwnershipStep = ({ formData, setFormData, errors }) => {
                   errors.capacity ? "border-red-500" : "border-gray-300"
                 } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
               />
-              <select
+              <CustomSelect
                 value={formData.capacity.unit}
-                onChange={(e) => handleCapacityChange("unit", e.target.value)}
-                className="w-32 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
-              >
-                {CAPACITY_UNITS.weight.map((unit) => (
-                  <option key={unit.value} value={unit.value}>
-                    {unit.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => handleCapacityChange("unit", value)}
+                options={CAPACITY_UNITS.weight}
+                placeholder="Unit"
+                className="w-32"
+              />
             </div>
             {errors.capacity && <p className="mt-1 text-sm text-red-600">{errors.capacity}</p>}
           </div>
@@ -82,17 +79,13 @@ const CapacityOwnershipStep = ({ formData, setFormData, errors }) => {
                 placeholder="e.g., 45"
                 className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
               />
-              <select
+              <CustomSelect
                 value={formData.capacity.volumeUnit}
-                onChange={(e) => handleCapacityChange("volumeUnit", e.target.value)}
-                className="w-32 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
-              >
-                {CAPACITY_UNITS.volume.map((unit) => (
-                  <option key={unit.value} value={unit.value}>
-                    {unit.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => handleCapacityChange("volumeUnit", value)}
+                options={CAPACITY_UNITS.volume}
+                placeholder="Unit"
+                className="w-32"
+              />
             </div>
           </div>
         </div>
@@ -105,20 +98,14 @@ const CapacityOwnershipStep = ({ formData, setFormData, errors }) => {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Ownership Type <span className="text-red-500">*</span>
             </label>
-            <select
+            <CustomSelect
               value={formData.ownership}
-              onChange={(e) => handleChange("ownership", e.target.value)}
-              className={`w-full px-4 py-2.5 border ${
-                errors.ownership ? "border-red-500" : "border-gray-300"
-              } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
-            >
-              <option value="">Select Ownership Type</option>
-              {OWNERSHIP_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => handleChange("ownership", value)}
+              options={OWNERSHIP_TYPES}
+              placeholder="Select Ownership Type"
+              error={errors.ownership}
+              className="w-full"
+            />
             {errors.ownership && <p className="mt-1 text-sm text-red-600">{errors.ownership}</p>}
           </div>
 

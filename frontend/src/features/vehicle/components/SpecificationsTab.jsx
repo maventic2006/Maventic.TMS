@@ -1,8 +1,9 @@
 import React from "react";
 import { Info, Gauge } from "lucide-react";
-import { FUEL_TYPES, TRANSMISSION_TYPES, EMISSION_STANDARDS } from "../../../utils/vehicleConstants";
+import { TRANSMISSION_TYPES, EMISSION_STANDARDS, SUSPENSION_TYPES } from "../../../utils/vehicleConstants";
+import { CustomSelect } from "../../../components/ui/Select";
 
-const SpecificationsTab = ({ formData, setFormData, errors }) => {
+const SpecificationsTab = ({ formData, setFormData, errors, masterData }) => {
   const handleChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -15,189 +16,196 @@ const SpecificationsTab = ({ formData, setFormData, errors }) => {
 
   const data = formData.specifications || {};
 
+  // ✅ USE MASTER DATA FROM API - NOT HARDCODED CONSTANTS
+  const engineTypes = masterData?.engineTypes || [
+    { value: 'ET001', label: 'BS4' },
+    { value: 'ET002', label: 'BS6' },
+    { value: 'ET003', label: 'EURO5' },
+    { value: 'ET004', label: 'EURO6' }
+  ];
+
+  // ✅ USE MASTER DATA FROM API - NOT HARDCODED CONSTANTS
+  const fuelTypes = masterData?.fuelTypes || [
+    { value: 'FT001', label: 'DIESEL' },
+    { value: 'FT002', label: 'CNG' },
+    { value: 'FT003', label: 'ELECTRIC' },
+    { value: 'FT004', label: 'LNG' }
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-gradient-to-br from-[#10B981] to-[#059669] rounded-xl flex items-center justify-center shadow-lg">
-          <Gauge className="w-5 h-5 text-white" />
-        </div>
+    <div className="space-y-5">
+      {/* 3-column grid layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Engine Type - CHANGED TO DROPDOWN */}
         <div>
-          <h2 className="text-lg font-bold text-[#0D1A33]">Vehicle Specifications</h2>
-          <p className="text-sm text-gray-600">Enter technical specifications and engine details</p>
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Engine Type <span className="text-red-500">*</span>
+          </label>
+          <CustomSelect
+            value={data.engineType || ""}
+            onChange={(value) => handleChange("engineType", value)}
+            options={engineTypes}
+            placeholder="Select Engine Type"
+            error={errors.engineType}
+            className="w-full"
+          />
+          {errors.engineType && (
+            <p className="mt-1 text-xs text-red-600">{errors.engineType}</p>
+          )}
         </div>
-      </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3 mb-6">
-        <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div className="text-sm text-blue-800">
-          <p className="font-semibold mb-1">Technical Specifications</p>
-          <p>Enter accurate technical details for proper vehicle classification and performance tracking.</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Engine Number */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
             Engine Number <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={data.engineNumber || ""}
             onChange={(e) => handleChange("engineNumber", e.target.value.toUpperCase())}
-            placeholder="e.g., ENG123456789"
-            className={`w-full px-4 py-2.5 border ${
+            placeholder="ENG123456789"
+            className={`w-full px-3 py-2 text-sm border ${
               errors.engineNumber ? "border-red-500" : "border-gray-300"
             } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
           />
           {errors.engineNumber && (
-            <p className="mt-1 text-sm text-red-600">{errors.engineNumber}</p>
+            <p className="mt-1 text-xs text-red-600">{errors.engineNumber}</p>
           )}
         </div>
 
-        {/* Engine Capacity */}
+        {/* Body Type Description */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Engine Capacity (CC)
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Body Type Description
           </label>
           <input
-            type="number"
-            value={data.engineCapacity || 0}
-            onChange={(e) => handleChange("engineCapacity", parseFloat(e.target.value) || 0)}
-            min="0"
-            step="1"
-            placeholder="e.g., 5700"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
+            type="text"
+            value={data.bodyTypeDescription || ""}
+            onChange={(e) => handleChange("bodyTypeDescription", e.target.value)}
+            placeholder="e.g., Flatbed, Container, Tanker"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
           />
         </div>
 
         {/* Fuel Type */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
             Fuel Type <span className="text-red-500">*</span>
           </label>
-          <select
+          <CustomSelect
             value={data.fuelType || ""}
-            onChange={(e) => handleChange("fuelType", e.target.value)}
-            className={`w-full px-4 py-2.5 border ${
-              errors.fuelType ? "border-red-500" : "border-gray-300"
-            } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
-          >
-            <option value="">Select Fuel Type</option>
-            {FUEL_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-          {errors.fuelType && <p className="mt-1 text-sm text-red-600">{errors.fuelType}</p>}
-        </div>
-
-        {/* Fuel Tank Capacity */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Fuel Tank Capacity (Liters)
-          </label>
-          <input
-            type="number"
-            value={data.fuelTankCapacity || 0}
-            onChange={(e) => handleChange("fuelTankCapacity", parseFloat(e.target.value) || 0)}
-            min="0"
-            step="0.1"
-            placeholder="e.g., 400"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
+            onChange={(value) => handleChange("fuelType", value)}
+            options={fuelTypes}
+            placeholder="Select Type"
+            error={errors.fuelType}
+            className="w-full"
           />
+          {errors.fuelType && <p className="mt-1 text-xs text-red-600">{errors.fuelType}</p>}
         </div>
 
-        {/* Transmission */}
+        {/* Transmission Type */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Transmission <span className="text-red-500">*</span>
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Transmission Type <span className="text-red-500">*</span>
           </label>
-          <select
+          <CustomSelect
             value={data.transmission || ""}
-            onChange={(e) => handleChange("transmission", e.target.value)}
-            className={`w-full px-4 py-2.5 border ${
-              errors.transmission ? "border-red-500" : "border-gray-300"
-            } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
-          >
-            <option value="">Select Transmission</option>
-            {TRANSMISSION_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-          {errors.transmission && <p className="mt-1 text-sm text-red-600">{errors.transmission}</p>}
-        </div>
-
-        {/* Number of Gears */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Number of Gears
-          </label>
-          <input
-            type="number"
-            value={data.noOfGears || 0}
-            onChange={(e) => handleChange("noOfGears", parseInt(e.target.value) || 0)}
-            min="0"
-            max="20"
-            step="1"
-            placeholder="e.g., 6"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
+            onChange={(value) => handleChange("transmission", value)}
+            options={TRANSMISSION_TYPES}
+            placeholder="Select"
+            error={errors.transmission}
+            className="w-full"
           />
+          {errors.transmission && <p className="mt-1 text-xs text-red-600">{errors.transmission}</p>}
         </div>
 
-        {/* Wheelbase */}
+        {/* Color */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Wheelbase (MM)
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Color
           </label>
           <input
-            type="number"
-            value={data.wheelbase || 0}
-            onChange={(e) => handleChange("wheelbase", parseFloat(e.target.value) || 0)}
-            min="0"
-            step="1"
-            placeholder="e.g., 5300"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
-          />
-        </div>
-
-        {/* Number of Axles */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Number of Axles
-          </label>
-          <input
-            type="number"
-            value={data.noOfAxles || 0}
-            onChange={(e) => handleChange("noOfAxles", parseInt(e.target.value) || 0)}
-            min="0"
-            max="10"
-            step="1"
-            placeholder="e.g., 2"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
+            type="text"
+            value={data.color || ""}
+            onChange={(e) => handleChange("color", e.target.value)}
+            placeholder="e.g., White, Blue"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
           />
         </div>
 
         {/* Emission Standard */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
             Emission Standard
           </label>
-          <select
+          <CustomSelect
             value={data.emissionStandard || ""}
-            onChange={(e) => handleChange("emissionStandard", e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
-          >
-            <option value="">Select Emission Standard</option>
-            {EMISSION_STANDARDS.map((standard) => (
-              <option key={standard.value} value={standard.value}>
-                {standard.label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => handleChange("emissionStandard", value)}
+            options={EMISSION_STANDARDS}
+            placeholder="Select Standard"
+            className="w-full"
+          />
+        </div>
+
+        {/* Financer */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Financer <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={data.financer || ""}
+            onChange={(e) => handleChange("financer", e.target.value)}
+            placeholder="e.g., HDFC Bank, ICICI Bank"
+            className={`w-full px-3 py-2 text-sm border ${
+              errors.financer ? "border-red-500" : "border-gray-300"
+            } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
+          />
+          {errors.financer && <p className="mt-1 text-xs text-red-600">{errors.financer}</p>}
+        </div>
+
+        {/* Suspension Type */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Suspension Type <span className="text-red-500">*</span>
+          </label>
+          <CustomSelect
+            value={data.suspensionType || ""}
+            onChange={(value) => handleChange("suspensionType", value)}
+            options={SUSPENSION_TYPES}
+            placeholder="Select Suspension Type"
+            error={errors.suspensionType}
+            className="w-full"
+          />
+          {errors.suspensionType && <p className="mt-1 text-xs text-red-600">{errors.suspensionType}</p>}
+        </div>
+
+        {/* Weight/Dimensions */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Weight/Dimensions <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={data.weightDimensions || ""}
+            onChange={(e) => handleChange("weightDimensions", e.target.value)}
+            placeholder="e.g., 25000kg, 10m x 2.5m x 3m"
+            className={`w-full px-3 py-2 text-sm border ${
+              errors.weightDimensions ? "border-red-500" : "border-gray-300"
+            } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
+          />
+          {errors.weightDimensions && (
+            <p className="mt-1 text-xs text-red-600">{errors.weightDimensions}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Information panel at the bottom */}
+      <div className="mt-6 bg-blue-50/50 border border-blue-200/50 rounded-lg p-3 flex items-start gap-2">
+        <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+        <div className="text-xs text-blue-800">
+          <p className="font-semibold mb-0.5">Vehicle Specifications</p>
+          <p className="text-blue-700">Enter accurate technical specifications for proper vehicle classification. Fields marked with * are mandatory.</p>
         </div>
       </div>
     </div>

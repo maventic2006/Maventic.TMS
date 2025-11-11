@@ -1,144 +1,36 @@
-import React from "react";
-import { FileText } from "lucide-react";
+import React, { useState } from "react";
+import { FileText, Upload, Eye, Trash2, Download, Check, X, AlertCircle } from "lucide-react";
 import { useSelector } from "react-redux";
-import { Country, State } from "country-state-city";
-import ThemeTable from "../../../components/ui/ThemeTable";
+import { Button } from "../../../components/ui/Button";
+import DocumentUploadModal from "./DocumentUploadModal";
 
 const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   const { masterData } = useSelector((state) => state.vehicle);
 
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState(null);
+
   const documents = formData.documents || [];
 
-  // Document type options for vehicles
-  const documentTypes = [
-    { value: "RC", label: "Registration Certificate (RC)" },
-    { value: "INSURANCE", label: "Insurance Certificate" },
-    { value: "POLLUTION", label: "Pollution Certificate (PUC)" },
-    { value: "FITNESS", label: "Fitness Certificate" },
-    { value: "PERMIT", label: "Permit" },
-    { value: "TAX", label: "Road Tax Receipt" },
-    { value: "LOAN", label: "Loan Documents" },
-    { value: "WARRANTY", label: "Warranty Certificate" },
-    { value: "INSPECTION", label: "Inspection Report" },
-    { value: "OTHER", label: "Other Document" },
-  ];
+  // Document type options from master data (centralized in backend)
+  const documentTypes = masterData.documentTypes || [];
+  
+  // Debug logging
+  console.log('📄 DocumentsTab - masterData:', masterData);
+  console.log('📄 DocumentsTab - documentTypes:', documentTypes);
+  console.log('📄 DocumentsTab - mandatory count:', documentTypes.filter(dt => dt.isMandatory).length);
 
-  // Get all countries from country-state-city package
-  const allCountries = Country.getAllCountries();
-
-  // Country options from country-state-city package
-  const countryOptions = React.useMemo(() => {
-    return allCountries.map((country) => ({
-      value: country.name,
-      label: country.name,
-    }));
-  }, []);
-
-  // State options - dynamically load based on selected country
-  const getStateOptions = (countryName) => {
-    const country = allCountries.find((c) => c.name === countryName);
-    if (!country) return [];
-
-    const states = State.getStatesOfCountry(country.isoCode);
-    return states.map((state) => ({
-      value: state.name,
-      label: state.name,
-    }));
-  };
-
-  // Table column configuration
-  const columns = [
-    {
-      key: "documentType",
-      label: "Document Type",
-      type: "select",
-      options: documentTypes,
-      placeholder: "Select Document Type",
-      searchable: true,
-      width: "min-w-[200px]",
-    },
-    {
-      key: "documentNumber",
-      label: "Document Number",
-      type: "text",
-      placeholder: "Enter document number",
-      width: "min-w-[200px]",
-    },
-    {
-      key: "issueDate",
-      label: "Issue Date",
-      type: "date",
-      width: "min-w-[150px]",
-    },
-    {
-      key: "expiryDate",
-      label: "Expiry Date",
-      type: "date",
-      width: "min-w-[150px]",
-    },
-    {
-      key: "issuingAuthority",
-      label: "Issuing Authority",
-      type: "text",
-      placeholder: "e.g., RTO Mumbai",
-      width: "min-w-[200px]",
-    },
-    {
-      key: "country",
-      label: "Country",
-      type: "select",
-      options: countryOptions,
-      placeholder: "Select Country",
-      searchable: true,
-      width: "min-w-[150px]",
-    },
-    {
-      key: "state",
-      label: "State",
-      type: "text",
-      placeholder: "Enter state",
-      width: "min-w-[150px]",
-    },
-    {
-      key: "fileUpload",
-      label: "Document Upload",
-      type: "file",
-      width: "min-w-[200px]",
-    },
-  ];
-
-  const handleDataChange = (updatedDocuments) => {
+  // Handle adding documents from modal
+  const handleDocumentsAdd = (newDocuments) => {
+    const updatedDocuments = [...documents, ...newDocuments];
     setFormData((prev) => ({
       ...prev,
       documents: updatedDocuments,
     }));
   };
 
-  const handleAddDocument = () => {
-    const newDocument = {
-      documentType: "",
-      documentNumber: "",
-      issueDate: "",
-      expiryDate: "",
-      issuingAuthority: "",
-      country: "",
-      state: "",
-      status: true,
-      fileName: "",
-      fileType: "",
-      fileData: "",
-    };
-
-    const updatedDocuments = [...documents, newDocument];
-    setFormData((prev) => ({
-      ...prev,
-      documents: updatedDocuments,
-    }));
-  };
-
+  // Handle removing a document
   const handleRemoveDocument = (index) => {
-    if (documents.length <= 1) return; // Keep at least one document
-
     const updatedDocuments = documents.filter((_, i) => i !== index);
     setFormData((prev) => ({
       ...prev,
@@ -146,26 +38,243 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
     }));
   };
 
+  // Handle document preview
+  const handlePreview = (doc) => {
+    setPreviewDocument(doc);
+  };
+
+  // Handle document download
+  const handleDownload = (doc) => {
+    const blob = base64ToBlob(doc.fileData, doc.fileType);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = doc.fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  // Helper function to convert base64 to Blob
+  const base64ToBlob = (base64, contentType) => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: contentType });
+  };
+
+  // Get document type label
+  const getDocumentTypeLabel = (value) => {
+    const docType = documentTypes.find((dt) => dt.value === value);
+    return docType ? docType.label : value;
+  };
+
+  // Get file icon based on type
+  const getFileIcon = (fileType) => {
+    if (fileType.startsWith("image/")) {
+      return "🖼️";
+    } else if (fileType === "application/pdf") {
+      return "📄";
+    } else {
+      return "📎";
+    }
+  };
+
   return (
-    <div className="bg-[#F5F7FA]">
-      <ThemeTable
-        title="Vehicle Documents"
-        titleIcon={FileText}
-        data={documents}
-        columns={columns}
-        onDataChange={handleDataChange}
-        onAddRow={handleAddDocument}
-        onRemoveRow={handleRemoveDocument}
-        errors={errors || {}}
-        hasRowSelection={false}
-        canRemoveRows={true}
-        canAddRows={true}
-        className="w-full"
-      />
+    <div className="space-y-5">
+      {/* Header with Upload Button */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-[#10B981]" />
+          <h3 className="text-lg font-semibold text-gray-900">Vehicle Documents</h3>
+          {documents.length > 0 && (
+            <span className="px-2 py-1 bg-[#10B981] text-white text-xs font-medium rounded-full">
+              {documents.length}
+            </span>
+          )}
+        </div>
+        <Button
+          type="button"
+          onClick={() => setIsUploadModalOpen(true)}
+          className="bg-[#10B981] hover:bg-[#059669] text-white"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Documents
+        </Button>
+      </div>
+
+      {/* Mandatory Documents Checklist */}
+      {documentTypes.filter(dt => dt.isMandatory).length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-blue-900 mb-2">Required Documents</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {documentTypes
+              .filter(dt => dt.isMandatory)
+              .map(docType => {
+                const isUploaded = documents.some(doc => doc.documentType === docType.value);
+                return (
+                  <div key={docType.value} className="flex items-center gap-2">
+                    {isUploaded ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <X className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className={`text-sm ${isUploaded ? 'text-green-700' : 'text-gray-700'}`}>
+                      {docType.label}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Validation Error Message */}
+      {errors.documents && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-semibold text-red-900 mb-1">Missing Required Documents</h4>
+            <p className="text-sm text-red-700">{errors.documents}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Documents List */}
+      {documents.length === 0 ? (
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+          <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium mb-2">No documents uploaded yet</p>
+          <p className="text-sm text-gray-500 mb-4">
+            Click the "Upload Documents" button to add vehicle documents
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsUploadModalOpen(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Your First Document
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {documents.map((doc, index) => (
+            <div
+              key={index}
+              className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start gap-4">
+                {/* File Icon */}
+                <div className="flex-shrink-0 text-3xl">
+                  {getFileIcon(doc.fileType)}
+                </div>
+
+                {/* Document Info */}
+                <div className="flex-1 min-w-0">
+                  {/* Header Row */}
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h4 className="font-semibold text-gray-900 truncate">
+                        {doc.fileName}
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        {getDocumentTypeLabel(doc.documentType)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePreview(doc)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Preview"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(doc)}
+                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDocument(index)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Remove"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Metadata Grid */}
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                    {doc.referenceNumber && (
+                      <div>
+                        <span className="text-gray-600">Reference:</span>{" "}
+                        <span className="font-medium text-gray-900">
+                          {doc.referenceNumber}
+                        </span>
+                      </div>
+                    )}
+                    {doc.documentProvider && (
+                      <div>
+                        <span className="text-gray-600">Provider:</span>{" "}
+                        <span className="font-medium text-gray-900">
+                          {doc.documentProvider}
+                        </span>
+                      </div>
+                    )}
+                    {doc.validFrom && (
+                      <div>
+                        <span className="text-gray-600">Valid From:</span>{" "}
+                        <span className="font-medium text-gray-900">
+                          {new Date(doc.validFrom).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                    {doc.validTo && (
+                      <div>
+                        <span className="text-gray-600">Valid To:</span>{" "}
+                        <span className="font-medium text-gray-900">
+                          {new Date(doc.validTo).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                    {doc.premiumAmount > 0 && (
+                      <div>
+                        <span className="text-gray-600">Premium:</span>{" "}
+                        <span className="font-medium text-gray-900">
+                          ${doc.premiumAmount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {doc.remarks && (
+                      <div className="col-span-2">
+                        <span className="text-gray-600">Remarks:</span>{" "}
+                        <span className="font-medium text-gray-900">
+                          {doc.remarks}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Validation Error Summary */}
       {errors && typeof errors === "string" && (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-xs text-red-700 flex items-center gap-2">
             {errors}
           </p>
@@ -173,26 +282,96 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       )}
 
       {errors && errors._general && (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-xs text-red-700 flex items-center gap-2">
             {errors._general}
           </p>
         </div>
       )}
 
-      {/* Guidelines */}
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h4 className="text-sm font-medium text-blue-900 mb-2">
+      {/* Guidelines - Bottom Info Panel */}
+      <div className="mt-6 bg-blue-50/50 border border-blue-200/50 rounded-lg p-3">
+        <h4 className="text-xs font-semibold text-blue-900 mb-2">
           Document Guidelines:
         </h4>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• RC, Insurance, Pollution, and Fitness certificates are typically mandatory</li>
-          <li>• Ensure expiry dates are monitored to maintain compliance</li>
-          <li>• Upload clear, legible copies of all documents</li>
-          <li>• Document numbers must be accurate for verification purposes</li>
-          <li>• Supported file formats: PDF, JPG, PNG (Max size: 5MB per file)</li>
+        <ul className="text-xs text-blue-800 space-y-1">
+          <li>• Document Type, Valid From, Valid To, and Remarks are mandatory fields</li>
+          <li>• Reference Number format: Policy/Permit Number (e.g., DDNP/50/1314/4345)</li>
+          <li>• Document Provider: Specify insurance provider name or issuing authority</li>
+          <li>• Coverage Type: Applicable specifically for insurance documents</li>
+          <li>• Premium Amount: Enter the premium or fee amount for insurance/permits</li>
+          <li>• Ensure validity dates are monitored to maintain compliance</li>
+          <li>• Supported file formats: PDF, JPG, PNG, GIF, DOC, DOCX (Max size: 5MB per file)</li>
+          <li>• You can upload multiple documents at once using the upload modal</li>
         </ul>
       </div>
+
+      {/* Document Upload Modal */}
+      <DocumentUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onSave={handleDocumentsAdd}
+        existingDocuments={documents}
+      />
+
+      {/* Preview Modal */}
+      {previewDocument && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setPreviewDocument(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Preview: {previewDocument.fileName}
+              </h3>
+              <button
+                onClick={() => setPreviewDocument(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <span className="text-2xl text-gray-600">×</span>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4">
+              <div className="flex justify-center items-center bg-gray-100 rounded-lg p-4 min-h-[400px]">
+                {previewDocument.fileType.startsWith("image/") ? (
+                  <img
+                    src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                    alt={previewDocument.fileName}
+                    className="max-w-full max-h-[600px] object-contain"
+                  />
+                ) : previewDocument.fileType === "application/pdf" ? (
+                  <iframe
+                    src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                    className="w-full h-[600px] border-0"
+                    title={previewDocument.fileName}
+                  />
+                ) : (
+                  <div className="text-center">
+                    <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">Preview not available for this file type</p>
+                    <p className="text-sm text-gray-500 mt-2">{previewDocument.fileName}</p>
+                    <Button
+                      type="button"
+                      onClick={() => handleDownload(previewDocument)}
+                      className="mt-4"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download File
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

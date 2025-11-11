@@ -1,182 +1,83 @@
-const express = require("express");
+﻿const express = require('express');
 const router = express.Router();
-const knex = require("knex")(require("../knexfile").development);
-const { authenticateToken } = require("../middleware/auth");
+const { authenticateToken } = require('../middleware/auth');
+const vehicleController = require('../controllers/vehicleController');
 
-// Get all vehicles with basic information
-router.get("/", authenticateToken, async (req, res) => {
-  try {
-    const vehicles = await knex("vehicle_basic_information_hdr as vh")
-      .leftJoin(
-        "vehicle_type_master as vt",
-        "vh.vehicle_type_id",
-        "vt.vehicle_type_id"
-      )
-      .select([
-        "vh.vehicle_unique_id",
-        "vh.vehicle_id_code_hdr",
-        "vh.maker_brand_description",
-        "vh.maker_model",
-        "vh.vin_chassis_no",
-        "vt.vehicle_type_description",
-        "vh.load_capacity_in_ton",
-        "vh.fuel_type",
-        "vh.vehicle_colour",
-        "vh.gps_tracker_active_flag",
-        "vh.status",
-      ])
-      .where("vh.status", "ACTIVE");
+/**
+ * Vehicle Routes
+ * All routes are protected with JWT authentication
+ * @module vehicleRoutes
+ */
 
-    res.json({
-      success: true,
-      data: vehicles,
-      count: vehicles.length,
-    });
-  } catch (error) {
-    console.error("Error fetching vehicles:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching vehicles",
-      error: error.message,
-    });
-  }
-});
+// ============================================================================
+// PUBLIC ROUTES (with authentication)
+// ============================================================================
 
-// Get vehicle by ID with full details
-router.get("/:vehicleId", authenticateToken, async (req, res) => {
-  try {
-    const { vehicleId } = req.params;
+/**
+ * @route   GET /api/vehicle/master-data
+ * @desc    Get master data for dropdowns
+ * @access  Private
+ */
+router.get('/master-data', authenticateToken, vehicleController.getMasterData);
 
-    // Get basic vehicle information
-    const vehicle = await knex("vehicle_basic_information_hdr as vh")
-      .leftJoin(
-        "vehicle_type_master as vt",
-        "vh.vehicle_type_id",
-        "vt.vehicle_type_id"
-      )
-      .select("vh.*", "vt.vehicle_type_description")
-      .where("vh.vehicle_id_code_hdr", vehicleId)
-      .andWhere("vh.status", "ACTIVE")
-      .first();
+/**
+ * @route   GET /api/vehicle
+ * @desc    Get all vehicles with pagination and filtering
+ * @access  Private
+ * @query   {number} page - Page number (default: 1)
+ * @query   {number} limit - Items per page (default: 25)
+ * @query   {string} search - Search term
+ * @query   {string} vehicleType - Filter by vehicle type
+ * @query   {string} status - Filter by status
+ * @query   {string} fuelType - Filter by fuel type
+ * @query   {string} sortBy - Sort field (default: created_at)
+ * @query   {string} sortOrder - Sort order (default: desc)
+ */
+router.get('/', authenticateToken, vehicleController.getAllVehicles);
 
-    if (!vehicle) {
-      return res.status(404).json({
-        success: false,
-        message: "Vehicle not found",
-      });
-    }
+/**
+ * @route   GET /api/vehicle/:id
+ * @desc    Get vehicle by ID with all related information
+ * @access  Private
+ * @param   {string} id - Vehicle ID
+ */
+router.get('/:id', authenticateToken, vehicleController.getVehicleById);
 
-    // Get insurance information
-    const insurance = await knex("vehicle_basic_information_itm")
-      .where("vehicle_id_code_hdr", vehicleId)
-      .andWhere("status", "ACTIVE");
+/**
+ * @route   POST /api/vehicle
+ * @desc    Create new vehicle
+ * @access  Private
+ * @body    {object} basicInformation - Vehicle basic info
+ * @body    {object} specifications - Vehicle specifications
+ * @body    {object} capacityDetails - Capacity and dimensions
+ * @body    {object} ownershipDetails - Ownership information
+ * @body    {object} maintenanceHistory - Maintenance records
+ * @body    {object} serviceFrequency - Service frequency settings
+ * @body    {array} documents - Vehicle documents
+ */
+router.post('/', authenticateToken, vehicleController.createVehicle);
 
-    // Get ownership details
-    const ownership = await knex("vehicle_ownership_details")
-      .where("vehicle_id_code", vehicleId)
-      .andWhere("status", "ACTIVE")
-      .first();
+/**
+ * @route   PUT /api/vehicle/:id
+ * @desc    Update vehicle information
+ * @access  Private
+ * @param   {string} id - Vehicle ID
+ * @body    {object} basicInformation - Vehicle basic info
+ * @body    {object} specifications - Vehicle specifications
+ * @body    {object} capacityDetails - Capacity and dimensions
+ * @body    {object} ownershipDetails - Ownership information
+ * @body    {object} maintenanceHistory - Maintenance records
+ * @body    {object} serviceFrequency - Service frequency settings
+ * @body    {array} documents - Vehicle documents
+ */
+router.put('/:id', authenticateToken, vehicleController.updateVehicle);
 
-    // Get maintenance history
-    const maintenance = await knex("vehicle_maintenance_service_history")
-      .where("vehicle_id_code", vehicleId)
-      .andWhere("status", "ACTIVE")
-      .orderBy("service_date", "desc");
-
-    // Get permits
-    const permits = await knex("vehicle_special_permit")
-      .where("vehicle_id_code_hdr", vehicleId)
-      .andWhere("status", "ACTIVE");
-
-    res.json({
-      success: true,
-      data: {
-        vehicle,
-        insurance,
-        ownership,
-        maintenance,
-        permits,
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching vehicle details:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching vehicle details",
-      error: error.message,
-    });
-  }
-});
-
-// Get vehicle maintenance history
-router.get("/:vehicleId/maintenance", authenticateToken, async (req, res) => {
-  try {
-    const { vehicleId } = req.params;
-
-    const maintenance = await knex("vehicle_maintenance_service_history as vm")
-      .join(
-        "vehicle_basic_information_hdr as vh",
-        "vm.vehicle_id_code",
-        "vh.vehicle_id_code_hdr"
-      )
-      .select(["vm.*", "vh.maker_brand_description", "vh.maker_model"])
-      .where("vm.vehicle_id_code", vehicleId)
-      .andWhere("vm.status", "ACTIVE")
-      .orderBy("vm.service_date", "desc");
-
-    res.json({
-      success: true,
-      data: maintenance,
-      count: maintenance.length,
-    });
-  } catch (error) {
-    console.error("Error fetching maintenance history:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching maintenance history",
-      error: error.message,
-    });
-  }
-});
-
-// Get vehicles due for maintenance
-router.get("/maintenance/due", authenticateToken, async (req, res) => {
-  try {
-    const today = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(today.getDate() + 30);
-
-    const vehiclesDue = await knex("vehicle_maintenance_service_history as vm")
-      .join(
-        "vehicle_basic_information_hdr as vh",
-        "vm.vehicle_id_code",
-        "vh.vehicle_id_code_hdr"
-      )
-      .select([
-        "vh.vehicle_id_code_hdr",
-        "vh.maker_brand_description",
-        "vh.maker_model",
-        "vm.upcoming_service_date",
-        "vm.type_of_service",
-      ])
-      .where("vm.upcoming_service_date", "<=", thirtyDaysFromNow)
-      .andWhere("vm.status", "ACTIVE")
-      .andWhere("vh.status", "ACTIVE")
-      .orderBy("vm.upcoming_service_date", "asc");
-
-    res.json({
-      success: true,
-      data: vehiclesDue,
-      count: vehiclesDue.length,
-    });
-  } catch (error) {
-    console.error("Error fetching vehicles due for maintenance:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching vehicles due for maintenance",
-      error: error.message,
-    });
-  }
-});
+/**
+ * @route   DELETE /api/vehicle/:id
+ * @desc    Soft delete vehicle (set status to INACTIVE)
+ * @access  Private
+ * @param   {string} id - Vehicle ID
+ */
+router.delete('/:id', authenticateToken, vehicleController.deleteVehicle);
 
 module.exports = router;
