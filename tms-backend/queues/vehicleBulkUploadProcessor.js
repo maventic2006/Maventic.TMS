@@ -128,21 +128,21 @@ async function processVehicleBulkUpload(job, io) {
     // Prepare batch insert data for valid vehicles
     const validVehicleRecords = validationResults.valid.map(validVehicle => ({
       batch_id: batchId,
-      vehicle_ref_id: validVehicle.basicInformation.Vehicle_Ref_ID,
-      excel_row_number: validVehicle.basicInformation._excelRowNumber,
+      vehicle_ref_id: validVehicle.vehicleRefId || validVehicle.data?.basicInformation?.Vehicle_Ref_ID,
+      excel_row_number: validVehicle.data?.basicInformation?._excelRowNumber || 0,
       validation_status: 'valid',
       validation_errors: JSON.stringify([]),
-      data: JSON.stringify(validVehicle)
+      data: JSON.stringify(validVehicle.data || validVehicle)
     }));
     
     // Prepare batch insert data for invalid vehicles
     const invalidVehicleRecords = validationResults.invalid.map(invalidVehicle => ({
       batch_id: batchId,
-      vehicle_ref_id: invalidVehicle.basicInformation?.Vehicle_Ref_ID || null,
-      excel_row_number: invalidVehicle.basicInformation?._excelRowNumber || 0,
+      vehicle_ref_id: invalidVehicle.vehicleRefId || invalidVehicle.data?.basicInformation?.Vehicle_Ref_ID || null,
+      excel_row_number: invalidVehicle.data?.basicInformation?._excelRowNumber || 0,
       validation_status: 'invalid',
       validation_errors: JSON.stringify(invalidVehicle.errors),
-      data: JSON.stringify(invalidVehicle)
+      data: JSON.stringify(invalidVehicle.data || invalidVehicle)
     }));
     
     // Batch insert all records (10x-50x faster than individual inserts)
@@ -371,7 +371,7 @@ async function createVehiclesBatch(validVehicles, batchId, userId, io) {
       // Mark all vehicles in failed chunk
       chunk.forEach(vehicleData => {
         results.failed.push({
-          vehicleRefId: vehicleData.basicInformation.Vehicle_Ref_ID,
+          vehicleRefId: vehicleData.vehicleRefId || vehicleData.data?.basicInformation?.Vehicle_Ref_ID || 'UNKNOWN',
           error: error.message
         });
       });
@@ -410,21 +410,22 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
     
     // Prepare batch insert arrays for all tables
     const basicInfoRecords = [];
-    const specificationsRecords = [];
-    const capacityRecords = [];
+    // Note: Specifications and Capacity fields are now part of basicInfoRecords (vehicle_basic_information_hdr)
+    // Note: Documents are NOT included in bulk upload (must be uploaded separately through UI)
     const ownershipRecords = [];
-    const documentRecords = [];
     const bulkUploadUpdates = [];
     
     // Build all records for batch insert
     for (const vehicleData of vehiclesChunk) {
       try {
-        const { basicInformation, specifications, capacityDetails, ownershipDetails, documents } = vehicleData;
+        // Extract data from validation result structure
+        // Note: Documents are excluded from bulk upload
+        const { basicInformation, specifications, capacityDetails, ownershipDetails } = vehicleData.data || vehicleData;
         
         const vehicleId = `VEH${String(nextNumber).padStart(4, '0')}`;
         nextNumber++;
         
-        // Basic information (header)
+        // Basic information (header) - includes specifications fields
         basicInfoRecords.push({
           vehicle_id_code_hdr: vehicleId,
           maker_brand_description: basicInformation.Make_Brand,
@@ -445,52 +446,31 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
           road_tax: basicInformation.Road_Tax || null,
           avg_running_speed: basicInformation.Avg_Running_Speed || null,
           max_running_speed: basicInformation.Max_Running_Speed || null,
+          // Specification fields (from specifications sheet)
+          engine_type_id: specifications?.Engine_Type_ID || null,
+          engine_number: specifications?.Engine_Number || null,
+          fuel_type_id: specifications?.Fuel_Type_ID || null,
+          transmission_type: specifications?.Transmission_Type || null,
+          emission_standard: specifications?.Emission_Standard || null,
+          financer: specifications?.Financer || null,
+          suspension_type: specifications?.Suspension_Type || null,
+          // Capacity fields (from capacity details sheet)
+          unloading_weight: capacityDetails?.Unloading_Weight_KG || null,
+          gross_vehicle_weight_kg: capacityDetails?.Gross_Vehicle_Weight_KG || null,
+          volume_capacity_cubic_meter: capacityDetails?.Volume_Capacity_CBM || null,
+          seating_capacity: capacityDetails?.Seating_Capacity || null,
+          load_capacity_in_ton: capacityDetails?.Load_Capacity_TON || null,
+          cargo_dimensions_width: capacityDetails?.Cargo_Width_M || null,
+          cargo_dimensions_height: capacityDetails?.Cargo_Height_M || null,
+          cargo_dimensions_length: capacityDetails?.Cargo_Length_M || null,
+          towing_capacity: capacityDetails?.Towing_Capacity_KG || null,
+          tire_load_rating: capacityDetails?.Tire_Load_Rating || null,
+          vehicle_condition: capacityDetails?.Vehicle_Condition || null,
+          fuel_tank_capacity: capacityDetails?.Fuel_Tank_Capacity_L || null,
           status: basicInformation.Status || 'ACTIVE',
           created_by: userId,
           updated_by: userId
         });
-        
-        // Specifications (item) if provided
-        if (specifications) {
-          specificationsRecords.push({
-            vehicle_id_code_itm: vehicleId,
-            engine_type_id: specifications.Engine_Type_ID,
-            engine_number: specifications.Engine_Number,
-            fuel_type_id: specifications.Fuel_Type_ID,
-            transmission_type: specifications.Transmission_Type,
-            emission_standard: specifications.Emission_Standard || null,
-            financer: specifications.Financer,
-            suspension_type: specifications.Suspension_Type,
-            weight_dimensions: specifications.Weight_Dimensions || null,
-            created_by: userId,
-            updated_by: userId
-          });
-        }
-        
-        // Capacity details if provided
-        if (capacityDetails) {
-          const capacityId = `${vehicleId}CAP001`;
-          
-          capacityRecords.push({
-            vehicle_capacity_id: capacityId,
-            vehicle_id_code_capacity: vehicleId,
-            unloading_weight_kg: capacityDetails.Unloading_Weight_KG || null,
-            gross_vehicle_weight_kg: capacityDetails.Gross_Vehicle_Weight_KG || null,
-            payload_capacity_kg: capacityDetails.Payload_Capacity_KG || null,
-            volume_capacity_cbm: capacityDetails.Volume_Capacity_CBM || null,
-            cargo_width_m: capacityDetails.Cargo_Width_M || null,
-            cargo_height_m: capacityDetails.Cargo_Height_M || null,
-            cargo_length_m: capacityDetails.Cargo_Length_M || null,
-            towing_capacity_kg: capacityDetails.Towing_Capacity_KG || null,
-            tire_load_rating: capacityDetails.Tire_Load_Rating || null,
-            vehicle_condition: capacityDetails.Vehicle_Condition || null,
-            fuel_tank_capacity_l: capacityDetails.Fuel_Tank_Capacity_L || null,
-            seating_capacity: capacityDetails.Seating_Capacity || null,
-            load_capacity_ton: capacityDetails.Load_Capacity_TON || null,
-            created_by: userId,
-            updated_by: userId
-          });
-        }
         
         // Ownership details if provided
         if (ownershipDetails) {
@@ -498,7 +478,7 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
           
           ownershipRecords.push({
             vehicle_ownership_id: ownershipId,
-            vehicle_id_code_ownership: vehicleId,
+            vehicle_id_code: vehicleId,
             ownership_name: ownershipDetails.Ownership_Name || null,
             valid_from: ownershipDetails.Valid_From || null,
             valid_to: ownershipDetails.Valid_To || null,
@@ -515,28 +495,8 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
           });
         }
         
-        // Documents if provided
-        if (documents && documents.length > 0) {
-          documents.forEach((doc, idx) => {
-            const documentId = `${vehicleId}DOC${String(idx + 1).padStart(3, '0')}`;
-            
-            documentRecords.push({
-              vehicle_document_id: documentId,
-              vehicle_id_code_document: vehicleId,
-              document_type_id: doc.Document_Type_ID,
-              document_type_name: doc.Document_Type_Name,
-              reference_number: doc.Reference_Number,
-              document_provider: doc.Document_Provider || null,
-              coverage_type_id: doc.Coverage_Type_ID || null,
-              premium_amount: doc.Premium_Amount || null,
-              valid_from: doc.Valid_From || null,
-              valid_to: doc.Valid_To || null,
-              remarks: doc.Remarks || null,
-              created_by: userId,
-              updated_by: userId
-            });
-          });
-        }
+        // Note: Documents are NOT included in bulk upload
+        // Documents must be uploaded separately through the UI after vehicle creation
         
         // Track bulk upload record update
         bulkUploadUpdates.push({
@@ -551,9 +511,10 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
         });
         
       } catch (error) {
-        console.error(`Failed to prepare vehicle ${vehicleData.basicInformation.Vehicle_Ref_ID}:`, error.message);
+        const vehicleRefId = vehicleData.vehicleRefId || vehicleData.data?.basicInformation?.Vehicle_Ref_ID || 'UNKNOWN';
+        console.error(`Failed to prepare vehicle ${vehicleRefId}:`, error.message);
         results.failed.push({
-          vehicleRefId: vehicleData.basicInformation.Vehicle_Ref_ID,
+          vehicleRefId,
           error: error.message
         });
       }
@@ -562,23 +523,20 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
     // Execute batch inserts (MUCH faster than individual inserts)
     if (basicInfoRecords.length > 0) {
       await trx('vehicle_basic_information_hdr').insert(basicInfoRecords);
+      console.log(`✓ Batch INSERT: vehicle_basic_information_hdr (${basicInfoRecords.length} rows)`);
     }
     
-    if (specificationsRecords.length > 0) {
-      await trx('vehicle_basic_information_itm').insert(specificationsRecords);
-    }
-    
-    if (capacityRecords.length > 0) {
-      await trx('vehicle_capacity_details').insert(capacityRecords);
-    }
+    // Note: vehicle_basic_information_itm is for insurance, not specifications
+    // Note: Capacity fields are included in vehicle_basic_information_hdr above (not separate table)
+    // Specifications and capacity are denormalized into the header table for performance
     
     if (ownershipRecords.length > 0) {
       await trx('vehicle_ownership_details').insert(ownershipRecords);
+      console.log(`✓ Batch INSERT: vehicle_ownership_details (${ownershipRecords.length} rows)`);
     }
     
-    if (documentRecords.length > 0) {
-      await trx('vehicle_documents').insert(documentRecords);
-    }
+    // Note: Documents are NOT included in bulk upload
+    // Users must upload documents separately through the vehicle details page after creation
     
     // Update bulk upload records with created vehicle IDs
     for (const update of bulkUploadUpdates) {
