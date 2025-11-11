@@ -1,66 +1,66 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../utils/api';
-import { API_ENDPOINTS } from '../../utils/constants';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import api from "../../utils/api";
+import { API_ENDPOINTS } from "../../utils/constants";
 
 // Mock data for initial development
 const mockWarehouses = [
   {
-    warehouse_id: 'WH001',
-    consignor_id: 'C001',
-    warehouse_type_id: 'WT001',
-    warehouse_type_name: 'Manufacturing',
-    warehouse_name_1: 'Central Manufacturing Hub',
+    warehouse_id: "WH001",
+    consignor_id: "C001",
+    warehouse_type_id: "WT001",
+    warehouse_type_name: "Manufacturing",
+    warehouse_name_1: "Central Manufacturing Hub",
     weigh_bridge: true,
     virtual_yard_in: true,
     geo_fencing: true,
     gate_pass: true,
     fuel_filling: false,
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    country: 'India',
-    created_by: 'Admin',
-    created_at: '2025-01-15',
-    status: 'ACTIVE',
-    approver: 'John Doe',
-    approved_on: '2025-01-16',
+    city: "Mumbai",
+    state: "Maharashtra",
+    country: "India",
+    created_by: "Admin",
+    created_at: "2025-01-15",
+    status: "ACTIVE",
+    approver: "John Doe",
+    approved_on: "2025-01-16",
   },
   {
-    warehouse_id: 'WH002',
-    consignor_id: 'C001',
-    warehouse_type_id: 'WT002',
-    warehouse_type_name: 'Cold Storage',
-    warehouse_name_1: 'Refrigerated Storage Facility',
+    warehouse_id: "WH002",
+    consignor_id: "C001",
+    warehouse_type_id: "WT002",
+    warehouse_type_name: "Cold Storage",
+    warehouse_name_1: "Refrigerated Storage Facility",
     weigh_bridge: true,
     virtual_yard_in: false,
     geo_fencing: true,
     gate_pass: true,
     fuel_filling: false,
-    city: 'Pune',
-    state: 'Maharashtra',
-    country: 'India',
-    created_by: 'Admin',
-    created_at: '2025-02-10',
-    status: 'ACTIVE',
-    approver: 'Jane Smith',
-    approved_on: '2025-02-11',
+    city: "Pune",
+    state: "Maharashtra",
+    country: "India",
+    created_by: "Admin",
+    created_at: "2025-02-10",
+    status: "ACTIVE",
+    approver: "Jane Smith",
+    approved_on: "2025-02-11",
   },
   {
-    warehouse_id: 'WH003',
-    consignor_id: 'C001',
-    warehouse_type_id: 'WT003',
-    warehouse_type_name: 'Distributor',
-    warehouse_name_1: 'Regional Distribution Center',
+    warehouse_id: "WH003",
+    consignor_id: "C001",
+    warehouse_type_id: "WT003",
+    warehouse_type_name: "Distributor",
+    warehouse_name_1: "Regional Distribution Center",
     weigh_bridge: false,
     virtual_yard_in: true,
     geo_fencing: false,
     gate_pass: true,
     fuel_filling: true,
-    city: 'Delhi',
-    state: 'Delhi',
-    country: 'India',
-    created_by: 'Manager',
-    created_at: '2025-03-05',
-    status: 'PENDING',
+    city: "Delhi",
+    state: "Delhi",
+    country: "India",
+    created_by: "Manager",
+    created_at: "2025-03-05",
+    status: "PENDING",
     approver: null,
     approved_on: null,
   },
@@ -84,23 +84,23 @@ const initialState = {
     totalPages: 0,
   },
   filters: {
-    warehouseId: '',
-    warehouseName: '',
+    warehouseId: "",
+    warehouseName: "",
     weighBridge: null,
     virtualYardIn: null,
     geoFencing: null,
-    status: '',
+    status: "",
   },
   useMockData: false, // Flag to switch between mock and real data
 };
 
 // Async thunks (will be implemented with real API later)
 export const fetchWarehouses = createAsyncThunk(
-  'warehouse/fetchWarehouses',
+  "warehouse/fetchWarehouses",
   async (params, { getState, rejectWithValue }) => {
     try {
       const { useMockData } = getState().warehouse;
-      
+
       if (useMockData) {
         // Return mock data for now
         return {
@@ -109,71 +109,91 @@ export const fetchWarehouses = createAsyncThunk(
             page: params?.page || 1,
             limit: params?.limit || 25,
             total: mockWarehouses.length,
-            totalPages: Math.ceil(mockWarehouses.length / (params?.limit || 25)),
+            totalPages: Math.ceil(
+              mockWarehouses.length / (params?.limit || 25)
+            ),
           },
         };
       }
-      
+
       // Real API call (to be implemented)
       const response = await api.get(API_ENDPOINTS.WAREHOUSE.LIST, { params });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch warehouses');
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch warehouses"
+      );
     }
   }
 );
 
 export const fetchWarehouseById = createAsyncThunk(
-  'warehouse/fetchWarehouseById',
+  "warehouse/fetchWarehouseById",
   async (id, { rejectWithValue }) => {
     try {
-      const response = await api.get(`${API_ENDPOINTS.WAREHOUSE.GET_BY_ID}/${id}`);
+      const response = await api.get(
+        `${API_ENDPOINTS.WAREHOUSE.GET_BY_ID}/${id}`
+      );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch warehouse details');
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch warehouse details"
+      );
     }
   }
 );
 
 export const createWarehouse = createAsyncThunk(
-  'warehouse/createWarehouse',
+  "warehouse/createWarehouse",
   async (warehouseData, { rejectWithValue }) => {
     try {
-      const response = await api.post(API_ENDPOINTS.WAREHOUSE.CREATE, warehouseData);
+      const response = await api.post(
+        API_ENDPOINTS.WAREHOUSE.CREATE,
+        warehouseData
+      );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create warehouse');
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to create warehouse"
+      );
     }
   }
 );
 
 export const updateWarehouse = createAsyncThunk(
-  'warehouse/updateWarehouse',
+  "warehouse/updateWarehouse",
   async ({ id, data }, { rejectWithValue }) => {
     try {
-      const response = await api.put(`${API_ENDPOINTS.WAREHOUSE.UPDATE}/${id}`, data);
+      const response = await api.put(
+        `${API_ENDPOINTS.WAREHOUSE.UPDATE}/${id}`,
+        data
+      );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update warehouse');
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to update warehouse"
+      );
     }
   }
 );
 
 export const fetchMasterData = createAsyncThunk(
-  'warehouse/fetchMasterData',
+  "warehouse/fetchMasterData",
   async (_, { rejectWithValue }) => {
     try {
       const response = await api.get(API_ENDPOINTS.WAREHOUSE.MASTER_DATA);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch master data');
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch master data"
+      );
     }
   }
 );
 
 // Warehouse slice
 const warehouseSlice = createSlice({
-  name: 'warehouse',
+  name: "warehouse",
   initialState,
   reducers: {
     setFilters: (state, action) => {
@@ -209,7 +229,7 @@ const warehouseSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
+
       // Fetch warehouse by ID
       .addCase(fetchWarehouseById.pending, (state) => {
         state.loading = true;
@@ -223,7 +243,7 @@ const warehouseSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
+
       // Create warehouse
       .addCase(createWarehouse.pending, (state) => {
         state.loading = true;
@@ -237,7 +257,7 @@ const warehouseSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
+
       // Update warehouse
       .addCase(updateWarehouse.pending, (state) => {
         state.loading = true;
@@ -256,7 +276,7 @@ const warehouseSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
+
       // Fetch master data
       .addCase(fetchMasterData.pending, (state) => {
         state.loading = true;
@@ -273,6 +293,12 @@ const warehouseSlice = createSlice({
   },
 });
 
-export const { setFilters, clearFilters, setFilteredWarehouses, setUseMockData, clearError } = warehouseSlice.actions;
+export const {
+  setFilters,
+  clearFilters,
+  setFilteredWarehouses,
+  setUseMockData,
+  clearError,
+} = warehouseSlice.actions;
 
 export default warehouseSlice.reducer;

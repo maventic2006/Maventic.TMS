@@ -35,7 +35,10 @@ const TopActionBar = ({
               </h1>
               {totalCount > 0 && (
                 <p className="text-xs sm:text-sm text-gray-600 font-medium">
-                  <span className="text-orange-600 font-bold">{totalCount}</span> warehouses
+                  <span className="text-orange-600 font-bold">
+                    {totalCount}
+                  </span>{" "}
+                  warehouses
                 </p>
               )}
             </div>

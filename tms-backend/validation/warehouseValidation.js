@@ -2,58 +2,81 @@
 
 const validateWarehouseListQuery = (query) => {
   const errors = [];
-  
-  if (query.page && (!Number.isInteger(Number(query.page)) || Number(query.page) < 1)) {
-    errors.push({ field: 'page', message: 'Page must be a positive integer' });
+
+  if (
+    query.page &&
+    (!Number.isInteger(Number(query.page)) || Number(query.page) < 1)
+  ) {
+    errors.push({ field: "page", message: "Page must be a positive integer" });
   }
-  
-  if (query.limit && (!Number.isInteger(Number(query.limit)) || Number(query.limit) < 1 || Number(query.limit) > 100)) {
-    errors.push({ field: 'limit', message: 'Limit must be between 1 and 100' });
+
+  if (
+    query.limit &&
+    (!Number.isInteger(Number(query.limit)) ||
+      Number(query.limit) < 1 ||
+      Number(query.limit) > 100)
+  ) {
+    errors.push({ field: "limit", message: "Limit must be between 1 and 100" });
   }
-  
-  const validStatuses = ['ACTIVE', 'INACTIVE', 'PENDING', 'APPROVED', 'REJECTED'];
+
+  const validStatuses = [
+    "ACTIVE",
+    "INACTIVE",
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+  ];
   if (query.status && !validStatuses.includes(query.status.toUpperCase())) {
-    errors.push({ field: 'status', message: 'Invalid status value' });
+    errors.push({ field: "status", message: "Invalid status value" });
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
 const validateWarehouseCreate = (data) => {
   const errors = [];
-  
-  if (!data.consignorId || data.consignorId.trim() === '') {
-    errors.push({ field: 'consignorId', message: 'Consignor ID is required' });
+
+  if (!data.consignorId || data.consignorId.trim() === "") {
+    errors.push({ field: "consignorId", message: "Consignor ID is required" });
   }
-  
-  if (!data.warehouseName1 || data.warehouseName1.trim() === '') {
-    errors.push({ field: 'warehouseName1', message: 'Warehouse name is required' });
+
+  if (!data.warehouseName1 || data.warehouseName1.trim() === "") {
+    errors.push({
+      field: "warehouseName1",
+      message: "Warehouse name is required",
+    });
   }
-  
+
   if (data.warehouseName1 && data.warehouseName1.length > 100) {
-    errors.push({ field: 'warehouseName1', message: 'Warehouse name cannot exceed 100 characters' });
+    errors.push({
+      field: "warehouseName1",
+      message: "Warehouse name cannot exceed 100 characters",
+    });
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
 const validateWarehouseUpdate = (data) => {
   // For update, all fields are optional
   const errors = [];
-  
+
   if (data.warehouseName1 && data.warehouseName1.length > 100) {
-    errors.push({ field: 'warehouseName1', message: 'Warehouse name cannot exceed 100 characters' });
+    errors.push({
+      field: "warehouseName1",
+      message: "Warehouse name cannot exceed 100 characters",
+    });
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 

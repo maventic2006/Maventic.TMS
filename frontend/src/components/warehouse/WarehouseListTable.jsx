@@ -1,11 +1,6 @@
 import React, { memo } from "react";
 import { motion } from "framer-motion";
-import {
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Search,
-} from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Search } from "lucide-react";
 import {
   Table,
   TableHeader,
@@ -63,11 +58,11 @@ const WarehouseListTable = ({
 
   return (
     <Card
-      className="overflow-hidden rounded-xl border border-gray-200 bg-white"
+      className="overflow-hidden rounded-xl"
       style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
     >
       {/* Results Count Section */}
-      <div className="px-0 pb-4 border-b border-gray-100 bg-white">
+      <div className="px-0 pb-4">
         <div className="flex items-center justify-between">
           {/* Left side - Results count */}
           <p className="text-sm text-[#0D1A33] font-semibold">
@@ -89,7 +84,7 @@ const WarehouseListTable = ({
                 value={searchText}
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="Search warehouses..."
-                className="pl-10 pr-4 py-2 w-48 sm:w-64 lg:w-72 border border-[#E5E7EB] rounded-lg focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 focus:outline-none transition-all duration-200 text-sm bg-white"
+                className="pl-10 pr-4 py-2 w-48 sm:w-64 lg:w-72 border border-[#E5E7EB] rounded-lg focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 focus:outline-none transition-all duration-200 text-sm"
                 style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
               />
             </div>
@@ -105,9 +100,7 @@ const WarehouseListTable = ({
               <Loader2 className="h-8 w-8 animate-spin text-[#1D4ED8]" />
               <div className="absolute inset-0 h-8 w-8 border-2 border-[#1D4ED8]/20 rounded-full animate-pulse"></div>
             </div>
-            <span className="text-sm font-semibold">
-              Loading warehouses...
-            </span>
+            <span className="text-sm font-semibold">Loading warehouses...</span>
           </div>
         </div>
       )}
@@ -134,7 +127,7 @@ const WarehouseListTable = ({
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50 hover:bg-gray-50 border-b-2 border-gray-200">
+                <TableRow className="border-b-2 border-gray-200">
                   <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap">
                     Warehouse ID
                   </TableHead>
@@ -151,22 +144,16 @@ const WarehouseListTable = ({
                     Virtual Yard
                   </TableHead>
                   <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap text-center">
-                    Geo Fencing
-                  </TableHead>
-                  <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap text-center">
                     Gatepass
                   </TableHead>
                   <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap text-center">
                     Fuel
                   </TableHead>
                   <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap">
-                    City
+                    Region
                   </TableHead>
                   <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap">
-                    State
-                  </TableHead>
-                  <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap">
-                    Country
+                    Zone
                   </TableHead>
                   <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap">
                     Created By
@@ -176,12 +163,6 @@ const WarehouseListTable = ({
                   </TableHead>
                   <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap text-center">
                     Status
-                  </TableHead>
-                  <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap">
-                    Approver
-                  </TableHead>
-                  <TableHead className="text-xs font-bold text-[#0D1A33] uppercase tracking-wide py-4 whitespace-nowrap">
-                    Approved On
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -203,49 +184,41 @@ const WarehouseListTable = ({
                       </button>
                     </TableCell>
                     <TableCell className="py-4 px-6 text-sm text-[#0D1A33]">
-                      {displayValue(warehouse.warehouse_type_name)}
+                      {displayValue(warehouse.warehouse_type)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-sm text-[#0D1A33] font-medium">
-                      {displayValue(warehouse.warehouse_name_1)}
+                      {displayValue(warehouse.warehouse_name1)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-center">
-                      {displayBoolean(warehouse.weigh_bridge)}
+                      {displayBoolean(warehouse.weigh_bridge_availability)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-center">
                       {displayBoolean(warehouse.virtual_yard_in)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-center">
-                      {displayBoolean(warehouse.geo_fencing)}
+                      {displayBoolean(warehouse.gatepass_system_available)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-center">
-                      {displayBoolean(warehouse.gate_pass)}
-                    </TableCell>
-                    <TableCell className="py-4 px-6 text-center">
-                      {displayBoolean(warehouse.fuel_filling)}
+                      {displayBoolean(warehouse.fuel_availability)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-sm text-[#0D1A33]">
-                      {displayValue(warehouse.city)}
+                      {displayValue(warehouse.region)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-sm text-[#0D1A33]">
-                      {displayValue(warehouse.state)}
-                    </TableCell>
-                    <TableCell className="py-4 px-6 text-sm text-[#0D1A33]">
-                      {displayValue(warehouse.country)}
+                      {displayValue(warehouse.zone)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-sm text-[#0D1A33]">
                       {displayValue(warehouse.created_by)}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-sm text-[#0D1A33]">
-                      {displayValue(warehouse.created_at)}
+                      {displayValue(
+                        warehouse.created_at
+                          ? new Date(warehouse.created_at).toLocaleDateString()
+                          : null
+                      )}
                     </TableCell>
                     <TableCell className="py-4 px-6 text-center">
                       <StatusPill status={warehouse.status} />
-                    </TableCell>
-                    <TableCell className="py-4 px-6 text-sm text-[#0D1A33]">
-                      {displayValue(warehouse.approver)}
-                    </TableCell>
-                    <TableCell className="py-4 px-6 text-sm text-[#0D1A33]">
-                      {displayValue(warehouse.approved_on)}
                     </TableCell>
                   </motion.tr>
                 ))}

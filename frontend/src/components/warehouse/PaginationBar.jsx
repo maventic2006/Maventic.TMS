@@ -1,5 +1,10 @@
 import React, { memo } from "react";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react";
 import { Button } from "../ui/Button";
 import { Card, CardContent } from "../ui/Card";
 
@@ -26,17 +31,9 @@ const PaginationBar = ({
           {/* Left side - Items count */}
           <div className="text-sm text-[#4A5568]">
             Showing{" "}
-            <span className="font-semibold text-[#0D1A33]">
-              {startItem}
-            </span>{" "}
-            to{" "}
-            <span className="font-semibold text-[#0D1A33]">
-              {endItem}
-            </span>{" "}
-            of{" "}
-            <span className="font-semibold text-[#0D1A33]">
-              {totalItems}
-            </span>{" "}
+            <span className="font-semibold text-[#0D1A33]">{startItem}</span> to{" "}
+            <span className="font-semibold text-[#0D1A33]">{endItem}</span> of{" "}
+            <span className="font-semibold text-[#0D1A33]">{totalItems}</span>{" "}
             warehouses
           </div>
 
@@ -68,9 +65,7 @@ const PaginationBar = ({
 
             {/* Page Info */}
             <div className="px-4 py-2 text-sm font-semibold text-[#0D1A33]">
-              Page{" "}
-              <span className="text-[#1D4ED8]">{currentPage}</span>{" "}
-              of{" "}
+              Page <span className="text-[#1D4ED8]">{currentPage}</span> of{" "}
               <span className="text-[#1D4ED8]">{totalPages}</span>
             </div>
 

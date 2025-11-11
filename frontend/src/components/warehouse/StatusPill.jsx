@@ -44,7 +44,9 @@ const StatusPill = ({ status }) => {
     <div
       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${style.bgColor} ${style.textColor} font-semibold text-xs whitespace-nowrap`}
     >
-      <span className={`h-2 w-2 rounded-full ${style.dotColor} animate-pulse`}></span>
+      <span
+        className={`h-2 w-2 rounded-full ${style.dotColor} animate-pulse`}
+      ></span>
       <span>{status || "N/A"}</span>
     </div>
   );

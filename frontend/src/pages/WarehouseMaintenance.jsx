@@ -1,235 +1,258 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  fetchWarehouses,
-  setFilters,
-  clearFilters,
-  setFilteredWarehouses,
-} from "../redux/slices/warehouseSlice";
+import TMSHeader from "../components/layout/TMSHeader";
+import { getPageTheme } from "../theme.config";
+import { fetchWarehouses } from "../redux/slices/warehouseSlice";
 import TopActionBar from "../components/warehouse/TopActionBar";
 import WarehouseFilterPanel from "../components/warehouse/WarehouseFilterPanel";
 import WarehouseListTable from "../components/warehouse/WarehouseListTable";
 import PaginationBar from "../components/warehouse/PaginationBar";
 
+// Fuzzy search utility function
+const fuzzySearch = (searchText, warehouses) => {
+  if (!searchText || searchText.trim() === "") {
+    return warehouses;
+  }
+
+  const searchLower = searchText.toLowerCase().trim();
+
+  return warehouses.filter((warehouse) => {
+    // Search across multiple fields
+    const searchableFields = [
+      warehouse.warehouse_id,
+      warehouse.warehouse_name1,
+      warehouse.warehouse_name2,
+      warehouse.warehouse_type,
+      warehouse.region,
+      warehouse.zone,
+      warehouse.created_by,
+      warehouse.status,
+    ];
+
+    // Check if any field contains the search text (case-insensitive partial match)
+    return searchableFields.some((field) => {
+      if (field === null || field === undefined) return false;
+      return String(field).toLowerCase().includes(searchLower);
+    });
+  });
+};
+
+// Main Warehouse Maintenance Component
 const WarehouseMaintenance = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const theme = getPageTheme("list");
 
   // Redux state
-  const {
-    warehouses,
-    filteredWarehouses,
-    loading,
-    error,
-    pagination,
-    filters,
-  } = useSelector((state) => state.warehouse);
+  const { warehouses, pagination, loading, error } = useSelector(
+    (state) => state.warehouse
+  );
 
   // Local state
-  const [showFilters, setShowFilters] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Fetch warehouses on mount
+  // Separate state for filter inputs and applied filters
+  const [filters, setFilters] = useState({
+    warehouseId: "",
+    warehouseName: "",
+    status: "",
+    weighBridge: null,
+    virtualYardIn: null,
+    fuelAvailability: null,
+  });
+
+  const [appliedFilters, setAppliedFilters] = useState({
+    warehouseId: "",
+    warehouseName: "",
+    status: "",
+    weighBridge: null,
+    virtualYardIn: null,
+    fuelAvailability: null,
+  });
+
+  // Fetch warehouses when component mounts or when appliedFilters change (not on every keystroke)
+  useEffect(() => {
+    const fetchData = () => {
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit || 25,
+      };
+
+      // Only add applied filter parameters (not the typing state)
+      if (appliedFilters.warehouseId) {
+        params.warehouseId = appliedFilters.warehouseId;
+      }
+      if (appliedFilters.warehouseName) {
+        params.warehouseName = appliedFilters.warehouseName;
+      }
+      if (appliedFilters.status) {
+        params.status = appliedFilters.status;
+      }
+      if (appliedFilters.weighBridge !== null) {
+        params.weighBridge = appliedFilters.weighBridge;
+      }
+      if (appliedFilters.virtualYardIn !== null) {
+        params.virtualYardIn = appliedFilters.virtualYardIn;
+      }
+      if (appliedFilters.fuelAvailability !== null) {
+        params.fuelAvailability = appliedFilters.fuelAvailability;
+      }
+
+      dispatch(fetchWarehouses(params));
+    };
+
+    fetchData();
+  }, [dispatch, appliedFilters, pagination.page]);
+
+  // Initial load
   useEffect(() => {
     dispatch(fetchWarehouses({ page: 1, limit: 25 }));
   }, [dispatch]);
 
-  // Fuzzy search function - client-side instant filtering
-  const performFuzzySearch = useMemo(() => {
-    if (!searchText.trim()) {
-      return warehouses;
-    }
+  // Initial load
+  useEffect(() => {
+    dispatch(fetchWarehouses({ page: 1, limit: 25 }));
+  }, [dispatch]);
 
-    const searchLower = searchText.toLowerCase();
-    return warehouses.filter((warehouse) => {
-      const searchableFields = [
-        warehouse.warehouse_id,
-        warehouse.warehouse_name_1,
-        warehouse.warehouse_type_name,
-        warehouse.city,
-        warehouse.state,
-        warehouse.country,
-        warehouse.created_by,
-        warehouse.status,
-      ];
-
-      return searchableFields.some((field) =>
-        field?.toString().toLowerCase().includes(searchLower)
-      );
-    });
-  }, [warehouses, searchText]);
-
-  // Apply filters function
-  const applyFilters = () => {
-    let filtered = [...warehouses];
-
-    // Apply warehouse ID filter
-    if (appliedFilters.warehouseId) {
-      filtered = filtered.filter((w) =>
-        w.warehouse_id
-          ?.toLowerCase()
-          .includes(appliedFilters.warehouseId.toLowerCase())
-      );
-    }
-
-    // Apply warehouse name filter
-    if (appliedFilters.warehouseName) {
-      filtered = filtered.filter((w) =>
-        w.warehouse_name_1
-          ?.toLowerCase()
-          .includes(appliedFilters.warehouseName.toLowerCase())
-      );
-    }
-
-    // Apply status filter
-    if (appliedFilters.status) {
-      filtered = filtered.filter(
-        (w) => w.status?.toUpperCase() === appliedFilters.status.toUpperCase()
-      );
-    }
-
-    // Apply weighBridge filter
-    if (appliedFilters.weighBridge !== null) {
-      filtered = filtered.filter(
-        (w) => w.weigh_bridge === appliedFilters.weighBridge
-      );
-    }
-
-    // Apply virtualYardIn filter
-    if (appliedFilters.virtualYardIn !== null) {
-      filtered = filtered.filter(
-        (w) => w.virtual_yard_in === appliedFilters.virtualYardIn
-      );
-    }
-
-    // Apply geoFencing filter
-    if (appliedFilters.geoFencing !== null) {
-      filtered = filtered.filter(
-        (w) => w.geo_fencing === appliedFilters.geoFencing
-      );
-    }
-
-    dispatch(setFilteredWarehouses(filtered));
-  };
-
-  // Handle filter changes
-  const handleFilterChange = (field, value) => {
-    setAppliedFilters((prev) => ({
+  const handleFilterChange = useCallback((key, value) => {
+    setFilters((prev) => ({
       ...prev,
-      [field]: value,
+      [key]: value,
     }));
-  };
+  }, []);
 
-  // Handle apply filters button
-  const handleApplyFilters = () => {
-    dispatch(setFilters(appliedFilters));
-    applyFilters();
-  };
+  const handleApplyFilters = useCallback(() => {
+    // Apply filters by copying current filter state to appliedFilters
+    // This will trigger the useEffect to fetch data with new filters
+    // Also reset to page 1 when applying filters
+    setAppliedFilters({ ...filters });
+  }, [filters]);
 
-  // Handle clear filters
-  const handleClearFilters = () => {
-    const clearedFilters = {
+  const handleClearFilters = useCallback(() => {
+    // Clear both filter input state and applied filters
+    const emptyFilters = {
       warehouseId: "",
       warehouseName: "",
+      status: "",
       weighBridge: null,
       virtualYardIn: null,
-      geoFencing: null,
-      status: "",
+      fuelAvailability: null,
     };
-    setAppliedFilters(clearedFilters);
-    dispatch(clearFilters());
-    dispatch(setFilteredWarehouses(warehouses));
-  };
+    setFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+  }, []);
 
-  // Handle search change - instant client-side filtering
-  const handleSearchChange = (value) => {
-    setSearchText(value);
-  };
+  const handleSearchChange = useCallback((text) => {
+    setSearchText(text);
+  }, []);
 
-  // Get final filtered warehouses (search + filters)
-  const finalFilteredWarehouses = useMemo(() => {
-    const searchFiltered = performFuzzySearch;
-    return searchFiltered;
-  }, [performFuzzySearch]);
+  // Apply client-side fuzzy search filtering on backend results
+  const filteredWarehouses = useMemo(() => {
+    return fuzzySearch(searchText, warehouses);
+  }, [searchText, warehouses]);
 
-  // Pagination calculations
-  const currentPage = pagination.page;
-  const itemsPerPage = pagination.limit;
-  const totalItems = finalFilteredWarehouses.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const handleWarehouseClick = useCallback(
+    (warehouseId) => {
+      navigate(`/warehouse/${warehouseId}`);
+    },
+    [navigate]
+  );
 
-  // Get current page items
-  const currentPageWarehouses = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return finalFilteredWarehouses.slice(startIndex, endIndex);
-  }, [finalFilteredWarehouses, currentPage, itemsPerPage]);
-
-  // Handle page change
-  const handlePageChange = (page) => {
-    dispatch(fetchWarehouses({ page, limit: itemsPerPage }));
-  };
-
-  // Handle warehouse click
-  const handleWarehouseClick = (warehouseId) => {
-    navigate(`/warehouse/${warehouseId}`);
-  };
-
-  // Handle create new warehouse
-  const handleCreateNew = () => {
+  const handleCreateNew = useCallback(() => {
     navigate("/warehouse/create");
-  };
+  }, [navigate]);
 
-  // Handle back button
-  const handleBack = () => {
-    navigate("/dashboard");
-  };
+  const handleBack = useCallback(() => {
+    navigate("/tms-portal");
+  }, [navigate]);
+
+  const handlePageChange = useCallback(
+    (page) => {
+      // Build params using only appliedFilters (not search or unapplied filters)
+      const params = {
+        page,
+        limit: pagination.limit || 25,
+      };
+
+      if (appliedFilters.warehouseId) {
+        params.warehouseId = appliedFilters.warehouseId;
+      }
+      if (appliedFilters.warehouseName) {
+        params.warehouseName = appliedFilters.warehouseName;
+      }
+      if (appliedFilters.status) {
+        params.status = appliedFilters.status;
+      }
+      if (appliedFilters.weighBridge !== null) {
+        params.weighBridge = appliedFilters.weighBridge;
+      }
+      if (appliedFilters.virtualYardIn !== null) {
+        params.virtualYardIn = appliedFilters.virtualYardIn;
+      }
+      if (appliedFilters.fuelAvailability !== null) {
+        params.fuelAvailability = appliedFilters.fuelAvailability;
+      }
+
+      dispatch(fetchWarehouses(params));
+    },
+    [dispatch, pagination.limit, appliedFilters]
+  );
+
+  const handleToggleFilters = useCallback(() => {
+    setShowFilters(!showFilters);
+  }, [showFilters]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-      <div className="max-w-[1800px] mx-auto">
-        {/* Top Action Bar */}
-        <TopActionBar
-          onCreateNew={handleCreateNew}
-          totalCount={finalFilteredWarehouses.length}
-          onBack={handleBack}
-          showFilters={showFilters}
-          onToggleFilters={() => setShowFilters(!showFilters)}
-          searchText={searchText}
-          onSearchChange={handleSearchChange}
-        />
-
-        {/* Filter Panel */}
-        <WarehouseFilterPanel
-          filters={appliedFilters}
-          onFilterChange={handleFilterChange}
-          onApplyFilters={handleApplyFilters}
-          onClearFilters={handleClearFilters}
-          showFilters={showFilters}
-        />
-
-        {/* Warehouse List Table */}
-        <WarehouseListTable
-          warehouses={currentPageWarehouses}
-          loading={loading}
-          onWarehouseClick={handleWarehouseClick}
-          filteredCount={finalFilteredWarehouses.length}
-          searchText={searchText}
-          onSearchChange={handleSearchChange}
-        />
-
-        {/* Pagination */}
-        {!loading && finalFilteredWarehouses.length > 0 && (
-          <PaginationBar
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            itemsPerPage={itemsPerPage}
-            onPageChange={handlePageChange}
+    <div className="min-h-screen bg-[#F5F7FA]">
+      <TMSHeader theme={theme} />
+      <div className="px-4 py-1 lg:px-6 lg:py-1">
+        <div className="max-w-7xl mx-auto space-y-0">
+          <TopActionBar
+            onCreateNew={handleCreateNew}
+            totalCount={pagination.total || 0}
+            onBack={handleBack}
+            showFilters={showFilters}
+            onToggleFilters={handleToggleFilters}
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
           />
-        )}
+
+          <WarehouseFilterPanel
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onApplyFilters={handleApplyFilters}
+            onClearFilters={handleClearFilters}
+            showFilters={showFilters}
+          />
+
+          <WarehouseListTable
+            warehouses={filteredWarehouses}
+            loading={loading}
+            onWarehouseClick={handleWarehouseClick}
+            currentPage={pagination.page}
+            totalPages={pagination.pages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={handlePageChange}
+            filteredCount={filteredWarehouses.length}
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
+          />
+
+          {error && (
+            <div
+              className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]"
+              style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+            >
+              <p className="font-semibold text-sm">Error loading warehouses:</p>
+              <p className="text-sm mt-1">
+                {error.message || "Something went wrong"}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
