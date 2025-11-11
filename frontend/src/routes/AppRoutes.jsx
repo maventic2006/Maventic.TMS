@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 // Import pages
 import TMSLandingPage from "../pages/TMSLandingPage";
 import TransporterMaintenance from "../pages/TransporterMaintenance";
+import WarehouseMaintenance from "../pages/WarehouseMaintenance";
 import LoginPage from "../features/auth/LoginPage";
 import Dashboard from "../features/dashboard/Dashboard";
 import IndentPage from "../features/indent/IndentPage";
@@ -68,6 +69,16 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roles={["product_owner"]}>
             <TransporterDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Warehouse Management Routes */}
+      <Route
+        path="/warehouse"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <WarehouseMaintenance />
           </ProtectedRoute>
         }
       />

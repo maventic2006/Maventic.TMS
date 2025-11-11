@@ -1,90 +1,33 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const db = require("../config/database");
-const { authenticateToken } = require("../middleware/auth");
+const {
+  getWarehouseList,
+  getWarehouseById,
+  createWarehouse,
+  updateWarehouse,
+  getMasterData,
+} = require('../controllers/warehouseController');
+const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
-// GET all warehouses
-router.get("/", authenticateToken, async (req, res) => {
-  try {
-    const warehouses = await db("warehouse_basic_information").select("*");
-    res.json(warehouses);
-  } catch (error) {
-    console.error("Error fetching warehouses:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// All routes require authentication
+router.use(authenticateToken);
 
-// GET warehouse by ID
-router.get("/:id", authenticateToken, async (req, res) => {
-  try {
-    const warehouse = await db("warehouse_basic_information")
-      .where("warehouse_id", req.params.id)
-      .first();
+// Routes accessible by Consignor, Admin, and Super Admin
+const allowedRoles = ['consignor', 'admin', 'product_owner']; // Using product_owner as super admin equivalent
 
-    if (!warehouse) {
-      return res.status(404).json({ error: "Warehouse not found" });
-    }
+// GET /api/warehouse/list - Get paginated warehouse list with filters
+router.get('/list', authorizeRoles(allowedRoles), getWarehouseList);
 
-    res.json(warehouse);
-  } catch (error) {
-    console.error("Error fetching warehouse:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// GET /api/warehouse/master-data - Get master data (warehouse types, etc.)
+router.get('/master-data', authorizeRoles(allowedRoles), getMasterData);
 
-// POST create new warehouse
-router.post("/", authenticateToken, async (req, res) => {
-  try {
-    const [id] = await db("warehouse_basic_information").insert(req.body);
-    const newWarehouse = await db("warehouse_basic_information")
-      .where("warehouse_unique_id", id)
-      .first();
+// GET /api/warehouse/:id - Get warehouse by ID
+router.get('/:id', authorizeRoles(allowedRoles), getWarehouseById);
 
-    res.status(201).json(newWarehouse);
-  } catch (error) {
-    console.error("Error creating warehouse:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// POST /api/warehouse - Create new warehouse
+router.post('/', authorizeRoles(allowedRoles), createWarehouse);
 
-// PUT update warehouse
-router.put("/:id", authenticateToken, async (req, res) => {
-  try {
-    const updated = await db("warehouse_basic_information")
-      .where("warehouse_id", req.params.id)
-      .update(req.body);
-
-    if (!updated) {
-      return res.status(404).json({ error: "Warehouse not found" });
-    }
-
-    const warehouse = await db("warehouse_basic_information")
-      .where("warehouse_id", req.params.id)
-      .first();
-
-    res.json(warehouse);
-  } catch (error) {
-    console.error("Error updating warehouse:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// DELETE warehouse
-router.delete("/:id", authenticateToken, async (req, res) => {
-  try {
-    const deleted = await db("warehouse_basic_information")
-      .where("warehouse_id", req.params.id)
-      .del();
-
-    if (!deleted) {
-      return res.status(404).json({ error: "Warehouse not found" });
-    }
-
-    res.status(204).send();
-  } catch (error) {
-    console.error("Error deleting warehouse:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// PUT /api/warehouse/:id - Update warehouse
+router.put('/:id', authorizeRoles(allowedRoles), updateWarehouse);
 
 module.exports = router;

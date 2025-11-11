@@ -21,6 +21,25 @@ const AccidentViolationViewTab = ({ driver }) => {
     }));
   };
 
+  // Helper function to format type name
+  const formatTypeName = (type) => {
+    if (!type) return "N/A";
+    // Handle violation_type_id format (VT001, VT002)
+    if (type === "VT001") return "Accident";
+    if (type === "VT002") return "Violation";
+    // If it's a number (ID), map it to name
+    if (type === "1" || type === 1) return "Accident";
+    if (type === "2" || type === 2) return "Violation";
+    // If it's already a name, capitalize it properly
+    if (typeof type === "string") {
+      const typeLower = type.toLowerCase();
+      if (typeLower === "accident") return "Accident";
+      if (typeLower === "violation") return "Violation";
+      return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+    }
+    return type;
+  };
+
   const safeTheme = {
     colors: {
       text: {
@@ -84,7 +103,7 @@ const AccidentViolationViewTab = ({ driver }) => {
                     className="text-lg font-semibold"
                     style={{ color: safeTheme.colors.text.primary }}
                   >
-                    {item.type || "N/A"}
+                    {formatTypeName(item.type)}
                   </h3>
                   <p
                     className="text-sm"
@@ -108,7 +127,7 @@ const AccidentViolationViewTab = ({ driver }) => {
               )}
             </button>
 
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {isExpanded && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}

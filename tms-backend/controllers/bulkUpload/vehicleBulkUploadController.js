@@ -1,5 +1,5 @@
 const { generateVehicleBulkUploadTemplate } = require('../../services/vehicleBulkUploadTemplate');
-const vehicleBulkUploadQueue = require('../../queues/vehicleBulkUploadQueue');
+const { processVehicleBulkUpload } = require('../../queues/vehicleBulkUploadProcessor');
 const knex = require('knex')(require('../../knexfile').development);
 const fs = require('fs');
 
@@ -35,17 +35,12 @@ exports.downloadTemplate = async (req, res) => {
 };
 
 /**
- * Upload Excel file and queue for processing
+ * Upload Excel file and process synchronously (NO REDIS REQUIRED)
  * @route POST /api/vehicle/bulk-upload/upload
  * 
- * Performance Optimized:
- * - Returns immediately after queuing job (~500ms)
- * - Database operations happen asynchronously
- * - Client polls for status updates
+ * Uses setImmediate() for background processing, same as Driver bulk upload
  */
 exports.uploadFile = async (req, res) => {
-  const startTime = Date.now();
-  
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -54,7 +49,7 @@ exports.uploadFile = async (req, res) => {
       });
     }
     
-    // Get authenticated user ID
+    // Get authenticated user ID - must be numeric for database
     const userId = req.user?.user_id || req.user?.id || 1;
     
     console.log('📤 Vehicle bulk upload file received:', req.file.originalname);
@@ -64,115 +59,60 @@ exports.uploadFile = async (req, res) => {
     // Generate unique batch ID
     const batchId = `VEH-BATCH-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Queue the processing job FIRST (fastest operation)
-    console.log(`⚡ Queuing job for batch: ${batchId}`);
-    const queueStart = Date.now();
-    
-    // Add timeout to queue operation (5 seconds max)
-    const job = await Promise.race([
-      vehicleBulkUploadQueue.add({
-        batchId,
-        filePath: req.file.path,
-        userId,
-        originalName: req.file.originalname
-      }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('REDIS_TIMEOUT: Redis connection timeout after 5 seconds')), 5000)
-      )
-    ]);
-    
-    console.log(`✓ Job queued in ${Date.now() - queueStart}ms (Job ID: ${job.id})`);
-    
-    // Create batch record asynchronously (don't wait for completion)
-    // The processor will update this record as it progresses
-    const dbStart = Date.now();
-    knex('tms_bulk_upload_vehicle_batches').insert({
+    // Create batch record in database
+    await knex('tms_bulk_upload_vehicle_batches').insert({
       batch_id: batchId,
       uploaded_by: userId,
       filename: req.file.originalname,
-      total_rows: 0, // Will be updated by processor
+      total_rows: 0, // Will be updated after parsing
       status: 'processing'
-    }).then(() => {
-      console.log(`✓ Batch record created in ${Date.now() - dbStart}ms`);
-    }).catch(err => {
-      console.error('⚠️  Failed to create batch record:', err.message);
-      // Non-critical error - processor will retry
     });
     
-    const totalTime = Date.now() - startTime;
-    console.log(`✅ Upload processed in ${totalTime}ms (OPTIMIZED)`);
+    console.log(`✅ Vehicle batch created: ${batchId}`);
     
-    // Return immediately - client will poll for status
+    // Send immediate response to client
     res.json({
       success: true,
-      message: 'File uploaded and queued for processing',
+      message: 'File uploaded and processing started',
       data: {
         batchId,
-        jobId: job.id,
-        filename: req.file.originalname,
         status: 'processing',
-        processingTime: totalTime
+      }
+    });
+    
+    // Process asynchronously in background (no Redis needed)
+    setImmediate(async () => {
+      try {
+        console.log(`� Starting background processing for batch ${batchId}`);
+        
+        await processVehicleBulkUpload(
+          {
+            data: {
+              batchId,
+              filePath: req.file.path,
+              userId,
+              originalName: req.file.originalname
+            }
+          },
+          null // No Socket.IO for now
+        );
+        
+        console.log(`✅ Batch ${batchId} processed successfully`);
+      } catch (error) {
+        console.error(`❌ Background processing failed for batch ${batchId}:`, error);
+        
+        // Update batch status to failed
+        await knex('tms_bulk_upload_vehicle_batches')
+          .where({ batch_id: batchId })
+          .update({
+            status: 'failed',
+            processed_timestamp: new Date()
+          });
       }
     });
     
   } catch (error) {
     console.error('❌ Error uploading vehicle file:', error);
-    console.error('   Stack trace:', error.stack);
-    
-    // Check if error is Redis timeout
-    if (error.message.includes('REDIS_TIMEOUT')) {
-      console.error('');
-      console.error('🔴 REDIS CONNECTION TIMEOUT!');
-      console.error('   Redis/Memurai is not responding within 5 seconds');
-      console.error('   This is likely because Redis is not running');
-      console.error('');
-      console.error('📋 IMMEDIATE SOLUTION:');
-      console.error('   1. Install Memurai: https://www.memurai.com/get-memurai');
-      console.error('   2. Or use Docker: docker run -d -p 6379:6379 redis:alpine');
-      console.error('   3. Restart backend after Redis is running');
-      console.error('');
-      
-      return res.status(503).json({
-        success: false,
-        message: 'Redis connection timeout. The bulk upload feature requires Redis to be running.',
-        error: 'Redis connection failed',
-        solution: 'Install and start Redis/Memurai, then restart the backend server.',
-        quickFix: {
-          windows: 'Download Memurai from https://www.memurai.com/get-memurai',
-          docker: 'docker run -d -p 6379:6379 redis:alpine',
-          linux: 'sudo service redis-server start'
-        },
-        redisConfig: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: process.env.REDIS_PORT || 6379,
-          timeout: '5 seconds'
-        }
-      });
-    }
-    
-    // Check if error is Redis-related
-    if (error.message.includes('ECONNREFUSED') || 
-        error.message.includes('Redis') ||
-        error.message.includes('connect') ||
-        error.code === 'ECONNREFUSED') {
-      console.error('');
-      console.error('🔴 REDIS CONNECTION ERROR DETECTED!');
-      console.error('   Redis/Memurai is not running or not accessible');
-      console.error('   Solution: Run setup-redis-windows.ps1 to install/start Redis');
-      console.error('');
-      
-      return res.status(503).json({
-        success: false,
-        message: 'Redis connection failed. The bulk upload feature requires Redis to be running.',
-        error: error.message,
-        solution: 'Please ensure Redis/Memurai is installed and running. Run setup-redis-windows.ps1 for help.',
-        redisConfig: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: process.env.REDIS_PORT || 6379
-        }
-      });
-    }
-    
     res.status(500).json({
       success: false,
       message: 'Failed to upload file',

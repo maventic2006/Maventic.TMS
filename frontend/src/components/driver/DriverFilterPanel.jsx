@@ -107,7 +107,7 @@ const DriverFilterPanel = ({
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.15 }}
-          className="mb-6"
+          className="mb-2"
         >
           <Card
             className="bg-white border border-[#E5E7EB] rounded-xl"

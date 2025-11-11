@@ -4,6 +4,8 @@ import {
   Routes,
   Route,
   Navigate,
+  useNavigate,
+  useLocation,
 } from "react-router-dom";
 import { Provider, useSelector, useDispatch } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,11 +26,14 @@ import DriverDetailsPage from "./features/driver/pages/DriverDetailsPage";
 import VehicleMaintenance from "./pages/VehicleMaintenance";
 import VehicleDetailsPage from "./features/vehicle/VehicleDetailsPage";
 import CreateVehiclePage from "./features/vehicle/CreateVehiclePage";
+import SessionExpiryWarningModal from "./components/auth/SessionExpiryWarningModal";
 import {
   verifyToken,
   logoutUser,
   setAuthInitialized,
 } from "./redux/slices/authSlice";
+import { useInactivityTimeout } from "./hooks/useInactivityTimeout";
+import { useTabSync } from "./hooks/useTabSync";
 import { USER_ROLES } from "./utils/constants";
 import { GlobalDropdownProvider } from "./components/ui/Select";
 import "./index.css";
@@ -255,244 +260,293 @@ const MainContent = () => {
   return renderContent();
 };
 
+// Session Manager component - handles inactivity timeout and tab sync
+const SessionManager = ({ children }) => {
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+
+  // Initialize tab synchronization
+  const { broadcastMessage } = useTabSync();
+
+  // Initialize inactivity timeout (only for authenticated users)
+  const { showWarning, secondsRemaining, extendSession } = useInactivityTimeout(
+    15 * 60 * 1000, // 15 minutes timeout
+    60 * 1000 // 1 minute warning
+  );
+
+  // Handle warning modal close (logout)
+  const handleWarningClose = () => {
+    dispatch(logoutUser());
+    sessionStorage.setItem(
+      "logoutReason",
+      "User chose to logout when session warning appeared"
+    );
+  };
+
+  // Handle extend session
+  const handleExtendSession = async () => {
+    await extendSession();
+    // Broadcast token refresh to other tabs
+    broadcastMessage("TOKEN_REFRESHED", {
+      user: store.getState().auth.user,
+      token: sessionStorage.getItem("authToken"),
+    });
+  };
+
+  return (
+    <>
+      {children}
+      {isAuthenticated && (
+        <SessionExpiryWarningModal
+          isOpen={showWarning}
+          onClose={handleWarningClose}
+          onExtendSession={handleExtendSession}
+          secondsRemaining={secondsRemaining}
+        />
+      )}
+    </>
+  );
+};
+
 function App() {
   return (
     <Provider store={store}>
       <GlobalDropdownProvider>
-        <Router>
-          <div className="App">
-            <AnimatePresence mode="wait">
-              <Routes>
-                {/* Public Routes - Always accessible */}
-                <Route
-                  path="/login"
-                  element={
-                    // <PageWrapper>
-                    // </PageWrapper>
-                    <LoginPage />
-                  }
-                />
+        <SessionManager>
+          <Router>
+            <div className="App">
+              <AnimatePresence mode="wait">
+                <Routes>
+                  {/* Public Routes - Always accessible */}
+                  <Route
+                    path="/login"
+                    element={
+                      // <PageWrapper>
+                      // </PageWrapper>
+                      <LoginPage />
+                    }
+                  />
 
-                {/* Reset Password Route - Semi-protected (requires userId) */}
-                <Route
-                  path="/reset-password/:userId"
-                  element={
-                    // <PageWrapper>
-                    // </PageWrapper>
-                    <ResetPasswordPage />
-                  }
-                />
+                  {/* Reset Password Route - Semi-protected (requires userId) */}
+                  <Route
+                    path="/reset-password/:userId"
+                    element={
+                      // <PageWrapper>
+                      // </PageWrapper>
+                      <ResetPasswordPage />
+                    }
+                  />
 
-                {/* Protected Routes - All require product_owner role */}
-                <Route
-                  path="/tms-portal"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <TMSLandingPage />
-                    </PrivateRoute>
-                  }
-                />
+                  {/* Protected Routes - All require product_owner role */}
+                  <Route
+                    path="/tms-portal"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <TMSLandingPage />
+                      </PrivateRoute>
+                    }
+                  />
 
-                {/* Alternative landing page route */}
-                <Route
-                  path="/landing"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <TMSLandingPage />
-                    </PrivateRoute>
-                  }
-                />
+                  {/* Alternative landing page route */}
+                  <Route
+                    path="/landing"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <TMSLandingPage />
+                      </PrivateRoute>
+                    }
+                  />
 
-                <Route
-                  path="/dashboard"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <MainContent />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <MainContent />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                {/* Transporter Management Routes */}
-                <Route
-                  path="/transporters"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <TransporterMaintenance />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  {/* Transporter Management Routes */}
+                  <Route
+                    path="/transporters"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <TransporterMaintenance />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                <Route
-                  path="/transporter/create"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <CreateTransporterPage />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  <Route
+                    path="/transporter/create"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <CreateTransporterPage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                <Route
-                  path="/transporter/:id"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <TransporterDetailsPage />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  <Route
+                    path="/transporter/:id"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <TransporterDetailsPage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                {/* Driver Management Routes */}
-                <Route
-                  path="/drivers"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <DriverMaintenance />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  {/* Driver Management Routes */}
+                  <Route
+                    path="/drivers"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <DriverMaintenance />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                <Route
-                  path="/driver/create"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <DriverCreatePage />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  <Route
+                    path="/driver/create"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <DriverCreatePage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                <Route
-                  path="/driver/:id"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <DriverDetailsPage />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  <Route
+                    path="/driver/:id"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <DriverDetailsPage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                {/* Vehicle Management Routes */}
-                <Route
-                  path="/vehicles"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <VehicleMaintenance />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  {/* Vehicle Management Routes */}
+                  <Route
+                    path="/vehicles"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <VehicleMaintenance />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                <Route
-                  path="/vehicle/create"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <CreateVehiclePage />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  <Route
+                    path="/vehicle/create"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <CreateVehiclePage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                <Route
-                  path="/vehicle/:id"
-                  element={
-                    <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
-                      <Layout>
-                        <VehicleDetailsPage />
-                      </Layout>
-                    </PrivateRoute>
-                  }
-                />
+                  <Route
+                    path="/vehicle/:id"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <VehicleDetailsPage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
 
-                {/* Default route - Always redirect to login */}
-                <Route path="/" element={<DefaultRoute />} />
+                  {/* Default route - Always redirect to login */}
+                  <Route path="/" element={<DefaultRoute />} />
 
-                {/* Error Pages with animations */}
-                <Route
-                  path="/unauthorized"
-                  element={
-                    <PageWrapper>
-                      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center">
-                        <motion.div
-                          className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md mx-4"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <div className="text-6xl font-bold text-red-500 mb-4">
-                            403
-                          </div>
-                          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                            Access Denied
-                          </h1>
-                          <p className="text-gray-600 mb-6">
-                            You don't have permission to access this resource.
-                          </p>
-                          <button
-                            onClick={() => window.history.back()}
-                            className="px-6 py-2 bg-primary-accent text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  {/* Error Pages with animations */}
+                  <Route
+                    path="/unauthorized"
+                    element={
+                      <PageWrapper>
+                        <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center">
+                          <motion.div
+                            className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md mx-4"
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.5 }}
                           >
-                            Go Back
-                          </button>
-                        </motion.div>
-                      </div>
-                    </PageWrapper>
-                  }
-                />
+                            <div className="text-6xl font-bold text-red-500 mb-4">
+                              403
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                              Access Denied
+                            </h1>
+                            <p className="text-gray-600 mb-6">
+                              You don't have permission to access this resource.
+                            </p>
+                            <button
+                              onClick={() => window.history.back()}
+                              className="px-6 py-2 bg-primary-accent text-white rounded-lg hover:bg-blue-600 transition-colors"
+                            >
+                              Go Back
+                            </button>
+                          </motion.div>
+                        </div>
+                      </PageWrapper>
+                    }
+                  />
 
-                {/* 404 page with animation */}
-                <Route
-                  path="*"
-                  element={
-                    <PageWrapper>
-                      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-                        <motion.div
-                          className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md mx-4"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <div className="text-6xl font-bold text-gray-500 mb-4">
-                            404
-                          </div>
-                          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                            Page Not Found
-                          </h1>
-                          <p className="text-gray-600 mb-6">
-                            The page you're looking for doesn't exist.
-                          </p>
-                          <button
-                            onClick={() => (window.location.href = "/")}
-                            className="px-6 py-2 bg-primary-accent text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  {/* 404 page with animation */}
+                  <Route
+                    path="*"
+                    element={
+                      <PageWrapper>
+                        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+                          <motion.div
+                            className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md mx-4"
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.5 }}
                           >
-                            Go Home
-                          </button>
-                        </motion.div>
-                      </div>
-                    </PageWrapper>
-                  }
-                />
-              </Routes>
-            </AnimatePresence>
-          </div>
-        </Router>
+                            <div className="text-6xl font-bold text-gray-500 mb-4">
+                              404
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                              Page Not Found
+                            </h1>
+                            <p className="text-gray-600 mb-6">
+                              The page you're looking for doesn't exist.
+                            </p>
+                            <button
+                              onClick={() => (window.location.href = "/")}
+                              className="px-6 py-2 bg-primary-accent text-white rounded-lg hover:bg-blue-600 transition-colors"
+                            >
+                              Go Home
+                            </button>
+                          </motion.div>
+                        </div>
+                      </PageWrapper>
+                    }
+                  />
+                </Routes>
+              </AnimatePresence>
+            </div>
+          </Router>
+        </SessionManager>
       </GlobalDropdownProvider>
       {/* <AuthInitializer>
       </AuthInitializer> */}
     </Provider>
   );
 }
-
 export default App;

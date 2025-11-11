@@ -260,33 +260,33 @@ async function checkExistingVehicles(basicInformationRows) {
   // Check VINs
   if (vins.length > 0) {
     const existingVins = await knex('vehicle_basic_information_hdr')
-      .whereIn('vin_chassis_number', vins)
-      .select('vin_chassis_number', 'vehicle_id_code_hdr');
+      .whereIn('vin_chassis_no', vins)
+      .select('vin_chassis_no', 'vehicle_id_code_hdr');
     
     existingVins.forEach(row => {
-      existing.vins.set(row.vin_chassis_number, row.vehicle_id_code_hdr);
+      existing.vins.set(row.vin_chassis_no, row.vehicle_id_code_hdr);
     });
   }
   
   // Check GPS IMEIs
   if (imeis.length > 0) {
     const existingImeis = await knex('vehicle_basic_information_hdr')
-      .whereIn('gps_imei_number', imeis)
-      .select('gps_imei_number', 'vehicle_id_code_hdr');
+      .whereIn('gps_tracker_imei_number', imeis)
+      .select('gps_tracker_imei_number', 'vehicle_id_code_hdr');
     
     existingImeis.forEach(row => {
-      existing.imeis.set(row.gps_imei_number, row.vehicle_id_code_hdr);
+      existing.imeis.set(row.gps_tracker_imei_number, row.vehicle_id_code_hdr);
     });
   }
   
   // Check registration numbers
   if (regNumbers.length > 0) {
     const existingRegNumbers = await knex('vehicle_basic_information_hdr')
-      .whereIn('registration_number', regNumbers)
-      .select('registration_number', 'vehicle_id_code_hdr');
+      .whereIn('vehicle_registration_number', regNumbers)
+      .select('vehicle_registration_number', 'vehicle_id_code_hdr');
     
     existingRegNumbers.forEach(row => {
-      existing.regNumbers.set(row.registration_number, row.vehicle_id_code_hdr);
+      existing.regNumbers.set(row.vehicle_registration_number, row.vehicle_id_code_hdr);
     });
   }
   

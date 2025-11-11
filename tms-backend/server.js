@@ -46,26 +46,28 @@ const transporterRoutes = require("./routes/transporter");
 const bulkUploadRoutes = require("./routes/bulkUploadRoutes");
 const bulkUploadQueue = require("./queues/bulkUploadQueue");
 const { processBulkUpload } = require("./queues/bulkUploadProcessor");
+const driverBulkUploadRoutes = require("./routes/driverBulkUploadRoutes");
+const driverBulkUploadQueue = require("./queues/driverBulkUploadQueue");
+const {
+  processDriverBulkUpload,
+} = require("./queues/driverBulkUploadProcessor");
 
 // Setup bulk upload queue processor
 bulkUploadQueue.process(async (job) => {
   return await processBulkUpload(job, io);
 });
 
-// Vehicle bulk upload
+// Vehicle bulk upload (NO REDIS - uses setImmediate() like driver upload)
 const vehicleBulkUploadRoutes = require("./routes/vehicleBulkUploadRoutes");
-const vehicleBulkUploadQueue = require("./queues/vehicleBulkUploadQueue");
-const { processVehicleBulkUpload } = require("./queues/vehicleBulkUploadProcessor");
 
-// Setup vehicle bulk upload queue processor
-vehicleBulkUploadQueue.process(async (job) => {
-  return await processVehicleBulkUpload(job, io);
+// Setup driver bulk upload queue processor
+driverBulkUploadQueue.process(async (job) => {
+  return await processDriverBulkUpload(job, io);
 });
-
 const driverRoutes = require("./routes/driver");
 
 // Routes
-app.use("/api/warehouses", warehouseRoutes);
+app.use("/api/warehouse", warehouseRoutes);
 app.use("/api/consignors", consignorRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/users", userRoutes);
@@ -75,6 +77,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/transporter", transporterRoutes);
 app.use("/api/bulk-upload", bulkUploadRoutes);
 app.use("/api/vehicle/bulk-upload", vehicleBulkUploadRoutes);
+app.use("/api/driver-bulk-upload", driverBulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
 

@@ -22,6 +22,13 @@ export const API_ENDPOINTS = {
     STATES: "/transporter/states",
     CITIES: "/transporter/cities",
   },
+  WAREHOUSE: {
+    LIST: "/warehouse/list",
+    GET_BY_ID: "/warehouse",
+    CREATE: "/warehouse",
+    UPDATE: "/warehouse",
+    MASTER_DATA: "/warehouse/master-data",
+  },
   BULK_UPLOAD: {
     TEMPLATE: "/bulk-upload/template",
     UPLOAD: "/bulk-upload/upload",
@@ -170,8 +177,41 @@ export const ERROR_MESSAGES = {
   FILE_TYPE_NOT_ALLOWED:
     "Please upload a file in JPG, PNG, GIF, PDF, DOC, or DOCX format",
 
+  // Driver-Specific Errors
+  DRIVER_NAME_REQUIRED: "Please enter the driver's full name",
+  DRIVER_NAME_TOO_SHORT: "Full name must be at least 2 characters long",
+  DRIVER_NAME_TOO_LONG: "Full name cannot exceed 100 characters",
+  DATE_OF_BIRTH_REQUIRED: "Please select date of birth",
+  DATE_OF_BIRTH_FUTURE: "Date of birth cannot be in the future",
+  DRIVER_AGE_INVALID: "Driver must be at least 18 years old",
+  DRIVER_PHONE_REQUIRED: "Please enter a phone number",
+  DRIVER_PHONE_INVALID:
+    "Please enter a valid 10-digit phone number starting with 6-9",
+  DRIVER_EMAIL_INVALID: "Please enter a valid email address",
+  EMERGENCY_CONTACT_REQUIRED: "Please enter emergency contact number",
+  EMERGENCY_CONTACT_INVALID:
+    "Please enter a valid 10-digit emergency contact number",
+  ALTERNATE_PHONE_DRIVER_INVALID:
+    "Please enter a valid 10-digit alternate phone number",
+  POSTAL_CODE_REQUIRED: "Please enter postal code/PIN code",
+  POSTAL_CODE_INVALID: "Postal code must be 6 digits",
+  ADDRESS_TYPE_REQUIRED: "Please select address type",
+  DRIVER_DOCUMENT_REQUIRED: "Please add at least one document",
+  DRIVER_DOCUMENT_TYPE_REQUIRED: "Please select document type",
+  DRIVER_DOCUMENT_NUMBER_REQUIRED: "Please enter document number",
+  DRIVER_DOCUMENT_NUMBER_INVALID: "Document number format is invalid",
+  LICENSE_NUMBER_INVALID: "License number format is invalid",
+  DUPLICATE_PHONE_DRIVER: "This phone number is already registered",
+  DUPLICATE_EMAIL_DRIVER: "This email is already registered",
+  DUPLICATE_LICENSE: "This license number is already registered",
+  DUPLICATE_DOCUMENT_DRIVER: "This document number already exists",
+  VEHICLE_REGISTRATION_INVALID:
+    "Invalid vehicle registration number format (e.g., MH12AB1234)",
+  ACCIDENT_TYPE_REQUIRED: "Please select accident/violation type",
+  ACCIDENT_DATE_REQUIRED: "Please select accident/violation date",
+
   // General Errors
-  VALIDATION_ERROR: "Please check the form and fix the errors",
+  VALIDATION_ERROR: "Please check the form and fix the validation errors",
   SUBMISSION_ERROR: "Unable to submit the form. Please try again",
   NETWORK_ERROR: "Network error. Please check your internet connection",
   SERVER_ERROR: "Server error. Please try again later",

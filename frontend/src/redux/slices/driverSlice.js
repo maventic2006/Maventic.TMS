@@ -196,6 +196,150 @@ export const fetchDriverById = createAsyncThunk(
   }
 );
 
+// Bulk Upload Actions
+export const downloadDriverTemplate = createAsyncThunk(
+  "driver/downloadTemplate",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/driver-bulk-upload/template", {
+        responseType: "blob",
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "Driver_Bulk_Upload_Template.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error downloading template:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "DOWNLOAD_ERROR",
+          message: "Failed to download template",
+        }
+      );
+    }
+  }
+);
+
+export const uploadDriverBulk = createAsyncThunk(
+  "driver/uploadBulk",
+  async (file, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await api.post("/driver-bulk-upload/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(response.data.error || "Failed to upload file");
+      }
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "UPLOAD_ERROR",
+          message: "Failed to upload file",
+        }
+      );
+    }
+  }
+);
+
+export const fetchDriverBatchStatus = createAsyncThunk(
+  "driver/fetchBatchStatus",
+  async (batchId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/driver-bulk-upload/status/${batchId}`);
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(
+          response.data.error || "Failed to fetch batch status"
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching batch status:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "FETCH_ERROR",
+          message: "Failed to fetch batch status",
+        }
+      );
+    }
+  }
+);
+
+export const fetchDriverUploadHistory = createAsyncThunk(
+  "driver/fetchUploadHistory",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/driver-bulk-upload/history", { params });
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(
+          response.data.error || "Failed to fetch upload history"
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching upload history:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "FETCH_ERROR",
+          message: "Failed to fetch upload history",
+        }
+      );
+    }
+  }
+);
+
+export const downloadDriverErrorReport = createAsyncThunk(
+  "driver/downloadErrorReport",
+  async (batchId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        `/driver-bulk-upload/error-report/${batchId}`,
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Driver_Error_Report_${batchId}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error downloading error report:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "DOWNLOAD_ERROR",
+          message: "Failed to download error report",
+        }
+      );
+    }
+  }
+);
+
 const initialState = {
   // Master data
   masterData: {
@@ -205,6 +349,7 @@ const initialState = {
     addressTypes: [],
     genderOptions: [],
     bloodGroupOptions: [],
+    violationTypes: [],
   },
   statesByCountry: {},
   citiesByCountryState: {},
@@ -229,6 +374,18 @@ const initialState = {
 
   // Success state
   lastCreated: null,
+
+  // Bulk upload state
+  bulkUpload: {
+    isUploading: false,
+    isDownloadingTemplate: false,
+    isDownloadingError: false,
+    uploadProgress: 0,
+    validationResults: null,
+    currentBatch: null,
+    uploadHistory: [],
+    errors: null,
+  },
 };
 
 const driverSlice = createSlice({
@@ -331,6 +488,63 @@ const driverSlice = createSlice({
       .addCase(fetchDriverById.rejected, (state, action) => {
         state.isFetchingDetails = false;
         state.error = action.payload;
+      })
+
+      // Download Template
+      .addCase(downloadDriverTemplate.pending, (state) => {
+        state.bulkUpload.isDownloadingTemplate = true;
+        state.bulkUpload.errors = null;
+      })
+      .addCase(downloadDriverTemplate.fulfilled, (state) => {
+        state.bulkUpload.isDownloadingTemplate = false;
+      })
+      .addCase(downloadDriverTemplate.rejected, (state, action) => {
+        state.bulkUpload.isDownloadingTemplate = false;
+        state.bulkUpload.errors = action.payload;
+      })
+
+      // Upload Bulk File
+      .addCase(uploadDriverBulk.pending, (state) => {
+        state.bulkUpload.isUploading = true;
+        state.bulkUpload.uploadProgress = 0;
+        state.bulkUpload.errors = null;
+      })
+      .addCase(uploadDriverBulk.fulfilled, (state, action) => {
+        state.bulkUpload.isUploading = false;
+        // Backend returns: {batchId, status}
+        state.bulkUpload.currentBatch = {
+          batch_id: action.payload.batchId,
+          status: action.payload.status,
+        };
+        state.bulkUpload.uploadProgress = 100;
+      })
+      .addCase(uploadDriverBulk.rejected, (state, action) => {
+        state.bulkUpload.isUploading = false;
+        state.bulkUpload.errors = action.payload;
+        state.bulkUpload.uploadProgress = 0;
+      })
+
+      // Fetch Batch Status
+      .addCase(fetchDriverBatchStatus.fulfilled, (state, action) => {
+        state.bulkUpload.currentBatch = action.payload.batch;
+        state.bulkUpload.validationResults = action.payload.statusCounts;
+      })
+
+      // Fetch Upload History
+      .addCase(fetchDriverUploadHistory.fulfilled, (state, action) => {
+        state.bulkUpload.uploadHistory = action.payload.batches;
+      })
+
+      // Download Error Report
+      .addCase(downloadDriverErrorReport.pending, (state) => {
+        state.bulkUpload.isDownloadingError = true;
+      })
+      .addCase(downloadDriverErrorReport.fulfilled, (state) => {
+        state.bulkUpload.isDownloadingError = false;
+      })
+      .addCase(downloadDriverErrorReport.rejected, (state, action) => {
+        state.bulkUpload.isDownloadingError = false;
+        state.bulkUpload.errors = action.payload;
       });
   },
 });

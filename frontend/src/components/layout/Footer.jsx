@@ -3,7 +3,7 @@ import { APP_NAME, APP_VERSION } from "../../utils/constants";
 
 const Footer = () => {
   return (
-    <footer className="bg-card border-t border-border py-4 px-6 mt-auto">
+    <footer className="bg-card py-4 px-6 mt-auto">
       <div className="max-w-7xl mx-auto flex items-center justify-between text-sm text-muted-foreground">
         <div className="flex items-center space-x-4">
           <p>&copy; 2025 {APP_NAME}. All rights reserved.</p>

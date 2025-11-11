@@ -11,6 +11,7 @@ import bulkUploadSlice from "./slices/bulkUploadSlice";
 import driverSlice from "./slices/driverSlice";
 import vehicleSlice from "./slices/vehicleSlice";
 import vehicleBulkUploadSlice from "./slices/vehicleBulkUploadSlice";
+import warehouseSlice from "./slices/warehouseSlice";
 
 export const store = configureStore({
   reducer: {
@@ -26,6 +27,7 @@ export const store = configureStore({
     driver: driverSlice,
     vehicle: vehicleSlice,
     vehicleBulkUpload: vehicleBulkUploadSlice,
+    warehouse: warehouseSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

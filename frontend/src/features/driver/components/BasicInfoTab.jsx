@@ -1,4 +1,4 @@
-﻿import React from "react";
+﻿import React, { useState, useMemo } from "react";
 import {
   User,
   Phone,
@@ -9,6 +9,8 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { CustomSelect } from "../../../components/ui/Select";
+import { Country, State, City } from "country-state-city";
 
 const BasicInfoTab = ({
   formData,
@@ -19,6 +21,31 @@ const BasicInfoTab = ({
 }) => {
   const basicInfo = formData?.basicInfo || {};
   const addresses = formData?.addresses || [];
+
+  // Get all countries
+  const allCountries = useMemo(() => {
+    return Country.getAllCountries().map((country) => ({
+      code: country.isoCode,
+      name: country.name,
+    }));
+  }, []);
+
+  // Get states for a specific country
+  const getStatesForCountry = (countryCode) => {
+    if (!countryCode) return [];
+    return State.getStatesOfCountry(countryCode).map((state) => ({
+      code: state.isoCode,
+      name: state.name,
+    }));
+  };
+
+  // Get cities for a specific state in a country
+  const getCitiesForState = (countryCode, stateCode) => {
+    if (!countryCode || !stateCode) return [];
+    return City.getCitiesOfState(countryCode, stateCode).map((city) => ({
+      name: city.name,
+    }));
+  };
 
   const handleBasicInfoChange = (field, value) => {
     setFormData((prev) => ({
@@ -37,6 +64,18 @@ const BasicInfoTab = ({
         ...updatedAddresses[index],
         [field]: value,
       };
+
+      // Clear dependent fields when country changes
+      if (field === "country") {
+        updatedAddresses[index].state = "";
+        updatedAddresses[index].city = "";
+      }
+
+      // Clear city when state changes
+      if (field === "state") {
+        updatedAddresses[index].city = "";
+      }
+
       return {
         ...prev,
         addresses: updatedAddresses,
@@ -75,15 +114,15 @@ const BasicInfoTab = ({
     <div className="space-y-8">
       {/* Basic Information Section */}
       <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2 text-gray-800">
+        {/* <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2 text-gray-800">
           <User className="h-5 w-5" />
           <span>Basic Information</span>
-        </h3>
+        </h3> */}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Full Name */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
+            <label className="block text-xs font-medium mb-2 text-gray-700">
               Full Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -93,18 +132,18 @@ const BasicInfoTab = ({
                 handleBasicInfoChange("fullName", e.target.value)
               }
               placeholder="Enter full name"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${"$"}{
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-xs ${
                 errors?.fullName ? "border-red-500" : "border-gray-300"
               }`}
             />
             {errors?.fullName && (
-              <p className="text-sm mt-1 text-red-500">{errors.fullName}</p>
+              <p className="text-xs mt-1 text-red-500">{errors.fullName}</p>
             )}
           </div>
 
           {/* Date of Birth */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
+            <label className="block text-xs font-medium mb-2 text-gray-700">
               Date of Birth <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -115,13 +154,13 @@ const BasicInfoTab = ({
                 onChange={(e) =>
                   handleBasicInfoChange("dateOfBirth", e.target.value)
                 }
-                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${"$"}{
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-xs ${
                   errors?.dateOfBirth ? "border-red-500" : "border-gray-300"
                 }`}
               />
             </div>
             {errors?.dateOfBirth && (
-              <p className="text-sm mt-1 text-red-500">{errors.dateOfBirth}</p>
+              <p className="text-xs mt-1 text-red-500">{errors.dateOfBirth}</p>
             )}
           </div>
 
@@ -130,18 +169,15 @@ const BasicInfoTab = ({
             <label className="block text-sm font-medium mb-2 text-gray-700">
               Gender
             </label>
-            <select
+            <CustomSelect
               value={basicInfo.gender || ""}
-              onChange={(e) => handleBasicInfoChange("gender", e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
-            >
-              <option value="">Select Gender</option>
-              {masterData?.genders?.map((gender) => (
-                <option key={gender.gender_id} value={gender.gender_name}>
-                  {gender.gender_name}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => handleBasicInfoChange("gender", value)}
+              options={masterData?.genderOptions || []}
+              placeholder="Select Gender"
+              getOptionLabel={(option) => option.label}
+              getOptionValue={(option) => option.value}
+              className="w-full text-sm"
+            />
           </div>
 
           {/* Blood Group */}
@@ -150,25 +186,22 @@ const BasicInfoTab = ({
               <Droplet className="h-4 w-4" />
               <span>Blood Group</span>
             </label>
-            <select
+            <CustomSelect
               value={basicInfo.bloodGroup || ""}
-              onChange={(e) =>
-                handleBasicInfoChange("bloodGroup", e.target.value)
+              onValueChange={(value) =>
+                handleBasicInfoChange("bloodGroup", value)
               }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
-            >
-              <option value="">Select Blood Group</option>
-              {masterData?.bloodGroups?.map((bg) => (
-                <option key={bg.blood_group_id} value={bg.blood_group_name}>
-                  {bg.blood_group_name}
-                </option>
-              ))}
-            </select>
+              options={masterData?.bloodGroupOptions || []}
+              placeholder="Select Blood Group"
+              getOptionLabel={(option) => option.label}
+              getOptionValue={(option) => option.value}
+              className="w-full text-sm"
+            />
           </div>
 
           {/* Phone Number */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
+            <label className="block text-xs font-medium mb-2 text-gray-700">
               Phone Number <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -181,19 +214,19 @@ const BasicInfoTab = ({
                 }
                 placeholder="10-digit phone number"
                 maxLength="10"
-                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${"$"}{
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-xs ${
                   errors?.phoneNumber ? "border-red-500" : "border-gray-300"
                 }`}
               />
             </div>
             {errors?.phoneNumber && (
-              <p className="text-sm mt-1 text-red-500">{errors.phoneNumber}</p>
+              <p className="text-xs mt-1 text-red-500">{errors.phoneNumber}</p>
             )}
           </div>
 
           {/* Email ID */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
+            <label className="block text-xs font-medium mb-2 text-gray-700">
               Email ID
             </label>
             <div className="relative">
@@ -205,39 +238,19 @@ const BasicInfoTab = ({
                   handleBasicInfoChange("emailId", e.target.value)
                 }
                 placeholder="email@example.com"
-                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${"$"}{
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-xs ${
                   errors?.emailId ? "border-red-500" : "border-gray-300"
                 }`}
               />
             </div>
             {errors?.emailId && (
-              <p className="text-sm mt-1 text-red-500">{errors.emailId}</p>
+              <p className="text-xs mt-1 text-red-500">{errors.emailId}</p>
             )}
-          </div>
-
-          {/* WhatsApp Number */}
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
-              WhatsApp Number
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 pointer-events-none text-gray-400" />
-              <input
-                type="tel"
-                value={basicInfo.whatsAppNumber || ""}
-                onChange={(e) =>
-                  handleBasicInfoChange("whatsAppNumber", e.target.value)
-                }
-                placeholder="10-digit WhatsApp number"
-                maxLength="10"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
-              />
-            </div>
           </div>
 
           {/* Alternate Phone Number */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">
+            <label className="block text-xs font-medium mb-2 text-gray-700">
               Alternate Phone Number
             </label>
             <div className="relative">
@@ -250,9 +263,38 @@ const BasicInfoTab = ({
                 }
                 placeholder="10-digit alternate number"
                 maxLength="10"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-xs"
               />
             </div>
+          </div>
+
+          {/* Emergency Contact Number */}
+          <div>
+            <label className="block text-xs font-medium mb-2 text-gray-700">
+              Emergency Contact Number <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 pointer-events-none text-gray-400" />
+              <input
+                type="tel"
+                value={basicInfo.emergencyContact || ""}
+                onChange={(e) =>
+                  handleBasicInfoChange("emergencyContact", e.target.value)
+                }
+                placeholder="10-digit emergency contact"
+                maxLength="10"
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-xs ${
+                  errors?.emergencyContact
+                    ? "border-red-500"
+                    : "border-gray-300"
+                }`}
+              />
+            </div>
+            {errors?.emergencyContact && (
+              <p className="text-xs mt-1 text-red-500">
+                {errors.emergencyContact}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -268,7 +310,7 @@ const BasicInfoTab = ({
             <button
               type="button"
               onClick={addAddress}
-              className="bg-[#10B981] text-white h-9 px-3 rounded-lg flex items-center gap-2 text-sm hover:bg-[#059669] transition-colors"
+              className="bg-[#10B981] text-white h-9 px-3 rounded-lg flex items-center gap-2 text-xs hover:bg-[#059669] transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add
@@ -282,14 +324,24 @@ const BasicInfoTab = ({
                   <thead>
                     <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
                       <th className="pb-3 w-12">Primary</th>
-                      <th className="pb-3 pl-4 min-w-[200px]">Address Type</th>
-                      <th className="pb-3 pl-4 min-w-[200px]">Country</th>
-                      <th className="pb-3 pl-4 min-w-[200px]">State</th>
-                      <th className="pb-3 pl-4 min-w-[200px]">City</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">
+                        Address Type <span className="text-red-500">*</span>
+                      </th>
+                      <th className="pb-3 pl-4 min-w-[200px]">
+                        Country <span className="text-red-500">*</span>
+                      </th>
+                      <th className="pb-3 pl-4 min-w-[200px]">
+                        State <span className="text-red-500">*</span>
+                      </th>
+                      <th className="pb-3 pl-4 min-w-[200px]">
+                        City <span className="text-red-500">*</span>
+                      </th>
                       <th className="pb-3 pl-4 min-w-[200px]">District</th>
                       <th className="pb-3 pl-4 min-w-[200px]">Street 1</th>
                       <th className="pb-3 pl-4 min-w-[200px]">Street 2</th>
-                      <th className="pb-3 min-w-[150px]">Postal Code</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">
+                        PIN <span className="text-red-500">*</span>
+                      </th>
                       <th className="pb-3 w-12"></th>
                     </tr>
                   </thead>
@@ -316,75 +368,63 @@ const BasicInfoTab = ({
                           />
                         </td>
                         <td className="px-3">
-                          <select
+                          <CustomSelect
                             value={address.addressTypeId || ""}
-                            onChange={(e) =>
-                              handleAddressChange(
-                                index,
-                                "addressTypeId",
-                                e.target.value
-                              )
+                            onValueChange={(value) =>
+                              handleAddressChange(index, "addressTypeId", value)
                             }
-                            className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
-                          >
-                            <option value="">Select</option>
-                            {masterData?.addressTypes?.map((type) => (
-                              <option
-                                key={type.address_type_id}
-                                value={type.address_type_id}
-                              >
-                                {type.address_type_name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-3">
-                          <select
-                            value={address.country || ""}
-                            onChange={(e) =>
-                              handleAddressChange(
-                                index,
-                                "country",
-                                e.target.value
-                              )
-                            }
-                            className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
-                          >
-                            <option value="">Select</option>
-                            {masterData?.countries?.map((country) => (
-                              <option
-                                key={country.isoCode}
-                                value={country.isoCode}
-                              >
-                                {country.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-3">
-                          <input
-                            type="text"
-                            value={address.state || ""}
-                            onChange={(e) =>
-                              handleAddressChange(
-                                index,
-                                "state",
-                                e.target.value
-                              )
-                            }
-                            placeholder="Enter state"
-                            className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
+                            options={masterData?.addressTypes || []}
+                            placeholder="Select"
+                            getOptionLabel={(option) => option.label}
+                            getOptionValue={(option) => option.value}
+                            className="min-w-[200px] text-xs"
                           />
                         </td>
                         <td className="px-3">
-                          <input
-                            type="text"
-                            value={address.city || ""}
-                            onChange={(e) =>
-                              handleAddressChange(index, "city", e.target.value)
+                          <CustomSelect
+                            value={address.country || ""}
+                            onValueChange={(value) =>
+                              handleAddressChange(index, "country", value)
                             }
-                            placeholder="Enter city"
-                            className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
+                            options={allCountries}
+                            placeholder="Select"
+                            searchable
+                            getOptionLabel={(option) => option.name}
+                            getOptionValue={(option) => option.code}
+                            className="min-w-[200px] text-xs"
+                          />
+                        </td>
+                        <td className="px-3">
+                          <CustomSelect
+                            value={address.state || ""}
+                            onValueChange={(value) =>
+                              handleAddressChange(index, "state", value)
+                            }
+                            options={getStatesForCountry(address.country)}
+                            placeholder="Select"
+                            searchable
+                            getOptionLabel={(option) => option.name}
+                            getOptionValue={(option) => option.code}
+                            className="min-w-[200px] text-xs"
+                            disabled={!address.country}
+                          />
+                        </td>
+                        <td className="px-3">
+                          <CustomSelect
+                            value={address.city || ""}
+                            onValueChange={(value) =>
+                              handleAddressChange(index, "city", value)
+                            }
+                            options={getCitiesForState(
+                              address.country,
+                              address.state
+                            )}
+                            placeholder="Select"
+                            searchable
+                            getOptionLabel={(option) => option.name}
+                            getOptionValue={(option) => option.name}
+                            className="min-w-[200px] text-xs"
+                            disabled={!address.state}
                           />
                         </td>
                         <td className="px-3">
@@ -443,7 +483,7 @@ const BasicInfoTab = ({
                                 e.target.value
                               )
                             }
-                            placeholder="Enter postal code"
+                            placeholder="Enter PIN"
                             className="min-w-[150px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
                           />
                         </td>
@@ -468,7 +508,7 @@ const BasicInfoTab = ({
               <div className="text-center py-12 text-gray-500">
                 <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p className="text-lg font-medium">No addresses added yet</p>
-                <p className="text-sm">Click "Add" to get started</p>
+                <p className="text-xs">Click "Add" to get started</p>
               </div>
             )}
           </div>

@@ -22,27 +22,31 @@ async function processVehicleBulkUpload(job, io) {
   const { batchId, filePath, userId, originalName } = job.data;
   
   console.log('🚗 Processing vehicle bulk upload batch:', batchId);
-  console.log('  File:', originalName);
+  console.log('  File:', originalName || 'Unknown');
   console.log('  User:', userId);
   
   try {
     // Step 1: Parse Excel file
     console.log('\n📖 Step 1: Parsing Excel file...');
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-      batchId,
-      progress: 10,
-      message: 'Starting file processing...',
-      type: 'info'
-    });
     
-    await job.progress(10);
+    // Emit progress only if Socket.IO is available
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 10,
+        message: 'Starting file processing...',
+        type: 'info'
+      });
+    }
     
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-      batchId,
-      progress: 20,
-      message: 'Reading Excel file (5 sheets)...',
-      type: 'info'
-    });
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 20,
+        message: 'Reading Excel file (5 sheets)...',
+        type: 'info'
+      });
+    }
     
     const parseResult = await parseVehicleExcelFile(filePath);
     
@@ -66,23 +70,25 @@ async function processVehicleBulkUpload(job, io) {
         total_rows: stats.totalVehicles
       });
     
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-      batchId,
-      progress: 30,
-      message: `Parsed ${stats.totalVehicles} vehicle(s) from Excel`,
-      type: 'success'
-    });
-    
-    await job.progress(30);
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 30,
+        message: `Parsed ${stats.totalVehicles} vehicle(s) from Excel`,
+        type: 'success'
+      });
+    }
     
     // Step 2: Validate all data
     console.log('\n✅ Step 2: Validating vehicle data...');
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-      batchId,
-      progress: 40,
-      message: 'Validating vehicle data (65+ rules)...',
-      type: 'info'
-    });
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 40,
+        message: 'Validating vehicle data (65+ rules)...',
+        type: 'info'
+      });
+    }
     
     const validationResults = await validateAllVehicleData(parsedData);
     
@@ -97,25 +103,27 @@ async function processVehicleBulkUpload(job, io) {
       console.log(`  Error breakdown:`, validationResults.summary.errorBreakdown);
     }
     
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-      batchId,
-      progress: 55,
-      message: `Validation complete: ${validCount} valid, ${invalidCount} invalid`,
-      type: invalidCount > 0 ? 'warning' : 'success'
-    });
-    
-    await job.progress(55);
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 55,
+        message: `Validation complete: ${validCount} valid, ${invalidCount} invalid`,
+        type: invalidCount > 0 ? 'warning' : 'success'
+      });
+    }
     
     // Step 3: Store validation results (BATCH INSERT - OPTIMIZED)
     console.log('\n💾 Step 3: Storing validation results...');
     const storeStart = Date.now();
     
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-      batchId,
-      progress: 65,
-      message: 'Storing validation results in database...',
-      type: 'info'
-    });
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 65,
+        message: 'Storing validation results in database...',
+        type: 'info'
+      });
+    }
     
     // Prepare batch insert data for valid vehicles
     const validVehicleRecords = validationResults.valid.map(validVehicle => ({
@@ -156,25 +164,27 @@ async function processVehicleBulkUpload(job, io) {
         total_invalid: invalidCount
       });
     
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-      batchId,
-      progress: 70,
-      message: 'Validation results stored',
-      type: 'success'
-    });
-    
-    await job.progress(70);
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 70,
+        message: 'Validation results stored',
+        type: 'success'
+      });
+    }
     
     // Step 4: Generate error report (if errors exist)
     let errorReportPath = null;
     if (invalidCount > 0) {
       console.log('\n📝 Step 4: Generating error report...');
-      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-        batchId,
-        progress: 75,
-        message: `Generating error report for ${invalidCount} invalid record(s)...`,
-        type: 'info'
-      });
+      if (io) {
+        io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+          batchId,
+          progress: 75,
+          message: `Generating error report for ${invalidCount} invalid record(s)...`,
+          type: 'info'
+        });
+      }
       
       errorReportPath = await generateVehicleErrorReport(validationResults.invalid, batchId);
       
@@ -186,14 +196,14 @@ async function processVehicleBulkUpload(job, io) {
       
       console.log(`✓ Error report saved: ${errorReportPath}`);
       
-      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-        batchId,
-        progress: 80,
-        message: 'Error report generated successfully',
-        type: 'success'
-      });
-      
-      await job.progress(80);
+      if (io) {
+        io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+          batchId,
+          progress: 80,
+          message: 'Error report generated successfully',
+          type: 'success'
+        });
+      }
     }
     
     // Step 5: Create valid vehicles in database
@@ -202,19 +212,20 @@ async function processVehicleBulkUpload(job, io) {
     
     if (validCount > 0) {
       console.log('\n🏗️  Step 5: Creating valid vehicles in database...');
-      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-        batchId,
-        progress: 85,
-        message: `Creating ${validCount} valid vehicle(s) in database...`,
-        type: 'info'
-      });
+      if (io) {
+        io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+          batchId,
+          progress: 85,
+          message: `Creating ${validCount} valid vehicle(s) in database...`,
+          type: 'info'
+        });
+      }
       
       const creationResults = await createVehiclesBatch(
         validationResults.valid,
         batchId,
         userId,
-        io,
-        job
+        io
       );
       
       createdCount = creationResults.success.length;
@@ -244,25 +255,27 @@ async function processVehicleBulkUpload(job, io) {
     
     console.log(`✓ Batch ${batchId} completed`);
     
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-      batchId,
-      progress: 100,
-      message: 'Processing complete!',
-      type: 'success'
-    });
-    
-    await job.progress(100);
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 100,
+        message: 'Processing complete!',
+        type: 'success'
+      });
+    }
     
     // Emit completion event
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadComplete', {
-      batchId,
-      validCount,
-      invalidCount,
-      createdCount,
-      failedCount,
-      errorReportPath,
-      timestamp: new Date().toISOString()
-    });
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadComplete', {
+        batchId,
+        validCount,
+        invalidCount,
+        createdCount,
+        failedCount,
+        errorReportPath,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     console.log('✅ Vehicle bulk upload processing complete!');
     
@@ -290,11 +303,13 @@ async function processVehicleBulkUpload(job, io) {
         processed_timestamp: knex.fn.now()
       });
     
-    io.to(`batch:${batchId}`).emit('vehicleBulkUploadError', {
-      batchId,
-      message: error.message,
-      timestamp: new Date().toISOString()
-    });
+    if (io) {
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadError', {
+        batchId,
+        message: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     throw error;
   }
@@ -304,7 +319,7 @@ async function processVehicleBulkUpload(job, io) {
  * Create vehicles in batch (OPTIMIZED with parallel processing)
  * Creates vehicle records with all related data using batch inserts
  */
-async function createVehiclesBatch(validVehicles, batchId, userId, io, job) {
+async function createVehiclesBatch(validVehicles, batchId, userId, io) {
   const results = {
     success: [],
     failed: []
@@ -336,16 +351,17 @@ async function createVehiclesBatch(validVehicles, batchId, userId, io, job) {
       
       processedCount += chunk.length;
       
-      // Update progress
+      // Update progress - only if io is available
       const progressPercent = 85 + Math.floor((processedCount / total) * 10);
-      await job.progress(progressPercent);
       
-      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
-        batchId,
-        progress: progressPercent,
-        message: `Created ${processedCount}/${total} vehicles`,
-        type: 'info'
-      });
+      if (io) {
+        io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+          batchId,
+          progress: progressPercent,
+          message: `Created ${processedCount}/${total} vehicles`,
+          type: 'info'
+        });
+      }
       
       console.log(`✓ Chunk ${chunkIndex + 1}/${chunks.length}: ${chunk.length} vehicles processed`);
       
@@ -411,19 +427,19 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
         // Basic information (header)
         basicInfoRecords.push({
           vehicle_id_code_hdr: vehicleId,
-          make_brand: basicInformation.Make_Brand,
-          model: basicInformation.Model,
-          vin_chassis_number: basicInformation.VIN_Chassis_Number,
+          maker_brand_description: basicInformation.Make_Brand,
+          maker_model: basicInformation.Model,
+          vin_chassis_no: basicInformation.VIN_Chassis_Number,
           vehicle_type_id: basicInformation.Vehicle_Type_ID,
           vehicle_category: basicInformation.Vehicle_Category || null,
           manufacturing_month_year: basicInformation.Manufacturing_Month_Year,
-          gps_imei_number: basicInformation.GPS_IMEI_Number,
-          gps_active_flag: basicInformation.GPS_Active_Flag === 'Y' ? 'Y' : 'N',
-          leasing_flag: basicInformation.Leasing_Flag === 'Y' ? 'Y' : 'N',
+          gps_tracker_imei_number: basicInformation.GPS_IMEI_Number,
+          gps_tracker_active_flag: basicInformation.GPS_Active_Flag === 'Y' ? 1 : 0,
+          leasing_flag: basicInformation.Leasing_Flag === 'Y' ? 1 : 0,
           usage_type_id: basicInformation.Usage_Type_ID,
-          registration_number: basicInformation.Registration_Number || null,
-          vehicle_color: basicInformation.Vehicle_Color || null,
-          body_type_description: basicInformation.Body_Type_Description || null,
+          vehicle_registration_number: basicInformation.Registration_Number || null,
+          vehicle_colour: basicInformation.Vehicle_Color || null,
+          body_type_desc: basicInformation.Body_Type_Description || null,
           safety_inspection_date: basicInformation.Safety_Inspection_Date || null,
           taxes_and_fees: basicInformation.Taxes_And_Fees || null,
           road_tax: basicInformation.Road_Tax || null,

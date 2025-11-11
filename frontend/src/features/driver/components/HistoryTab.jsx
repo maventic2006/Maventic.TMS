@@ -1,5 +1,6 @@
 ﻿import React from "react";
 import { Briefcase, Plus, X, Calendar } from "lucide-react";
+import { CustomSelect } from "@/components/ui/Select";
 
 const HistoryTab = ({
   formData,
@@ -30,12 +31,11 @@ const HistoryTab = ({
       history: [
         ...prev.history,
         {
-          companyName: "",
-          position: "",
+          employer: "",
+          employmentStatus: "",
           fromDate: "",
           toDate: "",
-          reasonForLeaving: "",
-          vehicleType: "",
+          jobTitle: "",
         },
       ],
     }));
@@ -72,14 +72,13 @@ const HistoryTab = ({
               <table className="w-full min-w-[800px]">
                 <thead>
                   <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
-                    <th className="pb-3 pl-4 min-w-[200px]">Company Name</th>
-                    <th className="pb-3 pl-4 min-w-[200px]">Position</th>
+                    <th className="pb-3 pl-4 min-w-[200px]">Employer</th>
+                    <th className="pb-3 pl-4 min-w-[200px]">
+                      Employment Status
+                    </th>
                     <th className="pb-3 pl-4 min-w-[150px]">From Date</th>
                     <th className="pb-3 pl-4 min-w-[150px]">To Date</th>
-                    <th className="pb-3 pl-4 min-w-[200px]">Vehicle Type</th>
-                    <th className="pb-3 pl-4 min-w-[250px]">
-                      Reason for Leaving
-                    </th>
+                    <th className="pb-3 pl-4 min-w-[200px]">Job Title</th>
                     <th className="pb-3 w-12"></th>
                   </tr>
                 </thead>
@@ -93,31 +92,38 @@ const HistoryTab = ({
                       <td className="px-3">
                         <input
                           type="text"
-                          value={item.companyName || ""}
+                          value={item.employer || ""}
                           onChange={(e) =>
                             handleHistoryChange(
                               index,
-                              "companyName",
+                              "employer",
                               e.target.value
                             )
                           }
-                          placeholder="Enter company name"
+                          placeholder="Enter employer name"
                           className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
                         />
                       </td>
                       <td className="px-3">
-                        <input
-                          type="text"
-                          value={item.position || ""}
-                          onChange={(e) =>
+                        <CustomSelect
+                          value={item.employmentStatus || ""}
+                          onValueChange={(value) =>
                             handleHistoryChange(
                               index,
-                              "position",
-                              e.target.value
+                              "employmentStatus",
+                              value
                             )
                           }
-                          placeholder="Enter position"
-                          className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
+                          options={[
+                            { label: "Full-Time", value: "Full-Time" },
+                            { label: "Part-Time", value: "Part-Time" },
+                            { label: "Contract", value: "Contract" },
+                            { label: "Temporary", value: "Temporary" },
+                          ]}
+                          placeholder="Select Status"
+                          getOptionLabel={(option) => option.label}
+                          getOptionValue={(option) => option.value}
+                          className="min-w-[200px] text-xs"
                         />
                       </td>
                       <td className="px-3">
@@ -157,31 +163,16 @@ const HistoryTab = ({
                       <td className="px-3">
                         <input
                           type="text"
-                          value={item.vehicleType || ""}
+                          value={item.jobTitle || ""}
                           onChange={(e) =>
                             handleHistoryChange(
                               index,
-                              "vehicleType",
+                              "jobTitle",
                               e.target.value
                             )
                           }
-                          placeholder="Enter vehicle type"
+                          placeholder="Enter job title"
                           className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
-                        />
-                      </td>
-                      <td className="px-3">
-                        <input
-                          type="text"
-                          value={item.reasonForLeaving || ""}
-                          onChange={(e) =>
-                            handleHistoryChange(
-                              index,
-                              "reasonForLeaving",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Enter reason"
-                          className="min-w-[250px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
                         />
                       </td>
                       <td className="px-3">
