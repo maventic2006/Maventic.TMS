@@ -9,6 +9,9 @@ import {
   MapPin,
   ChevronDown,
   ChevronUp,
+  Eye,
+  Download,
+  X as CloseIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Country, State } from "country-state-city";
@@ -18,6 +21,7 @@ const DocumentsViewTab = ({ driver }) => {
   const theme = getPageTheme("tab") || {};
   const documents = driver?.documents || [];
   const [expandedDocuments, setExpandedDocuments] = useState({});
+  const [previewDocument, setPreviewDocument] = useState(null);
 
   const toggleDocument = (index) => {
     setExpandedDocuments((prev) => ({
@@ -90,6 +94,28 @@ const DocumentsViewTab = ({ driver }) => {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const handlePreview = (document) => {
+    if (document.fileData) {
+      setPreviewDocument(document);
+    }
+  };
+
+  const handleDownload = (document) => {
+    if (!document.fileData || !document.fileName) return;
+
+    // Create a download link
+    const link = document.createElement("a");
+    link.href = document.fileData;
+    link.download = document.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
   };
 
   if (documents.length === 0) {
@@ -182,7 +208,7 @@ const DocumentsViewTab = ({ driver }) => {
               </div>
             </button>
 
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {isExpanded && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
@@ -345,6 +371,48 @@ const DocumentsViewTab = ({ driver }) => {
                         )}
                       </div>
                     </div>
+
+                    {/* Document File Section */}
+                    {document.fileName && (
+                      <div
+                        className="mt-6 pt-6 border-t"
+                        style={{ borderColor: safeTheme.colors.card.border }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                              <FileText className="w-4 h-4 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800">
+                                {document.fileName}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {document.fileType || "Document"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handlePreview(document)}
+                              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View
+                            </button>
+
+                            <button
+                              onClick={() => handleDownload(document)}
+                              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
+                            >
+                              <Download className="w-4 h-4" />
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -352,6 +420,86 @@ const DocumentsViewTab = ({ driver }) => {
           </div>
         );
       })}
+
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={closePreview}
+          />
+
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-6xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Document Preview
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {previewDocument.fileName}
+                </p>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <CloseIcon className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-auto p-6">
+              {previewDocument.fileType === "application/pdf" ? (
+                <iframe
+                  src={previewDocument.fileData}
+                  className="w-full h-full min-h-[600px]"
+                  title="Document Preview"
+                />
+              ) : previewDocument.fileType?.startsWith("image/") ? (
+                <img
+                  src={previewDocument.fileData}
+                  alt={previewDocument.fileName}
+                  className="max-w-full h-auto mx-auto"
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600">
+                    Preview not available for this file type
+                  </p>
+                  <button
+                    onClick={() => handleDownload(previewDocument)}
+                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors mx-auto"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download File
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => handleDownload(previewDocument)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+              <button
+                onClick={closePreview}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

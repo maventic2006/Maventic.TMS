@@ -58,6 +58,62 @@ const generateDocumentId = async (trx = knex) => {
   throw new Error("Failed to generate unique document ID after 100 attempts");
 };
 
+const generateHistoryId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("driver_history_information")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `DHIS${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("driver_history_information")
+      .where("driver_history_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique history ID after 100 attempts");
+};
+
+const generateAccidentId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("driver_accident_violation")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `DACC${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("driver_accident_violation")
+      .where("driver_violation_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique accident/violation ID after 100 attempts"
+  );
+};
+
+const generateDocumentUploadId = async () => {
+  const result = await knex("document_upload").count("* as count").first();
+  const count = parseInt(result.count) + 1;
+  return `DU${count.toString().padStart(4, "0")}`;
+};
+
 // Validation functions
 const validatePhoneNumber = (phoneNumber) => {
   // Allow exactly 10 digits only (no country code, no special characters)
@@ -68,6 +124,85 @@ const validatePhoneNumber = (phoneNumber) => {
 const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
+};
+
+const validatePostalCode = (postalCode) => {
+  // Indian postal code: 6 digits
+  const postalRegex = /^\d{6}$/;
+  return postalRegex.test(postalCode);
+};
+
+const validateDateOfBirth = (dateOfBirth) => {
+  if (!dateOfBirth) {
+    return { isValid: false, message: "Date of birth is required" };
+  }
+
+  const dob = new Date(dateOfBirth);
+  const today = new Date();
+
+  // Check if date is in the future
+  if (dob > today) {
+    return { isValid: false, message: "Date of birth cannot be in the future" };
+  }
+
+  // Calculate age
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+
+  // Check if driver is at least 18 years old
+  if (age < 18) {
+    return {
+      isValid: false,
+      message: "Driver must be at least 18 years old",
+    };
+  }
+
+  return { isValid: true, message: "" };
+};
+
+const validateVehicleRegistrationNumber = (regNumber) => {
+  if (!regNumber) {
+    return {
+      isValid: false,
+      message: "Vehicle registration number is required",
+    };
+  }
+
+  // Indian vehicle registration format: XX00XX0000 or XX-00-XX-0000
+  // Examples: MH12AB1234, DL1CAB1234, KA01MH1234
+  const regRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$/;
+  const cleanedReg = regNumber.trim().toUpperCase().replace(/[-\s]/g, "");
+
+  if (!regRegex.test(cleanedReg)) {
+    return {
+      isValid: false,
+      message:
+        "Invalid vehicle registration number format. Expected format: XX00XX0000 (e.g., MH12AB1234)",
+    };
+  }
+
+  return { isValid: true, message: "" };
+};
+
+const validateDateRange = (fromDate, toDate, fieldName = "Date") => {
+  if (!fromDate || !toDate) {
+    return { isValid: true, message: "" }; // Allow if dates are optional
+  }
+
+  const from = new Date(fromDate);
+  const to = new Date(toDate);
+
+  if (from > to) {
+    return {
+      isValid: false,
+      message: `${fieldName}: From date must be before To date`,
+    };
+  }
+
+  return { isValid: true, message: "" };
 };
 
 // Date formatting helper
@@ -82,7 +217,7 @@ const createDriver = async (req, res) => {
   const trx = await knex.transaction();
 
   try {
-    const { basicInfo, addresses, documents } = req.body;
+    const { basicInfo, addresses, documents, history, accidents } = req.body;
 
     console.log("🔍 Starting driver creation - VALIDATION PHASE");
 
@@ -97,8 +232,23 @@ const createDriver = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Driver name must be at least 2 characters long",
+          message: ERROR_MESSAGES.DRIVER_NAME_TOO_SHORT,
           field: "fullName",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Validate date of birth
+    const dobValidation = validateDateOfBirth(basicInfo.dateOfBirth);
+    if (!dobValidation.isValid) {
+      await trx.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: dobValidation.message,
+          field: "dateOfBirth",
         },
         timestamp: new Date().toISOString(),
       });
@@ -111,8 +261,7 @@ const createDriver = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message:
-            "Please enter a valid 10-digit phone number starting with 6, 7, 8, or 9",
+          message: ERROR_MESSAGES.DRIVER_PHONE_INVALID,
           field: "phoneNumber",
         },
         timestamp: new Date().toISOString(),
@@ -126,7 +275,7 @@ const createDriver = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Please enter a valid email address",
+          message: ERROR_MESSAGES.DRIVER_EMAIL_INVALID,
           field: "emailId",
         },
         timestamp: new Date().toISOString(),
@@ -143,25 +292,35 @@ const createDriver = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Please enter a valid 10-digit alternate phone number",
+          message: ERROR_MESSAGES.ALTERNATE_PHONE_DRIVER_INVALID,
           field: "alternatePhoneNumber",
         },
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Validate WhatsApp number if provided
-    if (
-      basicInfo.whatsAppNumber &&
-      !validatePhoneNumber(basicInfo.whatsAppNumber)
-    ) {
+    // Validate emergency contact
+    if (!basicInfo.emergencyContact) {
       await trx.rollback();
       return res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Please enter a valid 10-digit WhatsApp number",
-          field: "whatsAppNumber",
+          message: ERROR_MESSAGES.EMERGENCY_CONTACT_REQUIRED,
+          field: "emergencyContact",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (!validatePhoneNumber(basicInfo.emergencyContact)) {
+      await trx.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: ERROR_MESSAGES.EMERGENCY_CONTACT_INVALID,
+          field: "emergencyContact",
         },
         timestamp: new Date().toISOString(),
       });
@@ -178,7 +337,7 @@ const createDriver = async (req, res) => {
         success: false,
         error: {
           code: "DUPLICATE_PHONE",
-          message: `Phone number ${basicInfo.phoneNumber} already exists. Please use a unique phone number`,
+          message: ERROR_MESSAGES.DUPLICATE_PHONE_DRIVER,
           field: "phoneNumber",
         },
         timestamp: new Date().toISOString(),
@@ -197,7 +356,7 @@ const createDriver = async (req, res) => {
           success: false,
           error: {
             code: "DUPLICATE_EMAIL",
-            message: `Email ${basicInfo.emailId} already exists. Please use a unique email`,
+            message: ERROR_MESSAGES.DUPLICATE_EMAIL_DRIVER,
             field: "emailId",
           },
           timestamp: new Date().toISOString(),
@@ -212,7 +371,7 @@ const createDriver = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "At least one address is required",
+          message: ERROR_MESSAGES.ADDRESS_REQUIRED,
           field: "addresses",
         },
         timestamp: new Date().toISOString(),
@@ -229,7 +388,7 @@ const createDriver = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Address ${i + 1}: Address type is required`,
+            message: ERROR_MESSAGES.ADDRESS_TYPE_REQUIRED,
             field: `addresses[${i}].addressTypeId`,
           },
           timestamp: new Date().toISOString(),
@@ -242,7 +401,7 @@ const createDriver = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Address ${i + 1}: Country is required`,
+            message: ERROR_MESSAGES.COUNTRY_REQUIRED,
             field: `addresses[${i}].country`,
           },
           timestamp: new Date().toISOString(),
@@ -255,7 +414,7 @@ const createDriver = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Address ${i + 1}: State is required`,
+            message: ERROR_MESSAGES.STATE_REQUIRED,
             field: `addresses[${i}].state`,
           },
           timestamp: new Date().toISOString(),
@@ -268,7 +427,7 @@ const createDriver = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Address ${i + 1}: City is required`,
+            message: ERROR_MESSAGES.CITY_REQUIRED,
             field: `addresses[${i}].city`,
           },
           timestamp: new Date().toISOString(),
@@ -281,7 +440,21 @@ const createDriver = async (req, res) => {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: `Address ${i + 1}: Postal code is required`,
+            message: ERROR_MESSAGES.POSTAL_CODE_REQUIRED,
+            field: `addresses[${i}].postalCode`,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Validate postal code format
+      if (!validatePostalCode(address.postalCode)) {
+        await trx.rollback();
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.POSTAL_CODE_INVALID,
             field: `addresses[${i}].postalCode`,
           },
           timestamp: new Date().toISOString(),
@@ -320,8 +493,8 @@ const createDriver = async (req, res) => {
           });
         }
 
-        // Validate document type exists and resolve ID
-        const docTypeInfo = await trx("document_name_master")
+        // Validate document name exists in document_name_master and resolve ID
+        const docNameInfo = await trx("document_name_master")
           .where(function () {
             this.where("doc_name_master_id", doc.documentType).orWhere(
               "document_name",
@@ -331,7 +504,7 @@ const createDriver = async (req, res) => {
           .where("status", "ACTIVE")
           .first();
 
-        if (!docTypeInfo) {
+        if (!docNameInfo) {
           await trx.rollback();
           return res.status(400).json({
             success: false,
@@ -346,9 +519,27 @@ const createDriver = async (req, res) => {
           });
         }
 
-        // Store resolved ID for later use
-        doc.documentTypeId = docTypeInfo.doc_name_master_id;
-        doc.documentTypeName = docTypeInfo.document_name;
+        // Store resolved ID and name for later use
+        doc.documentTypeId = docNameInfo.doc_name_master_id;
+        doc.documentTypeName = docNameInfo.document_name;
+
+        // Validate document number format
+        const docValidation = validateDocumentNumber(
+          doc.documentNumber,
+          doc.documentTypeName
+        );
+        if (!docValidation.isValid) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document ${i + 1}: ${docValidation.message}`,
+              field: `documents[${i}].documentNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
 
         // Check for duplicate document number
         const existingDocCheck = await trx("driver_documents")
@@ -366,6 +557,119 @@ const createDriver = async (req, res) => {
                 doc.documentNumber
               } already exists`,
               field: `documents[${i}].documentNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    // Validate history information if provided
+    if (history && history.length > 0) {
+      for (let i = 0; i < history.length; i++) {
+        const hist = history[i];
+
+        // Validate date range
+        if (hist.fromDate && hist.toDate) {
+          const dateValidation = validateDateRange(
+            hist.fromDate,
+            hist.toDate,
+            `History ${i + 1}`
+          );
+          if (!dateValidation.isValid) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: dateValidation.message,
+                field: `history[${i}].fromDate`,
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    // Validate accident/violation information if provided
+    if (accidents && accidents.length > 0) {
+      for (let i = 0; i < accidents.length; i++) {
+        const accident = accidents[i];
+
+        // Validate type is required
+        if (!accident.type || accident.type.trim() === "") {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${i + 1}: Type is required`,
+              field: `accidents[${i}].type`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate date is required
+        if (!accident.date || accident.date.trim() === "") {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${i + 1}: Date is required`,
+              field: `accidents[${i}].date`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate vehicle registration number is required
+        if (
+          !accident.vehicleRegistrationNumber ||
+          accident.vehicleRegistrationNumber.trim() === ""
+        ) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${
+                i + 1
+              }: Vehicle registration number is required`,
+              field: `accidents[${i}].vehicleRegistrationNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate description is required
+        if (!accident.description || accident.description.trim() === "") {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${i + 1}: Description is required`,
+              field: `accidents[${i}].description`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate vehicle registration number format
+        const regValidation = validateVehicleRegistrationNumber(
+          accident.vehicleRegistrationNumber
+        );
+        if (!regValidation.isValid) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${i + 1}: ${regValidation.message}`,
+              field: `accidents[${i}].vehicleRegistrationNumber`,
             },
             timestamp: new Date().toISOString(),
           });
@@ -398,7 +702,7 @@ const createDriver = async (req, res) => {
       blood_group: basicInfo.bloodGroup || null,
       phone_number: basicInfo.phoneNumber,
       email_id: basicInfo.emailId || null,
-      whats_app_number: basicInfo.whatsAppNumber || null,
+      emergency_contact: basicInfo.emergencyContact,
       alternate_phone_number: basicInfo.alternatePhoneNumber || null,
       avg_rating: 0.0,
       created_at: currentTimestamp,
@@ -453,8 +757,8 @@ const createDriver = async (req, res) => {
           document_id: documentId,
           document_type_id: doc.documentTypeId || doc.documentType,
           document_number: doc.documentNumber,
-          issuing_country: doc.country || null,
-          issuing_state: doc.state || null,
+          issuing_country: doc.issuingCountry || null,
+          issuing_state: doc.issuingState || null,
           valid_from: doc.validFrom || null,
           valid_to: doc.validTo || null,
           active_flag: doc.status !== false,
@@ -470,6 +774,87 @@ const createDriver = async (req, res) => {
 
         console.log(
           `✅ Document ${documentId} inserted for driver ${driverId}`
+        );
+
+        // If file data is provided, insert into document_upload table
+        if (doc.fileData) {
+          const docUploadId = await generateDocumentUploadId();
+
+          await trx("document_upload").insert({
+            document_upload_unique_id: docUploadId,
+            document_id: documentId,
+            file_name: doc.fileName || null,
+            file_type: doc.fileType || null,
+            file_xstring_value: doc.fileData,
+            system_reference_id: documentUniqueId,
+            is_verified: false,
+            valid_from: doc.validFrom || null,
+            valid_to: doc.validTo || null,
+            created_at: currentTimestamp,
+            created_on: currentTimestamp,
+            created_by: currentUser,
+            updated_at: currentTimestamp,
+            updated_on: currentTimestamp,
+            updated_by: currentUser,
+            status: "ACTIVE",
+          });
+
+          console.log(
+            `✅ Document upload ${docUploadId} inserted for document ${documentId}`
+          );
+        }
+      }
+    }
+
+    // Insert history information if provided
+    if (history && history.length > 0) {
+      for (const hist of history) {
+        const historyId = await generateHistoryId(trx);
+
+        await trx("driver_history_information").insert({
+          driver_history_id: historyId,
+          driver_id: driverId,
+          employer: hist.employer || null,
+          employment_status: hist.employmentStatus || null,
+          from_date: hist.fromDate || null,
+          to_date: hist.toDate || null,
+          job_title: hist.jobTitle || null,
+          created_at: currentTimestamp,
+          created_on: currentTimestamp,
+          created_by: currentUser,
+          updated_at: currentTimestamp,
+          updated_on: currentTimestamp,
+          updated_by: currentUser,
+          status: "ACTIVE",
+        });
+
+        console.log(`✅ History ${historyId} inserted for driver ${driverId}`);
+      }
+    }
+
+    // Insert accidents/violations if provided
+    if (accidents && accidents.length > 0) {
+      for (const accident of accidents) {
+        const accidentId = await generateAccidentId(trx);
+
+        await trx("driver_accident_violation").insert({
+          driver_violation_id: accidentId,
+          driver_id: driverId,
+          type: accident.type,
+          date: accident.date,
+          vehicle_regn_number: accident.vehicleRegistrationNumber || null,
+          description: accident.description || null,
+          created_at: currentTimestamp,
+          created_on: currentTimestamp,
+          created_by: currentUser,
+          updated_at: currentTimestamp,
+          updated_on: currentTimestamp,
+          updated_by: currentUser,
+          status: "ACTIVE",
+        });
+
+        console.log(
+          `✅ Accident/Violation ${accidentId} inserted for driver ${driverId}`
         );
       }
     }
@@ -507,7 +892,7 @@ const updateDriver = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { basicInfo, addresses, documents } = req.body;
+    const { basicInfo, addresses, documents, history, accidents } = req.body;
 
     // Validate driver exists
     const existingDriver = await trx("driver_basic_information")
@@ -531,6 +916,23 @@ const updateDriver = async (req, res) => {
 
     // Update basic info if provided
     if (basicInfo) {
+      // Validate date of birth
+      if (basicInfo.dateOfBirth) {
+        const dobValidation = validateDateOfBirth(basicInfo.dateOfBirth);
+        if (!dobValidation.isValid) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: dobValidation.message,
+              field: "dateOfBirth",
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
       // Validate phone number
       if (
         basicInfo.phoneNumber &&
@@ -614,7 +1016,7 @@ const updateDriver = async (req, res) => {
           blood_group: basicInfo.bloodGroup || null,
           phone_number: basicInfo.phoneNumber,
           email_id: basicInfo.emailId || null,
-          whats_app_number: basicInfo.whatsAppNumber || null,
+          emergency_contact: basicInfo.emergencyContact || null,
           alternate_phone_number: basicInfo.alternatePhoneNumber || null,
           updated_at: currentTimestamp,
           updated_on: currentTimestamp,
@@ -624,51 +1026,117 @@ const updateDriver = async (req, res) => {
 
     // Update addresses if provided
     if (addresses && addresses.length > 0) {
-      // Mark existing addresses as inactive
-      await trx("tms_address")
-        .where("user_reference_id", id)
-        .where("user_type", "DRIVER")
-        .update({ status: "INACTIVE" });
+      // Validate addresses first
+      for (let i = 0; i < addresses.length; i++) {
+        const address = addresses[i];
 
-      // Insert new addresses
+        // Validate postal code format
+        if (address.postalCode && !validatePostalCode(address.postalCode)) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Address ${
+                i + 1
+              }: Invalid postal code format. Must be 6 digits`,
+              field: `addresses[${i}].postalCode`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      // Update or insert addresses
       for (const address of addresses) {
-        const addressId = await generateAddressId(trx);
+        if (address.addressId) {
+          // Update existing address
+          await trx("tms_address")
+            .where("address_id", address.addressId)
+            .where("user_reference_id", id)
+            .where("user_type", "DRIVER")
+            .update({
+              country: address.country,
+              state: address.state,
+              city: address.city,
+              district: address.district || null,
+              street_1: address.street1 || null,
+              street_2: address.street2 || null,
+              postal_code: address.postalCode,
+              address_type_id: address.addressTypeId,
+              is_primary: address.isPrimary || false,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: currentUser,
+              status: "ACTIVE",
+            });
+        } else {
+          // Insert new address
+          const addressId = await generateAddressId(trx);
 
-        await trx("tms_address").insert({
-          address_id: addressId,
-          user_reference_id: id,
-          user_type: "DRIVER",
-          country: address.country,
-          state: address.state,
-          city: address.city,
-          district: address.district || null,
-          street_1: address.street1 || null,
-          street_2: address.street2 || null,
-          postal_code: address.postalCode,
-          address_type_id: address.addressTypeId,
-          is_primary: address.isPrimary || false,
-          created_at: currentTimestamp,
-          created_on: currentTimestamp,
-          created_by: currentUser,
-          updated_at: currentTimestamp,
-          updated_on: currentTimestamp,
-          updated_by: currentUser,
-          status: "ACTIVE",
-        });
+          await trx("tms_address").insert({
+            address_id: addressId,
+            user_reference_id: id,
+            user_type: "DRIVER",
+            country: address.country,
+            state: address.state,
+            city: address.city,
+            district: address.district || null,
+            street_1: address.street1 || null,
+            street_2: address.street2 || null,
+            postal_code: address.postalCode,
+            address_type_id: address.addressTypeId,
+            is_primary: address.isPrimary || false,
+            created_at: currentTimestamp,
+            created_on: currentTimestamp,
+            created_by: currentUser,
+            updated_at: currentTimestamp,
+            updated_on: currentTimestamp,
+            updated_by: currentUser,
+            status: "ACTIVE",
+          });
+        }
       }
     }
 
     // Update documents if provided
     if (documents && documents.length > 0) {
-      // Mark existing documents as inactive
+      // First, delete all existing documents with empty document_number
+      // Do this BEFORE validation to clean up any existing empty records
       await trx("driver_documents")
         .where("driver_id", id)
-        .update({ status: "INACTIVE" });
+        .where(function () {
+          this.whereNull("document_number")
+            .orWhere("document_number", "")
+            .orWhere("document_number", "");
+        })
+        .delete();
 
-      // Insert new documents
-      for (const doc of documents) {
-        // Validate and resolve document type
-        const docTypeInfo = await trx("document_name_master")
+      // Validate documents (only non-empty ones)
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
+
+        // Skip validation for empty documents (they'll be filtered out later)
+        if (!doc.documentNumber || doc.documentNumber.trim() === "") {
+          continue;
+        }
+
+        // Validate document type is provided
+        if (!doc.documentType) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document ${i + 1}: Document type is required`,
+              field: `documents[${i}].documentType`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate document name exists in document_name_master and resolve ID
+        const docNameInfo = await trx("document_name_master")
           .where(function () {
             this.where("doc_name_master_id", doc.documentType).orWhere(
               "document_name",
@@ -678,33 +1146,408 @@ const updateDriver = async (req, res) => {
           .where("status", "ACTIVE")
           .first();
 
-        if (docTypeInfo) {
-          doc.documentTypeId = docTypeInfo.doc_name_master_id;
+        if (!docNameInfo) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document ${i + 1}: Invalid document type "${
+                doc.documentType
+              }"`,
+              field: `documents[${i}].documentType`,
+            },
+            timestamp: new Date().toISOString(),
+          });
         }
 
-        const documentId = await generateDocumentId(trx);
-        const documentUniqueId = `${id}-${documentId}`;
+        // Store resolved ID and name for later use
+        doc.documentTypeId = docNameInfo.doc_name_master_id;
+        doc.documentTypeName = docNameInfo.document_name;
 
-        await trx("driver_documents").insert({
-          document_unique_id: documentUniqueId,
-          driver_id: id,
-          document_id: documentId,
-          document_type_id: doc.documentTypeId || doc.documentType,
-          document_number: doc.documentNumber,
-          issuing_country: doc.country || null,
-          issuing_state: doc.state || null,
-          valid_from: doc.validFrom || null,
-          valid_to: doc.validTo || null,
-          active_flag: doc.status !== false,
-          remarks: doc.remarks || null,
-          created_at: currentTimestamp,
-          created_on: currentTimestamp,
-          created_by: currentUser,
-          updated_at: currentTimestamp,
-          updated_on: currentTimestamp,
-          updated_by: currentUser,
-          status: "ACTIVE",
-        });
+        // Validate document number format - MANDATORY
+        const docValidation = validateDocumentNumber(
+          doc.documentNumber,
+          doc.documentTypeName
+        );
+        if (!docValidation.isValid) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document ${i + 1}: ${docValidation.message}`,
+              field: `documents[${i}].documentNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Check for duplicate document number (excluding the current document being updated)
+        const duplicateCheck = await trx("driver_documents")
+          .where("document_type_id", doc.documentTypeId)
+          .where("document_number", doc.documentNumber)
+          .where("driver_id", "!=", id)
+          .first();
+
+        if (duplicateCheck) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "DUPLICATE_DOCUMENT",
+              message: `Document ${i + 1}: ${doc.documentTypeName} number ${
+                doc.documentNumber
+              } already exists for another driver`,
+              field: `documents[${i}].documentNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      // Update or insert documents
+      for (const doc of documents) {
+        // Skip documents without document number (empty documents)
+        if (!doc.documentNumber || doc.documentNumber.trim() === "") {
+          continue;
+        }
+
+        if (doc.documentId) {
+          // Update existing document
+          await trx("driver_documents")
+            .where("document_id", doc.documentId)
+            .where("driver_id", id)
+            .update({
+              document_type_id: doc.documentTypeId || doc.documentType,
+              document_number: doc.documentNumber,
+              issuing_country: doc.issuingCountry || null,
+              issuing_state: doc.issuingState || null,
+              valid_from: doc.validFrom || null,
+              valid_to: doc.validTo || null,
+              active_flag: doc.status !== false,
+              remarks: doc.remarks || null,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: currentUser,
+              status: "ACTIVE",
+            });
+
+          // Handle file upload for existing document
+          if (doc.fileData) {
+            // Check if document_upload record exists
+            const existingUpload = await trx("document_upload")
+              .where("document_id", doc.documentId)
+              .first();
+
+            if (existingUpload) {
+              // Update existing upload
+              await trx("document_upload")
+                .where("document_id", doc.documentId)
+                .update({
+                  file_name: doc.fileName || null,
+                  file_type: doc.fileType || null,
+                  file_xstring_value: doc.fileData,
+                  is_verified: false,
+                  valid_from: doc.validFrom || null,
+                  valid_to: doc.validTo || null,
+                  updated_at: currentTimestamp,
+                  updated_on: currentTimestamp,
+                  updated_by: currentUser,
+                });
+
+              console.log(
+                `✅ Document upload updated for document ${doc.documentId}`
+              );
+            } else {
+              // Insert new upload for existing document
+              const docUploadId = await generateDocumentUploadId();
+              const documentUniqueId = `${id}-${doc.documentId}`;
+
+              await trx("document_upload").insert({
+                document_upload_unique_id: docUploadId,
+                document_id: doc.documentId,
+                file_name: doc.fileName || null,
+                file_type: doc.fileType || null,
+                file_xstring_value: doc.fileData,
+                system_reference_id: documentUniqueId,
+                is_verified: false,
+                valid_from: doc.validFrom || null,
+                valid_to: doc.validTo || null,
+                created_at: currentTimestamp,
+                created_on: currentTimestamp,
+                created_by: currentUser,
+                updated_at: currentTimestamp,
+                updated_on: currentTimestamp,
+                updated_by: currentUser,
+                status: "ACTIVE",
+              });
+
+              console.log(
+                `✅ Document upload ${docUploadId} inserted for document ${doc.documentId}`
+              );
+            }
+          }
+        } else {
+          // Insert new document
+          const documentId = await generateDocumentId(trx);
+          const documentUniqueId = `${id}-${documentId}`;
+
+          await trx("driver_documents").insert({
+            document_unique_id: documentUniqueId,
+            driver_id: id,
+            document_id: documentId,
+            document_type_id: doc.documentTypeId || doc.documentType,
+            document_number: doc.documentNumber,
+            issuing_country: doc.issuingCountry || null,
+            issuing_state: doc.issuingState || null,
+            valid_from: doc.validFrom || null,
+            valid_to: doc.validTo || null,
+            active_flag: doc.status !== false,
+            remarks: doc.remarks || null,
+            created_at: currentTimestamp,
+            created_on: currentTimestamp,
+            created_by: currentUser,
+            updated_at: currentTimestamp,
+            updated_on: currentTimestamp,
+            updated_by: currentUser,
+            status: "ACTIVE",
+          });
+
+          // If file data is provided for new document, insert into document_upload table
+          if (doc.fileData) {
+            const docUploadId = await generateDocumentUploadId();
+
+            await trx("document_upload").insert({
+              document_upload_unique_id: docUploadId,
+              document_id: documentId,
+              file_name: doc.fileName || null,
+              file_type: doc.fileType || null,
+              file_xstring_value: doc.fileData,
+              system_reference_id: documentUniqueId,
+              is_verified: false,
+              valid_from: doc.validFrom || null,
+              valid_to: doc.validTo || null,
+              created_at: currentTimestamp,
+              created_on: currentTimestamp,
+              created_by: currentUser,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: currentUser,
+              status: "ACTIVE",
+            });
+
+            console.log(
+              `✅ Document upload ${docUploadId} inserted for document ${documentId}`
+            );
+          }
+        }
+      }
+    }
+
+    // Update history if provided
+    if (history && history.length > 0) {
+      // First, delete all existing history records with all null fields (empty records)
+      await trx("driver_history_information")
+        .where("driver_id", id)
+        .where(function () {
+          this.whereNull("employer")
+            .whereNull("employment_status")
+            .whereNull("from_date")
+            .whereNull("to_date")
+            .whereNull("job_title");
+        })
+        .delete();
+
+      for (const hist of history) {
+        // Skip empty history records (no meaningful data)
+        if (
+          !hist.employer &&
+          !hist.employmentStatus &&
+          !hist.fromDate &&
+          !hist.toDate &&
+          !hist.jobTitle
+        ) {
+          continue;
+        }
+
+        if (hist.historyId) {
+          // Update existing history record
+          await trx("driver_history_information")
+            .where("driver_history_id", hist.historyId)
+            .where("driver_id", id)
+            .update({
+              employer: hist.employer || null,
+              employment_status: hist.employmentStatus || null,
+              from_date: hist.fromDate || null,
+              to_date: hist.toDate || null,
+              job_title: hist.jobTitle || null,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: currentUser,
+              status: "ACTIVE",
+            });
+        } else {
+          // Insert new history record
+          const historyId = await generateHistoryId(trx);
+
+          await trx("driver_history_information").insert({
+            driver_history_id: historyId,
+            driver_id: id,
+            employer: hist.employer || null,
+            employment_status: hist.employmentStatus || null,
+            from_date: hist.fromDate || null,
+            to_date: hist.toDate || null,
+            job_title: hist.jobTitle || null,
+            created_at: currentTimestamp,
+            created_on: currentTimestamp,
+            created_by: currentUser,
+            updated_at: currentTimestamp,
+            updated_on: currentTimestamp,
+            updated_by: currentUser,
+            status: "ACTIVE",
+          });
+        }
+      }
+    }
+
+    // Update accidents/violations if provided
+    if (accidents && accidents.length > 0) {
+      // Validate accidents first
+      for (let i = 0; i < accidents.length; i++) {
+        const accident = accidents[i];
+
+        // Skip validation for empty records that will be deleted
+        if (!accident.type && !accident.date) {
+          continue;
+        }
+
+        // Validate type is required
+        if (!accident.type || accident.type.trim() === "") {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${i + 1}: Type is required`,
+              field: `accidents[${i}].type`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate date is required
+        if (!accident.date || accident.date.trim() === "") {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${i + 1}: Date is required`,
+              field: `accidents[${i}].date`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate vehicle registration number is required
+        const vehicleRegNum =
+          accident.vehicleRegnNumber || accident.vehicleRegistrationNumber;
+        if (!vehicleRegNum || vehicleRegNum.trim() === "") {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${
+                i + 1
+              }: Vehicle registration number is required`,
+              field: `accidents[${i}].vehicleRegnNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate description is required
+        if (!accident.description || accident.description.trim() === "") {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${i + 1}: Description is required`,
+              field: `accidents[${i}].description`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Validate vehicle registration number format
+        const regValidation = validateVehicleRegistrationNumber(vehicleRegNum);
+        if (!regValidation.isValid) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Accident/Violation ${i + 1}: ${regValidation.message}`,
+              field: `accidents[${i}].vehicleRegnNumber`,
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+
+      // First, delete all existing accident records with missing required fields (empty records)
+      await trx("driver_accident_violation")
+        .where("driver_id", id)
+        .where(function () {
+          this.whereNull("type").orWhereNull("date").orWhere("type", "");
+          // Don't check for date = '' as DATE column can't be empty string
+        })
+        .delete();
+
+      for (const accident of accidents) {
+        // Skip empty accident records (missing required fields)
+        if (!accident.type || !accident.date) {
+          continue;
+        }
+
+        if (accident.violationId) {
+          // Update existing accident/violation record
+          await trx("driver_accident_violation")
+            .where("driver_violation_id", accident.violationId)
+            .where("driver_id", id)
+            .update({
+              type: accident.type,
+              date: accident.date,
+              vehicle_regn_number: accident.vehicleRegnNumber || null,
+              description: accident.description || null,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: currentUser,
+              status: "ACTIVE",
+            });
+        } else {
+          // Insert new accident/violation record
+          const accidentId = await generateAccidentId(trx);
+
+          await trx("driver_accident_violation").insert({
+            driver_violation_id: accidentId,
+            driver_id: id,
+            type: accident.type,
+            date: accident.date,
+            vehicle_regn_number: accident.vehicleRegnNumber || null,
+            description: accident.description || null,
+            created_at: currentTimestamp,
+            created_on: currentTimestamp,
+            created_by: currentUser,
+            updated_at: currentTimestamp,
+            updated_on: currentTimestamp,
+            updated_by: currentUser,
+            status: "ACTIVE",
+          });
+        }
       }
     }
 
@@ -792,7 +1635,7 @@ const getDrivers = async (req, res) => {
         "dbi.blood_group",
         "dbi.phone_number",
         "dbi.email_id",
-        "dbi.whats_app_number",
+        "dbi.emergency_contact",
         "dbi.alternate_phone_number",
         "dbi.avg_rating",
         "dbi.status",
@@ -969,7 +1812,7 @@ const getDrivers = async (req, res) => {
       bloodGroup: driver.blood_group,
       phoneNumber: driver.phone_number,
       emailId: driver.email_id,
-      whatsAppNumber: driver.whats_app_number,
+      emergencyContact: driver.emergency_contact,
       alternatePhoneNumber: driver.alternate_phone_number,
       avgRating: driver.avg_rating || 0,
       status: driver.status,
@@ -1030,23 +1873,36 @@ const getDriverById = async (req, res) => {
       });
     }
 
-    // Get addresses for this driver
-    const addresses = await knex("tms_address")
-      .where("user_reference_id", id)
-      .where("user_type", "DRIVER")
-      .where("status", "ACTIVE")
-      .select("*");
+    // Get addresses for this driver with address type name
+    const addresses = await knex("tms_address as ta")
+      .leftJoin(
+        "address_type_master as atm",
+        "ta.address_type_id",
+        "atm.address_type_id"
+      )
+      .where("ta.user_reference_id", id)
+      .where("ta.user_type", "DRIVER")
+      .where("ta.status", "ACTIVE")
+      .select("ta.*", "atm.address as addressTypeName");
 
-    // Get documents for this driver
+    // Get documents for this driver with file upload information
     const documents = await knex("driver_documents as dd")
       .leftJoin(
         "document_name_master as dnm",
         "dd.document_type_id",
         "dnm.doc_name_master_id"
       )
+      .leftJoin("document_upload as du", "dd.document_id", "du.document_id")
       .where("dd.driver_id", id)
       .where("dd.status", "ACTIVE")
-      .select("dd.*", "dnm.document_name as documentTypeName");
+      .select(
+        "dd.*",
+        "dnm.document_name as documentTypeName",
+        "du.file_name as fileName",
+        "du.file_type as fileType",
+        "du.file_xstring_value as fileData",
+        "du.is_verified as isVerified"
+      );
 
     // Get history information
     const history = await knex("driver_history_information")
@@ -1055,12 +1911,17 @@ const getDriverById = async (req, res) => {
       .orderBy("from_date", "desc")
       .select("*");
 
-    // Get accident/violation records
-    const accidents = await knex("driver_accident_violation")
-      .where("driver_id", id)
-      .where("status", "ACTIVE")
-      .orderBy("date", "desc")
-      .select("*");
+    // Get accident/violation records with violation type name
+    const accidents = await knex("driver_accident_violation as dav")
+      .leftJoin(
+        "violation_type_master as vtm",
+        "dav.type",
+        "vtm.violation_type_id"
+      )
+      .where("dav.driver_id", id)
+      .where("dav.status", "ACTIVE")
+      .orderBy("dav.date", "desc")
+      .select("dav.*", "vtm.violation_type as violationTypeName");
 
     // Get transporter mappings
     const transporterMappings = await knex("transporter_driver_mapping as tdm")
@@ -1086,9 +1947,30 @@ const getDriverById = async (req, res) => {
       .where("status", "ACTIVE")
       .select("*");
 
+    // Calculate dashboard metrics
+    const totalAccidents = accidents.filter(
+      (acc) => acc.type === "VT001" || acc.violationTypeName === "Accident"
+    ).length;
+
+    const totalViolations = accidents.filter(
+      (acc) => acc.type === "VT002" || acc.violationTypeName === "Violation"
+    ).length;
+
+    const avgRating = driver.avg_rating || "0.00";
+
+    // Dashboard metrics object
+    const dashboardMetrics = {
+      avgRating: parseFloat(avgRating),
+      totalTrips: 0, // No trips table available yet
+      tripsOnTime: 0, // No trips table available yet
+      totalAccidents,
+      totalViolations,
+    };
+
     // Format response
     const response = {
       driverId: driver.driver_id,
+      dashboard: dashboardMetrics,
       basicInfo: {
         fullName: driver.full_name,
         dateOfBirth: formatDateForInput(driver.date_of_birth),
@@ -1096,7 +1978,7 @@ const getDriverById = async (req, res) => {
         bloodGroup: driver.blood_group,
         phoneNumber: driver.phone_number,
         emailId: driver.email_id,
-        whatsAppNumber: driver.whats_app_number,
+        emergencyContact: driver.emergency_contact,
         alternatePhoneNumber: driver.alternate_phone_number,
         avgRating: driver.avg_rating,
         status: driver.status,
@@ -1105,18 +1987,40 @@ const getDriverById = async (req, res) => {
         updatedBy: driver.updated_by,
         updatedOn: formatDateForInput(driver.updated_on),
       },
-      addresses: addresses.map((addr) => ({
-        addressId: addr.address_id,
-        addressTypeId: addr.address_type_id,
-        country: addr.country,
-        state: addr.state,
-        city: addr.city,
-        district: addr.district,
-        street1: addr.street_1,
-        street2: addr.street_2,
-        postalCode: addr.postal_code,
-        isPrimary: addr.is_primary,
-      })),
+      addresses: addresses.map((addr) => {
+        // Convert ISO codes to names for display
+        let countryName = addr.country;
+        let stateName = addr.state;
+
+        // Get country name from ISO code
+        if (addr.country && addr.country.length === 2) {
+          const countryObj = Country.getCountryByCode(addr.country);
+          countryName = countryObj ? countryObj.name : addr.country;
+        }
+
+        // Get state name from ISO code
+        if (addr.state && addr.state.length <= 3 && addr.country) {
+          const stateObj = State.getStateByCodeAndCountry(
+            addr.state,
+            addr.country
+          );
+          stateName = stateObj ? stateObj.name : addr.state;
+        }
+
+        return {
+          addressId: addr.address_id,
+          addressTypeId: addr.address_type_id,
+          addressType: addr.addressTypeName || addr.address_type_id,
+          country: countryName,
+          state: stateName,
+          city: addr.city,
+          district: addr.district,
+          street1: addr.street_1,
+          street2: addr.street_2,
+          postalCode: addr.postal_code,
+          isPrimary: addr.is_primary,
+        };
+      }),
       documents: documents.map((doc) => ({
         documentId: doc.document_id,
         documentType: doc.documentTypeName || doc.document_type_id,
@@ -1128,6 +2032,10 @@ const getDriverById = async (req, res) => {
         validTo: formatDateForInput(doc.valid_to),
         status: doc.active_flag,
         remarks: doc.remarks,
+        fileName: doc.fileName,
+        fileType: doc.fileType,
+        fileData: doc.fileData,
+        isVerified: doc.isVerified,
       })),
       history: history.map((hist) => ({
         historyId: hist.driver_history_id,
@@ -1140,7 +2048,7 @@ const getDriverById = async (req, res) => {
       })),
       accidents: accidents.map((acc) => ({
         violationId: acc.driver_violation_id,
-        type: acc.type,
+        type: acc.violationTypeName || acc.type,
         description: acc.description,
         date: formatDateForInput(acc.date),
         vehicleRegnNumber: acc.vehicle_regn_number,
@@ -1201,49 +2109,21 @@ const getMasterData = async (req, res) => {
       name: country.name,
     }));
 
-    // Get document types (driver-specific) with fallback
+    // Get document names (driver-specific: licenses, ID proofs) from document_name_master
     let documentTypes = [];
     try {
-      documentTypes = await knex("document_type_master")
-        .select("document_type_id as value", "document_type as label")
-        .where("status", "ACTIVE")
-        .orderBy("document_type");
-    } catch (err) {
-      console.warn("document_type_master table error:", err.message);
-      documentTypes = [
-        { value: "DT001", label: "License" },
-        { value: "DT002", label: "ID Proof" },
-      ];
-    }
-
-    // Get document names (driver-specific: licenses, ID proofs) with fallback
-    let documentNames = [];
-    try {
-      documentNames = await knex("document_name_master")
+      documentTypes = await knex("document_name_master")
         .select("doc_name_master_id as value", "document_name as label")
         .where("status", "ACTIVE")
-        .whereIn("doc_name_master_id", [
-          "LIC001",
-          "LIC002",
-          "LIC003",
-          "LIC004",
-          "LIC005",
-          "LIC006",
-          "ID001",
-          "ID002",
-        ])
         .orderBy("document_name");
     } catch (err) {
       console.warn("document_name_master table error:", err.message);
-      documentNames = [
-        { value: "LIC001", label: "LMV" },
-        { value: "LIC002", label: "TRANS" },
-        { value: "LIC003", label: "HGMV" },
-        { value: "LIC004", label: "HMV" },
-        { value: "LIC005", label: "HPMV" },
-        { value: "LIC006", label: "LDRXCV" },
-        { value: "ID001", label: "Pan" },
-        { value: "ID002", label: "Aadhar" },
+      documentTypes = [
+        { value: "LIC001", label: "Driving License" },
+        { value: "ID001", label: "PAN Card" },
+        { value: "ID002", label: "Aadhar Card" },
+        { value: "ID003", label: "Passport" },
+        { value: "ID004", label: "Voter ID" },
       ];
     }
 
@@ -1291,15 +2171,30 @@ const getMasterData = async (req, res) => {
       { value: "O-", label: "O-" },
     ];
 
+    // Get violation types with fallback
+    let violationTypes = [];
+    try {
+      violationTypes = await knex("violation_type_master")
+        .select("violation_type_id as value", "violation_type as label")
+        .where("status", "ACTIVE")
+        .orderBy("violation_type");
+    } catch (err) {
+      console.warn("violation_type_master table error:", err.message);
+      violationTypes = [
+        { value: "VT001", label: "Accident" },
+        { value: "VT002", label: "Violation" },
+      ];
+    }
+
     res.json({
       success: true,
       data: {
         countries,
         documentTypes,
-        documentNames,
         addressTypes,
         genderOptions,
         bloodGroupOptions,
+        violationTypes,
       },
       timestamp: new Date().toISOString(),
     });

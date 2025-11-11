@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import TMSHeader from "../../../components/layout/TMSHeader";
 import {
   ArrowLeft,
   RefreshCw,
@@ -21,13 +20,17 @@ import {
   clearLastCreated,
 } from "../../../redux/slices/driverSlice";
 import { addToast } from "../../../redux/slices/uiSlice";
-import { TOAST_TYPES } from "../../../utils/constants";
+import { TOAST_TYPES, ERROR_MESSAGES } from "../../../utils/constants";
+import { createDriverSchema, formatFieldName } from "../validation";
 
 // Import tab components
 import BasicInfoTab from "../components/BasicInfoTab";
 import DocumentsTab from "../components/DocumentsTab";
 import HistoryTab from "../components/HistoryTab";
 import AccidentViolationTab from "../components/AccidentViolationTab";
+import DriverBulkUploadModal from "../components/DriverBulkUploadModal";
+import TMSHeader from "@/components/layout/TMSHeader";
+import { getPageTheme } from "@/theme.config";
 
 const DriverCreatePage = () => {
   const dispatch = useDispatch();
@@ -46,7 +49,7 @@ const DriverCreatePage = () => {
       bloodGroup: "",
       phoneNumber: "",
       emailId: "",
-      whatsAppNumber: "",
+      emergencyContact: "",
       alternatePhoneNumber: "",
     },
     addresses: [
@@ -62,9 +65,35 @@ const DriverCreatePage = () => {
         addressTypeId: "",
       },
     ],
-    documents: [],
-    history: [],
-    accidents: [],
+    documents: [
+      {
+        documentType: "",
+        documentNumber: "",
+        issuingCountry: "",
+        issuingState: "",
+        validFrom: "",
+        validTo: "",
+        status: true,
+        // Note: File uploads will be handled separately via document_upload table
+      },
+    ],
+    history: [
+      {
+        employer: "",
+        employmentStatus: "",
+        fromDate: "",
+        toDate: "",
+        jobTitle: "",
+      },
+    ],
+    accidents: [
+      {
+        type: "",
+        date: "",
+        description: "",
+        vehicleRegistrationNumber: "",
+      },
+    ],
   });
 
   const [validationErrors, setValidationErrors] = useState({});
@@ -74,6 +103,7 @@ const DriverCreatePage = () => {
     2: false, // History
     3: false, // Accident & Violation
   });
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
 
   const tabs = [
     {
@@ -104,7 +134,7 @@ const DriverCreatePage = () => {
 
   // Load master data on component mount
   useEffect(() => {
-    if (masterData?.genders?.length === 0) {
+    if (!masterData?.genderOptions || masterData?.genderOptions?.length === 0) {
       console.log("🔄 Attempting to fetch master data...");
       dispatch(fetchMasterData()).catch((error) => {
         console.log(
@@ -113,7 +143,7 @@ const DriverCreatePage = () => {
         );
       });
     }
-  }, [dispatch, masterData?.genders?.length]);
+  }, [dispatch, masterData?.genderOptions?.length]);
 
   // Clear any previous errors on mount
   useEffect(() => {
@@ -213,7 +243,7 @@ const DriverCreatePage = () => {
           bloodGroup: "",
           phoneNumber: "",
           emailId: "",
-          whatsAppNumber: "",
+          emergencyContact: "",
           alternatePhoneNumber: "",
         },
         addresses: [
@@ -229,9 +259,34 @@ const DriverCreatePage = () => {
             addressTypeId: "",
           },
         ],
-        documents: [],
-        history: [],
-        accidents: [],
+        documents: [
+          {
+            documentType: "",
+            documentNumber: "",
+            issuingCountry: "",
+            issuingState: "",
+            validFrom: "",
+            validTo: "",
+            status: true,
+          },
+        ],
+        history: [
+          {
+            employer: "",
+            employmentStatus: "",
+            fromDate: "",
+            toDate: "",
+            jobTitle: "",
+          },
+        ],
+        accidents: [
+          {
+            type: "",
+            date: "",
+            description: "",
+            vehicleRegistrationNumber: "",
+          },
+        ],
       });
       setValidationErrors({});
       setTabErrors({
@@ -245,38 +300,172 @@ const DriverCreatePage = () => {
   };
 
   const handleSubmit = async () => {
-    // Clear any previous errors
+    // Clear previous errors
     setValidationErrors({});
+    setTabErrors({
+      0: false,
+      1: false,
+      2: false,
+      3: false,
+    });
 
-    // Prepare data for API
-    const driverData = {
-      basicInfo: formData.basicInfo,
-      addresses: formData.addresses,
-      documents: formData.documents,
-      history: formData.history,
-      accidents: formData.accidents,
-    };
+    // Validate entire form
+    const validation = createDriverSchema.safeParse(formData);
 
-    // Dispatch the create action
-    dispatch(createDriver(driverData));
+    if (!validation.success) {
+      // Process validation errors
+      const errors = {};
+      const allErrorMessages = [];
+
+      validation.error.issues.forEach((issue) => {
+        const path = issue.path.join(".");
+        if (!errors[path]) {
+          // Extract the actual error message properly - handle all formats
+          let errorMessage = "Validation error";
+
+          if (typeof issue.message === "string") {
+            errorMessage = issue.message;
+          } else if (issue.message && typeof issue.message === "object") {
+            // If message is an object, extract the inner message
+            errorMessage = issue.message.message || "Validation error";
+          }
+
+          errors[path] = errorMessage;
+
+          // Format error messages with section and field name
+          const pathParts = issue.path;
+          let formattedMessage = errorMessage;
+
+          if (pathParts.length > 0) {
+            const section = pathParts[0];
+            const fieldOrIndex = pathParts[1];
+            const fieldName = pathParts[2] || pathParts[1];
+
+            // Create user-friendly error message
+            if (section === "basicInfo") {
+              const field = formatFieldName(fieldName);
+              formattedMessage = `Basic Information - ${field}: ${errorMessage}`;
+            } else if (section === "addresses" && !isNaN(fieldOrIndex)) {
+              const field = formatFieldName(fieldName);
+              formattedMessage = `Address ${
+                parseInt(fieldOrIndex) + 1
+              } - ${field}: ${errorMessage}`;
+            } else if (section === "documents" && !isNaN(fieldOrIndex)) {
+              const field = formatFieldName(fieldName);
+              formattedMessage = `Document ${
+                parseInt(fieldOrIndex) + 1
+              } - ${field}: ${errorMessage}`;
+            } else if (section === "history" && !isNaN(fieldOrIndex)) {
+              const field = formatFieldName(fieldName);
+              formattedMessage = `History ${
+                parseInt(fieldOrIndex) + 1
+              } - ${field}: ${errorMessage}`;
+            } else if (section === "accidents" && !isNaN(fieldOrIndex)) {
+              const field = formatFieldName(fieldName);
+              formattedMessage = `Accident/Violation ${
+                parseInt(fieldOrIndex) + 1
+              } - ${field}: ${errorMessage}`;
+            }
+          }
+
+          // Only add if we have a clean error message (not a JSON string)
+          if (
+            !formattedMessage.startsWith("[") &&
+            !formattedMessage.startsWith("{")
+          ) {
+            allErrorMessages.push(formattedMessage);
+          }
+        }
+      });
+
+      // Convert flat error paths to nested structure for easier component access
+      const nestedErrors = {};
+      Object.keys(errors).forEach((path) => {
+        const parts = path.split(".");
+        let current = nestedErrors;
+
+        for (let i = 0; i < parts.length - 1; i++) {
+          const part = parts[i];
+          const nextPart = parts[i + 1];
+
+          // Check if next part is a number (array index)
+          if (!isNaN(nextPart)) {
+            if (!Array.isArray(current[part])) {
+              current[part] = [];
+            }
+            const index = parseInt(nextPart);
+            if (!current[part][index]) {
+              current[part][index] = {};
+            }
+            current = current[part][index];
+            i++; // Skip the index part as we've already processed it
+          } else {
+            if (!current[part]) {
+              current[part] = {};
+            }
+            current = current[part];
+          }
+        }
+
+        const lastPart = parts[parts.length - 1];
+        current[lastPart] = errors[path];
+      });
+
+      setValidationErrors(nestedErrors);
+
+      // Determine which tabs have errors
+      const newTabErrors = {
+        0: !!nestedErrors.basicInfo || !!nestedErrors.addresses,
+        1: !!nestedErrors.documents,
+        2: !!nestedErrors.history,
+        3: !!nestedErrors.accidents,
+      };
+      setTabErrors(newTabErrors);
+
+      // Find the first tab with errors and switch to it
+      const tabsWithErrors = [];
+      if (newTabErrors[0]) tabsWithErrors.push(0);
+      if (newTabErrors[1]) tabsWithErrors.push(1);
+      if (newTabErrors[2]) tabsWithErrors.push(2);
+      if (newTabErrors[3]) tabsWithErrors.push(3);
+
+      if (tabsWithErrors.length > 0) {
+        setActiveTab(tabsWithErrors[0]);
+      }
+
+      // Get unique error messages (limit to first 10 for readability)
+      const uniqueErrors = [...new Set(allErrorMessages)].slice(0, 10);
+
+      // Show toast notification with error details
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: ERROR_MESSAGES.VALIDATION_ERROR,
+          details: uniqueErrors,
+          duration: 8000,
+        })
+      );
+
+      return;
+    }
+
+    // Submit valid data
+    dispatch(createDriver(formData));
   };
 
   const handleBulkUpload = useCallback(() => {
-    // Placeholder for bulk upload functionality
-    dispatch(
-      addToast({
-        type: TOAST_TYPES.INFO,
-        message: "Bulk upload feature coming soon",
-        duration: 3000,
-      })
-    );
-  }, [dispatch]);
+    // Open bulk upload modal
+    setIsBulkUploadModalOpen(true);
+  }, []);
 
   const canSubmit = true; // Always allow submission
 
+  const theme = getPageTheme("list");
+
   return (
-<<<<<<< Updated upstream
     <div className="bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
+      <TMSHeader theme={theme} />
+
       {/* Modern Header Bar with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
         {/* Background decoration */}
@@ -425,58 +614,6 @@ const DriverCreatePage = () => {
                       masterData={masterData}
                       isLoading={isLoading}
                     />
-=======
-    <div
-      className="min-h-screen"
-      style={{
-        background: `linear-gradient(to bottom right, ${safeTheme.colors.primary.background}, #f0f4f8, #e6f0ff)`,
-      }}
-    >
-      <TMSHeader theme={safeTheme} />
-      <div className="p-4 lg:p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <Card
-          className="overflow-hidden border shadow-md"
-          style={{
-            backgroundColor: safeTheme.colors.card.background,
-            borderColor: safeTheme.colors.card.border,
-          }}
-        >
-          <div className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Button
-                  onClick={handleBack}
-                  style={{
-                    backgroundColor: safeActionButtonTheme.secondary.background,
-                    color: safeActionButtonTheme.secondary.text,
-                    borderColor: safeActionButtonTheme.secondary.border,
-                  }}
-                  className="flex items-center space-x-2 border hover:opacity-90 transition-opacity"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>Back</span>
-                </Button>
-                <div className="flex items-center space-x-3">
-                  <User
-                    className="h-8 w-8"
-                    style={{ color: safeActionButtonTheme.primary.background }}
-                  />
-                  <div>
-                    <h1
-                      className="text-2xl font-bold"
-                      style={{ color: safeTheme.colors.text.primary }}
-                    >
-                      Create Driver
-                    </h1>
-                    <p
-                      className="text-sm"
-                      style={{ color: safeTheme.colors.text.secondary }}
-                    >
-                      Add a new driver to the system
-                    </p>
->>>>>>> Stashed changes
                   </div>
                 </div>
               </div>
@@ -484,7 +621,12 @@ const DriverCreatePage = () => {
           })}
         </div>
       </div>
-      </div>
+
+      {/* Bulk Upload Modal */}
+      <DriverBulkUploadModal
+        isOpen={isBulkUploadModalOpen}
+        onClose={() => setIsBulkUploadModalOpen(false)}
+      />
     </div>
   );
 };

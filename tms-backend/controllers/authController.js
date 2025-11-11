@@ -328,6 +328,66 @@ const logout = (req, res) => {
   });
 };
 
+/**
+ * Refresh Token Controller
+ * Generates a new JWT token for authenticated users to extend their session
+ */
+const refreshToken = async (req, res) => {
+  try {
+    // User is already authenticated via authenticateToken middleware
+    const { user_id, user_type_id, user_full_name, role } = req.user;
+
+    // Verify user still exists and is active
+    const user = await knex("user_master")
+      .where({ user_id: user_id })
+      .andWhere({ status: "ACTIVE" })
+      .first();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found or inactive",
+      });
+    }
+
+    // Generate new JWT token with extended expiry
+    const newToken = jwt.sign(
+      {
+        user_id: user.user_id,
+        user_type_id: user.user_type_id,
+        user_full_name: user.user_full_name,
+        role: role,
+      },
+      JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+
+    // Update cookie with new token
+    const isProduction = process.env.NODE_ENV === "production";
+    res.cookie("authToken", newToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "strict",
+    });
+
+    // Return user data (excluding password)
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      message: "Token refreshed successfully",
+      token: newToken,
+      user: userWithoutPassword,
+    });
+  } catch (error) {
+    console.error("Refresh token error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to refresh token",
+    });
+  }
+};
+
 module.exports = {
   login,
   resetPassword,
@@ -335,4 +395,5 @@ module.exports = {
   getUserTypes,
   getUserApplications,
   logout,
+  refreshToken,
 };

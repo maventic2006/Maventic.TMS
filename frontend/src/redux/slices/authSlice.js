@@ -32,7 +32,10 @@ export const loginUser = createAsyncThunk(
         console.log("✅ Backend is reachable");
       } catch (healthError) {
         console.error("❌ Backend health check failed:", healthError);
-        if (healthError.name === "TimeoutError" || healthError.name === "AbortError") {
+        if (
+          healthError.name === "TimeoutError" ||
+          healthError.name === "AbortError"
+        ) {
           return rejectWithValue(
             "Backend server is not responding. Please ensure the server is running on http://localhost:5000"
           );
@@ -101,7 +104,8 @@ export const loginUser = createAsyncThunk(
         );
       } else if (
         error.name === "TypeError" &&
-        (error.message.includes("fetch") || error.message.includes("Failed to fetch"))
+        (error.message.includes("fetch") ||
+          error.message.includes("Failed to fetch"))
       ) {
         console.error("🌐 Network error - cannot reach server");
         return rejectWithValue(
@@ -127,9 +131,24 @@ export const loginUser = createAsyncThunk(
 export const refreshToken = createAsyncThunk(
   "auth/refreshToken",
   async (_, { rejectWithValue }) => {
-    // Refresh token endpoint not implemented yet
-    // For cookie-based auth, just reject and redirect to login
-    return rejectWithValue("Token refresh not implemented");
+    try {
+      const response = await api.post("/auth/refresh");
+
+      if (response.data.success) {
+        const { user, token } = response.data;
+
+        // Store new token in sessionStorage for multi-tab access
+        sessionStorage.setItem("authToken", token);
+
+        return { user, token };
+      } else {
+        return rejectWithValue(response.data.message || "Token refresh failed");
+      }
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Token refresh failed"
+      );
+    }
   }
 );
 
@@ -341,6 +360,23 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
       })
       // Refresh Token
+      .addCase(refreshToken.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(refreshToken.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload.user;
+        state.isAuthenticated = true;
+        const role = mapUserTypeToRole(action.payload.user?.user_type_id);
+        state.role = role;
+        state.permissions = action.payload.user?.permissions || [];
+        // Persist to localStorage
+        saveAuthToStorage(
+          action.payload.user,
+          role,
+          action.payload.user?.permissions || []
+        );
+      })
       .addCase(refreshToken.rejected, (state) => {
         state.user = null;
         state.isAuthenticated = false;

@@ -53,6 +53,18 @@ const documentValidationPatterns = {
     format: "ID123456",
     description: "6-20 alphanumeric characters with hyphens/slashes allowed",
   },
+  "Driving License": {
+    regex: /^[A-Z]{2}[0-9]{2}[0-9]{11}$/,
+    format: "DL0120230012345",
+    description:
+      "State Code (2 letters) + RTO Code (2 digits) + Issue Year (4 digits) + Unique Number (7 digits)",
+  },
+  "Driver License": {
+    regex: /^[A-Z]{2}[0-9]{2}[0-9]{11}$/,
+    format: "DL0120230012345",
+    description:
+      "State Code (2 letters) + RTO Code (2 digits) + Issue Year (4 digits) + Unique Number (7 digits)",
+  },
 };
 
 /**

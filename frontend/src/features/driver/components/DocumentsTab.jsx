@@ -1,5 +1,7 @@
-﻿import React from "react";
-import { FileText, Plus, X, Calendar } from "lucide-react";
+﻿import React, { useMemo } from "react";
+import { FileText, Plus, X, Calendar, Upload, File } from "lucide-react";
+import { CustomSelect } from "../../../components/ui/Select";
+import { Country, State } from "country-state-city";
 
 const DocumentsTab = ({
   formData,
@@ -10,12 +12,83 @@ const DocumentsTab = ({
 }) => {
   const documents = formData?.documents || [];
 
+  // Get all countries
+  const allCountries = useMemo(() => Country.getAllCountries(), []);
+
+  // Get states for a specific country
+  const getStatesForCountry = (countryCode) => {
+    if (!countryCode) return [];
+    return State.getStatesOfCountry(countryCode);
+  };
+
   const handleDocumentChange = (index, field, value) => {
     setFormData((prev) => {
       const updatedDocuments = [...prev.documents];
       updatedDocuments[index] = {
         ...updatedDocuments[index],
         [field]: value,
+      };
+
+      // Clear state if country changes
+      if (field === "issuingCountry") {
+        updatedDocuments[index].issuingState = "";
+      }
+
+      return {
+        ...prev,
+        documents: updatedDocuments,
+      };
+    });
+  };
+
+  const handleFileUpload = (index, event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type (PDF only)
+    if (file.type !== "application/pdf") {
+      alert("Only PDF files are allowed");
+      event.target.value = "";
+      return;
+    }
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > maxSize) {
+      alert("File size must be less than 5MB");
+      event.target.value = "";
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result;
+      setFormData((prev) => {
+        const updatedDocuments = [...prev.documents];
+        updatedDocuments[index] = {
+          ...updatedDocuments[index],
+          fileName: file.name,
+          fileType: file.type,
+          fileData: base64String,
+        };
+        return {
+          ...prev,
+          documents: updatedDocuments,
+        };
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeFile = (index) => {
+    setFormData((prev) => {
+      const updatedDocuments = [...prev.documents];
+      updatedDocuments[index] = {
+        ...updatedDocuments[index],
+        fileName: "",
+        fileType: "",
+        fileData: "",
       };
       return {
         ...prev,
@@ -32,7 +105,8 @@ const DocumentsTab = ({
         {
           documentType: "",
           documentNumber: "",
-          referenceNumber: "",
+          issuingCountry: "",
+          issuingState: "",
           validFrom: "",
           validTo: "",
           status: true,
@@ -75,13 +149,17 @@ const DocumentsTab = ({
               <table className="w-full min-w-[800px]">
                 <thead>
                   <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
-                    <th className="pb-3 pl-4 min-w-[200px]">Document Type</th>
-                    <th className="pb-3 pl-4 min-w-[200px]">Document Number</th>
                     <th className="pb-3 pl-4 min-w-[200px]">
-                      Reference Number
+                      Document Type <span className="text-red-500">*</span>
                     </th>
+                    <th className="pb-3 pl-4 min-w-[200px]">
+                      Document Number <span className="text-red-500">*</span>
+                    </th>
+                    <th className="pb-3 pl-4 min-w-[200px]">Issuing Country</th>
+                    <th className="pb-3 pl-4 min-w-[200px]">Issuing State</th>
                     <th className="pb-3 pl-4 min-w-[150px]">Valid From</th>
                     <th className="pb-3 pl-4 min-w-[150px]">Valid To</th>
+                    <th className="pb-3 pl-4 min-w-[250px]">Upload Document</th>
                     <th className="pb-3 w-12">Active</th>
                     <th className="pb-3 w-12"></th>
                   </tr>
@@ -94,27 +172,17 @@ const DocumentsTab = ({
                       style={{ height: "60px" }}
                     >
                       <td className="px-3">
-                        <select
+                        <CustomSelect
                           value={document.documentType || ""}
-                          onChange={(e) =>
-                            handleDocumentChange(
-                              index,
-                              "documentType",
-                              e.target.value
-                            )
+                          onValueChange={(value) =>
+                            handleDocumentChange(index, "documentType", value)
                           }
-                          className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
-                        >
-                          <option value="">Select</option>
-                          {masterData?.documentTypes?.map((type) => (
-                            <option
-                              key={type.document_type_id}
-                              value={type.document_type_name}
-                            >
-                              {type.document_type_name}
-                            </option>
-                          ))}
-                        </select>
+                          options={masterData?.documentTypes || []}
+                          placeholder="Select"
+                          getOptionLabel={(option) => option.label}
+                          getOptionValue={(option) => option.value}
+                          className="min-w-[200px] text-xs"
+                        />
                       </td>
                       <td className="px-3">
                         <input
@@ -132,18 +200,32 @@ const DocumentsTab = ({
                         />
                       </td>
                       <td className="px-3">
-                        <input
-                          type="text"
-                          value={document.referenceNumber || ""}
-                          onChange={(e) =>
-                            handleDocumentChange(
-                              index,
-                              "referenceNumber",
-                              e.target.value
-                            )
+                        <CustomSelect
+                          value={document.issuingCountry || ""}
+                          onValueChange={(value) =>
+                            handleDocumentChange(index, "issuingCountry", value)
                           }
-                          placeholder="Enter reference"
-                          className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
+                          options={allCountries}
+                          placeholder="Select"
+                          searchable
+                          getOptionLabel={(option) => option.name}
+                          getOptionValue={(option) => option.isoCode}
+                          className="min-w-[200px] text-xs"
+                        />
+                      </td>
+                      <td className="px-3">
+                        <CustomSelect
+                          value={document.issuingState || ""}
+                          onValueChange={(value) =>
+                            handleDocumentChange(index, "issuingState", value)
+                          }
+                          options={getStatesForCountry(document.issuingCountry)}
+                          placeholder="Select"
+                          searchable
+                          getOptionLabel={(option) => option.name}
+                          getOptionValue={(option) => option.isoCode}
+                          className="min-w-[200px] text-xs"
+                          disabled={!document.issuingCountry}
                         />
                       </td>
                       <td className="px-3">
@@ -178,6 +260,38 @@ const DocumentsTab = ({
                             }
                             className="w-full pl-8 pr-2 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
                           />
+                        </div>
+                      </td>
+                      <td className="px-3">
+                        <div className="min-w-[250px]">
+                          {document.fileName ? (
+                            <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                              <File className="w-4 h-4 text-green-600" />
+                              <span className="text-xs text-green-700 flex-1 truncate">
+                                {document.fileName}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeFile(index)}
+                                className="p-1 text-red-500 hover:text-red-700"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer transition-colors">
+                              <Upload className="w-4 h-4 text-gray-400" />
+                              <span className="text-xs text-gray-600">
+                                Choose PDF (Max 5MB)
+                              </span>
+                              <input
+                                type="file"
+                                accept="application/pdf"
+                                onChange={(e) => handleFileUpload(index, e)}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
                         </div>
                       </td>
                       <td className="px-3 text-center">

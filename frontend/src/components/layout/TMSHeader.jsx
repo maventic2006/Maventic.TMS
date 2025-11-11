@@ -300,6 +300,8 @@ const TMSHeader = ({ theme }) => {
       navigate("/vehicles");
     } else if (item.title === "Driver Maintenance") {
       navigate("/drivers");
+    } else if (item.title === "Consignor WH Maintenance") {
+      navigate("/warehouse");
     }
   };
 
@@ -313,20 +315,20 @@ const TMSHeader = ({ theme }) => {
   return (
     <>
       {/* Glassmorphic Header */}
-      <nav 
+      <nav
         className="sticky top-0 z-50 transition-all duration-300 mb-0"
         style={{
           background: "#0D1A33",
           // background: "rgba(255, 255, 255, 0.36)",
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
-          border: `1px solid ${borderColor}`,
-          borderTop: "none",
-          borderLeft: "none",
-          borderRight: "none",
-          borderBottomLeftRadius: "10px",
-          borderBottomRightRadius: "10px",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+          // border: `1px solid ${borderColor}`,
+          // borderTop: "none",
+          // borderLeft: "none",
+          // borderRight: "none",
+          // borderBottomLeftRadius: "10px",
+          // borderBottomRightRadius: "10px",
+          // boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
         }}
       >
         {/* Top Row - Logo and User Info */}
@@ -334,21 +336,24 @@ const TMSHeader = ({ theme }) => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-14">
               {/* Logo Section */}
-              <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate("/tms-portal")}>
-                <div 
+              <div
+                className="flex items-center space-x-3 cursor-pointer"
+                onClick={() => navigate("/tms-portal")}
+              >
+                <div
                   className="p-2 rounded-lg shadow-sm transform hover:scale-110 transition-all duration-300"
                   style={{ backgroundColor: accentColor }}
                 >
                   <Home className="h-5 w-5" style={{ color: "#FFFFFF" }} />
                 </div>
                 <div>
-                  <h1 
+                  <h1
                     className="text-lg font-bold"
                     style={{ color: "#FFFFFF" }}
                   >
                     TMS Portal
                   </h1>
-                  <p 
+                  <p
                     className="text-xs font-semibold hidden lg:block leading-none"
                     style={{ color: "#FFFFFF" }}
                   >
@@ -360,24 +365,24 @@ const TMSHeader = ({ theme }) => {
               {/* User Profile Section */}
               <div className="flex items-center space-x-3">
                 <div className="text-right hidden sm:block">
-                  <p 
+                  <p
                     className="text-sm font-semibold leading-tight"
                     style={{ color: "#FFFFFF" }}
                   >
                     {user?.user_full_name || "User"}
                   </p>
-                  <p 
+                  <p
                     className="text-xs leading-none"
                     style={{ color: "#FFFFFF" }}
                   >
                     {user?.user_type_id || "User"}
                   </p>
                 </div>
-                <div 
+                <div
                   className="h-9 w-9 rounded-full flex items-center justify-center shadow-md transition-all duration-300 transform hover:scale-110"
-                  style={{ 
+                  style={{
                     backgroundColor: accentColor,
-                    border: `2px solid ${accentColor}40`
+                    border: `2px solid ${accentColor}40`,
                   }}
                 >
                   <User className="h-4 w-4" style={{ color: "#FFFFFF" }} />
@@ -389,8 +394,13 @@ const TMSHeader = ({ theme }) => {
                     onClick={() => setShowLogoutModal(true)}
                     className="flex items-center space-x-1 px-2 py-2 rounded-md text-xs font-medium transition-all duration-300 transform hover:scale-105 group"
                     style={{ color: "#DC2626" }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(220, 38, 38, 0.1)"}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        "rgba(220, 38, 38, 0.1)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "transparent")
+                    }
                     title="Logout"
                   >
                     <LogOut className="h-4 w-4 transition-colors duration-300" />
@@ -423,7 +433,9 @@ const TMSHeader = ({ theme }) => {
                       style={{
                         backgroundColor: isHovered ? headerBg : "transparent",
                         color: isHovered ? textPrimary : "#FFFFFF",
-                        boxShadow: isHovered ? "0 2px 6px rgba(0, 0, 0, 0.1)" : "none",
+                        boxShadow: isHovered
+                          ? "0 2px 6px rgba(0, 0, 0, 0.1)"
+                          : "none",
                       }}
                     >
                       <Icon
@@ -435,9 +447,11 @@ const TMSHeader = ({ theme }) => {
                       </span>
                       <ChevronDown
                         className="h-3 w-3 transition-all duration-300 flex-shrink-0"
-                        style={{ 
+                        style={{
                           color: isHovered ? accentColor : "#FFFFFF",
-                          transform: isHovered ? "rotate(180deg)" : "rotate(0deg)"
+                          transform: isHovered
+                            ? "rotate(180deg)"
+                            : "rotate(0deg)",
                         }}
                       />
                     </button>
@@ -448,19 +462,44 @@ const TMSHeader = ({ theme }) => {
 
             {/* Mobile Menu Button */}
             <div className="sm:hidden w-full flex justify-between items-center py-2 px-4">
-              <span className="text-sm font-medium" style={{ color: "#FFFFFF" }}>Menu</span>
+              <span
+                className="text-sm font-medium"
+                style={{ color: "#FFFFFF" }}
+              >
+                Menu
+              </span>
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-md transition-all duration-200"
                 style={{ color: "#FFFFFF" }}
               >
                 {mobileMenuOpen ? (
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 ) : (
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
                   </svg>
                 )}
               </button>
@@ -479,7 +518,7 @@ const TMSHeader = ({ theme }) => {
               className="sm:hidden"
               style={{
                 backgroundColor: headerBg,
-                borderTop: `1px solid ${borderColor}`
+                borderTop: `1px solid ${borderColor}`,
               }}
             >
               <div className="px-4 py-3 space-y-2 max-h-96 overflow-y-auto">
@@ -491,8 +530,14 @@ const TMSHeader = ({ theme }) => {
                       className="pb-2 last:pb-0"
                       style={{ borderBottom: `1px solid ${borderColor}` }}
                     >
-                      <div className="flex items-center space-x-3 font-medium py-2" style={{ color: textPrimary }}>
-                        <Icon className="h-5 w-5" style={{ color: accentColor }} />
+                      <div
+                        className="flex items-center space-x-3 font-medium py-2"
+                        style={{ color: textPrimary }}
+                      >
+                        <Icon
+                          className="h-5 w-5"
+                          style={{ color: accentColor }}
+                        />
                         <span>{menu.title}</span>
                       </div>
                       {menu.items && (
@@ -507,7 +552,9 @@ const TMSHeader = ({ theme }) => {
                                 onClick={() => handleMenuItemClick(item)}
                               >
                                 <ItemIcon className="h-4 w-4 flex-shrink-0" />
-                                <span className="flex-1 leading-snug">{item.title}</span>
+                                <span className="flex-1 leading-snug">
+                                  {item.title}
+                                </span>
                               </div>
                             );
                           })}
@@ -535,7 +582,7 @@ const TMSHeader = ({ theme }) => {
                 backdropFilter: "blur(10px)",
                 WebkitBackdropFilter: "blur(10px)",
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                borderTop: `2px solid ${accentColor}`
+                borderTop: `2px solid ${accentColor}`,
               }}
               onMouseEnter={() => setHoveredDropdown(hoveredDropdown)}
               onMouseLeave={handleMouseLeave}
@@ -562,19 +609,26 @@ const TMSHeader = ({ theme }) => {
                               border: `1px solid ${borderColor}`,
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = theme?.colors?.table?.row?.hover || "#F9FAFB";
+                              e.currentTarget.style.backgroundColor =
+                                theme?.colors?.table?.row?.hover || "#F9FAFB";
                               e.currentTarget.style.borderColor = accentColor;
-                              e.currentTarget.style.transform = "translateY(-2px)";
-                              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
+                              e.currentTarget.style.transform =
+                                "translateY(-2px)";
+                              e.currentTarget.style.boxShadow =
+                                "0 4px 12px rgba(0, 0, 0, 0.1)";
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = "transparent";
+                              e.currentTarget.style.backgroundColor =
+                                "transparent";
                               e.currentTarget.style.borderColor = borderColor;
                               e.currentTarget.style.transform = "translateY(0)";
                               e.currentTarget.style.boxShadow = "none";
                             }}
                           >
-                            <Icon className="h-5 w-5 flex-shrink-0" style={{ color: accentColor }} />
+                            <Icon
+                              className="h-5 w-5 flex-shrink-0"
+                              style={{ color: accentColor }}
+                            />
                             <div className="flex-1 min-w-0">
                               <h4
                                 className="text-sm font-semibold leading-tight mb-1"
@@ -619,7 +673,10 @@ const TMSHeader = ({ theme }) => {
               style={{ backgroundColor: headerBg }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-bold mb-2" style={{ color: textPrimary }}>
+              <h3
+                className="text-lg font-bold mb-2"
+                style={{ color: textPrimary }}
+              >
                 Confirm Logout
               </h3>
               <p className="text-sm mb-6" style={{ color: textSecondary }}>

@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertTriangle, Plus, X, Calendar } from "lucide-react";
+import { CustomSelect } from "../../../components/ui/Select";
 
 const AccidentViolationTab = ({
   formData,
@@ -27,10 +28,7 @@ const AccidentViolationTab = ({
           type: "",
           date: "",
           description: "",
-          location: "",
-          severity: "",
-          penaltyAmount: "",
-          resolved: false,
+          vehicleRegistrationNumber: "",
         },
       ],
     }));
@@ -67,13 +65,19 @@ const AccidentViolationTab = ({
               <table className="w-full min-w-[800px]">
                 <thead>
                   <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
-                    <th className="pb-3 pl-4 min-w-[150px]">Type</th>
-                    <th className="pb-3 pl-4 min-w-[150px]">Date</th>
-                    <th className="pb-3 pl-4 min-w-[200px]">Location</th>
-                    <th className="pb-3 pl-4 min-w-[150px]">Severity</th>
-                    <th className="pb-3 pl-4 min-w-[150px]">Penalty Amount</th>
-                    <th className="pb-3 pl-4 min-w-[250px]">Description</th>
-                    <th className="pb-3 w-12">Resolved</th>
+                    <th className="pb-3 pl-4 min-w-[150px]">
+                      Type <span className="text-red-500">*</span>
+                    </th>
+                    <th className="pb-3 pl-4 min-w-[150px]">
+                      Date <span className="text-red-500">*</span>
+                    </th>
+                    <th className="pb-3 pl-4 min-w-[200px]">
+                      Vehicle Registration Number{" "}
+                      <span className="text-red-500">*</span>
+                    </th>
+                    <th className="pb-3 pl-4 min-w-[250px]">
+                      Description <span className="text-red-500">*</span>
+                    </th>
                     <th className="pb-3 w-12"></th>
                   </tr>
                 </thead>
@@ -85,22 +89,17 @@ const AccidentViolationTab = ({
                       style={{ height: "60px" }}
                     >
                       <td className="px-3">
-                        <select
+                        <CustomSelect
                           value={item.type || ""}
-                          onChange={(e) =>
-                            handleAccidentChange(index, "type", e.target.value)
+                          onValueChange={(value) =>
+                            handleAccidentChange(index, "type", value)
                           }
-                          className="min-w-[150px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
-                        >
-                          <option value="">Select</option>
-                          <option value="Accident">Accident</option>
-                          <option value="Traffic Violation">
-                            Traffic Violation
-                          </option>
-                          <option value="Safety Violation">
-                            Safety Violation
-                          </option>
-                        </select>
+                          options={masterData?.violationTypes || []}
+                          placeholder="Select"
+                          getOptionLabel={(option) => option.label}
+                          getOptionValue={(option) => option.value}
+                          className="min-w-[150px] text-xs"
+                        />
                       </td>
                       <td className="px-3">
                         <div className="relative min-w-[150px]">
@@ -122,49 +121,16 @@ const AccidentViolationTab = ({
                       <td className="px-3">
                         <input
                           type="text"
-                          value={item.location || ""}
+                          value={item.vehicleRegistrationNumber || ""}
                           onChange={(e) =>
                             handleAccidentChange(
                               index,
-                              "location",
+                              "vehicleRegistrationNumber",
                               e.target.value
                             )
                           }
-                          placeholder="Enter location"
+                          placeholder="Enter vehicle regn number"
                           className="min-w-[200px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
-                        />
-                      </td>
-                      <td className="px-3">
-                        <select
-                          value={item.severity || ""}
-                          onChange={(e) =>
-                            handleAccidentChange(
-                              index,
-                              "severity",
-                              e.target.value
-                            )
-                          }
-                          className="min-w-[150px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
-                        >
-                          <option value="">Select</option>
-                          <option value="Minor">Minor</option>
-                          <option value="Moderate">Moderate</option>
-                          <option value="Severe">Severe</option>
-                        </select>
-                      </td>
-                      <td className="px-3">
-                        <input
-                          type="number"
-                          value={item.penaltyAmount || ""}
-                          onChange={(e) =>
-                            handleAccidentChange(
-                              index,
-                              "penaltyAmount",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Amount"
-                          className="min-w-[150px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
                         />
                       </td>
                       <td className="px-3">
@@ -180,20 +146,6 @@ const AccidentViolationTab = ({
                           }
                           placeholder="Enter description"
                           className="min-w-[250px] px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs"
-                        />
-                      </td>
-                      <td className="px-3 text-center">
-                        <input
-                          type="radio"
-                          checked={item.resolved || false}
-                          onChange={(e) =>
-                            handleAccidentChange(
-                              index,
-                              "resolved",
-                              e.target.checked
-                            )
-                          }
-                          className="w-4 h-4 text-green-500 focus:ring-green-500"
                         />
                       </td>
                       <td className="px-3">
