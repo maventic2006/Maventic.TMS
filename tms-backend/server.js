@@ -51,6 +51,17 @@ const { processBulkUpload } = require("./queues/bulkUploadProcessor");
 bulkUploadQueue.process(async (job) => {
   return await processBulkUpload(job, io);
 });
+
+// Vehicle bulk upload
+const vehicleBulkUploadRoutes = require("./routes/vehicleBulkUploadRoutes");
+const vehicleBulkUploadQueue = require("./queues/vehicleBulkUploadQueue");
+const { processVehicleBulkUpload } = require("./queues/vehicleBulkUploadProcessor");
+
+// Setup vehicle bulk upload queue processor
+vehicleBulkUploadQueue.process(async (job) => {
+  return await processVehicleBulkUpload(job, io);
+});
+
 const driverRoutes = require("./routes/driver");
 
 // Routes
@@ -63,6 +74,7 @@ app.use("/api/transporters", transporterRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/transporter", transporterRoutes);
 app.use("/api/bulk-upload", bulkUploadRoutes);
+app.use("/api/vehicle/bulk-upload", vehicleBulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
 
@@ -103,7 +115,94 @@ io.on("connection", (socket) => {
   });
 });
 
+// Error handling for server
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error('');
+    console.error('🔴 ========================================');
+    console.error('🔴 PORT ALREADY IN USE ERROR');
+    console.error('🔴 ========================================');
+    console.error(`❌ Port ${PORT} is already in use by another process`);
+    console.error('');
+    console.error('💡 SOLUTIONS:');
+    console.error('   Option 1: Kill the conflicting process');
+    console.error(`     PowerShell: .\\kill-port.ps1`);
+    console.error(`     Or: taskkill /F /PID <process-id>`);
+    console.error('');
+    console.error('   Option 2: Use a different port');
+    console.error('     Update PORT in .env file');
+    console.error('');
+    console.error('   Option 3: Find what\'s using the port');
+    console.error(`     PowerShell: Get-NetTCPConnection -LocalPort ${PORT}`);
+    console.error(`     CMD: netstat -ano | findstr :${PORT}`);
+    console.error('');
+    console.error('🔴 ========================================');
+    console.error('');
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', error);
+    process.exit(1);
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`🚀 TMS Backend server running on port ${PORT}`);
   console.log(`📡 Socket.IO server running`);
+});
+
+// Graceful shutdown handling
+const gracefulShutdown = (signal) => {
+  console.log('');
+  console.log(`⚠️  ${signal} received. Starting graceful shutdown...`);
+  
+  // Close server
+  server.close(() => {
+    console.log('✅ HTTP server closed');
+    
+    // Close Socket.IO connections
+    io.close(() => {
+      console.log('✅ Socket.IO connections closed');
+      
+      // Close database connections (if any)
+      // knex.destroy() - uncomment if using knex
+      
+      console.log('✅ Graceful shutdown complete');
+      process.exit(0);
+    });
+  });
+  
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error('⚠️  Forced shutdown after 10 seconds');
+    process.exit(1);
+  }, 10000);
+};
+
+// Handle shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('');
+  console.error('🔴 ========================================');
+  console.error('🔴 UNCAUGHT EXCEPTION');
+  console.error('🔴 ========================================');
+  console.error(error);
+  console.error('🔴 ========================================');
+  console.error('');
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('');
+  console.error('🔴 ========================================');
+  console.error('🔴 UNHANDLED PROMISE REJECTION');
+  console.error('🔴 ========================================');
+  console.error('Reason:', reason);
+  console.error('Promise:', promise);
+  console.error('🔴 ========================================');
+  console.error('');
+  process.exit(1);
 });

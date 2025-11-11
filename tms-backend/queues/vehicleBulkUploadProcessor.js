@@ -1,0 +1,585 @@
+const { parseVehicleExcelFile, getParseStatistics } = require('../services/vehicleBulkUploadService');
+const { validateAllVehicleData } = require('../services/vehicleBulkUploadValidation');
+const { generateVehicleErrorReport } = require('../services/vehicleBulkUploadErrorReport');
+const knex = require('knex')(require('../knexfile').development);
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * Vehicle Bulk Upload Processor
+ * Processes vehicle bulk upload batches in the background
+ * 
+ * Pipeline:
+ * 1. Parse Excel file (5 sheets)
+ * 2. Validate all data (4 layers)
+ * 3. Store validation results
+ * 4. Generate error report (if errors exist)
+ * 5. Create valid vehicles in database
+ * 6. Update batch status
+ */
+
+async function processVehicleBulkUpload(job, io) {
+  const { batchId, filePath, userId, originalName } = job.data;
+  
+  console.log('🚗 Processing vehicle bulk upload batch:', batchId);
+  console.log('  File:', originalName);
+  console.log('  User:', userId);
+  
+  try {
+    // Step 1: Parse Excel file
+    console.log('\n📖 Step 1: Parsing Excel file...');
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+      batchId,
+      progress: 10,
+      message: 'Starting file processing...',
+      type: 'info'
+    });
+    
+    await job.progress(10);
+    
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+      batchId,
+      progress: 20,
+      message: 'Reading Excel file (5 sheets)...',
+      type: 'info'
+    });
+    
+    const parseResult = await parseVehicleExcelFile(filePath);
+    
+    if (!parseResult.success) {
+      throw new Error(`Excel parsing failed: ${parseResult.error || parseResult.errors.join(', ')}`);
+    }
+    
+    const parsedData = parseResult.data;
+    const stats = getParseStatistics(parsedData);
+    
+    console.log(`✓ Parsed successfully:`);
+    console.log(`  Total vehicles: ${stats.totalVehicles}`);
+    console.log(`  With specifications: ${stats.totalVehicles - stats.missingSpecifications}`);
+    console.log(`  With capacity: ${stats.totalVehicles - stats.missingCapacity}`);
+    console.log(`  With ownership: ${stats.totalVehicles - stats.missingOwnership}`);
+    console.log(`  Total documents: ${stats.totalDocuments}`);
+    
+    await knex('tms_bulk_upload_vehicle_batches')
+      .where({ batch_id: batchId })
+      .update({
+        total_rows: stats.totalVehicles
+      });
+    
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+      batchId,
+      progress: 30,
+      message: `Parsed ${stats.totalVehicles} vehicle(s) from Excel`,
+      type: 'success'
+    });
+    
+    await job.progress(30);
+    
+    // Step 2: Validate all data
+    console.log('\n✅ Step 2: Validating vehicle data...');
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+      batchId,
+      progress: 40,
+      message: 'Validating vehicle data (65+ rules)...',
+      type: 'info'
+    });
+    
+    const validationResults = await validateAllVehicleData(parsedData);
+    
+    const validCount = validationResults.summary.validCount;
+    const invalidCount = validationResults.summary.invalidCount;
+    
+    console.log(`✓ Validation complete:`);
+    console.log(`  Valid vehicles: ${validCount}`);
+    console.log(`  Invalid vehicles: ${invalidCount}`);
+    
+    if (invalidCount > 0) {
+      console.log(`  Error breakdown:`, validationResults.summary.errorBreakdown);
+    }
+    
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+      batchId,
+      progress: 55,
+      message: `Validation complete: ${validCount} valid, ${invalidCount} invalid`,
+      type: invalidCount > 0 ? 'warning' : 'success'
+    });
+    
+    await job.progress(55);
+    
+    // Step 3: Store validation results (BATCH INSERT - OPTIMIZED)
+    console.log('\n💾 Step 3: Storing validation results...');
+    const storeStart = Date.now();
+    
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+      batchId,
+      progress: 65,
+      message: 'Storing validation results in database...',
+      type: 'info'
+    });
+    
+    // Prepare batch insert data for valid vehicles
+    const validVehicleRecords = validationResults.valid.map(validVehicle => ({
+      batch_id: batchId,
+      vehicle_ref_id: validVehicle.basicInformation.Vehicle_Ref_ID,
+      excel_row_number: validVehicle.basicInformation._excelRowNumber,
+      validation_status: 'valid',
+      validation_errors: JSON.stringify([]),
+      data: JSON.stringify(validVehicle)
+    }));
+    
+    // Prepare batch insert data for invalid vehicles
+    const invalidVehicleRecords = validationResults.invalid.map(invalidVehicle => ({
+      batch_id: batchId,
+      vehicle_ref_id: invalidVehicle.basicInformation?.Vehicle_Ref_ID || null,
+      excel_row_number: invalidVehicle.basicInformation?._excelRowNumber || 0,
+      validation_status: 'invalid',
+      validation_errors: JSON.stringify(invalidVehicle.errors),
+      data: JSON.stringify(invalidVehicle)
+    }));
+    
+    // Batch insert all records (10x-50x faster than individual inserts)
+    if (validVehicleRecords.length > 0) {
+      await knex('tms_bulk_upload_vehicles').insert(validVehicleRecords);
+    }
+    
+    if (invalidVehicleRecords.length > 0) {
+      await knex('tms_bulk_upload_vehicles').insert(invalidVehicleRecords);
+    }
+    
+    const storeTime = Date.now() - storeStart;
+    console.log(`✓ Stored ${validCount + invalidCount} vehicle records in ${storeTime}ms (BATCH INSERT)`);
+    
+    await knex('tms_bulk_upload_vehicle_batches')
+      .where({ batch_id: batchId })
+      .update({
+        total_valid: validCount,
+        total_invalid: invalidCount
+      });
+    
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+      batchId,
+      progress: 70,
+      message: 'Validation results stored',
+      type: 'success'
+    });
+    
+    await job.progress(70);
+    
+    // Step 4: Generate error report (if errors exist)
+    let errorReportPath = null;
+    if (invalidCount > 0) {
+      console.log('\n📝 Step 4: Generating error report...');
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 75,
+        message: `Generating error report for ${invalidCount} invalid record(s)...`,
+        type: 'info'
+      });
+      
+      errorReportPath = await generateVehicleErrorReport(validationResults.invalid, batchId);
+      
+      await knex('tms_bulk_upload_vehicle_batches')
+        .where({ batch_id: batchId })
+        .update({
+          error_report_path: errorReportPath
+        });
+      
+      console.log(`✓ Error report saved: ${errorReportPath}`);
+      
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 80,
+        message: 'Error report generated successfully',
+        type: 'success'
+      });
+      
+      await job.progress(80);
+    }
+    
+    // Step 5: Create valid vehicles in database
+    let createdCount = 0;
+    let failedCount = 0;
+    
+    if (validCount > 0) {
+      console.log('\n🏗️  Step 5: Creating valid vehicles in database...');
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: 85,
+        message: `Creating ${validCount} valid vehicle(s) in database...`,
+        type: 'info'
+      });
+      
+      const creationResults = await createVehiclesBatch(
+        validationResults.valid,
+        batchId,
+        userId,
+        io,
+        job
+      );
+      
+      createdCount = creationResults.success.length;
+      failedCount = creationResults.failed.length;
+      
+      console.log(`✓ Creation complete:`);
+      console.log(`  Successfully created: ${createdCount}`);
+      console.log(`  Failed to create: ${failedCount}`);
+      
+      if (failedCount > 0) {
+        console.log(`  Failures:`, creationResults.failed.map(f => f.error));
+      }
+    }
+    
+    // Step 6: Update batch status
+    console.log('\n📊 Step 6: Updating batch status...');
+    
+    const finalStatus = 'completed';
+    await knex('tms_bulk_upload_vehicle_batches')
+      .where({ batch_id: batchId })
+      .update({
+        total_created: createdCount,
+        total_creation_failed: failedCount,
+        status: finalStatus,
+        processed_timestamp: knex.fn.now()
+      });
+    
+    console.log(`✓ Batch ${batchId} completed`);
+    
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+      batchId,
+      progress: 100,
+      message: 'Processing complete!',
+      type: 'success'
+    });
+    
+    await job.progress(100);
+    
+    // Emit completion event
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadComplete', {
+      batchId,
+      validCount,
+      invalidCount,
+      createdCount,
+      failedCount,
+      errorReportPath,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('✅ Vehicle bulk upload processing complete!');
+    
+    // Cleanup uploaded file
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log('🗑️  Cleaned up uploaded file');
+    }
+    
+    return {
+      validCount,
+      invalidCount,
+      createdCount,
+      failedCount
+    };
+    
+  } catch (error) {
+    console.error('❌ Error processing vehicle bulk upload:', error);
+    
+    await knex('tms_bulk_upload_vehicle_batches')
+      .where({ batch_id: batchId })
+      .update({
+        status: 'failed',
+        error_message: error.message,
+        processed_timestamp: knex.fn.now()
+      });
+    
+    io.to(`batch:${batchId}`).emit('vehicleBulkUploadError', {
+      batchId,
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+    
+    throw error;
+  }
+}
+
+/**
+ * Create vehicles in batch (OPTIMIZED with parallel processing)
+ * Creates vehicle records with all related data using batch inserts
+ */
+async function createVehiclesBatch(validVehicles, batchId, userId, io, job) {
+  const results = {
+    success: [],
+    failed: []
+  };
+  
+  const total = validVehicles.length;
+  console.log(`\n🏗️  Creating ${total} vehicles with optimized batch processing...`);
+  const createStart = Date.now();
+  
+  // Process in chunks to avoid overwhelming database
+  const CHUNK_SIZE = 50; // Process 50 vehicles at a time
+  const chunks = [];
+  
+  for (let i = 0; i < validVehicles.length; i += CHUNK_SIZE) {
+    chunks.push(validVehicles.slice(i, i + CHUNK_SIZE));
+  }
+  
+  let processedCount = 0;
+  
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+    const chunk = chunks[chunkIndex];
+    
+    try {
+      // Process chunk with optimized batch operations
+      const chunkResults = await createVehiclesChunk(chunk, batchId, userId);
+      
+      results.success.push(...chunkResults.success);
+      results.failed.push(...chunkResults.failed);
+      
+      processedCount += chunk.length;
+      
+      // Update progress
+      const progressPercent = 85 + Math.floor((processedCount / total) * 10);
+      await job.progress(progressPercent);
+      
+      io.to(`batch:${batchId}`).emit('vehicleBulkUploadProgress', {
+        batchId,
+        progress: progressPercent,
+        message: `Created ${processedCount}/${total} vehicles`,
+        type: 'info'
+      });
+      
+      console.log(`✓ Chunk ${chunkIndex + 1}/${chunks.length}: ${chunk.length} vehicles processed`);
+      
+    } catch (error) {
+      console.error(`❌ Chunk ${chunkIndex + 1} failed:`, error.message);
+      
+      // Mark all vehicles in failed chunk
+      chunk.forEach(vehicleData => {
+        results.failed.push({
+          vehicleRefId: vehicleData.basicInformation.Vehicle_Ref_ID,
+          error: error.message
+        });
+      });
+      
+      processedCount += chunk.length;
+    }
+  }
+  
+  const createTime = Date.now() - createStart;
+  console.log(`✓ Batch creation complete in ${createTime}ms (${(createTime / total).toFixed(2)}ms per vehicle)`);
+  
+  return results;
+}
+
+/**
+ * Create a chunk of vehicles with optimized batch inserts
+ * Uses single transaction for entire chunk with batch INSERT operations
+ */
+async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
+  return await knex.transaction(async (trx) => {
+    const results = {
+      success: [],
+      failed: []
+    };
+    
+    // Get next vehicle ID number
+    const lastVehicle = await trx('vehicle_basic_information_hdr')
+      .orderBy('vehicle_id_code_hdr', 'desc')
+      .first();
+    
+    let nextNumber = 1;
+    if (lastVehicle && lastVehicle.vehicle_id_code_hdr) {
+      const lastNumber = parseInt(lastVehicle.vehicle_id_code_hdr.replace('VEH', ''));
+      nextNumber = lastNumber + 1;
+    }
+    
+    // Prepare batch insert arrays for all tables
+    const basicInfoRecords = [];
+    const specificationsRecords = [];
+    const capacityRecords = [];
+    const ownershipRecords = [];
+    const documentRecords = [];
+    const bulkUploadUpdates = [];
+    
+    // Build all records for batch insert
+    for (const vehicleData of vehiclesChunk) {
+      try {
+        const { basicInformation, specifications, capacityDetails, ownershipDetails, documents } = vehicleData;
+        
+        const vehicleId = `VEH${String(nextNumber).padStart(4, '0')}`;
+        nextNumber++;
+        
+        // Basic information (header)
+        basicInfoRecords.push({
+          vehicle_id_code_hdr: vehicleId,
+          make_brand: basicInformation.Make_Brand,
+          model: basicInformation.Model,
+          vin_chassis_number: basicInformation.VIN_Chassis_Number,
+          vehicle_type_id: basicInformation.Vehicle_Type_ID,
+          vehicle_category: basicInformation.Vehicle_Category || null,
+          manufacturing_month_year: basicInformation.Manufacturing_Month_Year,
+          gps_imei_number: basicInformation.GPS_IMEI_Number,
+          gps_active_flag: basicInformation.GPS_Active_Flag === 'Y' ? 'Y' : 'N',
+          leasing_flag: basicInformation.Leasing_Flag === 'Y' ? 'Y' : 'N',
+          usage_type_id: basicInformation.Usage_Type_ID,
+          registration_number: basicInformation.Registration_Number || null,
+          vehicle_color: basicInformation.Vehicle_Color || null,
+          body_type_description: basicInformation.Body_Type_Description || null,
+          safety_inspection_date: basicInformation.Safety_Inspection_Date || null,
+          taxes_and_fees: basicInformation.Taxes_And_Fees || null,
+          road_tax: basicInformation.Road_Tax || null,
+          avg_running_speed: basicInformation.Avg_Running_Speed || null,
+          max_running_speed: basicInformation.Max_Running_Speed || null,
+          status: basicInformation.Status || 'ACTIVE',
+          created_by: userId,
+          updated_by: userId
+        });
+        
+        // Specifications (item) if provided
+        if (specifications) {
+          specificationsRecords.push({
+            vehicle_id_code_itm: vehicleId,
+            engine_type_id: specifications.Engine_Type_ID,
+            engine_number: specifications.Engine_Number,
+            fuel_type_id: specifications.Fuel_Type_ID,
+            transmission_type: specifications.Transmission_Type,
+            emission_standard: specifications.Emission_Standard || null,
+            financer: specifications.Financer,
+            suspension_type: specifications.Suspension_Type,
+            weight_dimensions: specifications.Weight_Dimensions || null,
+            created_by: userId,
+            updated_by: userId
+          });
+        }
+        
+        // Capacity details if provided
+        if (capacityDetails) {
+          const capacityId = `${vehicleId}CAP001`;
+          
+          capacityRecords.push({
+            vehicle_capacity_id: capacityId,
+            vehicle_id_code_capacity: vehicleId,
+            unloading_weight_kg: capacityDetails.Unloading_Weight_KG || null,
+            gross_vehicle_weight_kg: capacityDetails.Gross_Vehicle_Weight_KG || null,
+            payload_capacity_kg: capacityDetails.Payload_Capacity_KG || null,
+            volume_capacity_cbm: capacityDetails.Volume_Capacity_CBM || null,
+            cargo_width_m: capacityDetails.Cargo_Width_M || null,
+            cargo_height_m: capacityDetails.Cargo_Height_M || null,
+            cargo_length_m: capacityDetails.Cargo_Length_M || null,
+            towing_capacity_kg: capacityDetails.Towing_Capacity_KG || null,
+            tire_load_rating: capacityDetails.Tire_Load_Rating || null,
+            vehicle_condition: capacityDetails.Vehicle_Condition || null,
+            fuel_tank_capacity_l: capacityDetails.Fuel_Tank_Capacity_L || null,
+            seating_capacity: capacityDetails.Seating_Capacity || null,
+            load_capacity_ton: capacityDetails.Load_Capacity_TON || null,
+            created_by: userId,
+            updated_by: userId
+          });
+        }
+        
+        // Ownership details if provided
+        if (ownershipDetails) {
+          const ownershipId = `${vehicleId}OWN001`;
+          
+          ownershipRecords.push({
+            vehicle_ownership_id: ownershipId,
+            vehicle_id_code_ownership: vehicleId,
+            ownership_name: ownershipDetails.Ownership_Name || null,
+            valid_from: ownershipDetails.Valid_From || null,
+            valid_to: ownershipDetails.Valid_To || null,
+            registration_number: ownershipDetails.Registration_Number || null,
+            registration_date: ownershipDetails.Registration_Date || null,
+            registration_upto: ownershipDetails.Registration_Upto || null,
+            purchase_date: ownershipDetails.Purchase_Date || null,
+            owner_sr_number: ownershipDetails.Owner_Sr_Number || null,
+            state_code: ownershipDetails.State_Code || null,
+            rto_code: ownershipDetails.RTO_Code || null,
+            sale_amount: ownershipDetails.Sale_Amount || null,
+            created_by: userId,
+            updated_by: userId
+          });
+        }
+        
+        // Documents if provided
+        if (documents && documents.length > 0) {
+          documents.forEach((doc, idx) => {
+            const documentId = `${vehicleId}DOC${String(idx + 1).padStart(3, '0')}`;
+            
+            documentRecords.push({
+              vehicle_document_id: documentId,
+              vehicle_id_code_document: vehicleId,
+              document_type_id: doc.Document_Type_ID,
+              document_type_name: doc.Document_Type_Name,
+              reference_number: doc.Reference_Number,
+              document_provider: doc.Document_Provider || null,
+              coverage_type_id: doc.Coverage_Type_ID || null,
+              premium_amount: doc.Premium_Amount || null,
+              valid_from: doc.Valid_From || null,
+              valid_to: doc.Valid_To || null,
+              remarks: doc.Remarks || null,
+              created_by: userId,
+              updated_by: userId
+            });
+          });
+        }
+        
+        // Track bulk upload record update
+        bulkUploadUpdates.push({
+          batch_id: batchId,
+          vehicle_ref_id: basicInformation.Vehicle_Ref_ID,
+          created_vehicle_id: vehicleId
+        });
+        
+        results.success.push({
+          vehicleRefId: basicInformation.Vehicle_Ref_ID,
+          vehicleId
+        });
+        
+      } catch (error) {
+        console.error(`Failed to prepare vehicle ${vehicleData.basicInformation.Vehicle_Ref_ID}:`, error.message);
+        results.failed.push({
+          vehicleRefId: vehicleData.basicInformation.Vehicle_Ref_ID,
+          error: error.message
+        });
+      }
+    }
+    
+    // Execute batch inserts (MUCH faster than individual inserts)
+    if (basicInfoRecords.length > 0) {
+      await trx('vehicle_basic_information_hdr').insert(basicInfoRecords);
+    }
+    
+    if (specificationsRecords.length > 0) {
+      await trx('vehicle_basic_information_itm').insert(specificationsRecords);
+    }
+    
+    if (capacityRecords.length > 0) {
+      await trx('vehicle_capacity_details').insert(capacityRecords);
+    }
+    
+    if (ownershipRecords.length > 0) {
+      await trx('vehicle_ownership_details').insert(ownershipRecords);
+    }
+    
+    if (documentRecords.length > 0) {
+      await trx('vehicle_documents').insert(documentRecords);
+    }
+    
+    // Update bulk upload records with created vehicle IDs
+    for (const update of bulkUploadUpdates) {
+      await trx('tms_bulk_upload_vehicles')
+        .where({
+          batch_id: update.batch_id,
+          vehicle_ref_id: update.vehicle_ref_id
+        })
+        .update({
+          created_vehicle_id: update.created_vehicle_id
+        });
+    }
+    
+    return results;
+  });
+}
+
+module.exports = {
+  processVehicleBulkUpload
+};

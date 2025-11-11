@@ -1,5 +1,5 @@
-﻿import React, { useRef } from "react";
-import { Plus, X, Upload, FileText, Image } from "lucide-react";
+﻿import React, { useRef, useState } from "react";
+import { Plus, X, Upload, FileText, Image, Eye } from "lucide-react";
 import { useSelector } from "react-redux";
 import { CustomSelect } from "./Select";
 import ThemedCheckbox from "./themed/ThemedCheckbox";
@@ -25,6 +25,7 @@ const ThemeTable = ({
 }) => {
   const { masterData } = useSelector((state) => state.transporter);
   const fileInputRefs = useRef({});
+  const [previewDocument, setPreviewDocument] = useState(null);
 
   const handleCellChange = (rowIndex, columnKey, value) => {
     const updatedData = [...data];
@@ -107,6 +108,20 @@ const ThemeTable = ({
     }
   };
 
+  const handlePreviewDocument = (row) => {
+    if (row.fileData && row.fileType) {
+      setPreviewDocument({
+        fileName: row.fileName,
+        fileType: row.fileType,
+        fileData: row.fileData,
+      });
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
+  };
+
   const renderCell = (row, column, rowIndex) => {
     const value = row[column.key] || "";
     const hasError = errors[rowIndex]?.[column.key];
@@ -140,8 +155,16 @@ const ThemeTable = ({
                 {row.fileName}
               </span>
               <button
+                onClick={() => handlePreviewDocument(row)}
+                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                title="Preview Document"
+              >
+                <Eye className="w-3 h-3" />
+              </button>
+              <button
                 onClick={() => removeFile(rowIndex)}
                 className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                title="Remove Document"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -332,6 +355,66 @@ const ThemeTable = ({
           </div>
         )}
       </div>
+
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                {getFileIcon(previewDocument.fileType)}
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {previewDocument.fileName}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body - Preview Area */}
+            <div className="flex-1 overflow-auto p-4">
+              {previewDocument.fileType?.startsWith("image/") ? (
+                <img
+                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  alt={previewDocument.fileName}
+                  className="max-w-full h-auto mx-auto"
+                />
+              ) : previewDocument.fileType === "application/pdf" ? (
+                <iframe
+                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  className="w-full h-[600px] border-0"
+                  title={previewDocument.fileName}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {previewDocument.fileName}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={closePreview}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

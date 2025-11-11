@@ -5,6 +5,11 @@ import {
   updateBatchStatus,
   setValidationResults,
 } from "../redux/slices/bulkUploadSlice";
+import {
+  updateVehicleProgress,
+  updateVehicleBatchStatus,
+  setVehicleValidationResults,
+} from "../redux/slices/vehicleBulkUploadSlice";
 
 class SocketService {
   constructor() {
@@ -47,6 +52,10 @@ class SocketService {
       this.isConnected = false;
     });
 
+    // ========================================================================
+    // TRANSPORTER BULK UPLOAD EVENTS
+    // ========================================================================
+    
     // Bulk upload progress events
     this.socket.on("bulkUploadProgress", (data) => {
       console.log("📊 Bulk upload progress:", data);
@@ -101,6 +110,65 @@ class SocketService {
         })
       );
     });
+    
+    // ========================================================================
+    // VEHICLE BULK UPLOAD EVENTS
+    // ========================================================================
+    
+    // Vehicle bulk upload progress
+    this.socket.on("vehicleBulkUploadProgress", (data) => {
+      console.log("🚗 Vehicle bulk upload progress:", data);
+      store.dispatch(
+        updateVehicleProgress({
+          progress: data.progress,
+          log: data.message,
+          type: data.type || "info",
+        })
+      );
+    });
+    
+    // Vehicle batch status updates
+    this.socket.on("vehicleBatchStatusUpdate", (data) => {
+      console.log("🔄 Vehicle batch status update:", data);
+      store.dispatch(updateVehicleBatchStatus(data));
+    });
+    
+    // Vehicle validation complete
+    this.socket.on("vehicleValidationComplete", (data) => {
+      console.log("✅ Vehicle validation complete:", data);
+      store.dispatch(setVehicleValidationResults(data.validationResults));
+      store.dispatch(
+        updateVehicleProgress({
+          progress: 100,
+          log: `Validation complete: ${data.validationResults.valid} valid, ${data.validationResults.invalid} invalid`,
+          type: data.validationResults.invalid > 0 ? "warning" : "success",
+        })
+      );
+    });
+    
+    // Vehicle bulk upload complete
+    this.socket.on("vehicleBulkUploadComplete", (data) => {
+      console.log("✅ Vehicle bulk upload complete:", data);
+      store.dispatch(
+        updateVehicleProgress({
+          progress: 100,
+          log: `Complete! Created: ${data.createdCount}, Failed: ${data.failedCount}, Invalid: ${data.invalidCount}`,
+          type: data.failedCount > 0 || data.invalidCount > 0 ? "warning" : "success",
+        })
+      );
+    });
+    
+    // Vehicle processing error
+    this.socket.on("vehicleBulkUploadError", (data) => {
+      console.error("❌ Vehicle processing error:", data);
+      store.dispatch(
+        updateVehicleProgress({
+          progress: 0,
+          log: `Error: ${data.message}`,
+          type: "error",
+        })
+      );
+    });
   }
 
   disconnect() {
@@ -136,3 +204,4 @@ class SocketService {
 // Export singleton instance
 const socketService = new SocketService();
 export default socketService;
+

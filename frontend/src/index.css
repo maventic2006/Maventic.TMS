@@ -310,3 +310,13 @@ button[role="switch"] span {
 .scrollable-tabs::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
+
+/* Tailwind utility for hiding scrollbar */
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

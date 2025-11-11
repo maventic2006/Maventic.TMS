@@ -16,7 +16,7 @@ import {
   FileText,
 } from "lucide-react";
 
-import { createVehicle, clearError } from "../../redux/slices/vehicleSlice";
+import { createVehicle, clearError, fetchMasterData } from "../../redux/slices/vehicleSlice";
 import { addToast, openModal } from "../../redux/slices/uiSlice";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../utils/constants";
 import { getPageTheme } from "../../theme.config";
@@ -36,7 +36,7 @@ const CreateVehiclePage = () => {
   const navigate = useNavigate();
   const theme = getPageTheme("general");
 
-  const { isCreating, error, vehicles } = useSelector((state) => state.vehicle);
+  const { isCreating, error, vehicles, masterData } = useSelector((state) => state.vehicle);
   const { user } = useSelector((state) => state.auth);
 
   const [activeTab, setActiveTab] = useState(0);
@@ -64,7 +64,6 @@ const CreateVehiclePage = () => {
     },
     specifications: {
       engineNumber: "",
-      engineCapacity: 0,
       fuelType: "",
       fuelTankCapacity: 0,
       transmission: "",
@@ -85,47 +84,10 @@ const CreateVehiclePage = () => {
       doorType: "",
       noOfPallets: 0,
     },
-    ownershipDetails: {
-      ownership: "",
-      ownerName: "",
-      contactNumber: "",
-      email: "",
-      purchaseDate: "",
-      purchasePrice: 0,
-      registrationDate: "",
-      registrationAuthority: "",
-      rtoCode: "",
-      chassisNumber: "",
-      permitType: "",
-      permitValidTill: "",
-    },
-    maintenanceHistory: {
-      lastServiceDate: "",
-      nextServiceDue: "",
-      lastInspectionDate: "",
-      totalServiceExpense: 0,
-      maintenanceNotes: "",
-    },
-    serviceFrequency: {
-      serviceIntervalKM: 0,
-      serviceIntervalMonths: 0,
-      inspectionFrequencyMonths: 0,
-    },
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        issueDate: "",
-        expiryDate: "",
-        issuingAuthority: "",
-        country: "",
-        state: "",
-        status: true,
-        fileName: "",
-        fileType: "",
-        fileData: "",
-      },
-    ],
+    ownershipDetails: [],
+    maintenanceHistory: [],
+    serviceFrequency: [],
+    documents: [],
     status: "PENDING_APPROVAL",
     createdBy: user?.userId || "ADMIN001",
     createdAt: new Date().toISOString(),
@@ -192,6 +154,11 @@ const CreateVehiclePage = () => {
     dispatch(clearError());
   }, [dispatch]);
 
+  // Fetch master data on mount
+  useEffect(() => {
+    dispatch(fetchMasterData());
+  }, [dispatch]);
+
   const handleClear = () => {
     if (window.confirm("Are you sure you want to clear all data? This action cannot be undone.")) {
       setFormData({
@@ -218,7 +185,6 @@ const CreateVehiclePage = () => {
         },
         specifications: {
           engineNumber: "",
-          engineCapacity: 0,
           fuelType: "",
           fuelTankCapacity: 0,
           transmission: "",
@@ -319,8 +285,23 @@ const CreateVehiclePage = () => {
       errors.model = "Model is required";
       errorMessages.push("Model is required");
     }
+    if (!formData.basicInformation.vin?.trim()) {
+      errors.vin = "VIN is required";
+      errorMessages.push("VIN is required");
+    } else if (formData.basicInformation.vin.length !== 17) {
+      errors.vin = "VIN must be exactly 17 characters";
+      errorMessages.push("VIN must be exactly 17 characters");
+    }
+    if (!formData.basicInformation.year || formData.basicInformation.year < 1990) {
+      errors.year = "Valid year is required";
+      errorMessages.push("Valid year is required");
+    }
 
     // Specifications validation
+    if (!formData.specifications.engineType) {
+      errors.engineType = "Engine type is required";
+      errorMessages.push("Engine type is required");
+    }
     if (!formData.specifications.engineNumber?.trim()) {
       errors.engineNumber = "Engine number is required";
       errorMessages.push("Engine number is required");
@@ -333,6 +314,10 @@ const CreateVehiclePage = () => {
       errors.transmission = "Transmission type is required";
       errorMessages.push("Transmission type is required");
     }
+    if (!formData.specifications.suspensionType) {
+      errors.suspensionType = "Suspension type is required";
+      errorMessages.push("Suspension type is required");
+    }
 
     // Capacity Details validation
     if (!formData.capacityDetails.gvw || formData.capacityDetails.gvw <= 0) {
@@ -343,31 +328,56 @@ const CreateVehiclePage = () => {
       errors.payloadCapacity = "Payload capacity is required";
       errorMessages.push("Payload capacity is required");
     }
+    if (!formData.capacityDetails.unladenWeight || formData.capacityDetails.unladenWeight <= 0) {
+      errors.unladenWeight = "Unladen weight is required";
+      errorMessages.push("Unladen weight is required");
+    }
 
-    // Ownership Details validation
-    if (!formData.ownershipDetails.ownership) {
-      errors.ownership = "Ownership type is required";
-      errorMessages.push("Ownership type is required");
-    }
-    if (!formData.ownershipDetails.ownerName?.trim()) {
-      errors.ownerName = "Owner name is required";
-      errorMessages.push("Owner name is required");
-    }
-    if (!formData.ownershipDetails.chassisNumber?.trim()) {
-      errors.chassisNumber = "Chassis number is required";
-      errorMessages.push("Chassis number is required");
+    // Ownership Details validation - check if array has at least one entry
+    if (!formData.ownershipDetails || formData.ownershipDetails.length === 0) {
+      errors.ownershipDetails = "At least one ownership record is required";
+      errorMessages.push("At least one ownership record is required");
+    } else {
+      // Validate each ownership record
+      formData.ownershipDetails.forEach((ownership, index) => {
+        if (!ownership.ownershipName?.trim()) {
+          errors[`ownershipDetails[${index}].ownershipName`] = "Ownership name is required";
+          errorMessages.push(`Ownership name is required for record ${index + 1}`);
+        }
+        if (!ownership.registrationNumber?.trim()) {
+          errors[`ownershipDetails[${index}].registrationNumber`] = "Registration number is required";
+          errorMessages.push(`Registration number is required for record ${index + 1}`);
+        }
+      });
     }
 
     // Determine which tabs have errors
     const newTabErrors = {
-      0: !!(errors.registrationNumber || errors.vehicleType || errors.make || errors.model),
-      1: !!(errors.engineNumber || errors.fuelType || errors.transmission),
-      2: !!(errors.gvw || errors.payloadCapacity),
-      3: !!(errors.ownership || errors.ownerName || errors.chassisNumber),
+      0: !!(errors.registrationNumber || errors.vehicleType || errors.make || errors.model || errors.vin || errors.year),
+      1: !!(errors.engineType || errors.engineNumber || errors.fuelType || errors.transmission || errors.suspensionType),
+      2: !!(errors.gvw || errors.payloadCapacity || errors.unladenWeight),
+      3: !!(errors.ownershipDetails || Object.keys(errors).some(key => key.startsWith('ownershipDetails['))),
       4: false, // Maintenance History - optional
       5: false, // Service Frequency - optional
-      6: false, // Documents - optional
+      6: false, // Documents - will be updated if mandatory docs missing
     };
+
+    // Validate mandatory documents
+    if (masterData.documentTypes && masterData.documentTypes.length > 0) {
+      const mandatoryDocTypes = masterData.documentTypes.filter(dt => dt.isMandatory);
+      const uploadedDocTypes = (formData.documents || []).map(doc => doc.documentType);
+      
+      const missingMandatoryDocs = mandatoryDocTypes.filter(
+        docType => !uploadedDocTypes.includes(docType.value)
+      );
+
+      if (missingMandatoryDocs.length > 0) {
+        const missingDocNames = missingMandatoryDocs.map(dt => dt.label).join(', ');
+        errors.documents = `Missing mandatory documents: ${missingDocNames}`;
+        errorMessages.push(`Missing mandatory documents: ${missingDocNames}`);
+        newTabErrors[6] = true;
+      }
+    }
 
     setTabErrors(newTabErrors);
     setValidationErrors(errors);
@@ -381,6 +391,114 @@ const CreateVehiclePage = () => {
     }
 
     return { isValid: Object.keys(errors).length === 0, errorMessages };
+  };
+
+  /**
+   * Transform frontend formData to backend-compatible format
+   * Maps camelCase frontend fields to backend expected structure
+   */
+  const transformFormDataForBackend = (frontendData) => {
+    // Helper function to format date to YYYY-MM-DD
+    const formatDate = (dateStr) => {
+      if (!dateStr) return undefined;
+      if (dateStr instanceof Date) return dateStr.toISOString().split('T')[0];
+      return dateStr;
+    };
+
+    // Helper function to convert year to YYYY-MM format
+    const convertYearToMonthYear = (year) => {
+      if (!year) return undefined;
+      return `${year}-01`; // Default to January
+    };
+
+    return {
+      basicInformation: {
+        vehicle_registration_number: frontendData.basicInformation.registrationNumber || "",
+        maker_brand_description: frontendData.basicInformation.make || "",
+        maker_model: frontendData.basicInformation.model || "",
+        vin_chassis_no: frontendData.basicInformation.vin || "",
+        vehicle_type_id: frontendData.basicInformation.vehicleType || "",
+        vehicle_category: "", // Optional - can be added later
+        manufacturing_month_year: convertYearToMonthYear(frontendData.basicInformation.year),
+        vehicle_colour: frontendData.basicInformation.color || "",
+        gps_tracker_imei_number: frontendData.basicInformation.gpsIMEI || "",
+        gps_tracker_active_flag: frontendData.basicInformation.gpsEnabled || false,
+        usage_type_id: frontendData.basicInformation.usageType || "UT001", // Default to Commercial Transport (UT001)
+        safety_inspection_date: formatDate(frontendData.basicInformation.safetyInspectionDate),
+        taxes_and_fees: frontendData.basicInformation.taxesAndFees || 0,
+        mileage: frontendData.basicInformation.mileage || 0,
+      },
+      specifications: {
+        engine_type_id: frontendData.specifications.engineType || "",
+        engine_number: frontendData.specifications.engineNumber || "",
+        fuel_type_id: frontendData.specifications.fuelType || "",
+        fuel_tank_capacity: frontendData.specifications.fuelTankCapacity || 0,
+        transmission_type: frontendData.specifications.transmission || "",
+        financer: frontendData.specifications.financer || "",
+        suspension_type: frontendData.specifications.suspensionType || "",
+        emission_standard: frontendData.specifications.emissionStandard || "",
+        wheelbase: frontendData.specifications.wheelbase || 0,
+        no_of_axles: frontendData.specifications.noOfAxles || 0,
+      },
+      capacityDetails: {
+        unloadingWeight: frontendData.capacityDetails.unladenWeight || 0,
+        gvw: frontendData.capacityDetails.gvw || 0,
+        volumeCapacity: frontendData.capacityDetails.loadingCapacityVolume || 0,
+        towingCapacity: frontendData.capacityDetails.towingCapacity || 0,
+        tireLoadRating: frontendData.capacityDetails.tireLoadRating || "",
+        vehicleCondition: "GOOD", // Default - should be made dynamic
+        fuelTankCapacity: frontendData.specifications.fuelTankCapacity || 0,
+        seatingCapacity: frontendData.capacityDetails.seatingCapacity || 0,
+        cargoLength: frontendData.capacityDetails.cargoLength || 0,
+        cargoWidth: frontendData.capacityDetails.cargoWidth || 0,
+        cargoHeight: frontendData.capacityDetails.cargoHeight || 0,
+      },
+      ownershipDetails: {
+        ownershipName: frontendData.ownershipDetails.ownerName || "",
+        registrationNumber: frontendData.basicInformation.registrationNumber || "", // Moved from basicInfo
+        registrationDate: formatDate(frontendData.ownershipDetails.registrationDate),
+        registrationUpto: formatDate(frontendData.ownershipDetails.registrationUpto),
+        validFrom: formatDate(frontendData.ownershipDetails.validFrom),
+        validTo: formatDate(frontendData.ownershipDetails.validTo),
+        purchaseDate: formatDate(frontendData.ownershipDetails.purchaseDate),
+        saleAmount: frontendData.ownershipDetails.purchasePrice || 0,
+        stateCode: frontendData.ownershipDetails.stateCode || "",
+        rtoCode: frontendData.ownershipDetails.rtoCode || "",
+        contactNumber: frontendData.ownershipDetails.contactNumber || "",
+        email: frontendData.ownershipDetails.email || "",
+      },
+      maintenanceHistory: {
+        serviceDate: formatDate(frontendData.maintenanceHistory.lastServiceDate) || new Date().toISOString().split('T')[0],
+        upcomingServiceDate: formatDate(frontendData.maintenanceHistory.nextServiceDue) || new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        typeOfService: frontendData.maintenanceHistory.typeOfService || "",
+        serviceExpense: frontendData.maintenanceHistory.totalServiceExpense || 0,
+        serviceRemark: frontendData.maintenanceHistory.maintenanceNotes || "",
+        lastInspectionDate: formatDate(frontendData.maintenanceHistory.lastInspectionDate),
+      },
+      serviceFrequency: {
+        timePeriod: frontendData.serviceFrequency.serviceIntervalMonths 
+          ? `${frontendData.serviceFrequency.serviceIntervalMonths} months` 
+          : "6 months",
+        kmDrove: frontendData.serviceFrequency.serviceIntervalKM || 0,
+      },
+      documents: (frontendData.documents || []).map(doc => ({
+        documentType: doc.documentType || "",
+        referenceNumber: doc.documentNumber || doc.referenceNumber || "",
+        vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
+        permitCategory: doc.permitCategory || "",
+        permitCode: doc.permitCode || "",
+        documentProvider: doc.documentProvider || "",
+        coverageType: doc.coverageType || "",
+        premiumAmount: doc.premiumAmount || 0,
+        validFrom: formatDate(doc.issueDate || doc.validFrom),
+        validTo: formatDate(doc.expiryDate || doc.validTo),
+        remarks: doc.remarks || "Document uploaded",
+        // ✅ File upload data (base64 encoded from DocumentUploadModal)
+        fileName: doc.fileName || "",
+        fileType: doc.fileType || "",
+        fileData: doc.fileData || "", // Base64 encoded file string
+      })).filter(doc => doc.documentType), // Only include documents with type
+    };
   };
 
   const handleSubmit = async () => {
@@ -415,23 +533,54 @@ const CreateVehiclePage = () => {
     }
 
     try {
-      const result = await dispatch(createVehicle(formData)).unwrap();
+      // Transform form data to backend format
+      const transformedData = transformFormDataForBackend(formData);
+      
+      console.log("📤 Submitting vehicle data:", transformedData);
+      
+      const result = await dispatch(createVehicle(transformedData)).unwrap();
+      
+      console.log("✅ Vehicle created successfully:", result);
       
       dispatch(addToast({
         type: TOAST_TYPES.SUCCESS,
-        message: `Vehicle created successfully!`,
+        message: `Vehicle ${result.vehicleId || ''} created successfully!`,
         duration: 5000,
       }));
 
       setTimeout(() => {
-        navigate(`/vehicle/${result.vehicleId}`);
+        // Navigate to vehicle list or details page
+        if (result.vehicleId) {
+          navigate(`/vehicle/${result.vehicleId}`);
+        } else {
+          navigate('/vehicle');
+        }
       }, 1500);
     } catch (err) {
+      console.error("❌ Error creating vehicle:", err);
+      
+      // Handle backend validation errors
+      let errorDetails = [];
+      
+      if (err.errors && Array.isArray(err.errors)) {
+        // Backend returned validation errors array
+        errorDetails = err.errors.map(error => {
+          if (error.field && error.message) {
+            return `${error.field}: ${error.message}`;
+          }
+          return error.message || error;
+        });
+      } else if (err.message) {
+        errorDetails = [err.message];
+      } else {
+        errorDetails = ["An unexpected error occurred"];
+      }
+      
       dispatch(addToast({
         type: TOAST_TYPES.ERROR,
-        message: "Failed to create vehicle",
-        details: [err.message || "An error occurred"],
-        duration: 5000,
+        message: err.message || "Failed to create vehicle",
+        details: errorDetails.slice(0, 5), // Limit to 5 errors for readability
+        duration: 8000,
       }));
     }
   };
@@ -483,7 +632,7 @@ const CreateVehiclePage = () => {
             <button
               onClick={handleBulkUpload}
               disabled={isCreating}
-              className="group inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <Upload className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
               Bulk Upload
@@ -510,62 +659,65 @@ const CreateVehiclePage = () => {
         </div>
       </div>
 
-      {/* Modern Tab Navigation with glassmorphism */}
+      {/* Modern Tab Navigation with horizontally scrollable tabs (hidden scrollbar) */}
       <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">
         {/* Tab backdrop blur effect */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] backdrop-blur-sm"></div>
 
-        <div className="relative flex space-x-2 py-2">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            const hasError = tabErrors[tab.id];
+        {/* Horizontally scrollable container with hidden scrollbar */}
+        <div className="relative overflow-x-auto overflow-y-hidden scrollbar-hide py-2">
+          <div className="flex space-x-2 min-w-max">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              const hasError = tabErrors[tab.id];
 
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`text-nowrap group relative px-6 py-3 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-3 ${
-                  isActive
-                    ? "bg-gradient-to-br from-white via-white to-gray-50 text-[#0D1A33] shadow-lg transform -translate-y-1 scale-105"
-                    : "bg-white/5 backdrop-blur-sm text-blue-100/80 hover:bg-white/10 hover:text-white border border-white/10 hover:border-white/20"
-                }`}
-              >
-                {/* Active tab decoration */}
-                {isActive && (
-                  <div className="absolute inset-x-0 -bottom-0 h-1 bg-gradient-to-r from-[#10B981] to-[#059669] rounded-t-full"></div>
-                )}
-
-                {/* Error indicator */}
-                {hasError && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                    <AlertCircle className="w-3 h-3 text-white" />
-                  </div>
-                )}
-
-                <Icon
-                  className={`w-5 h-5 transition-all duration-300 ${
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`text-nowrap group relative px-5 py-2.5 font-medium text-xs rounded-t-xl transition-all duration-300 flex items-center gap-2 ${
                     isActive
-                      ? "text-[#10B981] scale-110"
-                      : hasError
-                      ? "text-red-300 group-hover:text-red-200"
-                      : "text-blue-200/70 group-hover:text-white group-hover:scale-105"
+                      ? "bg-gradient-to-br from-white via-white to-gray-50 text-[#0D1A33] shadow-lg transform -translate-y-1"
+                      : "bg-white/5 backdrop-blur-sm text-blue-100/80 hover:bg-white/10 hover:text-white border border-white/10 hover:border-white/20"
                   }`}
-                />
-                <span className="font-semibold tracking-wide">{tab.name}</span>
+                >
+                  {/* Active tab decoration */}
+                  {isActive && (
+                    <div className="absolute inset-x-0 -bottom-0 h-0.5 bg-gradient-to-r from-[#10B981] to-[#059669] rounded-t-full"></div>
+                  )}
 
-                {/* Hover glow effect */}
-                {!isActive && (
-                  <div className="absolute inset-0 rounded-t-2xl bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                )}
-              </button>
-            );
-          })}
+                  {/* Error indicator */}
+                  {hasError && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                      <AlertCircle className="w-2.5 h-2.5 text-white" />
+                    </div>
+                  )}
+
+                  <Icon
+                    className={`w-4 h-4 transition-all duration-300 ${
+                      isActive
+                        ? "text-[#10B981]"
+                        : hasError
+                        ? "text-red-300 group-hover:text-red-200"
+                        : "text-blue-200/70 group-hover:text-white"
+                    }`}
+                  />
+                  <span className="font-semibold">{tab.name}</span>
+
+                  {/* Hover glow effect */}
+                  {!isActive && (
+                    <div className="absolute inset-0 rounded-t-xl bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Modern Content Area */}
-      <div className="px-0 rounded-none py-0 space-y-4">
+      <div className="px-6 py-6">
         {/* Enhanced Tab Content Container */}
         <div className="relative">
           {tabs.map((tab) => {
@@ -582,13 +734,28 @@ const CreateVehiclePage = () => {
                 }`}
               >
                 {/* Content wrapper with modern styling */}
-                <div className="bg-white/60 backdrop-blur-sm rounded-b-3xl shadow-xl border border-white/40 overflow-hidden">
-                  {/* Tab content */}
-                  <div className="p-4">
+                <div className="bg-white/60 backdrop-blur-sm rounded-2xl shadow-xl border border-white/40 overflow-hidden">
+                  {/* Tab content with reduced padding */}
+                  <div className="p-6">
                     <TabComponent
                       formData={formData}
-                      setFormData={setFormData}
+                      setFormData={(dataOrUpdater) => {
+                        if (typeof dataOrUpdater === 'function') {
+                          const resultIfFull = dataOrUpdater(formData);
+                          const topKeys = ['basicInformation','specifications','capacityDetails','ownershipDetails','maintenanceHistory','serviceFrequency','documents'];
+                          const isFullForm = resultIfFull && typeof resultIfFull === 'object' && Object.keys(resultIfFull).some(k => topKeys.includes(k));
+                          if (isFullForm) {
+                            setFormData(resultIfFull);
+                          } else {
+                            // assume updater wants to update the whole form (fallback)
+                            setFormData(resultIfFull);
+                          }
+                        } else {
+                          setFormData(dataOrUpdater);
+                        }
+                      }}
                       errors={validationErrors}
+                      masterData={masterData}
                     />
                   </div>
                 </div>
@@ -597,6 +764,7 @@ const CreateVehiclePage = () => {
           })}
         </div>
       </div>
+
     </div>
   );
 };

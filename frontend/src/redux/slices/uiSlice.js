@@ -92,4 +92,7 @@ export const {
   setGlobalLoading,
 } = uiSlice.actions;
 
+// Alias addToast as showToast for backward compatibility
+export const showToast = addToast;
+
 export default uiSlice.reducer;

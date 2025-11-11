@@ -1,6 +1,7 @@
 ﻿import React from "react";
 import { Info, Truck } from "lucide-react";
 import { VEHICLE_TYPES } from "../../../utils/vehicleConstants";
+import { CustomSelect } from "../../../components/ui/Select";
 
 const BasicInformationTab = ({ formData, setFormData, errors }) => {
   const handleChange = (field, value) => {
@@ -75,20 +76,14 @@ const BasicInformationTab = ({ formData, setFormData, errors }) => {
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             Vehicle Type <span className="text-red-500">*</span>
           </label>
-          <select
+          <CustomSelect
             value={data.vehicleType || ""}
-            onChange={(e) => handleChange("vehicleType", e.target.value)}
-            className={`w-full px-4 py-2.5 border ${
-              errors.vehicleType ? "border-red-500" : "border-gray-300"
-            } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
-          >
-            <option value="">Select Vehicle Type</option>
-            {VEHICLE_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => handleChange("vehicleType", value)}
+            options={VEHICLE_TYPES}
+            placeholder="Select Vehicle Type"
+            error={errors.vehicleType}
+            className="w-full"
+          />
           {errors.vehicleType && <p className="mt-1 text-sm text-red-600">{errors.vehicleType}</p>}
         </div>
 

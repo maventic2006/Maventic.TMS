@@ -33,7 +33,6 @@ const SpecificationsViewTab = ({ vehicle, isEditMode }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
           <InfoField label="Engine Number" value={vehicle.engineNumber} />
           <InfoField label="Engine Type" value={vehicle.engineType} />
-          <InfoField label="Engine Capacity (cc)" value={vehicle.engineCapacity} />
           <InfoField label="Max Power (HP)" value={vehicle.maxPower} />
           <InfoField label="Max Torque (Nm)" value={vehicle.maxTorque} />
           <InfoField label="Number of Cylinders" value={vehicle.numberOfCylinders} />
