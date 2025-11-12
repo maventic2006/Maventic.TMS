@@ -5,7 +5,7 @@ import { Card, CardContent } from "../ui/Card";
 import { Input, Label } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { StatusSelect } from "../ui/Select";
-import { Checkbox } from "../ui/Checkbox";
+import { Checkbox } from "../ui/checkbox";
 
 const WarehouseFilterPanel = ({
   filters,

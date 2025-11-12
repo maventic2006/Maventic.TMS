@@ -23,7 +23,7 @@ export const API_ENDPOINTS = {
     CITIES: "/transporter/cities",
   },
   WAREHOUSE: {
-    LIST: "/warehouse/list",
+    LIST: "/warehouse",
     GET_BY_ID: "/warehouse",
     CREATE: "/warehouse",
     UPDATE: "/warehouse",

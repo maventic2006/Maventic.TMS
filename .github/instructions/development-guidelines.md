@@ -1152,6 +1152,85 @@ This ensures data consistency - if any operation fails, all changes are rolled b
 
 ### 5. Database Layer (Knex + MySQL)
 
+#### Warehouse Module Database Tables
+
+The warehouse maintenance module references the following database tables:
+
+**Primary Warehouse Tables:**
+
+1. **warehouse_basic_information** - Core warehouse data
+
+   - Warehouse Unique Id, Warehouse ID, Consignor ID
+   - Warehouse Type, Warehouse Name1, Warehouse Name2
+   - Language, Vehicle Capacity, Virtual Yard-In settings
+   - Radius for Virtual Yard-In, Speed Limit
+   - Facility flags: Weigh Bridge, Gatepass System, Fuel Availability
+   - Operational areas: Staging Area, Driver Waiting Area
+   - Security: Gate-In/Gate-Out Checklist Auth
+   - Warehouse Address Id (foreign key)
+
+2. **warehouse_sub_location_header** - Geofencing header records
+
+   - SubLocation Hdr Id, Warehouse_Unique Id, Consignor Id
+   - SubLocation ID, Subtype Name, Description
+
+3. **warehouse_sub_location_item** - GPS coordinates for geofencing
+
+   - GeoFence Item Id, SubLocation Hdr Id, Sequence
+   - Latitude, Longitude coordinates
+
+4. **warehouse_sublocation_master** - Sub-location configuration
+
+   - SubLocation ID, Warehouse SubLocation description
+   - Is Mandatory flag
+
+5. **warehouse_documents** - Document management
+   - Document_Unique_Id, Warehouse ID, Document Id
+   - Document Type Id, Document Number
+   - Valid From, Valid To, Active status
+
+**Configuration Tables:**
+
+6. **consignor_general_config_master** - General warehouse configuration
+
+   - GConfig Id, Consignor ID, Warehouse ID
+   - Parameter Name Key, Parameter Value, Description
+   - Active status, Valid From/To dates
+
+7. **consignor_general_config_parameter_name** - Configuration parameters
+
+   - Parameter Name Key, Parameter Name Description
+   - Probable Values
+
+8. **e_bidding_config** - E-bidding configuration per warehouse
+   - e-bidding Config Id, Consignor ID, Warehouse ID
+   - Vehicle Type, Max rate, Min rate, Freight Unit
+   - e-bidding Tolerance Value
+
+**Approval & Access Control:**
+
+9. **consignor_approval_hierarchy_configuration** - Approval workflows
+   - Approval Hierarchy Id, Consignor ID, Transporter ID
+   - Approval type, Approval Level, Approval Control
+   - Role of, Role, User ID
+
+**Material Management:**
+
+10. **consignor_material_master_information** - Material specifications per warehouse
+    - CMaterial Master Id, Material Master Id, Consignor Id
+    - Volumetric Weight per Unit, Net Weight per Unit
+    - Dimensions: L, B, H
+    - Timing: Avg Packaging/Loading/Unloading Time (minutes)
+    - Packing Type, Material Description
+
+**Database Relationships:**
+
+- Primary keys use auto-increment or generated IDs
+- Foreign key relationships between warehouse → consignor → documents
+- Address data linked via warehouse_address_id
+- Multi-table transactions for data consistency
+- Audit fields: created_at, created_by, updated_at, updated_by
+
 #### Migration Pattern
 
 ```javascript

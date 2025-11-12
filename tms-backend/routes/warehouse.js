@@ -15,14 +15,14 @@ router.use(authenticateToken);
 // Routes accessible by Consignor, Admin, and Super Admin
 const allowedRoles = ["consignor", "admin", "product_owner"]; // Using product_owner as super admin equivalent
 
-// GET /api/warehouse/list - Get paginated warehouse list with filters
-router.get("/list", authorizeRoles(allowedRoles), getWarehouseList);
-
 // GET /api/warehouse/master-data - Get master data (warehouse types, etc.)
 router.get("/master-data", authorizeRoles(allowedRoles), getMasterData);
 
-// GET /api/warehouse/:id - Get warehouse by ID
+// GET /api/warehouse/:id - Get warehouse by ID (specific warehouse)
 router.get("/:id", authorizeRoles(allowedRoles), getWarehouseById);
+
+// GET /api/warehouse - Get paginated warehouse list with filters (matches transporter pattern)
+router.get("/", authorizeRoles(allowedRoles), getWarehouseList);
 
 // POST /api/warehouse - Create new warehouse
 router.post("/", authorizeRoles(allowedRoles), createWarehouse);

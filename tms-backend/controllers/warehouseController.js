@@ -6,7 +6,7 @@ const {
 } = require("../validation/warehouseValidation");
 
 // @desc    Get warehouse list with filters and pagination
-// @route   GET /api/warehouse/list
+// @route   GET /api/warehouse
 // @access  Private (Consignor, Admin, Super Admin)
 const getWarehouseList = async (req, res) => {
   try {
@@ -32,23 +32,36 @@ const getWarehouseList = async (req, res) => {
     // Filter by consignor ID only if user has consignor_id (not for product_owner/admin)
     const consignorId = req.user.consignor_id || null;
 
-    // Build query
-    let query = knex("warehouse_basic_information as w").select(
-      "w.warehouse_id",
-      "w.consignor_id",
-      "w.warehouse_type",
-      "w.warehouse_name1",
-      "w.warehouse_name2",
-      "w.weigh_bridge_availability",
-      "w.virtual_yard_in",
-      "w.gatepass_system_available",
-      "w.fuel_availability",
-      "w.region",
-      "w.zone",
-      "w.created_by",
-      "w.created_at",
-      "w.status"
-    );
+    // Build query with address join for city/state/country
+    let query = knex("warehouse_basic_information as w")
+      .leftJoin("tms_address as addr", function () {
+        this.on("w.warehouse_id", "=", "addr.user_reference_id").andOn(
+          "addr.user_type",
+          "=",
+          knex.raw("'WH'")
+        );
+      })
+      .select(
+        "w.warehouse_id",
+        "w.consignor_id",
+        "w.warehouse_type",
+        "w.warehouse_name1",
+        knex.raw("0 as geo_fencing"), // Field doesn't exist in table, default to 0
+        "w.weigh_bridge_availability",
+        "w.virtual_yard_in",
+        "w.gatepass_system_available",
+        "w.fuel_availability",
+        knex.raw("COALESCE(addr.city, 'N/A') as city"),
+        knex.raw("COALESCE(addr.state, 'N/A') as state"),
+        knex.raw("COALESCE(addr.country, 'N/A') as country"),
+        "w.region",
+        "w.zone",
+        "w.created_by",
+        "w.created_at",
+        knex.raw("'N/A' as approver"), // Field doesn't exist in table, default to N/A
+        knex.raw("NULL as approved_on"), // Field doesn't exist in table, default to NULL
+        "w.status"
+      );
 
     // Filter by consignor ID (user's own warehouses)
     if (consignorId) {
