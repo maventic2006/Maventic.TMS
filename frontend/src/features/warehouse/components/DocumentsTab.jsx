@@ -49,7 +49,9 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
   return (
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-[#0D1A33]">Warehouse Documents</h3>
+        <h3 className="text-lg font-semibold text-[#0D1A33]">
+          Warehouse Documents
+        </h3>
         <Button
           type="button"
           onClick={addDocument}
@@ -62,7 +64,9 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
 
       {formData.documents.length === 0 && (
         <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <p className="text-gray-600">No documents added yet. Click "Add Document" to start.</p>
+          <p className="text-gray-600">
+            No documents added yet. Click "Add Document" to start.
+          </p>
         </div>
       )}
 
@@ -72,7 +76,9 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
           className="p-6 bg-gray-50 rounded-lg border border-gray-200 space-y-4"
         >
           <div className="flex justify-between items-center">
-            <h4 className="font-semibold text-[#0D1A33]">Document {index + 1}</h4>
+            <h4 className="font-semibold text-[#0D1A33]">
+              Document {index + 1}
+            </h4>
             {formData.documents.length > 1 && (
               <Button
                 type="button"
@@ -94,21 +100,34 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
               </Label>
               <Select
                 value={document.documentType}
-                onValueChange={(value) => handleDocumentChange(index, "documentType", value)}
+                onValueChange={(value) =>
+                  handleDocumentChange(index, "documentType", value)
+                }
               >
-                <SelectTrigger className={errors?.[`documents.${index}.documentType`] ? "border-red-500" : ""}>
+                <SelectTrigger
+                  className={
+                    errors?.[`documents.${index}.documentType`]
+                      ? "border-red-500"
+                      : ""
+                  }
+                >
                   <SelectValue placeholder="Select document type" />
                 </SelectTrigger>
                 <SelectContent>
                   {masterData?.documentTypes?.map((type) => (
-                    <SelectItem key={type.document_type_id} value={type.document_type_id}>
+                    <SelectItem
+                      key={type.document_type_id}
+                      value={type.document_type_id}
+                    >
                       {type.document_type_name || type.document_type_id}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {errors?.[`documents.${index}.documentType`] && (
-                <p className="text-xs text-red-500">{errors[`documents.${index}.documentType`]}</p>
+                <p className="text-xs text-red-500">
+                  {errors[`documents.${index}.documentType`]}
+                </p>
               )}
             </div>
 
@@ -119,12 +138,24 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
               </Label>
               <Input
                 value={document.documentNumber}
-                onChange={(e) => handleDocumentChange(index, "documentNumber", e.target.value.toUpperCase())}
+                onChange={(e) =>
+                  handleDocumentChange(
+                    index,
+                    "documentNumber",
+                    e.target.value.toUpperCase()
+                  )
+                }
                 placeholder="Enter document number"
-                className={errors?.[`documents.${index}.documentNumber`] ? "border-red-500" : ""}
+                className={
+                  errors?.[`documents.${index}.documentNumber`]
+                    ? "border-red-500"
+                    : ""
+                }
               />
               {errors?.[`documents.${index}.documentNumber`] && (
-                <p className="text-xs text-red-500">{errors[`documents.${index}.documentNumber`]}</p>
+                <p className="text-xs text-red-500">
+                  {errors[`documents.${index}.documentNumber`]}
+                </p>
               )}
             </div>
 
@@ -136,7 +167,9 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
               <Input
                 type="date"
                 value={document.validFrom}
-                onChange={(e) => handleDocumentChange(index, "validFrom", e.target.value)}
+                onChange={(e) =>
+                  handleDocumentChange(index, "validFrom", e.target.value)
+                }
               />
             </div>
 
@@ -148,7 +181,9 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
               <Input
                 type="date"
                 value={document.validTo}
-                onChange={(e) => handleDocumentChange(index, "validTo", e.target.value)}
+                onChange={(e) =>
+                  handleDocumentChange(index, "validTo", e.target.value)
+                }
               />
             </div>
           </div>

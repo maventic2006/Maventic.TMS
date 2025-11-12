@@ -23,7 +23,10 @@ const AddressTab = ({ formData, setFormData, errors }) => {
 
   useEffect(() => {
     if (formData.address.country && formData.address.state) {
-      const stateCities = City.getCitiesOfState(formData.address.country, formData.address.state);
+      const stateCities = City.getCitiesOfState(
+        formData.address.country,
+        formData.address.state
+      );
       setCities(stateCities);
     }
   }, [formData.address.country, formData.address.state]);
@@ -65,14 +68,19 @@ const AddressTab = ({ formData, setFormData, errors }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Country */}
         <div className="space-y-2">
-          <Label htmlFor="country" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="country"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Country <span className="text-red-500">*</span>
           </Label>
           <Select
             value={formData.address.country}
             onValueChange={(value) => handleChange("country", value)}
           >
-            <SelectTrigger className={errors?.["address.country"] ? "border-red-500" : ""}>
+            <SelectTrigger
+              className={errors?.["address.country"] ? "border-red-500" : ""}
+            >
               <SelectValue placeholder="Select country" />
             </SelectTrigger>
             <SelectContent>
@@ -90,7 +98,10 @@ const AddressTab = ({ formData, setFormData, errors }) => {
 
         {/* State */}
         <div className="space-y-2">
-          <Label htmlFor="state" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="state"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             State <span className="text-red-500">*</span>
           </Label>
           <Select
@@ -98,7 +109,9 @@ const AddressTab = ({ formData, setFormData, errors }) => {
             onValueChange={(value) => handleChange("state", value)}
             disabled={!formData.address.country}
           >
-            <SelectTrigger className={errors?.["address.state"] ? "border-red-500" : ""}>
+            <SelectTrigger
+              className={errors?.["address.state"] ? "border-red-500" : ""}
+            >
               <SelectValue placeholder="Select state" />
             </SelectTrigger>
             <SelectContent>
@@ -116,7 +129,10 @@ const AddressTab = ({ formData, setFormData, errors }) => {
 
         {/* City */}
         <div className="space-y-2">
-          <Label htmlFor="city" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="city"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             City <span className="text-red-500">*</span>
           </Label>
           <Select
@@ -124,7 +140,9 @@ const AddressTab = ({ formData, setFormData, errors }) => {
             onValueChange={(value) => handleChange("city", value)}
             disabled={!formData.address.state}
           >
-            <SelectTrigger className={errors?.["address.city"] ? "border-red-500" : ""}>
+            <SelectTrigger
+              className={errors?.["address.city"] ? "border-red-500" : ""}
+            >
               <SelectValue placeholder="Select city" />
             </SelectTrigger>
             <SelectContent>
@@ -142,7 +160,10 @@ const AddressTab = ({ formData, setFormData, errors }) => {
 
         {/* District */}
         <div className="space-y-2">
-          <Label htmlFor="district" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="district"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             District
           </Label>
           <Input
@@ -155,7 +176,10 @@ const AddressTab = ({ formData, setFormData, errors }) => {
 
         {/* Street 1 */}
         <div className="space-y-2">
-          <Label htmlFor="street1" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="street1"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Street Address 1 <span className="text-red-500">*</span>
           </Label>
           <Input
@@ -172,7 +196,10 @@ const AddressTab = ({ formData, setFormData, errors }) => {
 
         {/* Street 2 */}
         <div className="space-y-2">
-          <Label htmlFor="street2" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="street2"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Street Address 2
           </Label>
           <Input
@@ -185,7 +212,10 @@ const AddressTab = ({ formData, setFormData, errors }) => {
 
         {/* Postal Code */}
         <div className="space-y-2">
-          <Label htmlFor="postalCode" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="postalCode"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Postal Code
           </Label>
           <Input
@@ -197,7 +227,9 @@ const AddressTab = ({ formData, setFormData, errors }) => {
             className={errors?.["address.postalCode"] ? "border-red-500" : ""}
           />
           {errors?.["address.postalCode"] && (
-            <p className="text-xs text-red-500">{errors["address.postalCode"]}</p>
+            <p className="text-xs text-red-500">
+              {errors["address.postalCode"]}
+            </p>
           )}
         </div>
       </div>

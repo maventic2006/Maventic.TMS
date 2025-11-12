@@ -25,7 +25,10 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Warehouse Name */}
         <div className="space-y-2">
-          <Label htmlFor="warehouseName" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="warehouseName"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Warehouse Name <span className="text-red-500">*</span>
           </Label>
           <Input
@@ -33,41 +36,60 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
             value={formData.generalDetails.warehouseName}
             onChange={(e) => handleChange("warehouseName", e.target.value)}
             placeholder="Enter warehouse name"
-            className={errors?.["generalDetails.warehouseName"] ? "border-red-500" : ""}
+            className={
+              errors?.["generalDetails.warehouseName"] ? "border-red-500" : ""
+            }
           />
           {errors?.["generalDetails.warehouseName"] && (
-            <p className="text-xs text-red-500">{errors["generalDetails.warehouseName"]}</p>
+            <p className="text-xs text-red-500">
+              {errors["generalDetails.warehouseName"]}
+            </p>
           )}
         </div>
 
         {/* Warehouse Type */}
         <div className="space-y-2">
-          <Label htmlFor="warehouseType" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="warehouseType"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Warehouse Type <span className="text-red-500">*</span>
           </Label>
           <Select
             value={formData.generalDetails.warehouseType}
             onValueChange={(value) => handleChange("warehouseType", value)}
           >
-            <SelectTrigger className={errors?.["generalDetails.warehouseType"] ? "border-red-500" : ""}>
+            <SelectTrigger
+              className={
+                errors?.["generalDetails.warehouseType"] ? "border-red-500" : ""
+              }
+            >
               <SelectValue placeholder="Select warehouse type" />
             </SelectTrigger>
             <SelectContent>
               {masterData?.warehouseTypes?.map((type) => (
-                <SelectItem key={type.warehouse_type_id} value={type.warehouse_type_id}>
+                <SelectItem
+                  key={type.warehouse_type_id}
+                  value={type.warehouse_type_id}
+                >
                   {type.warehouse_type_name || type.warehouse_type_id}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           {errors?.["generalDetails.warehouseType"] && (
-            <p className="text-xs text-red-500">{errors["generalDetails.warehouseType"]}</p>
+            <p className="text-xs text-red-500">
+              {errors["generalDetails.warehouseType"]}
+            </p>
           )}
         </div>
 
         {/* Language */}
         <div className="space-y-2">
-          <Label htmlFor="language" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="language"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Language
           </Label>
           <Input
@@ -80,7 +102,10 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
 
         {/* Vehicle Capacity */}
         <div className="space-y-2">
-          <Label htmlFor="vehicleCapacity" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="vehicleCapacity"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Vehicle Capacity
           </Label>
           <Input
@@ -100,14 +125,19 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
           </Label>
           <ThemedSwitch
             checked={formData.generalDetails.virtualYardIn}
-            onCheckedChange={(checked) => handleChange("virtualYardIn", checked)}
+            onCheckedChange={(checked) =>
+              handleChange("virtualYardIn", checked)
+            }
           />
         </div>
 
         {/* Radius for Virtual Yard-In */}
         {formData.generalDetails.virtualYardIn && (
           <div className="space-y-2">
-            <Label htmlFor="radiusVirtualYardIn" className="text-sm font-semibold text-[#0D1A33]">
+            <Label
+              htmlFor="radiusVirtualYardIn"
+              className="text-sm font-semibold text-[#0D1A33]"
+            >
               Radius for Virtual Yard-In (meters)
             </Label>
             <Input
@@ -115,7 +145,9 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
               type="number"
               min="0"
               value={formData.generalDetails.radiusVirtualYardIn}
-              onChange={(e) => handleChange("radiusVirtualYardIn", e.target.value)}
+              onChange={(e) =>
+                handleChange("radiusVirtualYardIn", e.target.value)
+              }
               placeholder="Enter radius in meters"
             />
           </div>
@@ -123,7 +155,10 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
 
         {/* Speed Limit */}
         <div className="space-y-2">
-          <Label htmlFor="speedLimit" className="text-sm font-semibold text-[#0D1A33]">
+          <Label
+            htmlFor="speedLimit"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
             Speed Limit (km/h)
           </Label>
           <Input
