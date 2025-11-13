@@ -18,14 +18,15 @@ const allowedRoles = ["consignor", "admin", "product_owner"]; // Using product_o
 // GET /api/warehouse/master-data - Get master data (warehouse types, etc.)
 router.get("/master-data", authorizeRoles(allowedRoles), getMasterData);
 
-// GET /api/warehouse/:id - Get warehouse by ID (specific warehouse)
-router.get("/:id", authorizeRoles(allowedRoles), getWarehouseById);
-
 // GET /api/warehouse - Get paginated warehouse list with filters (matches transporter pattern)
 router.get("/", authorizeRoles(allowedRoles), getWarehouseList);
 
 // POST /api/warehouse - Create new warehouse
 router.post("/", authorizeRoles(allowedRoles), createWarehouse);
+
+// GET /api/warehouse/:id - Get warehouse by ID (specific warehouse)
+// IMPORTANT: Keep this AFTER more specific routes to prevent catching routes like /master-data
+router.get("/:id", authorizeRoles(allowedRoles), getWarehouseById);
 
 // PUT /api/warehouse/:id - Update warehouse
 router.put("/:id", authorizeRoles(allowedRoles), updateWarehouse);

@@ -242,66 +242,56 @@ const WarehouseCreatePage = () => {
       )
     ) {
       setFormData({
-        transporterId: null,
         generalDetails: {
-          businessName: "",
-          fromDate: "",
-          toDate: "",
-          avgRating: 0,
-          transMode: {
-            road: false,
-            rail: false,
-            air: false,
-            sea: false,
-          },
-          activeFlag: true,
+          warehouseName: "",
+          warehouseType: "",
+          language: "",
+          vehicleCapacity: 0,
+          virtualYardIn: false,
+          radiusVirtualYardIn: 0,
+          speedLimit: 0,
         },
-        addresses: [
-          {
-            vatNumber: "",
-            country: "",
-            state: "",
-            city: "",
-            district: "",
-            street1: "",
-            street2: "",
-            postalCode: "",
-            isPrimary: true,
-            contacts: [
-              {
-                name: "",
-                role: "",
-                phoneNumber: "",
-                alternatePhoneNumber: "",
-                email: "",
-                alternateEmail: "",
-                whatsappNumber: "",
-              },
-            ],
-          },
-        ],
-        serviceableAreas: [
-          {
-            country: "",
-            states: [],
-          },
-        ],
+        facilities: {
+          weighBridge: false,
+          gatepassSystem: false,
+          fuelAvailability: false,
+          stagingArea: false,
+          driverWaitingArea: false,
+          gateInChecklistAuth: false,
+          gateOutChecklistAuth: false,
+        },
+        address: {
+          country: "",
+          state: "",
+          city: "",
+          district: "",
+          street1: "",
+          street2: "",
+          postalCode: "",
+          isPrimary: true,
+        },
         documents: [
           {
             documentType: "",
             documentNumber: "",
-            referenceNumber: "",
-            country: "",
             validFrom: "",
             validTo: "",
-            status: true,
             fileName: "",
             fileType: "",
             fileData: "",
+            status: true,
           },
         ],
+        subLocations: [],
       });
       setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+        4: false,
+      });
       setActiveTab(0);
     }
   };
@@ -314,6 +304,7 @@ const WarehouseCreatePage = () => {
       1: false,
       2: false,
       3: false,
+      4: false,
     });
 
     // Validate entire form
@@ -370,9 +361,10 @@ const WarehouseCreatePage = () => {
       // Determine which tabs have errors
       const newTabErrors = {
         0: !!nestedErrors.generalDetails,
-        1: !!nestedErrors.addresses,
-        2: !!nestedErrors.serviceableAreas,
+        1: !!nestedErrors.facilities,
+        2: !!nestedErrors.address,
         3: !!nestedErrors.documents,
+        4: !!nestedErrors.subLocations,
       };
       setTabErrors(newTabErrors);
 
@@ -382,6 +374,7 @@ const WarehouseCreatePage = () => {
       if (newTabErrors[1]) tabsWithErrors.push(1);
       if (newTabErrors[2]) tabsWithErrors.push(2);
       if (newTabErrors[3]) tabsWithErrors.push(3);
+      if (newTabErrors[4]) tabsWithErrors.push(4);
 
       if (tabsWithErrors.length > 0) {
         setActiveTab(tabsWithErrors[0]);

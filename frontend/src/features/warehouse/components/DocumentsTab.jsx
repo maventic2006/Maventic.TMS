@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "../../../components/ui/select";
 import { Button } from "../../../components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Upload, FileCheck } from "lucide-react";
 
 const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
   const addDocument = () => {
@@ -44,6 +44,29 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
         i === index ? { ...doc, [field]: value } : doc
       ),
     }));
+  };
+
+  const handleFileUpload = (index, event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({
+          ...prev,
+          documents: prev.documents.map((doc, i) =>
+            i === index
+              ? {
+                  ...doc,
+                  fileName: file.name,
+                  fileType: file.type,
+                  fileData: reader.result.split(",")[1], // Base64 string without data URL prefix
+                }
+              : doc
+          ),
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -185,6 +208,40 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
                   handleDocumentChange(index, "validTo", e.target.value)
                 }
               />
+            </div>
+
+            {/* File Upload */}
+            <div className="space-y-2 md:col-span-2">
+              <Label className="text-sm font-semibold text-[#0D1A33]">
+                Upload Document
+              </Label>
+              <div className="flex items-center gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="relative overflow-hidden"
+                  onClick={() => document.getElementById(`file-upload-${index}`).click()}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+                <input
+                  id={`file-upload-${index}`}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={(e) => handleFileUpload(index, e)}
+                />
+                {document.fileName && (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <FileCheck className="w-4 h-4" />
+                    <span className="font-medium">{document.fileName}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">
+                Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 5MB)
+              </p>
             </div>
           </div>
         </div>
