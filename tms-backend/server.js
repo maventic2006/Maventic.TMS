@@ -30,7 +30,12 @@ app.set("io", io);
 app.use(helmet());
 app.use(
   cors({
-    origin: "http://localhost:5173", // Frontend URL
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://192.168.2.32:5173",
+      "http://192.168.2.32:5174",
+    ], // Frontend URL
     credentials: true, // Allow cookies to be sent
   })
 );
