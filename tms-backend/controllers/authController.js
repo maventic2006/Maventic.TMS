@@ -83,19 +83,34 @@ const login = async (req, res) => {
     if (!requirePasswordReset) {
       // Set JWT token in HTTP-only cookie (expires when browser closes)
       const isProduction = process.env.NODE_ENV === "production";
+
+      // Get the origin from the request to set cookie domain properly
+      const origin = req.get("origin") || "";
+      const isDifferentOrigin =
+        origin &&
+        !origin.includes("localhost") &&
+        !origin.includes("127.0.0.1");
+
       const cookieOptions = {
         httpOnly: true,
-        secure: isProduction, // Use secure cookies in production (HTTPS only)
-        sameSite: "lax", // Changed from "strict" to "lax" for better cross-origin compatibility
+        secure: false, // Set to false for now - can be enabled when HTTPS is available
+        sameSite: "lax", // "lax" allows cookies in cross-origin GET requests (better compatibility)
         path: "/", // Ensure cookie is available for all paths
         // No maxAge - cookie expires when browser closes (session cookie)
       };
+
+      // If production AND using HTTPS, enable secure flag
+      if (isProduction && origin.startsWith("https://")) {
+        cookieOptions.secure = true;
+      }
 
       console.log("🍪 Setting authentication cookie with options:", {
         ...cookieOptions,
         token: token.substring(0, 20) + "...", // Log only first 20 chars for security
         isProduction,
         NODE_ENV: process.env.NODE_ENV,
+        origin,
+        isDifferentOrigin,
       });
 
       res.cookie("authToken", token, cookieOptions);
@@ -332,7 +347,7 @@ const logout = (req, res) => {
   // Clear the auth token cookie with same options as when set
   res.clearCookie("authToken", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: false, // Match login cookie settings
     sameSite: "lax", // Changed from "strict" to "lax" to match login cookie
     path: "/", // Ensure cookie is cleared from all paths
   });
@@ -381,12 +396,19 @@ const refreshToken = async (req, res) => {
 
     // Update cookie with new token
     const isProduction = process.env.NODE_ENV === "production";
+    const origin = req.get("origin") || "";
+
     const cookieOptions = {
       httpOnly: true,
-      secure: isProduction,
+      secure: false, // Match login cookie settings
       sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
       path: "/",
     };
+
+    // If production AND using HTTPS, enable secure flag
+    if (isProduction && origin.startsWith("https://")) {
+      cookieOptions.secure = true;
+    }
 
     console.log("🔄 Refreshing authentication cookie");
     res.cookie("authToken", newToken, cookieOptions);

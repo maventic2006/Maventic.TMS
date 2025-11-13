@@ -56,11 +56,15 @@ app.use(
         console.warn("⚠️ CORS blocked origin:", origin);
         return callback(new Error(msg), false);
       }
+      console.log("✅ CORS allowed origin:", origin);
       return callback(null, true);
     },
     credentials: true, // Allow cookies to be sent
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["Set-Cookie"], // Expose Set-Cookie header to frontend
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
 app.use(cookieParser());
