@@ -15,14 +15,30 @@ export const generalDetailsSchema = z.object({
   warehouseName: z
     .string()
     .min(2, "Warehouse name must be at least 2 characters")
-    .max(100, "Warehouse name cannot exceed 100 characters")
+    .max(30, "Warehouse name cannot exceed 30 characters")
+    .trim(),
+  warehouseName2: z
+    .string()
+    .min(2, "Warehouse name 2 must be at least 2 characters")
+    .max(30, "Warehouse name 2 cannot exceed 30 characters")
     .trim(),
   warehouseType: z.string().min(1, "Please select warehouse type"),
-  language: z.string().optional(),
-  vehicleCapacity: z.coerce.number().min(0, "Vehicle capacity must be non-negative").optional(),
+  materialType: z.string().min(1, "Please select material type"),
+  language: z.string().max(10).optional(),
+  vehicleCapacity: z.coerce
+    .number()
+    .min(0, "Vehicle capacity must be non-negative")
+    .int("Vehicle capacity must be a whole number"),
   virtualYardIn: z.boolean().default(false),
-  radiusVirtualYardIn: z.coerce.number().min(0).optional(),
-  speedLimit: z.coerce.number().min(0).optional(),
+  radiusVirtualYardIn: z.coerce
+    .number()
+    .min(0, "Radius must be non-negative")
+    .optional(),
+  speedLimit: z.coerce
+    .number()
+    .min(1, "Speed limit must be at least 1 KM/H")
+    .max(200, "Speed limit cannot exceed 200 KM/H")
+    .default(20),
 });
 
 // Facilities Schema
@@ -36,7 +52,7 @@ export const facilitiesSchema = z.object({
   gateOutChecklistAuth: z.boolean().default(false),
 });
 
-// Address Schema  
+// Address Schema
 export const addressSchema = z.object({
   country: z.string().min(1, ERROR_MESSAGES.COUNTRY_REQUIRED),
   state: z.string().min(1, ERROR_MESSAGES.STATE_REQUIRED),
@@ -48,6 +64,14 @@ export const addressSchema = z.object({
     .string()
     .regex(/^\d{6}$/, ERROR_MESSAGES.POSTAL_CODE_INVALID)
     .optional(),
+  vatNumber: z
+    .string()
+    .min(1, "VAT number is required")
+    .regex(
+      /^[A-Z0-9]{8,20}$/,
+      "VAT number must be 8-20 alphanumeric characters"
+    ),
+  addressType: z.string().min(1, "Please select address type"),
   isPrimary: z.boolean().default(true),
 });
 
@@ -70,11 +94,15 @@ export const documentSchema = z.object({
 export const subLocationSchema = z.object({
   subLocationType: z.string().min(1, "Please select sub-location type"),
   description: z.string().optional(),
-  coordinates: z.array(z.object({
-    latitude: z.coerce.number().min(-90).max(90),
-    longitude: z.coerce.number().min(-180).max(180),
-    sequence: z.number(),
-  })).min(3, "At least 3 coordinates required for geofencing"),
+  coordinates: z
+    .array(
+      z.object({
+        latitude: z.coerce.number().min(-90).max(90),
+        longitude: z.coerce.number().min(-180).max(180),
+        sequence: z.number(),
+      })
+    )
+    .min(3, "At least 3 coordinates required for geofencing"),
 });
 
 // Complete Warehouse Create Schema

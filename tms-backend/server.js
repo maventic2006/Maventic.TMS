@@ -9,14 +9,31 @@ require("dotenv").config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Define allowed origins (supports both development and production)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://192.168.2.32:5173",
+  "http://192.168.2.32:5174",
+  // Add production server origins here when deployed
+  // Example: "https://tms.yourdomain.com"
+];
+
+// If FRONTEND_URL is set in environment, add it to allowed origins
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+  console.log(
+    "🌐 Added FRONTEND_URL to CORS origins:",
+    process.env.FRONTEND_URL
+  );
+}
+
+console.log("🔐 CORS Configuration - Allowed Origins:", allowedOrigins);
+
 const io = socketIO(server, {
   cors: {
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "http://192.168.2.32:5173",
-      "http://192.168.2.32:5174",
-    ],
+    origin: allowedOrigins,
     credentials: true,
   },
 });
@@ -30,13 +47,20 @@ app.set("io", io);
 app.use(helmet());
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "http://192.168.2.32:5173",
-      "http://192.168.2.32:5174",
-    ], // Frontend URL
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, Postman, or same-origin)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = `The CORS policy for this site does not allow access from origin: ${origin}`;
+        console.warn("⚠️ CORS blocked origin:", origin);
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
     credentials: true, // Allow cookies to be sent
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(cookieParser());

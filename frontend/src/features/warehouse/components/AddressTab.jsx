@@ -9,7 +9,7 @@ import {
 } from "../../../components/ui/select";
 import { Country, State, City } from "country-state-city";
 
-const AddressTab = ({ formData, setFormData, errors }) => {
+const AddressTab = ({ formData, setFormData, errors, masterData }) => {
   const [countries] = useState(Country.getAllCountries());
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
@@ -216,7 +216,7 @@ const AddressTab = ({ formData, setFormData, errors }) => {
             htmlFor="postalCode"
             className="text-sm font-semibold text-[#0D1A33]"
           >
-            Postal Code
+            Postal Code (PIN)
           </Label>
           <Input
             id="postalCode"
@@ -229,6 +229,69 @@ const AddressTab = ({ formData, setFormData, errors }) => {
           {errors?.["address.postalCode"] && (
             <p className="text-xs text-red-500">
               {errors["address.postalCode"]}
+            </p>
+          )}
+        </div>
+
+        {/* VAT Number - Mandatory */}
+        <div className="space-y-2">
+          <Label
+            htmlFor="vatNumber"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
+            VAT Number <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="vatNumber"
+            value={formData.address.vatNumber}
+            onChange={(e) =>
+              handleChange("vatNumber", e.target.value.toUpperCase())
+            }
+            placeholder="Enter VAT number"
+            maxLength={20}
+            className={errors?.["address.vatNumber"] ? "border-red-500" : ""}
+          />
+          {errors?.["address.vatNumber"] && (
+            <p className="text-xs text-red-500">
+              {errors["address.vatNumber"]}
+            </p>
+          )}
+          <p className="text-xs text-gray-500">8-20 alphanumeric characters</p>
+        </div>
+
+        {/* Address Type - Mandatory */}
+        <div className="space-y-2">
+          <Label
+            htmlFor="addressType"
+            className="text-sm font-semibold text-[#0D1A33]"
+          >
+            Address Type <span className="text-red-500">*</span>
+          </Label>
+          <Select
+            value={formData.address.addressType}
+            onValueChange={(value) => handleChange("addressType", value)}
+          >
+            <SelectTrigger
+              className={
+                errors?.["address.addressType"] ? "border-red-500" : ""
+              }
+            >
+              <SelectValue placeholder="Select address type" />
+            </SelectTrigger>
+            <SelectContent>
+              {masterData?.addressTypes?.map((type) => (
+                <SelectItem
+                  key={type.address_type_id}
+                  value={type.address_type_id}
+                >
+                  {type.address}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors?.["address.addressType"] && (
+            <p className="text-xs text-red-500">
+              {errors["address.addressType"]}
             </p>
           )}
         </div>

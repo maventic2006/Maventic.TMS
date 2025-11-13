@@ -280,24 +280,47 @@ const updateWarehouse = async (req, res) => {
   }
 };
 
-// @desc    Get master data (warehouse types, etc.)
+// @desc    Get master data (warehouse types, material types, address types, sub-location types)
 // @route   GET /api/warehouse/master-data
 // @access  Private (Consignor, Admin, Super Admin)
 const getMasterData = async (req, res) => {
   try {
     console.log("📦 Fetching warehouse master data");
 
+    // Fetch warehouse types
     const warehouseTypes = await knex("warehouse_type_master")
       .select("warehouse_type_id", "warehouse_type")
       .where("status", "ACTIVE")
       .orderBy("warehouse_type");
 
-    console.log(`✅ Found ${warehouseTypes.length} warehouse types`);
+    // Fetch material types
+    const materialTypes = await knex("material_types_master")
+      .select("material_types_id", "material_types")
+      .where("status", "ACTIVE")
+      .orderBy("material_types");
+
+    // Fetch address types
+    const addressTypes = await knex("address_type_master")
+      .select("address_type_id", "address")
+      .where("status", "ACTIVE")
+      .orderBy("address");
+
+    // Fetch sub-location types
+    const subLocationTypes = await knex("warehouse_sub_location_master")
+      .select("sub_location_id", "warehouse_sub_location_description")
+      .where("status", "ACTIVE")
+      .orderBy("warehouse_sub_location_description");
+
+    console.log(
+      `✅ Found ${warehouseTypes.length} warehouse types, ${materialTypes.length} material types, ${addressTypes.length} address types, ${subLocationTypes.length} sub-location types`
+    );
 
     res.json({
       success: true,
       warehouseTypes,
-      subLocationTypes: [], // TODO: Add when needed
+      materialTypes,
+      addressTypes,
+      subLocationTypes,
     });
   } catch (error) {
     console.error("❌ Error fetching master data:", error);

@@ -592,7 +592,6 @@ import {
   formatFieldName,
 } from "../validation";
 
-
 // Import view tab components
 import DriverDashboardViewTab from "../components/DriverDashboardViewTab";
 import BasicInfoViewTab from "../components/BasicInfoViewTab";
@@ -603,7 +602,6 @@ import TransporterMappingViewTab from "../components/TransporterMappingViewTab";
 import VehicleMappingViewTab from "../components/VehicleMappingViewTab";
 import BlacklistMappingViewTab from "../components/BlacklistMappingViewTab";
 
-
 // Import edit tab components
 import BasicInfoTab from "../components/BasicInfoTab";
 import DocumentsTab from "../components/DocumentsTab";
@@ -612,18 +610,16 @@ import AccidentViolationTab from "../components/AccidentViolationTab";
 import TransporterMappingTab from "../components/TransporterMappingTab";
 import VehicleMappingTab from "../components/VehicleMappingTab";
 import BlacklistMappingTab from "../components/BlacklistMappingTab";
-
+import TMSHeader from "@/components/layout/TMSHeader";
 
 const DriverDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-
   const theme = getPageTheme("tab") || {};
   const actionButtonTheme = getComponentTheme("actionButton") || {};
   const tabButtonTheme = getComponentTheme("tabButton") || {};
-
 
   // Ensure theme objects have required structure with defaults
   const safeTheme = {
@@ -643,7 +639,6 @@ const DriverDetailsPage = () => {
     },
   };
 
-
   const safeActionButtonTheme = {
     primary: {
       background: actionButtonTheme.primary?.background || "#10B981",
@@ -656,7 +651,6 @@ const DriverDetailsPage = () => {
       border: actionButtonTheme.secondary?.border || "#D1D5DB",
     },
   };
-
 
   const safeTabButtonTheme = {
     active: {
@@ -671,10 +665,8 @@ const DriverDetailsPage = () => {
     },
   };
 
-
   const { selectedDriver, isFetchingDetails, isUpdating, error, masterData } =
     useSelector((state) => state.driver);
-
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -690,7 +682,6 @@ const DriverDetailsPage = () => {
     6: false, // Vehicle Mapping
     7: false, // Blacklist Mapping
   });
-
 
   const tabs = [
     {
@@ -751,7 +742,6 @@ const DriverDetailsPage = () => {
     },
   ];
 
-
   // Load driver data
   useEffect(() => {
     if (id) {
@@ -759,7 +749,6 @@ const DriverDetailsPage = () => {
       dispatch(fetchMasterData());
     }
   }, [id, dispatch]);
-
 
   // Initialize edit form data when driver loads
   useEffect(() => {
@@ -802,7 +791,6 @@ const DriverDetailsPage = () => {
       });
     }
   }, [selectedDriver, editFormData]);
-
 
   // Handle errors
   useEffect(() => {
@@ -861,11 +849,9 @@ const DriverDetailsPage = () => {
     }
   }, [error, isUpdating, dispatch]);
 
-
   const handleBack = () => {
     navigate("/drivers");
   };
-
 
   const handleEditToggle = () => {
     if (isEditMode) {
@@ -886,7 +872,6 @@ const DriverDetailsPage = () => {
     setIsEditMode(!isEditMode);
   };
 
-
   const handleFormDataChange = (section, data) => {
     setEditFormData((prev) => ({
       ...prev,
@@ -894,11 +879,9 @@ const DriverDetailsPage = () => {
     }));
   };
 
-
   const handleValidationErrorsChange = (errors) => {
     setValidationErrors(errors);
   };
-
 
   const handleTabErrorChange = (tabId, hasError) => {
     setTabErrors((prev) => ({
@@ -906,7 +889,6 @@ const DriverDetailsPage = () => {
       [tabId]: hasError,
     }));
   };
-
 
   const handleSave = async () => {
     // Validate form data
@@ -1118,7 +1100,6 @@ const DriverDetailsPage = () => {
       ),
     };
 
-
     // Dispatch update action
     const result = await dispatch(
       updateDriver({
@@ -1126,7 +1107,6 @@ const DriverDetailsPage = () => {
         driverData: filteredFormData,
       })
     );
-
 
     if (result.type.endsWith("/fulfilled")) {
       // Clear edit mode state first
@@ -1157,11 +1137,9 @@ const DriverDetailsPage = () => {
     }
   };
 
-
   const ActiveTabComponent = isEditMode
     ? tabs[activeTab].editComponent
     : tabs[activeTab].viewComponent;
-
 
   return (
     <div
@@ -1343,7 +1321,6 @@ const DriverDetailsPage = () => {
                 {/* Tab backdrop blur effect */}
                 <div className="absolute inset-0 bg-black/20 backdrop-blur-sm rounded-t-2xl"></div>
 
-
                 <div className="relative flex flex-nowrap gap-2 py-2 scrollable-tabs px-2">
                   {tabs.map((tab) => {
                     const Icon = tab.icon;
@@ -1370,7 +1347,6 @@ const DriverDetailsPage = () => {
                         {isActive && (
                           <div className="absolute inset-x-0 -bottom-0 h-1 bg-gradient-to-r from-[#10B981] to-[#059669] rounded-t-full"></div>
                         )}
-
 
                         <Icon
                           className={`w-5 h-5 transition-all duration-300 ${
@@ -1435,9 +1411,4 @@ const DriverDetailsPage = () => {
   );
 };
 
-
 export default DriverDetailsPage;
-
-
-
-

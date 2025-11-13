@@ -154,10 +154,10 @@ const GeofencingTab = ({ formData, setFormData, errors, masterData }) => {
                 <SelectContent>
                   {masterData?.subLocationTypes?.map((type) => (
                     <SelectItem
-                      key={type.sublocation_id}
-                      value={type.sublocation_id}
+                      key={type.sub_location_id}
+                      value={type.sub_location_id}
                     >
-                      {type.warehouse_sublocation_desc || type.sublocation_id}
+                      {type.warehouse_sub_location_description}
                     </SelectItem>
                   ))}
                 </SelectContent>

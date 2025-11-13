@@ -74,6 +74,8 @@ const initialState = {
   lastCreatedWarehouse: null,
   masterData: {
     warehouseTypes: [],
+    materialTypes: [],
+    addressTypes: [],
     subLocationTypes: [],
     documentTypes: [],
   },

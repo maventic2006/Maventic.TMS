@@ -54,12 +54,14 @@ const WarehouseCreatePage = () => {
   const [formData, setFormData] = useState({
     generalDetails: {
       warehouseName: "",
+      warehouseName2: "",
       warehouseType: "",
-      language: "",
+      materialType: "",
+      language: "EN",
       vehicleCapacity: 0,
       virtualYardIn: false,
       radiusVirtualYardIn: 0,
-      speedLimit: 0,
+      speedLimit: 20,
     },
     facilities: {
       weighBridge: false,
@@ -78,6 +80,8 @@ const WarehouseCreatePage = () => {
       street1: "",
       street2: "",
       postalCode: "",
+      vatNumber: "",
+      addressType: "",
       isPrimary: true,
     },
     documents: [
@@ -244,12 +248,14 @@ const WarehouseCreatePage = () => {
       setFormData({
         generalDetails: {
           warehouseName: "",
+          warehouseName2: "",
           warehouseType: "",
-          language: "",
+          materialType: "",
+          language: "EN",
           vehicleCapacity: 0,
           virtualYardIn: false,
           radiusVirtualYardIn: 0,
-          speedLimit: 0,
+          speedLimit: 20,
         },
         facilities: {
           weighBridge: false,
@@ -268,6 +274,8 @@ const WarehouseCreatePage = () => {
           street1: "",
           street2: "",
           postalCode: "",
+          vatNumber: "",
+          addressType: "",
           isPrimary: true,
         },
         documents: [

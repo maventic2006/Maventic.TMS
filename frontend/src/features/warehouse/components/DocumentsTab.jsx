@@ -220,7 +220,9 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
                   type="button"
                   variant="outline"
                   className="relative overflow-hidden"
-                  onClick={() => document.getElementById(`file-upload-${index}`).click()}
+                  onClick={() =>
+                    document.getElementById(`file-upload-${index}`).click()
+                  }
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   Choose File
