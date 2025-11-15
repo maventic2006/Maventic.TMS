@@ -37,24 +37,30 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId }) => {
 
   // Only show approval actions if status is pending and user is assigned approver
   const showApprovalActions =
-    currentApprovalStatus === "Pending for Approval" && isAssignedApprover;
+    (currentApprovalStatus === "PENDING" ||
+      currentApprovalStatus === "Pending for Approval") &&
+    isAssignedApprover;
 
   // Determine status badge color and icon
   const getStatusBadge = (status) => {
     switch (status) {
+      case "PENDING":
       case "Pending for Approval":
         return {
           color: "bg-yellow-100 text-yellow-800 border-yellow-300",
           icon: Clock,
           text: "Pending Approval",
         };
+      case "ACTIVE":
       case "Active":
+      case "APPROVED":
       case "Approve":
         return {
           color: "bg-green-100 text-green-800 border-green-300",
           icon: CheckCircle,
           text: "Approved",
         };
+      case "REJECTED":
       case "Sent Back":
         return {
           color: "bg-red-100 text-red-800 border-red-300",
@@ -154,17 +160,19 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId }) => {
         </motion.div>
 
         {/* Pending With Info (only if pending) */}
-        {currentApprovalStatus === "Pending for Approval" && pendingWith && (
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            className="text-sm text-blue-100/80"
-          >
-            Pending with:{" "}
-            <span className="font-semibold text-white">{pendingWith}</span>
-          </motion.div>
-        )}
+        {(currentApprovalStatus === "PENDING" ||
+          currentApprovalStatus === "Pending for Approval") &&
+          pendingWith && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              className="text-sm text-blue-100/80"
+            >
+              Pending with:{" "}
+              <span className="font-semibold text-white">{pendingWith}</span>
+            </motion.div>
+          )}
 
         {/* Approval Action Buttons (only if user is assigned approver) */}
         {showApprovalActions && (

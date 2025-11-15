@@ -972,7 +972,7 @@ const createTransporter = async (req, res) => {
         `${transporterId.toLowerCase()}@transporter.com`;
       const userMobile = primaryAddress?.mobileNumber || "0000000000";
 
-      // Create user in user_master with Pending for Approval status
+      // Create user in user_master with PENDING status (max 20 chars)
       await trx("user_master").insert({
         user_id: transporterAdminUserId,
         user_type_id: "UT002", // Transporter Admin
@@ -985,7 +985,7 @@ const createTransporter = async (req, res) => {
         created_by_user_id: creatorUserId,
         password: hashedPassword,
         password_type: "initial",
-        status: "Pending for Approval", // Critical: Set to pending
+        status: "PENDING", // VARCHAR(20) limit - use short status
         created_by: creatorUserId,
         updated_by: creatorUserId,
         created_at: currentTimestamp,
@@ -995,7 +995,7 @@ const createTransporter = async (req, res) => {
       });
 
       console.log(
-        `  ✅ Created user: ${transporterAdminUserId} (Pending for Approval)`
+        `  ✅ Created user: ${transporterAdminUserId} (PENDING approval)`
       );
 
       // Get approval configuration for Transporter Admin (Level 1 only)
@@ -1042,7 +1042,7 @@ const createTransporter = async (req, res) => {
         approval_config_id: approvalConfig.approval_config_id,
         approval_type_id: "AT001", // Transporter Admin
         user_id_reference_id: transporterAdminUserId,
-        s_status: "Pending for Approval",
+        s_status: "PENDING",
         approver_level: 1,
         pending_with_role_id: "RL001", // Product Owner role
         pending_with_user_id: pendingWithUserId,
@@ -1080,7 +1080,7 @@ const createTransporter = async (req, res) => {
           initialPassword: initialPassword,
           message:
             "Transporter created successfully. Transporter Admin user created and pending approval.",
-          approvalStatus: "Pending for Approval",
+          approvalStatus: "PENDING",
           pendingWith: pendingWithName,
         },
         timestamp: new Date().toISOString(),
@@ -2646,8 +2646,8 @@ const getTransporterById = async (req, res) => {
         ])
         .select(
           "user_id",
-          "email",
-          "mobile",
+          "email_id",
+          "mobile_number",
           "status",
           "is_active",
           "created_at"
@@ -2664,7 +2664,7 @@ const getTransporterById = async (req, res) => {
             "aft.approval_type_id",
             "atm.approval_type_id"
           )
-          .where("aft.user_id", associatedUser.user_id)
+          .where("aft.user_id_reference_id", associatedUser.user_id)
           .select(
             "aft.*",
             "atm.approval_type as approval_category",
@@ -2674,12 +2674,12 @@ const getTransporterById = async (req, res) => {
 
         userApprovalStatus = {
           userId: associatedUser.user_id,
-          userEmail: associatedUser.email,
-          userMobile: associatedUser.mobile,
+          userEmail: associatedUser.email_id,
+          userMobile: associatedUser.mobile_number,
           userStatus: associatedUser.status,
           isActive: associatedUser.is_active,
           currentApprovalStatus:
-            approvalFlows[0]?.status || associatedUser.status,
+            approvalFlows[0]?.s_status || associatedUser.status,
           pendingWith: approvalFlows[0]?.pending_with_name || null,
           pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
         };

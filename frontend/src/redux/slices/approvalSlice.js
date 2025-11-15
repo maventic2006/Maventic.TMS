@@ -58,7 +58,7 @@ export const approveUser = createAsyncThunk(
   "approval/approveUser",
   async ({ userId, remarks }, { rejectWithValue }) => {
     try {
-      const response = await api.post(`/api/approval/approve/${userId}`, {
+      const response = await api.post(`/approval/approve/${userId}`, {
         remarks: remarks || "",
       });
 
