@@ -103,6 +103,7 @@ driverBulkUploadQueue.process(async (job) => {
   return await processDriverBulkUpload(job, io);
 });
 const driverRoutes = require("./routes/driver");
+const approvalRoutes = require("./routes/approval");
 
 // Routes
 app.use("/api/warehouse", warehouseRoutes);
@@ -118,6 +119,7 @@ app.use("/api/vehicle/bulk-upload", vehicleBulkUploadRoutes);
 app.use("/api/driver-bulk-upload", driverBulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
+app.use("/api/approval", approvalRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

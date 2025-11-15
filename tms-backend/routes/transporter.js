@@ -8,6 +8,7 @@ const {
   getCitiesByCountryAndState,
   getTransporters,
   getTransporterById,
+  getDocumentFile,
 } = require("../controllers/transporterController");
 const { authenticateToken } = require("../middleware/auth");
 
@@ -65,6 +66,12 @@ router.get(
   authenticateToken,
   checkProductOwnerAccess,
   getCitiesByCountryAndState
+);
+router.get(
+  "/document/:documentId",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getDocumentFile
 );
 
 module.exports = router;
