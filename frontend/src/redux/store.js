@@ -12,6 +12,7 @@ import driverSlice from "./slices/driverSlice";
 import vehicleSlice from "./slices/vehicleSlice";
 import vehicleBulkUploadSlice from "./slices/vehicleBulkUploadSlice";
 import warehouseSlice from "./slices/warehouseSlice";
+import approvalSlice from "./slices/approvalSlice";
 import consignorSlice from "./slices/consignorSlice";
 
 export const store = configureStore({
@@ -29,6 +30,7 @@ export const store = configureStore({
     vehicle: vehicleSlice,
     vehicleBulkUpload: vehicleBulkUploadSlice,
     warehouse: warehouseSlice,
+    approval: approvalSlice,
     consignor: consignorSlice,
   },
   middleware: (getDefaultMiddleware) =>

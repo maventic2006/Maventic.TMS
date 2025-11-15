@@ -4,7 +4,6 @@
  */
 
 const knex = require('../config/database');
-const { uploadFile, deleteFile } = require('../utils/storageService');
 const {
   consignorCreateSchema,
   consignorUpdateSchema,
@@ -272,25 +271,32 @@ const getConsignorById = async (customerId) => {
       }
     }
 
-    // Get documents with file information
+    // Get documents with file information and document type name
     const documents = await knex('consignor_documents as cd')
       .leftJoin('document_upload as du', 'cd.document_id', 'du.document_id')
       .leftJoin('doc_type_configuration as dtc', 'cd.document_type_id', 'dtc.document_type_id')
+      .leftJoin('document_name_master as dnm', 'dtc.doc_name_master_id', 'dnm.doc_name_master_id')
       .where('cd.customer_id', customerId)
       .where('cd.status', 'ACTIVE')
       .select(
         'cd.document_unique_id',
         'cd.document_type_id',
-        'dtc.document_type_id as document_type_name', // Use document_type_id as name since no name column exists
+        'dnm.document_name as document_type',      // Get actual document name from master table
         'cd.document_number',
         'cd.valid_from',
         'cd.valid_to',
         'du.document_id',
-        'du.file_name as document_path',           // Actual column is file_name, alias as document_path
-        'du.file_name as original_file_name',      // Reuse file_name for original name
-        knex.raw('NULL as file_size'),             // Column doesn't exist, return NULL
-        'du.file_type as mime_type'                // Actual column is file_type, alias as mime_type
+        'du.file_name',                            // Keep file name
+        'du.file_type'                             // Keep file type
       );
+
+    console.log(`📄 Found ${documents.length} documents for customer ${customerId}`);
+    if (documents.length > 0) {
+      console.log('Document details:', JSON.stringify(documents, null, 2));
+    }
+
+    console.log(`📸 Found ${contacts.length} contacts for customer ${customerId}`);
+    console.log(`📋 NDA: ${consignor.upload_nda}, MSA: ${consignor.upload_msa}`);
 
     // Construct response with frontend field names
     return {
@@ -306,6 +312,10 @@ const getConsignorById = async (customerId) => {
         name_on_po: consignor.name_on_po,
         approved_by: consignor.approved_by,
         approved_date: consignor.approved_date,
+        upload_nda: consignor.upload_nda,          // Add NDA document ID
+        nda_expiry_date: consignor.nda_expiry_date, // Add NDA expiry
+        upload_msa: consignor.upload_msa,          // Add MSA document ID
+        msa_expiry_date: consignor.msa_expiry_date, // Add MSA expiry
         status: consignor.status
       },
       // Map database column names to frontend field names
@@ -319,7 +329,7 @@ const getConsignorById = async (customerId) => {
         linkedin_link: c.linkedin_link,
         team: c.contact_team,
         role: c.contact_role,
-        photo: c.contact_photo,
+        contact_photo: c.contact_photo,            // Keep as contact_photo for API endpoint
         status: c.status
       })),
       organization: organization ? {
@@ -330,14 +340,14 @@ const getConsignorById = async (customerId) => {
       documents: documents.map(d => ({
         document_unique_id: d.document_unique_id,
         document_type_id: d.document_type_id,
-        document_type_name: d.document_type_name,
+        document_type: d.document_type,            // Document name from master table
         document_number: d.document_number,
         valid_from: d.valid_from,
         valid_to: d.valid_to,
-        file_path: d.document_path,
-        original_name: d.original_file_name,
-        file_size: d.file_size,
-        mime_type: d.mime_type
+        document_id: d.document_id,                // Document upload ID for download
+        file_name: d.file_name,                    // Original file name
+        file_type: d.file_type,                    // MIME type
+        status: 'ACTIVE'                           // Add status for frontend
       }))
     };
   } catch (error) {
@@ -440,47 +450,37 @@ const createConsignor = async (payload, files, userId) => {
       updated_at: knex.fn.now()
     });
 
-    // 2. Insert contacts with photo upload handling
+    // 2. Insert contacts (photo upload handled separately in step 6)
     if (contacts && contacts.length > 0) {
-      const contactInserts = await Promise.all(
-        contacts.map(async (contact, index) => {
-          const contactId = await generateContactId(trx);
-          
-          // Handle photo upload if file exists
-          let photoUrl = contact.photo || null;
-          const photoFileKey = `contact_${index}_photo`;
-          
-          if (files && files[photoFileKey]) {
-            try {
-              const uploadResult = await uploadFile(files[photoFileKey], 'consignor/contacts');
-              photoUrl = uploadResult.fileUrl;  // Store the URL path
-            } catch (uploadError) {
-              console.error(`Error uploading photo for contact ${index}:`, uploadError);
-              // Continue without photo if upload fails
-            }
-          }
-          
-          return {
-            contact_id: contactId,
-            customer_id: general.customer_id,
-            // Map frontend field names to database column names
-            contact_designation: contact.designation,
-            contact_name: contact.name,
-            contact_number: contact.number || null,
-            country_code: contact.country_code || null,
-            email_id: contact.email || null,
-            linkedin_link: contact.linkedin_link || null,
-            contact_team: contact.team || null,
-            contact_role: contact.role,
-            contact_photo: photoUrl,  // Store uploaded file URL
-            status: contact.status || 'ACTIVE',
-            created_by: userId,
-            updated_by: userId,
-            created_at: knex.fn.now(),
-            updated_at: knex.fn.now()
-          };
-        })
-      );
+      const contactInserts = contacts.map((contact) => {
+        const contactId = `CON${Math.random().toString(36).substr(2, 9).toUpperCase()}`; // Temp ID, will be replaced
+        
+        return {
+          contact_id: contactId,
+          customer_id: general.customer_id,
+          // Map frontend field names to database column names
+          contact_designation: contact.designation,
+          contact_name: contact.name,
+          contact_number: contact.number || null,
+          country_code: contact.country_code || null,
+          email_id: contact.email || null,
+          linkedin_link: contact.linkedin_link || null,
+          contact_team: contact.team || null,
+          contact_role: contact.role,
+          contact_photo: null,  // Will be updated in step 6 if photo exists
+          status: contact.status || 'ACTIVE',
+          created_by: userId,
+          updated_by: userId,
+          created_at: knex.fn.now(),
+          updated_at: knex.fn.now()
+        };
+      });
+
+      // Generate proper contact IDs sequentially
+      for (let i = 0; i < contactInserts.length; i++) {
+        contactInserts[i].contact_id = await generateContactId(trx);
+        contacts[i].contact_id = contactInserts[i].contact_id; // Store for later use
+      }
 
       await trx('contact').insert(contactInserts);
     }
@@ -503,22 +503,28 @@ const createConsignor = async (payload, files, userId) => {
     }
 
     // 4. Handle document uploads
-    if (documents && documents.length > 0 && files) {
-      for (const doc of documents) {
-        // Find corresponding file if fileKey is specified
-        const file = files[doc.fileKey];
+    if (documents && documents.length > 0) {
+      console.log(`📄 Processing ${documents.length} documents with files...`);
+      
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
+        console.log(`  Document ${i}: fileKey=${doc.fileKey}, has file=${!!files[doc.fileKey]}`);
         
-        if (file) {
-          // Upload file to storage
-          const uploadResult = await uploadFile(file, 'consignor/documents');
+        // Find corresponding file if fileKey is specified
+        if (doc.fileKey && files[doc.fileKey]) {
+          const file = files[doc.fileKey];
+          console.log(`  Uploading file: ${file.originalname}, size: ${file.size}, type: ${file.mimetype}`);
+          
+          // Convert file buffer to base64
+          const base64Data = file.buffer.toString('base64');
 
-          // Insert into document_upload table
+          // Insert into document_upload table with base64 data
           const documentUploadId = await generateDocumentUploadId(trx);
           await trx('document_upload').insert({
             document_id: documentUploadId,
-            file_name: uploadResult.filePath,        // Actual column is file_name (not document_path)
-            file_type: uploadResult.mimeType,        // Actual column is file_type (not mime_type)
-            file_xstring_value: null,                // Optional metadata field
+            file_name: file.originalname,                    // Original filename
+            file_type: file.mimetype,                        // MIME type
+            file_xstring_value: base64Data,                  // Base64 encoded file data
             created_by: userId,
             updated_by: userId,
             created_at: knex.fn.now(),
@@ -531,16 +537,128 @@ const createConsignor = async (payload, files, userId) => {
             document_unique_id: documentUniqueId,
             document_id: documentUploadId,
             customer_id: general.customer_id,
-            document_type_id: doc.document_type_id || doc.documentTypeId,
-            document_number: doc.document_number || doc.documentNumber || null,
-            valid_from: doc.valid_from || doc.validFrom,
-            valid_to: doc.valid_to || doc.validTo || null,
+            document_type_id: doc.document_type_id,
+            document_number: doc.document_number || null,
+            valid_from: doc.valid_from,
+            valid_to: doc.valid_to || null,
             status: 'ACTIVE',
             created_by: userId,
             updated_by: userId,
             created_at: knex.fn.now(),
             updated_at: knex.fn.now()
           });
+          
+          console.log(`  ✅ Document saved: ${documentUniqueId} -> ${documentUploadId}`);
+        } else {
+          console.log(`  ⚠️  No file provided for document ${i}`);
+        }
+      }
+    }
+
+    // 5. Handle NDA/MSA uploads
+    if (general) {
+      // Handle NDA upload
+      if (files['general_nda']) {
+        const ndaFile = files['general_nda'];
+        console.log(`📄 Uploading NDA: ${ndaFile.originalname}`);
+        
+        const ndaBase64 = ndaFile.buffer.toString('base64');
+        const ndaDocId = await generateDocumentUploadId(trx);
+        
+        await trx('document_upload').insert({
+          document_id: ndaDocId,
+          file_name: ndaFile.originalname,
+          file_type: ndaFile.mimetype,
+          file_xstring_value: ndaBase64,
+          created_by: userId,
+          updated_by: userId,
+          created_at: knex.fn.now(),
+          updated_at: knex.fn.now()
+        });
+        
+        // Update consignor_basic_information with NDA document ID
+        await trx('consignor_basic_information')
+          .where('customer_id', general.customer_id)
+          .update({
+            upload_nda: ndaDocId,
+            nda_expiry_date: general.nda_expiry_date || null,
+            updated_by: userId,
+            updated_at: knex.fn.now()
+          });
+          
+        console.log(`  ✅ NDA saved: ${ndaDocId}`);
+      }
+      
+      // Handle MSA upload
+      if (files['general_msa']) {
+        const msaFile = files['general_msa'];
+        console.log(`📄 Uploading MSA: ${msaFile.originalname}`);
+        
+        const msaBase64 = msaFile.buffer.toString('base64');
+        const msaDocId = await generateDocumentUploadId(trx);
+        
+        await trx('document_upload').insert({
+          document_id: msaDocId,
+          file_name: msaFile.originalname,
+          file_type: msaFile.mimetype,
+          file_xstring_value: msaBase64,
+          created_by: userId,
+          updated_by: userId,
+          created_at: knex.fn.now(),
+          updated_at: knex.fn.now()
+        });
+        
+        // Update consignor_basic_information with MSA document ID
+        await trx('consignor_basic_information')
+          .where('customer_id', general.customer_id)
+          .update({
+            upload_msa: msaDocId,
+            msa_expiry_date: general.msa_expiry_date || null,
+            updated_by: userId,
+            updated_at: knex.fn.now()
+          });
+          
+        console.log(`  ✅ MSA saved: ${msaDocId}`);
+      }
+    }
+
+    // 6. Handle contact photo uploads
+    if (contacts && contacts.length > 0) {
+      for (let i = 0; i < contacts.length; i++) {
+        const photoFileKey = `contact_${i}_photo`;
+        
+        if (files[photoFileKey]) {
+          const photoFile = files[photoFileKey];
+          console.log(`📸 Uploading contact photo ${i}: ${photoFile.originalname}`);
+          
+          const photoBase64 = photoFile.buffer.toString('base64');
+          const photoDocId = await generateDocumentUploadId(trx);
+          
+          await trx('document_upload').insert({
+            document_id: photoDocId,
+            file_name: photoFile.originalname,
+            file_type: photoFile.mimetype,
+            file_xstring_value: photoBase64,
+            created_by: userId,
+            updated_by: userId,
+            created_at: knex.fn.now(),
+            updated_at: knex.fn.now()
+          });
+          
+          // Update contact with photo document ID
+          const contactId = contacts[i].contact_id || contacts[i].contactId;
+          if (contactId) {
+            await trx('contact')
+              .where('customer_id', general.customer_id)
+              .where('contact_id', contactId)
+              .update({
+                contact_photo: photoDocId,
+                updated_by: userId,
+                updated_at: knex.fn.now()
+              });
+              
+            console.log(`  ✅ Contact photo saved: ${photoDocId}`);
+          }
         }
       }
     }
@@ -838,11 +956,145 @@ const getMasterData = async () => {
   }
 };
 
+/**
+ * Get document file for download
+ */
+const getDocumentFile = async (customerId, documentId) => {
+  try {
+    console.log(`📄 Fetching document: ${documentId} for customer: ${customerId}`);
+
+    // Get document metadata and file data
+    const document = await knex('consignor_documents as cd')
+      .join('document_upload as du', 'cd.document_id', 'du.document_id')
+      .where('cd.customer_id', customerId)
+      .where('cd.document_unique_id', documentId)
+      .where('cd.status', 'ACTIVE')
+      .select(
+        'du.file_name',
+        'du.file_type',
+        'du.file_xstring_value'
+      )
+      .first();
+
+    if (!document) {
+      console.log('❌ Document not found in database');
+      return null;
+    }
+
+    // Convert base64 to buffer
+    const buffer = Buffer.from(document.file_xstring_value, 'base64');
+
+    console.log(`✅ Document found: ${document.file_name} (${buffer.length} bytes)`);
+
+    return {
+      fileName: document.file_name,
+      mimeType: document.file_type,
+      buffer
+    };
+  } catch (error) {
+    console.error('❌ Get document file error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get contact photo for download/display
+ */
+const getContactPhoto = async (customerId, contactId) => {
+  try {
+    console.log(`📸 Fetching photo for contact: ${contactId}`);
+
+    // Get contact with photo reference
+    const contact = await knex('contact')
+      .where('customer_id', customerId)
+      .where('contact_id', contactId)
+      .where('status', 'ACTIVE')
+      .first();
+
+    if (!contact || !contact.contact_photo) {
+      console.log('❌ Contact or photo not found');
+      return null;
+    }
+
+    // Get photo file data from document_upload table
+    const photo = await knex('document_upload')
+      .where('document_id', contact.contact_photo)
+      .first();
+
+    if (!photo) {
+      console.log('❌ Photo file not found in document_upload');
+      return null;
+    }
+
+    // Convert base64 to buffer
+    const buffer = Buffer.from(photo.file_xstring_value, 'base64');
+
+    console.log(`✅ Photo found: ${photo.file_name} (${buffer.length} bytes)`);
+
+    return {
+      fileName: photo.file_name,
+      mimeType: photo.file_type,
+      buffer
+    };
+  } catch (error) {
+    console.error('❌ Get contact photo error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get general document (NDA or MSA) for download
+ */
+const getGeneralDocument = async (customerId, fileType) => {
+  try {
+    console.log(`📄 Fetching ${fileType.toUpperCase()} for customer: ${customerId}`);
+
+    const fieldName = fileType.toLowerCase() === 'nda' ? 'upload_nda' : 'upload_msa';
+
+    // Get consignor basic info with document reference
+    const consignor = await knex('consignor_basic_information')
+      .where('customer_id', customerId)
+      .first();
+
+    if (!consignor || !consignor[fieldName]) {
+      console.log(`❌ ${fileType.toUpperCase()} document not found for consignor`);
+      return null;
+    }
+
+    // Get file from document_upload table
+    const file = await knex('document_upload')
+      .where('document_id', consignor[fieldName])
+      .first();
+
+    if (!file) {
+      console.log(`❌ ${fileType.toUpperCase()} file not found in document_upload`);
+      return null;
+    }
+
+    // Convert base64 to buffer
+    const buffer = Buffer.from(file.file_xstring_value, 'base64');
+
+    console.log(`✅ ${fileType.toUpperCase()} found: ${file.file_name} (${buffer.length} bytes)`);
+
+    return {
+      fileName: file.file_name,
+      mimeType: file.file_type,
+      buffer
+    };
+  } catch (error) {
+    console.error(`❌ Get ${fileType} document error:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getConsignorList,
   getConsignorById,
   createConsignor,
   updateConsignor,
   deleteConsignor,
-  getMasterData
+  getMasterData,
+  getDocumentFile,
+  getContactPhoto,
+  getGeneralDocument
 };

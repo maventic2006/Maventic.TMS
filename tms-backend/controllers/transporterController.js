@@ -2,6 +2,7 @@ const knex = require("../config/database");
 const { Country, State, City } = require("country-state-city");
 const fs = require("fs").promises;
 const path = require("path");
+const bcrypt = require("bcrypt");
 const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
 
@@ -15,7 +16,8 @@ const generateTransporterId = async () => {
 };
 
 // Collision-resistant ID generation - checks if ID exists before returning
-const generateAddressId = async (trx = knex) => {
+// Uses in-memory tracking to avoid duplicates within same transaction
+const generateAddressId = async (trx = knex, generatedIds = new Set()) => {
   let attempts = 0;
   const maxAttempts = 100;
 
@@ -26,12 +28,14 @@ const generateAddressId = async (trx = knex) => {
 
     console.log(`  🔍 Checking address ID: ${newId} (attempt ${attempts + 1})`);
 
-    // Check if this ID already exists
-    const existing = await trx("tms_address")
+    // Check if this ID already exists in database OR in current generation batch
+    const existsInDb = await trx("tms_address")
       .where("address_id", newId)
       .first();
-    if (!existing) {
+
+    if (!existsInDb && !generatedIds.has(newId)) {
       console.log(`  ✅ Address ID ${newId} is unique`);
+      generatedIds.add(newId); // Track this ID to prevent duplicates in same batch
       return newId;
     }
 
@@ -42,7 +46,7 @@ const generateAddressId = async (trx = knex) => {
   throw new Error("Failed to generate unique address ID after 100 attempts");
 };
 
-const generateContactId = async (trx = knex) => {
+const generateContactId = async (trx = knex, generatedIds = new Set()) => {
   let attempts = 0;
   const maxAttempts = 100;
 
@@ -51,10 +55,13 @@ const generateContactId = async (trx = knex) => {
     const count = parseInt(result.count) + 1 + attempts;
     const newId = `TC${count.toString().padStart(4, "0")}`;
 
-    const existing = await trx("transporter_contact")
+    // Check if this ID already exists in database OR in current generation batch
+    const existsInDb = await trx("transporter_contact")
       .where("tcontact_id", newId)
       .first();
-    if (!existing) {
+
+    if (!existsInDb && !generatedIds.has(newId)) {
+      generatedIds.add(newId); // Track this ID to prevent duplicates in same batch
       return newId;
     }
 
@@ -116,7 +123,7 @@ const generateServiceAreaItemId = async (trx = knex) => {
   );
 };
 
-const generateDocumentId = async (trx = knex) => {
+const generateDocumentId = async (trx = knex, generatedIds = new Set()) => {
   let attempts = 0;
   const maxAttempts = 100;
 
@@ -127,10 +134,13 @@ const generateDocumentId = async (trx = knex) => {
     const count = parseInt(result.count) + 1 + attempts;
     const newId = `DOC${count.toString().padStart(4, "0")}`;
 
-    const existing = await trx("transporter_documents")
+    // Check if this ID already exists in database OR in current generation batch
+    const existsInDb = await trx("transporter_documents")
       .where("document_id", newId)
       .first();
-    if (!existing) {
+
+    if (!existsInDb && !generatedIds.has(newId)) {
+      generatedIds.add(newId); // Track this ID to prevent duplicates in same batch
       return newId;
     }
 
@@ -144,6 +154,57 @@ const generateDocumentUploadId = async () => {
   const result = await knex("document_upload").count("* as count").first();
   const count = parseInt(result.count) + 1;
   return `DU${count.toString().padStart(4, "0")}`;
+};
+
+// Generate Transporter Admin User ID (format: TA0001, TA0002, etc.)
+const generateTransporterAdminUserId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("user_master")
+      .where("user_type_id", "UT002") // Transporter Admin type
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `TA${count.toString().padStart(4, "0")}`;
+
+    const existsInDb = await trx("user_master").where("user_id", newId).first();
+    if (!existsInDb) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique Transporter Admin user ID after 100 attempts"
+  );
+};
+
+// Generate Approval Flow Transaction ID (format: AF0001, AF0002, etc.)
+const generateApprovalFlowId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("approval_flow_trans").count("* as count").first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `AF${count.toString().padStart(4, "0")}`;
+
+    const existsInDb = await trx("approval_flow_trans")
+      .where("approval_flow_trans_id", newId)
+      .first();
+    if (!existsInDb) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique Approval Flow ID after 100 attempts"
+  );
 };
 
 // Validation functions
@@ -620,23 +681,25 @@ const createTransporter = async (req, res) => {
     try {
       // All validations passed, start creating the transporter
       const transporterId = await generateTransporterId();
-      const currentUser = req.user?.userId || "SYSTEM";
+      const currentUser = req.user?.user_id || "SYSTEM";
       const currentTimestamp = new Date();
 
       // Pre-generate all IDs to avoid race conditions
       console.log("🔑 Generating unique IDs...");
       const addressIds = [];
+      const generatedAddressIds = new Set(); // Track generated IDs to prevent duplicates
       for (let i = 0; i < addresses.length; i++) {
-        const newAddressId = await generateAddressId(trx);
+        const newAddressId = await generateAddressId(trx, generatedAddressIds);
         console.log(`  📍 Generated address ID ${i + 1}: ${newAddressId}`);
         addressIds.push(newAddressId);
       }
 
       const contactIds = [];
+      const generatedContactIds = new Set(); // Track generated IDs to prevent duplicates
       let contactIndex = 0;
       for (const address of addresses) {
         for (const contact of address.contacts) {
-          contactIds.push(await generateContactId(trx));
+          contactIds.push(await generateContactId(trx, generatedContactIds));
           contactIndex++;
         }
       }
@@ -678,8 +741,9 @@ const createTransporter = async (req, res) => {
       }
 
       const documentIds = [];
+      const generatedDocumentIds = new Set(); // Track generated IDs to prevent duplicates
       for (let i = 0; i < documents.length; i++) {
-        documentIds.push(await generateDocumentId(trx));
+        documentIds.push(await generateDocumentId(trx, generatedDocumentIds));
       }
 
       // 1. Create transporter general info
@@ -875,6 +939,133 @@ const createTransporter = async (req, res) => {
         documentIndex++;
       }
 
+      // ========================================
+      // PHASE 4: CREATE TRANSPORTER ADMIN USER & APPROVAL WORKFLOW
+      // ========================================
+
+      console.log(
+        "📝 Creating Transporter Admin user for approval workflow..."
+      );
+
+      // Generate user ID for Transporter Admin
+      const transporterAdminUserId = await generateTransporterAdminUserId(trx);
+      console.log(`  Generated user ID: ${transporterAdminUserId}`);
+
+      // Get creator details from request (current logged-in Product Owner)
+      const creatorUserId = req.user?.user_id || "SYSTEM";
+      const creatorName = req.user?.user_full_name || "System";
+
+      // Generate initial password (based on business name + random number)
+      const businessNameClean = generalDetails.businessName.replace(
+        /[^a-zA-Z0-9]/g,
+        ""
+      );
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      const initialPassword = `${businessNameClean}@${randomNum}`;
+      const hashedPassword = await bcrypt.hash(initialPassword, 10);
+
+      // Extract contact details from first address (primary contact)
+      const primaryAddress =
+        addresses.find((addr) => addr.addressType === "AT001") || addresses[0];
+      const userEmail =
+        primaryAddress?.emailId ||
+        `${transporterId.toLowerCase()}@transporter.com`;
+      const userMobile = primaryAddress?.mobileNumber || "0000000000";
+
+      // Create user in user_master with Pending for Approval status
+      await trx("user_master").insert({
+        user_id: transporterAdminUserId,
+        user_type_id: "UT002", // Transporter Admin
+        user_full_name: `${generalDetails.businessName} - Admin`,
+        email_id: userEmail,
+        mobile_number: userMobile,
+        from_date: generalDetails.fromDate,
+        to_date: generalDetails.toDate || null,
+        is_active: false, // Inactive until approved
+        created_by_user_id: creatorUserId,
+        password: hashedPassword,
+        password_type: "initial",
+        status: "Pending for Approval", // Critical: Set to pending
+        created_by: creatorUserId,
+        updated_by: creatorUserId,
+        created_at: currentTimestamp,
+        updated_at: currentTimestamp,
+        created_on: currentTimestamp,
+        updated_on: currentTimestamp,
+      });
+
+      console.log(
+        `  ✅ Created user: ${transporterAdminUserId} (Pending for Approval)`
+      );
+
+      // Get approval configuration for Transporter Admin (Level 1 only)
+      const approvalConfig = await trx("approval_configuration")
+        .where({
+          approval_type_id: "AT001", // Transporter Admin
+          approver_level: 1,
+          status: "ACTIVE",
+        })
+        .first();
+
+      if (!approvalConfig) {
+        throw new Error(
+          "Approval configuration not found for Transporter Admin"
+        );
+      }
+
+      // Determine pending approver (Product Owner who did NOT create this)
+      // If PO001 created, pending with PO002; if PO002 created, pending with PO001
+      let pendingWithUserId = null;
+      let pendingWithName = null;
+
+      if (creatorUserId === "PO001") {
+        const po2 = await trx("user_master").where("user_id", "PO002").first();
+        pendingWithUserId = "PO002";
+        pendingWithName = po2?.user_full_name || "Product Owner 2";
+      } else if (creatorUserId === "PO002") {
+        const po1 = await trx("user_master").where("user_id", "PO001").first();
+        pendingWithUserId = "PO001";
+        pendingWithName = po1?.user_full_name || "Product Owner 1";
+      } else {
+        // If creator is neither PO1 nor PO2, default to PO001
+        const po1 = await trx("user_master").where("user_id", "PO001").first();
+        pendingWithUserId = "PO001";
+        pendingWithName = po1?.user_full_name || "Product Owner 1";
+      }
+
+      // Generate approval flow trans ID
+      const approvalFlowId = await generateApprovalFlowId(trx);
+
+      // Create approval flow transaction entry
+      await trx("approval_flow_trans").insert({
+        approval_flow_trans_id: approvalFlowId,
+        approval_config_id: approvalConfig.approval_config_id,
+        approval_type_id: "AT001", // Transporter Admin
+        user_id_reference_id: transporterAdminUserId,
+        s_status: "Pending for Approval",
+        approver_level: 1,
+        pending_with_role_id: "RL001", // Product Owner role
+        pending_with_user_id: pendingWithUserId,
+        pending_with_name: pendingWithName,
+        created_by_user_id: creatorUserId,
+        created_by_name: creatorName,
+        created_by: creatorUserId,
+        updated_by: creatorUserId,
+        created_at: currentTimestamp,
+        updated_at: currentTimestamp,
+        created_on: currentTimestamp,
+        updated_on: currentTimestamp,
+        status: "ACTIVE",
+      });
+
+      console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+      console.log(
+        `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
+      );
+      console.log(
+        `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
+      );
+
       // Commit the transaction
       await trx.commit();
 
@@ -884,7 +1075,13 @@ const createTransporter = async (req, res) => {
         success: true,
         data: {
           transporterId: transporterId,
-          message: "Transporter created successfully",
+          userId: transporterAdminUserId,
+          userEmail: userEmail,
+          initialPassword: initialPassword,
+          message:
+            "Transporter created successfully. Transporter Admin user created and pending approval.",
+          approvalStatus: "Pending for Approval",
+          pendingWith: pendingWithName,
         },
         timestamp: new Date().toISOString(),
       });
@@ -1362,7 +1559,7 @@ const updateTransporter = async (req, res) => {
       }
     }
 
-    const currentUser = req.user?.userId || "SYSTEM";
+    const currentUser = req.user?.user_id || "SYSTEM";
     const currentTimestamp = new Date();
 
     // Update general details if provided
@@ -1882,22 +2079,29 @@ const getTransporters = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Build base query with contacts
+    // Build base query - Get one row per transporter with primary address and first contact
     let query = knex("transporter_general_info as tgi")
       .leftJoin("tms_address as addr", function () {
-        this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
-          "addr.user_type",
-          "=",
-          knex.raw("'TRANSPORTER'")
-        );
+        this.on("tgi.transporter_id", "=", "addr.user_reference_id")
+          .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"))
+          .andOn("addr.is_primary", "=", knex.raw("1")); // Get only primary address
       })
-      .leftJoin("transporter_contact as tc", function () {
-        this.on("tgi.transporter_id", "=", "tc.transporter_id").andOn(
-          "tc.status",
-          "=",
-          knex.raw("'ACTIVE'")
-        );
-      })
+      .leftJoin(
+        knex.raw(`(
+          SELECT tc1.*
+          FROM transporter_contact tc1
+          INNER JOIN (
+            SELECT transporter_id, MIN(tcontact_id) as min_contact_id, MIN(contact_unique_id) as min_unique_id
+            FROM transporter_contact
+            WHERE status = 'ACTIVE'
+            GROUP BY transporter_id
+          ) tc2 ON tc1.transporter_id = tc2.transporter_id 
+               AND tc1.tcontact_id = tc2.min_contact_id
+               AND tc1.contact_unique_id = tc2.min_unique_id
+        ) as tc`),
+        "tgi.transporter_id",
+        "tc.transporter_id"
+      )
       .select(
         "tgi.transporter_id",
         "tgi.business_name",
@@ -1921,35 +2125,8 @@ const getTransporters = async (req, res) => {
         "addr.tin_pan",
         "addr.tan",
         knex.raw(
-          "CONCAT(addr.street_1, ', ', addr.city, ', ', addr.state, ', ', addr.country) as address"
+          "CONCAT(COALESCE(addr.street_1, ''), ', ', COALESCE(addr.city, ''), ', ', COALESCE(addr.state, ''), ', ', COALESCE(addr.country, '')) as address"
         ),
-        "tc.contact_person_name",
-        "tc.phone_number",
-        "tc.email_id"
-      )
-      .groupBy(
-        "tgi.transporter_id",
-        "tgi.business_name",
-        "tgi.trans_mode_road",
-        "tgi.trans_mode_rail",
-        "tgi.trans_mode_air",
-        "tgi.trans_mode_sea",
-        "tgi.active_flag",
-        "tgi.from_date",
-        "tgi.to_date",
-        "tgi.avg_rating",
-        "tgi.status",
-        "tgi.created_by",
-        "tgi.created_on",
-        "tgi.updated_on",
-        "addr.country",
-        "addr.state",
-        "addr.city",
-        "addr.district",
-        "addr.vat_number",
-        "addr.tin_pan",
-        "addr.tan",
-        "addr.street_1",
         "tc.contact_person_name",
         "tc.phone_number",
         "tc.email_id"
@@ -2019,22 +2196,21 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    // Get total count for pagination - create a fresh query without SELECT fields
-    let countQuery = knex("transporter_general_info as tgi")
-      .leftJoin("tms_address as addr", function () {
+    // Get total count for pagination - count distinct transporters only
+    let countQuery = knex("transporter_general_info as tgi");
+
+    // For filters that need address or contact data, we join but count distinct transporter_id
+    let needsAddressJoin = search || state || city || vatGst || tan;
+
+    if (needsAddressJoin) {
+      countQuery = countQuery.leftJoin("tms_address as addr", function () {
         this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
           "addr.user_type",
           "=",
           knex.raw("'TRANSPORTER'")
         );
-      })
-      .leftJoin("transporter_contact as tc", function () {
-        this.on("tgi.transporter_id", "=", "tc.transporter_id").andOn(
-          "tc.status",
-          "=",
-          knex.raw("'ACTIVE'")
-        );
       });
+    }
 
     // Apply the same filters to count query
     if (search) {
@@ -2330,6 +2506,7 @@ const getTransporterById = async (req, res) => {
       .where("td.document_unique_id", "like", `${id}_%`)
       .where("td.status", "ACTIVE")
       .select(
+        "td.document_unique_id",
         "td.document_type_id",
         "dnm.document_name as documentTypeName",
         "td.document_number",
@@ -2427,6 +2604,7 @@ const getTransporterById = async (req, res) => {
       addresses: addressesWithContacts,
       serviceableAreas: groupedServiceableAreas,
       documents: documents.map((doc) => ({
+        documentUniqueId: doc.document_unique_id,
         documentType: doc.documentTypeName || doc.document_type_id,
         documentTypeId: doc.document_type_id,
         documentNumber: doc.document_number,
@@ -2441,6 +2619,83 @@ const getTransporterById = async (req, res) => {
         // fileData: doc.file_data,
       })),
     };
+
+    // NEW: Get user approval status for this transporter
+    // Find the associated Transporter Admin user by checking user_master
+    // Assumption: User records will have a reference or we query by creation timing
+    // For now, we'll query approval_flow_trans for any user created around same time as transporter
+
+    let userApprovalStatus = null;
+    let approvalHistory = [];
+
+    try {
+      // Try to find user created for this transporter
+      // We can identify by checking approval_flow_trans for users created by same creator
+      // OR by finding user_master entries created around the same time
+
+      // Better approach: Find TA#### user that was created closest in time to this transporter
+      const transporterCreatedAt = transporter.created_on;
+
+      // Get all Transporter Admin users created around the same time (within 1 minute)
+      const potentialUsers = await knex("user_master")
+        .where("user_type_id", "UT002")
+        .where("user_id", "like", "TA%")
+        .whereBetween("created_at", [
+          knex.raw("DATE_SUB(?, INTERVAL 1 MINUTE)", [transporterCreatedAt]),
+          knex.raw("DATE_ADD(?, INTERVAL 1 MINUTE)", [transporterCreatedAt]),
+        ])
+        .select(
+          "user_id",
+          "email",
+          "mobile",
+          "status",
+          "is_active",
+          "created_at"
+        );
+
+      if (potentialUsers.length > 0) {
+        // Take the first user (most likely to be the associated one)
+        const associatedUser = potentialUsers[0];
+
+        // Get approval flow for this user
+        const approvalFlows = await knex("approval_flow_trans as aft")
+          .leftJoin(
+            "approval_type_master as atm",
+            "aft.approval_type_id",
+            "atm.approval_type_id"
+          )
+          .where("aft.user_id", associatedUser.user_id)
+          .select(
+            "aft.*",
+            "atm.approval_type as approval_category",
+            "atm.approval_name"
+          )
+          .orderBy("aft.created_at", "desc");
+
+        userApprovalStatus = {
+          userId: associatedUser.user_id,
+          userEmail: associatedUser.email,
+          userMobile: associatedUser.mobile,
+          userStatus: associatedUser.status,
+          isActive: associatedUser.is_active,
+          currentApprovalStatus:
+            approvalFlows[0]?.status || associatedUser.status,
+          pendingWith: approvalFlows[0]?.pending_with_name || null,
+          pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
+        };
+
+        approvalHistory = approvalFlows;
+      }
+    } catch (approvalError) {
+      console.error("Error fetching user approval status:", approvalError);
+      // Don't fail the entire request if approval fetch fails
+    }
+
+    // Add approval status to response if available
+    if (userApprovalStatus) {
+      response.userApprovalStatus = userApprovalStatus;
+      response.approvalHistory = approvalHistory;
+    }
 
     res.json({
       success: true,
@@ -2461,6 +2716,94 @@ const getTransporterById = async (req, res) => {
   }
 };
 
+// Get document file by document unique ID
+const getDocumentFile = async (req, res) => {
+  try {
+    const { documentId } = req.params;
+
+    console.log(`🔍 Fetching document file for ID: ${documentId}`);
+
+    // Fetch document details with file data
+    const document = await knex("transporter_documents as td")
+      .leftJoin(
+        "document_upload as du",
+        "td.document_unique_id",
+        "du.system_reference_id"
+      )
+      .leftJoin(
+        "document_name_master as dnm",
+        "td.document_type_id",
+        "dnm.doc_name_master_id"
+      )
+      .where("td.document_unique_id", documentId)
+      .where("td.status", "ACTIVE")
+      .select(
+        "td.document_type_id",
+        "dnm.document_name as documentTypeName",
+        "td.document_number",
+        "td.reference_number",
+        "td.country",
+        "td.valid_from",
+        "td.valid_to",
+        "td.active",
+        "du.file_name",
+        "du.file_type",
+        "du.file_xstring_value as fileData"
+      )
+      .first();
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "DOCUMENT_NOT_FOUND",
+          message: "Document not found",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Helper function to format date to YYYY-MM-DD
+    const formatDateForInput = (dateValue) => {
+      if (!dateValue) return null;
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return null;
+      return date.toISOString().split("T")[0];
+    };
+
+    const response = {
+      documentType: document.documentTypeName || document.document_type_id,
+      documentTypeId: document.document_type_id,
+      documentNumber: document.document_number,
+      referenceNumber: document.reference_number,
+      country: document.country,
+      validFrom: formatDateForInput(document.valid_from),
+      validTo: formatDateForInput(document.valid_to),
+      status: document.active,
+      fileName: document.file_name,
+      fileType: document.file_type,
+      fileData: document.fileData, // Include base64 file data
+    };
+
+    res.json({
+      success: true,
+      data: response,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error fetching document file:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch document file",
+        details: error.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   createTransporter,
   updateTransporter,
@@ -2469,4 +2812,5 @@ module.exports = {
   getCitiesByCountryAndState,
   getTransporters,
   getTransporterById,
+  getDocumentFile,
 };

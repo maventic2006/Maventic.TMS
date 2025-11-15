@@ -113,9 +113,9 @@ const DriverFilterPanel = ({
             className="bg-white border border-[#E5E7EB] rounded-xl"
             style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
           >
-            <CardContent className="p-6 relative">
+            <CardContent className="p-0 relative">
               {/* Filter Input Grid - Row 1 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
                 <div className="space-y-2 group">
                   <Label
                     htmlFor="driverId"

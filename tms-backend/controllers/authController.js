@@ -83,12 +83,39 @@ const login = async (req, res) => {
     if (!requirePasswordReset) {
       // Set JWT token in HTTP-only cookie (expires when browser closes)
       const isProduction = process.env.NODE_ENV === "production";
-      res.cookie("authToken", token, {
+
+      // Get the origin from the request to set cookie domain properly
+      const origin = req.get("origin") || "";
+      const isDifferentOrigin =
+        origin &&
+        !origin.includes("localhost") &&
+        !origin.includes("127.0.0.1");
+
+      const cookieOptions = {
         httpOnly: true,
-        secure: isProduction, // Use secure cookies in production
-        sameSite: "strict",
+        secure: false, // Set to false for now - can be enabled when HTTPS is available
+        sameSite: "lax", // "lax" allows cookies in cross-origin GET requests (better compatibility)
+        path: "/", // Ensure cookie is available for all paths
         // No maxAge - cookie expires when browser closes (session cookie)
+      };
+
+      // If production AND using HTTPS, enable secure flag
+      if (isProduction && origin.startsWith("https://")) {
+        cookieOptions.secure = true;
+      }
+
+      console.log("🍪 Setting authentication cookie with options:", {
+        ...cookieOptions,
+        token: token.substring(0, 20) + "...", // Log only first 20 chars for security
+        isProduction,
+        NODE_ENV: process.env.NODE_ENV,
+        origin,
+        isDifferentOrigin,
       });
+
+      res.cookie("authToken", token, cookieOptions);
+
+      console.log("✅ Authentication cookie set successfully");
     }
 
     // Return user data (excluding password)
@@ -315,12 +342,17 @@ const getUserApplications = async (req, res) => {
  * Logout Controller
  */
 const logout = (req, res) => {
-  // Clear the auth token cookie
+  console.log("🚪 Logout request received");
+
+  // Clear the auth token cookie with same options as when set
   res.clearCookie("authToken", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: false, // Match login cookie settings
+    sameSite: "lax", // Changed from "strict" to "lax" to match login cookie
+    path: "/", // Ensure cookie is cleared from all paths
   });
+
+  console.log("✅ Authentication cookie cleared successfully");
 
   res.json({
     success: true,
@@ -364,11 +396,23 @@ const refreshToken = async (req, res) => {
 
     // Update cookie with new token
     const isProduction = process.env.NODE_ENV === "production";
-    res.cookie("authToken", newToken, {
+    const origin = req.get("origin") || "";
+
+    const cookieOptions = {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: "strict",
-    });
+      secure: false, // Match login cookie settings
+      sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
+      path: "/",
+    };
+
+    // If production AND using HTTPS, enable secure flag
+    if (isProduction && origin.startsWith("https://")) {
+      cookieOptions.secure = true;
+    }
+
+    console.log("🔄 Refreshing authentication cookie");
+    res.cookie("authToken", newToken, cookieOptions);
+    console.log("✅ Authentication cookie refreshed successfully");
 
     // Return user data (excluding password)
     const { password: _, ...userWithoutPassword } = user;

@@ -231,10 +231,10 @@ const WarehouseMaintenance = () => {
             warehouses={filteredWarehouses}
             loading={loading}
             onWarehouseClick={handleWarehouseClick}
-            currentPage={pagination.page}
-            totalPages={pagination.pages}
-            totalItems={pagination.total}
-            itemsPerPage={pagination.limit}
+            currentPage={pagination.page || 1}
+            totalPages={pagination.pages || 1}
+            totalItems={pagination.total || 0}
+            itemsPerPage={pagination.limit || 25}
             onPageChange={handlePageChange}
             filteredCount={filteredWarehouses.length}
             searchText={searchText}

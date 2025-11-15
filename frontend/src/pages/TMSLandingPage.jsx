@@ -328,6 +328,9 @@ const TMSLandingPage = () => {
       } else if (item.title === "Driver Maintenance") {
         console.log("Navigating to /drivers");
         navigate("/drivers");
+      } else if (item.title === "Consignor WH Maintenance") {
+        console.log("Navigating to /warehouse");
+        navigate("/warehouse");
       } else if (item.title === "Consignor Maintenance") {
         console.log("Navigating to /consignor");
         navigate("/consignor");
@@ -351,7 +354,7 @@ const TMSLandingPage = () => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#F5F7FA" }}>
       {/* Combined Header & Navigation Section with Glassmorphism */}
-      <nav 
+      <nav
         className="sticky top-0 z-50 transition-all duration-300"
         style={{
           background: "rgba(255, 255, 255, 0.3)",
@@ -372,20 +375,20 @@ const TMSLandingPage = () => {
             <div className="flex justify-between items-center h-14">
               {/* Compact Logo Section */}
               <div className="flex items-center space-x-3">
-                <div 
+                <div
                   className="p-2 rounded-lg shadow-sm transform hover:scale-110 transition-all duration-300"
                   style={{ backgroundColor: "#3B82F6" }}
                 >
                   <Home className="h-5 w-5" style={{ color: "#FFFFFF" }} />
                 </div>
                 <div>
-                  <h1 
+                  <h1
                     className="text-lg font-bold"
                     style={{ color: "#0D1A33" }}
                   >
                     TMS Portal
                   </h1>
-                  <p 
+                  <p
                     className="text-xs font-semibold hidden lg:block leading-none"
                     style={{ color: "#4A5568" }}
                   >
@@ -397,24 +400,24 @@ const TMSLandingPage = () => {
               {/* Compact User Profile Section */}
               <div className="flex items-center space-x-3">
                 <div className="text-right hidden sm:block">
-                  <p 
+                  <p
                     className="text-sm font-semibold leading-tight"
                     style={{ color: "#0D1A33" }}
                   >
                     {user?.user_full_name || "User"}
                   </p>
-                  <p 
+                  <p
                     className="text-xs leading-none"
                     style={{ color: "#4A5568" }}
                   >
                     {user?.user_type_id || "User"}
                   </p>
                 </div>
-                <div 
+                <div
                   className="h-9 w-9 rounded-full flex items-center justify-center shadow-md transition-all duration-300 transform hover:scale-110"
-                  style={{ 
+                  style={{
                     backgroundColor: "#3B82F6",
-                    border: "2px solid rgba(59, 130, 246, 0.3)"
+                    border: "2px solid rgba(59, 130, 246, 0.3)",
                   }}
                 >
                   <User className="h-4 w-4" style={{ color: "#FFFFFF" }} />
@@ -426,8 +429,13 @@ const TMSLandingPage = () => {
                     onClick={() => setShowLogoutModal(true)}
                     className="flex items-center space-x-1 px-2 py-2 rounded-md text-xs font-medium transition-all duration-300 transform hover:scale-105 group"
                     style={{ color: "#DC2626" }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(220, 38, 38, 0.1)"}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor =
+                        "rgba(220, 38, 38, 0.1)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "transparent")
+                    }
                     title="Logout"
                   >
                     <LogOut className="h-4 w-4 transition-colors duration-300" />
@@ -437,12 +445,16 @@ const TMSLandingPage = () => {
                   <button
                     onClick={() => navigate("/login")}
                     className="flex items-center space-x-1 px-3 py-2 rounded-md text-xs font-medium transition-all duration-300 transform hover:scale-105"
-                    style={{ 
+                    style={{
                       backgroundColor: "#3B82F6",
-                      color: "#FFFFFF"
+                      color: "#FFFFFF",
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#2563EB"}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#3B82F6"}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = "#2563EB")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = "#3B82F6")
+                    }
                     title="Login"
                   >
                     <User className="h-4 w-4" />
@@ -473,13 +485,18 @@ const TMSLandingPage = () => {
                     <button
                       className="flex items-center justify-center space-x-1.5 px-2 py-2 md:px-3 md:py-2.5 lg:px-4 lg:py-2.5 rounded-lg text-xs font-medium transition-all duration-300 transform hover:scale-[1.02] min-w-[140px] lg:min-w-[180px]"
                       style={{
-                        backgroundColor: isHovered ? "rgba(255, 255, 255, 0.9)" : "transparent",
+                        backgroundColor: isHovered
+                          ? "rgba(255, 255, 255, 0.9)"
+                          : "transparent",
                         color: isHovered ? "#0D1A33" : "#0D1A33",
-                        boxShadow: isHovered ? "0 2px 6px rgba(0, 0, 0, 0.1)" : "none",
+                        boxShadow: isHovered
+                          ? "0 2px 6px rgba(0, 0, 0, 0.1)"
+                          : "none",
                       }}
                       onMouseEnter={(e) => {
                         if (!isHovered) {
-                          e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.5)";
+                          e.currentTarget.style.backgroundColor =
+                            "rgba(255, 255, 255, 0.5)";
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -497,9 +514,11 @@ const TMSLandingPage = () => {
                       </span>
                       <ChevronDown
                         className="h-3 w-3 transition-all duration-300 flex-shrink-0"
-                        style={{ 
+                        style={{
                           color: isHovered ? "#3B82F6" : "#0D1A33",
-                          transform: isHovered ? "rotate(180deg)" : "rotate(0deg)"
+                          transform: isHovered
+                            ? "rotate(180deg)"
+                            : "rotate(0deg)",
                         }}
                       />
                     </button>
@@ -510,13 +529,19 @@ const TMSLandingPage = () => {
 
             {/* Compact Mobile Menu Button */}
             <div className="sm:hidden w-full flex justify-between items-center py-2">
-              <span className="text-sm font-medium" style={{ color: "#0D1A33" }}>Menu</span>
+              <span
+                className="text-sm font-medium"
+                style={{ color: "#0D1A33" }}
+              >
+                Menu
+              </span>
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-md transition-all duration-200"
                 style={{ color: "#0D1A33" }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.5)";
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(255, 255, 255, 0.5)";
                   e.currentTarget.style.color = "#3B82F6";
                 }}
                 onMouseLeave={(e) => {
@@ -569,7 +594,7 @@ const TMSLandingPage = () => {
               className="sm:hidden"
               style={{
                 backgroundColor: "rgba(255, 255, 255, 0.95)",
-                borderTop: "1px solid rgba(229, 231, 235, 0.5)"
+                borderTop: "1px solid rgba(229, 231, 235, 0.5)",
               }}
             >
               <div className="px-4 py-3 space-y-2">
@@ -579,10 +604,18 @@ const TMSLandingPage = () => {
                     <div
                       key={menu.id}
                       className="pb-2 last:pb-0"
-                      style={{ borderBottom: "1px solid rgba(229, 231, 235, 0.3)" }}
+                      style={{
+                        borderBottom: "1px solid rgba(229, 231, 235, 0.3)",
+                      }}
                     >
-                      <div className="flex items-center space-x-3 font-medium py-2" style={{ color: "#0D1A33" }}>
-                        <Icon className="h-5 w-5" style={{ color: "#3B82F6" }} />
+                      <div
+                        className="flex items-center space-x-3 font-medium py-2"
+                        style={{ color: "#0D1A33" }}
+                      >
+                        <Icon
+                          className="h-5 w-5"
+                          style={{ color: "#3B82F6" }}
+                        />
                         <span>{menu.title}</span>
                       </div>
                       {menu.items && (
@@ -594,17 +627,26 @@ const TMSLandingPage = () => {
                                 key={index}
                                 className="flex items-center space-x-2 text-sm py-1 cursor-pointer transition-colors duration-200"
                                 style={{ color: "#4A5568" }}
-                                onMouseEnter={(e) => e.currentTarget.style.color = "#0D1A33"}
-                                onMouseLeave={(e) => e.currentTarget.style.color = "#4A5568"}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.color = "#0D1A33")
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.color = "#4A5568")
+                                }
                                 onClick={() => handleMenuItemClick(item)}
                               >
                                 <ItemIcon className="h-4 w-4 flex-shrink-0" />
-                                <span className="flex-1 leading-snug">{item.title}</span>
+                                <span className="flex-1 leading-snug">
+                                  {item.title}
+                                </span>
                               </div>
                             );
                           })}
                           {menu.items.length > 3 && (
-                            <div className="text-xs py-1 ml-6" style={{ color: "#9CA3AF" }}>
+                            <div
+                              className="text-xs py-1 ml-6"
+                              style={{ color: "#9CA3AF" }}
+                            >
                               +{menu.items.length - 3} more items
                             </div>
                           )}
@@ -632,7 +674,7 @@ const TMSLandingPage = () => {
                 backdropFilter: "blur(10px)",
                 WebkitBackdropFilter: "blur(10px)",
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                borderTop: "2px solid #3B82F6"
+                borderTop: "2px solid #3B82F6",
               }}
               onMouseEnter={() => setHoveredDropdown(hoveredDropdown)}
               onMouseLeave={handleMouseLeave}
@@ -656,11 +698,13 @@ const TMSLandingPage = () => {
                             style={{
                               border: "1px solid transparent",
                               backgroundColor: "#FFFFFF",
-                              minHeight: "70px"
+                              minHeight: "70px",
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = "rgba(59, 130, 246, 0.3)";
-                              e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.02)";
+                              e.currentTarget.style.borderColor =
+                                "rgba(59, 130, 246, 0.3)";
+                              e.currentTarget.style.backgroundColor =
+                                "rgba(59, 130, 246, 0.02)";
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.borderColor = "transparent";
@@ -669,20 +713,25 @@ const TMSLandingPage = () => {
                             onClick={() => handleMenuItemClick(item)}
                           >
                             <div className="flex items-center space-x-2">
-                              <div 
+                              <div
                                 className="p-1.5 rounded-lg transition-all duration-200 flex-shrink-0"
-                                style={{ backgroundColor: "rgba(59, 130, 246, 0.1)" }}
+                                style={{
+                                  backgroundColor: "rgba(59, 130, 246, 0.1)",
+                                }}
                               >
-                                <Icon className="h-4 w-4 transition-colors duration-200" style={{ color: "#3B82F6" }} />
+                                <Icon
+                                  className="h-4 w-4 transition-colors duration-200"
+                                  style={{ color: "#3B82F6" }}
+                                />
                               </div>
                               <div className="flex-1">
-                                <h3 
+                                <h3
                                   className="text-xs font-bold transition-colors duration-200 mb-0.5 leading-tight"
                                   style={{ color: "#0D1A33" }}
                                 >
                                   {item.title}
                                 </h3>
-                                <p 
+                                <p
                                   className="text-xs transition-colors duration-200 leading-tight opacity-80"
                                   style={{ color: "#4A5568" }}
                                 >
@@ -702,14 +751,17 @@ const TMSLandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden" style={{ backgroundColor: "#F5F7FA" }}>
+      <div
+        className="relative overflow-hidden"
+        style={{ backgroundColor: "#F5F7FA" }}
+      >
         {/* Background Elements - Minimal */}
         <div className="absolute inset-0 overflow-hidden">
-          <div 
-            className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl" 
+          <div
+            className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl"
             style={{ backgroundColor: "rgba(59, 130, 246, 0.08)" }}
           ></div>
-          <div 
+          <div
             className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl"
             style={{ backgroundColor: "rgba(59, 130, 246, 0.05)" }}
           ></div>
@@ -722,7 +774,7 @@ const TMSLandingPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
-              <h1 
+              <h1
                 className="text-3xl md:text-4xl font-extrabold mb-8 leading-tight"
                 style={{ color: "#0D1A33" }}
               >
@@ -730,23 +782,17 @@ const TMSLandingPage = () => {
                 <br />
                 Transport Management System
               </h1>
-              <p 
+              <p
                 className="text-lg md:text-xl max-w-4xl mx-auto mb-12 leading-relaxed"
                 style={{ color: "#4A5568" }}
               >
                 Revolutionize your logistics operations with our
-                <span 
-                  className="font-semibold"
-                  style={{ color: "#3B82F6" }}
-                >
+                <span className="font-semibold" style={{ color: "#3B82F6" }}>
                   {" "}
                   AI-powered
                 </span>{" "}
                 platform designed for
-                <span 
-                  className="font-semibold"
-                  style={{ color: "#3B82F6" }}
-                >
+                <span className="font-semibold" style={{ color: "#3B82F6" }}>
                   {" "}
                   modern enterprises
                 </span>
@@ -759,9 +805,12 @@ const TMSLandingPage = () => {
                   style={{
                     backgroundColor: "#10B981",
                     color: "#FFFFFF",
-                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
+                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
                   }}
-                  whileHover={{ y: -2, boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)" }}
+                  whileHover={{
+                    y: -2,
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  }}
                 >
                   <CheckCircle className="inline h-5 w-5 mr-2" />
                   Real-time Tracking
@@ -771,9 +820,12 @@ const TMSLandingPage = () => {
                   style={{
                     backgroundColor: "#3B82F6",
                     color: "#FFFFFF",
-                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
+                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
                   }}
-                  whileHover={{ y: -2, boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)" }}
+                  whileHover={{
+                    y: -2,
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  }}
                 >
                   <Shield className="inline h-5 w-5 mr-2" />
                   Secure Management
@@ -783,9 +835,12 @@ const TMSLandingPage = () => {
                   style={{
                     backgroundColor: "#8B5CF6",
                     color: "#FFFFFF",
-                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)"
+                    boxShadow: "0 2px 6px rgba(0, 0, 0, 0.1)",
                   }}
-                  whileHover={{ y: -2, boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)" }}
+                  whileHover={{
+                    y: -2,
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  }}
                 >
                   <BarChart3 className="inline h-5 w-5 mr-2" />
                   Advanced Analytics
@@ -801,42 +856,36 @@ const TMSLandingPage = () => {
                   className="rounded-xl p-6 max-w-lg mx-auto mb-12"
                   style={{
                     backgroundColor: "rgba(59, 130, 246, 0.05)",
-                    border: "1px solid rgba(59, 130, 246, 0.2)"
+                    border: "1px solid rgba(59, 130, 246, 0.2)",
                   }}
                 >
                   <div className="text-center">
-                    <h3 
+                    <h3
                       className="text-lg font-semibold mb-2"
                       style={{ color: "#3B82F6" }}
                     >
                       Demo Access
                     </h3>
-                    <p 
-                      className="text-sm mb-3"
-                      style={{ color: "#4A5568" }}
-                    >
+                    <p className="text-sm mb-3" style={{ color: "#4A5568" }}>
                       Login to access all features including Transporter
                       Maintenance
                     </p>
-                    <div 
+                    <div
                       className="rounded-lg p-3 text-sm"
                       style={{ backgroundColor: "#FFFFFF" }}
                     >
-                      <div 
-                        className="font-medium"
-                        style={{ color: "#0D1A33" }}
-                      >
+                      <div className="font-medium" style={{ color: "#0D1A33" }}>
                         Test Credentials:
                       </div>
                       <div style={{ color: "#4A5568" }}>
-                        <span 
+                        <span
                           className="font-mono px-2 py-1 rounded mr-2"
                           style={{ backgroundColor: "#F5F7FA" }}
                         >
                           test1
                         </span>
                         /
-                        <span 
+                        <span
                           className="font-mono px-2 py-1 rounded ml-2"
                           style={{ backgroundColor: "#F5F7FA" }}
                         >
@@ -890,41 +939,41 @@ const TMSLandingPage = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
                   >
-                    <Card 
+                    <Card
                       className="p-8 text-center group transition-all duration-500 transform hover:-translate-y-3"
                       style={{
                         backgroundColor: "#FFFFFF",
                         border: "1px solid transparent",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)"
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "rgba(59, 130, 246, 0.2)";
-                        e.currentTarget.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.12)";
+                        e.currentTarget.style.borderColor =
+                          "rgba(59, 130, 246, 0.2)";
+                        e.currentTarget.style.boxShadow =
+                          "0 8px 24px rgba(0, 0, 0, 0.12)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.borderColor = "transparent";
-                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)";
+                        e.currentTarget.style.boxShadow =
+                          "0 2px 8px rgba(0, 0, 0, 0.08)";
                       }}
                     >
                       <div
                         className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 transition-all duration-300 group-hover:scale-110"
                         style={{
                           backgroundColor: stat.bgColor,
-                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)"
+                          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
                         }}
                       >
                         <Icon className="h-8 w-8 text-white" />
                       </div>
-                      <h3 
+                      <h3
                         className="text-3xl font-bold mb-2"
                         style={{ color: "#0D1A33" }}
                       >
                         {stat.count}
                       </h3>
-                      <p 
-                        className="font-medium"
-                        style={{ color: "#4A5568" }}
-                      >
+                      <p className="font-medium" style={{ color: "#4A5568" }}>
                         {stat.label}
                       </p>
                     </Card>
@@ -943,19 +992,21 @@ const TMSLandingPage = () => {
         animate={{ scale: 1, rotate: 0 }}
         transition={{ delay: 1, duration: 0.5, ease: "easeOut" }}
       >
-        <button 
+        <button
           className="text-white p-4 rounded-full transition-all duration-300 transform hover:scale-110 hover:rotate-12"
           style={{
             backgroundColor: "#3B82F6",
-            boxShadow: "0 4px 16px rgba(59, 130, 246, 0.4)"
+            boxShadow: "0 4px 16px rgba(59, 130, 246, 0.4)",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = "#2563EB";
-            e.currentTarget.style.boxShadow = "0 8px 24px rgba(59, 130, 246, 0.5)";
+            e.currentTarget.style.boxShadow =
+              "0 8px 24px rgba(59, 130, 246, 0.5)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = "#3B82F6";
-            e.currentTarget.style.boxShadow = "0 4px 16px rgba(59, 130, 246, 0.4)";
+            e.currentTarget.style.boxShadow =
+              "0 4px 16px rgba(59, 130, 246, 0.4)";
           }}
         >
           <MessageSquare className="h-6 w-6" />
@@ -984,27 +1035,24 @@ const TMSLandingPage = () => {
               className="rounded-2xl p-8 max-w-md mx-4"
               style={{
                 backgroundColor: "#FFFFFF",
-                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)"
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
               }}
             >
               <div className="flex items-center space-x-4 mb-6">
-                <div 
+                <div
                   className="p-3 rounded-full"
                   style={{ backgroundColor: "rgba(220, 38, 38, 0.1)" }}
                 >
                   <LogOut className="h-6 w-6" style={{ color: "#DC2626" }} />
                 </div>
                 <div>
-                  <h3 
+                  <h3
                     className="text-xl font-bold"
                     style={{ color: "#0D1A33" }}
                   >
                     Confirm Logout
                   </h3>
-                  <p 
-                    className="mt-1"
-                    style={{ color: "#4A5568" }}
-                  >
+                  <p className="mt-1" style={{ color: "#4A5568" }}>
                     Are you sure you want to sign out?
                   </p>
                 </div>
@@ -1016,7 +1064,7 @@ const TMSLandingPage = () => {
                   className="flex-1 px-6 py-3 rounded-lg transition-colors font-medium"
                   style={{
                     backgroundColor: "#F5F7FA",
-                    color: "#0D1A33"
+                    color: "#0D1A33",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = "#E5E7EB";
@@ -1032,7 +1080,7 @@ const TMSLandingPage = () => {
                   className="flex-1 px-6 py-3 rounded-lg transition-colors font-medium"
                   style={{
                     backgroundColor: "#DC2626",
-                    color: "#FFFFFF"
+                    color: "#FFFFFF",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = "#B91C1C";

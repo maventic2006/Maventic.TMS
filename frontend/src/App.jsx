@@ -27,6 +27,8 @@ import VehicleMaintenance from "./pages/VehicleMaintenance";
 import VehicleDetailsPage from "./features/vehicle/VehicleDetailsPage";
 import CreateVehiclePage from "./features/vehicle/CreateVehiclePage";
 import WarehouseMaintenance from "./pages/WarehouseMaintenance";
+import WarehouseDetails from "./pages/WarehouseDetails";
+import WarehouseCreatePage from "./features/warehouse/pages/WarehouseCreatePage";
 import ConsignorMaintenance from "./pages/ConsignorMaintenance";
 import ConsignorDetailsPage from "./pages/ConsignorDetailsPage";
 import ConsignorCreatePage from "./features/consignor/pages/ConsignorCreatePage";
@@ -470,6 +472,26 @@ function App() {
                       <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                         <Layout>
                           <WarehouseMaintenance />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/warehouse/create"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <WarehouseCreatePage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/warehouse/:id"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <WarehouseDetails />
                         </Layout>
                       </PrivateRoute>
                     }

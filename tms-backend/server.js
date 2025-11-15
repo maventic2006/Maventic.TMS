@@ -12,9 +12,31 @@ require("dotenv").config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Define allowed origins (supports both development and production)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://192.168.2.32:5173",
+  "http://192.168.2.32:5174",
+  // Add production server origins here when deployed
+  // Example: "https://tms.yourdomain.com"
+];
+
+// If FRONTEND_URL is set in environment, add it to allowed origins
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+  console.log(
+    "🌐 Added FRONTEND_URL to CORS origins:",
+    process.env.FRONTEND_URL
+  );
+}
+
+console.log("🔐 CORS Configuration - Allowed Origins:", allowedOrigins);
+
 const io = socketIO(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: allowedOrigins,
     credentials: true,
   },
 });
@@ -30,8 +52,24 @@ app.use(helmet({
 }));
 app.use(
   cors({
-    origin: "http://localhost:5173", // Frontend URL
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, Postman, or same-origin)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = `The CORS policy for this site does not allow access from origin: ${origin}`;
+        console.warn("⚠️ CORS blocked origin:", origin);
+        return callback(new Error(msg), false);
+      }
+      console.log("✅ CORS allowed origin:", origin);
+      return callback(null, true);
+    },
     credentials: true, // Allow cookies to be sent
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["Set-Cookie"], // Expose Set-Cookie header to frontend
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
 app.use(cookieParser());
@@ -73,6 +111,7 @@ driverBulkUploadQueue.process(async (job) => {
   return await processDriverBulkUpload(job, io);
 });
 const driverRoutes = require("./routes/driver");
+const approvalRoutes = require("./routes/approval");
 
 // Routes
 app.use("/api/warehouse", warehouseRoutes);
@@ -88,6 +127,7 @@ app.use("/api/vehicle/bulk-upload", vehicleBulkUploadRoutes);
 app.use("/api/driver-bulk-upload", driverBulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
+app.use("/api/approval", approvalRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
@@ -159,92 +199,88 @@ const startServer = async () => {
 startServer();
 
 // Error handling for server
-server.on('error', (error) => {
-  if (error.code === 'EADDRINUSE') {
-    console.error('');
-    console.error('🔴 ========================================');
-    console.error('🔴 PORT ALREADY IN USE ERROR');
-    console.error('🔴 ========================================');
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error("");
+    console.error("🔴 ========================================");
+    console.error("🔴 PORT ALREADY IN USE ERROR");
+    console.error("🔴 ========================================");
     console.error(`❌ Port ${PORT} is already in use by another process`);
-    console.error('');
-    console.error('💡 SOLUTIONS:');
-    console.error('   Option 1: Kill the conflicting process');
+    console.error("");
+    console.error("💡 SOLUTIONS:");
+    console.error("   Option 1: Kill the conflicting process");
     console.error(`     PowerShell: .\\kill-port.ps1`);
     console.error(`     Or: taskkill /F /PID <process-id>`);
-    console.error('');
-    console.error('   Option 2: Use a different port');
-    console.error('     Update PORT in .env file');
-    console.error('');
-    console.error('   Option 3: Find what\'s using the port');
+    console.error("");
+    console.error("   Option 2: Use a different port");
+    console.error("     Update PORT in .env file");
+    console.error("");
+    console.error("   Option 3: Find what's using the port");
     console.error(`     PowerShell: Get-NetTCPConnection -LocalPort ${PORT}`);
     console.error(`     CMD: netstat -ano | findstr :${PORT}`);
-    console.error('');
-    console.error('🔴 ========================================');
-    console.error('');
+    console.error("");
+    console.error("🔴 ========================================");
+    console.error("");
     process.exit(1);
   } else {
-    console.error('❌ Server error:', error);
+    console.error("❌ Server error:", error);
     process.exit(1);
   }
 });
 
 // Graceful shutdown handling
-const gracefulShutdown = async (signal) => {
-  console.log('');
+const gracefulShutdown = (signal) => {
+  console.log("");
   console.log(`⚠️  ${signal} received. Starting graceful shutdown...`);
-  
+
   // Close server
   server.close(() => {
-    console.log('✅ HTTP server closed');
-    
+    console.log("✅ HTTP server closed");
+
     // Close Socket.IO connections
     io.close(() => {
-      console.log('✅ Socket.IO connections closed');
-      
-      // Close database connections
-      knex.destroy().then(() => {
-        console.log('✅ Database connections closed');
-        console.log('✅ Graceful shutdown complete');
-        process.exit(0);
-      }).catch(err => {
-        console.error('❌ Error closing database connections:', err);
-        process.exit(1);
-      });
+      console.log("✅ Socket.IO connections closed");
+
+      // Close database connections (if any)
+      // knex.destroy() - uncomment if using knex
+
+      console.log("✅ Graceful shutdown complete");
+      process.exit(0);
     });
   });
-  
+
   // Force shutdown after 10 seconds
   setTimeout(() => {
-    console.error('⚠️  Forced shutdown after 10 seconds');
+    console.error("⚠️  Forced shutdown after 10 seconds");
     process.exit(1);
   }, 10000);
 };
 
 // Handle shutdown signals
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('');
-  console.error('🔴 ========================================');
-  console.error('🔴 UNCAUGHT EXCEPTION');
-  console.error('🔴 ========================================');
+process.on("uncaughtException", (error) => {
+  console.error("");
+  console.error("🔴 ========================================");
+  console.error("🔴 UNCAUGHT EXCEPTION");
+  console.error("🔴 ========================================");
   console.error(error);
-  console.error('🔴 ========================================');
-  console.error('');
+  console.error("🔴 ========================================");
+  console.error("");
   process.exit(1);
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('');
-  console.error('🔴 ========================================');
-  console.error('🔴 UNHANDLED PROMISE REJECTION');
-  console.error('🔴 ========================================');
-  console.error('Reason:', reason);
-  console.error('Promise:', promise);
-  console.error('🔴 ========================================');
-  console.error('');
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("");
+  console.error("🔴 ========================================");
+  console.error("🔴 UNHANDLED PROMISE REJECTION");
+  console.error("🔴 ========================================");
+  console.error("Reason:", reason);
+  console.error("Promise:", promise);
+  console.error("🔴 ========================================");
+  console.error("");
   process.exit(1);
 });

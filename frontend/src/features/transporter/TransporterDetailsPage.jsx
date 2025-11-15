@@ -44,6 +44,9 @@ import AddressContactsTab from "./components/AddressContactsTab";
 import ServiceableAreaTab from "./components/ServiceableAreaTab";
 import DocumentsTab from "./components/DocumentsTab";
 
+// Import approval component
+import ApprovalActionBar from "../../components/approval/ApprovalActionBar";
+
 const TransporterDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -470,7 +473,7 @@ const TransporterDetailsPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
       <TMSHeader theme={theme} />
-      
+
       {/* Modern Header Bar with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
         {/* Background decoration */}
@@ -522,6 +525,15 @@ const TransporterDetailsPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Approval Action Bar - shows approval status and actions */}
+            {selectedTransporter.userApprovalStatus && (
+              <ApprovalActionBar
+                userApprovalStatus={selectedTransporter.userApprovalStatus}
+                transporterId={selectedTransporter.transporterId}
+              />
+            )}
+
+            {/* Edit/Save/Cancel Buttons */}
             {isEditMode ? (
               <>
                 <button

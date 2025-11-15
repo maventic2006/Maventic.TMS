@@ -24,3 +24,11 @@ exports.up = function (knex) {
 exports.down = function (knex) {
   return knex.schema.dropTableIfExists('master_industry_type');
 };
+// Stub migration - already applied to database
+exports.up = function (knex) {
+  return Promise.resolve();
+};
+
+exports.down = function (knex) {
+  return Promise.resolve();
+};

@@ -11,6 +11,8 @@ import Dashboard from "../features/dashboard/Dashboard";
 import IndentPage from "../features/indent/IndentPage";
 import TransporterDetailsPage from "../features/transporter/TransporterDetailsPage";
 import CreateTransporterPage from "../features/transporter/CreateTransporterPage";
+import WarehouseCreatePage from "../features/warehouse/pages/WarehouseCreatePage";
+import WarehouseDetails from "../pages/WarehouseDetails";
 import ConsignorMaintenance from "../pages/ConsignorMaintenance";
 import ConsignorDetailsPage from "../features/consignor/pages/ConsignorDetailsPage";
 import ConsignorCreatePage from "../features/consignor/pages/ConsignorCreatePage";
@@ -82,6 +84,24 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roles={["product_owner"]}>
             <WarehouseMaintenance />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/warehouse/create"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <WarehouseCreatePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/warehouse/:id"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <WarehouseDetails />
           </ProtectedRoute>
         }
       />

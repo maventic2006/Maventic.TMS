@@ -143,6 +143,18 @@ features/[module]/
 - BlacklistMappingTab / BlacklistMappingViewTab
 - AdditionalTab / AdditionalViewTab
 
+**Warehouse Module**: 5 Edit tabs + 4 View tabs
+
+- GeneralDetailsTab (Edit)
+- FacilitiesTab (Edit)
+- AddressTab (Edit)
+- DocumentsTab (Edit)
+- GeofencingTab (Edit)
+- GeneralDetailsViewTab (View with collapsible sections)
+- FacilitiesViewTab (View with collapsible sections)
+- AddressViewTab (View with collapsible sections)
+- DocumentsViewTab (View with collapsible sections)
+
 ## Collapsible Sections Pattern (Required for All View Tabs)
 
 ### Mandatory Implementation
@@ -205,6 +217,10 @@ All feature implementation documentation moved to `/docs` folder for better proj
 - DRIVER_DETAILS_COLLAPSIBLE_UPDATE.md
 - TRANSPORTER_FIX.md
 - VAT_GST_FILTER_FIX.md
+- TRANSPORTER_LIST_NAVIGATION_FIX.md
+- FUZZY_SEARCH_FIX.md
+- TRANSPORTER_LIST_TAN_NA_UPDATE.md
+- WAREHOUSE_CREATE_COMPLETE_FIX.md
 - And all other implementation fix documents
 
 ### Theme Configuration System
@@ -286,6 +302,66 @@ const buttonTheme = getComponentTheme('actionButton');
 3. All components using theme reflect changes automatically
 
 **Remember**: Theme.config.js is the ONLY place colors should be defined!
+
+## Critical Component Patterns
+
+### Button Component - Type Attribute (CRITICAL FIX)
+
+**Issue**: Button component causing unwanted form submissions and API calls instead of onClick navigation
+
+**Root Cause**: HTML `<button>` elements default to `type="submit"` when no type is specified. When buttons are inside forms (or when React handles events), missing `type` attribute causes form submission behavior instead of executing onClick handlers.
+
+**Symptom**:
+
+- Clicking "Create New" button hits backend API endpoint directly (e.g., `POST http://localhost:5000/api/warehouse/create`)
+- Shows backend error "Warehouse not found" instead of navigating to create page
+- Frontend route `/warehouse/create` never loads
+
+**Fix Applied** (November 13, 2025):
+
+**File**: `frontend/src/components/ui/Button.jsx`
+
+```javascript
+// ✅ CORRECT - Explicit type="button" prevents form submission
+return (
+  <button
+    type="button" // ⭐ CRITICAL: Prevents default submit behavior
+    className={classes}
+    ref={ref}
+    disabled={disabled || loading}
+    {...props}
+  >
+    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+    {children}
+  </button>
+);
+
+// ❌ WRONG - Missing type defaults to "submit"
+return (
+  <button
+    className={classes}
+    ref={ref}
+    disabled={disabled || loading}
+    {...props}
+  >
+    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+    {children}
+  </button>
+);
+```
+
+**Impact**:
+
+- ✅ All navigation buttons now work correctly (Create, Back, etc.)
+- ✅ onClick handlers execute instead of triggering form submissions
+- ✅ Warehouse create page loads properly at `/warehouse/create`
+- ✅ No more unwanted backend API calls from button clicks
+
+**Rule**:
+
+- **ALWAYS** specify `type="button"` for buttons that should NOT submit forms
+- **ONLY** use `type="submit"` for actual form submission buttons
+- Base UI components MUST default to `type="button"` for safety
 
 #### Theme Compliance Fixes - DocumentsViewTab (Completed)
 

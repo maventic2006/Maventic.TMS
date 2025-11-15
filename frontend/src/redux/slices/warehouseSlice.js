@@ -71,11 +71,16 @@ const initialState = {
   warehouses: [],
   filteredWarehouses: [],
   currentWarehouse: null,
+  lastCreatedWarehouse: null,
   masterData: {
     warehouseTypes: [],
+    materialTypes: [],
+    addressTypes: [],
     subLocationTypes: [],
+    documentTypes: [],
   },
   loading: false,
+  isCreating: false,
   error: null,
   pagination: {
     page: 1,
@@ -91,7 +96,7 @@ const initialState = {
     geoFencing: null,
     status: "",
   },
-  useMockData: false, // Flag to switch between mock and real data
+  useMockData: false, // Flag to switch between mock and real data - now using real API
 };
 
 // Async thunks (will be implemented with real API later)
@@ -116,9 +121,12 @@ export const fetchWarehouses = createAsyncThunk(
         };
       }
 
-      // Real API call (to be implemented)
+      // Real API call
       const response = await api.get(API_ENDPOINTS.WAREHOUSE.LIST, { params });
-      return response.data;
+      return {
+        warehouses: response.data.warehouses,
+        pagination: response.data.pagination,
+      };
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || "Failed to fetch warehouses"
@@ -129,15 +137,36 @@ export const fetchWarehouses = createAsyncThunk(
 
 export const fetchWarehouseById = createAsyncThunk(
   "warehouse/fetchWarehouseById",
-  async (id, { rejectWithValue }) => {
+  async (id, { getState, rejectWithValue }) => {
     try {
+      console.log("📦 Fetching warehouse details for ID:", id);
+
+      const { useMockData } = getState().warehouse;
+
+      if (useMockData) {
+        // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        // Find warehouse in mock data
+        const warehouse = mockWarehouses.find((w) => w.warehouse_id === id);
+
+        if (!warehouse) {
+          throw new Error("Warehouse not found");
+        }
+
+        return { warehouse };
+      }
+
+      // Real API call
       const response = await api.get(
         `${API_ENDPOINTS.WAREHOUSE.GET_BY_ID}/${id}`
       );
       return response.data;
     } catch (error) {
       return rejectWithValue(
-        error.response?.data?.message || "Failed to fetch warehouse details"
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to fetch warehouse details"
       );
     }
   }
@@ -147,14 +176,16 @@ export const createWarehouse = createAsyncThunk(
   "warehouse/createWarehouse",
   async (warehouseData, { rejectWithValue }) => {
     try {
-      const response = await api.post(
-        API_ENDPOINTS.WAREHOUSE.CREATE,
-        warehouseData
-      );
+      console.log("📦 Creating warehouse via API:", warehouseData);
+      const response = await api.post("/warehouse/create", warehouseData);
       return response.data;
     } catch (error) {
+      console.error("❌ Create warehouse error:", error.response?.data);
       return rejectWithValue(
-        error.response?.data?.message || "Failed to create warehouse"
+        error.response?.data?.error || {
+          message:
+            error.response?.data?.message || "Failed to create warehouse",
+        }
       );
     }
   }
@@ -162,17 +193,55 @@ export const createWarehouse = createAsyncThunk(
 
 export const updateWarehouse = createAsyncThunk(
   "warehouse/updateWarehouse",
-  async ({ id, data }, { rejectWithValue }) => {
+  async ({ id, data }, { getState, rejectWithValue }) => {
     try {
+      console.log("📦 Updating warehouse:", id, data);
+
+      const { useMockData } = getState().warehouse;
+
+      if (useMockData) {
+        // Simulate API delay
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Basic validation
+        if (!data.warehouse_name1 || data.warehouse_name1.trim() === "") {
+          throw {
+            code: "VALIDATION_ERROR",
+            field: "warehouse_name1",
+            message: "Warehouse name is required",
+          };
+        }
+
+        // Find and update warehouse in mock data
+        const warehouseIndex = mockWarehouses.findIndex(
+          (w) => w.warehouse_id === id
+        );
+
+        if (warehouseIndex === -1) {
+          throw new Error("Warehouse not found");
+        }
+
+        // Update mock data
+        mockWarehouses[warehouseIndex] = {
+          ...mockWarehouses[warehouseIndex],
+          ...data,
+          updated_at: new Date().toISOString().split("T")[0],
+        };
+
+        return {
+          warehouse: mockWarehouses[warehouseIndex],
+          message: "Warehouse updated successfully",
+        };
+      }
+
+      // Real API call
       const response = await api.put(
         `${API_ENDPOINTS.WAREHOUSE.UPDATE}/${id}`,
         data
       );
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || "Failed to update warehouse"
-      );
+      return rejectWithValue(error.response?.data || error);
     }
   }
 );
@@ -211,6 +280,9 @@ const warehouseSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    clearLastCreated: (state) => {
+      state.lastCreatedWarehouse = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -237,7 +309,7 @@ const warehouseSlice = createSlice({
       })
       .addCase(fetchWarehouseById.fulfilled, (state, action) => {
         state.loading = false;
-        state.currentWarehouse = action.payload;
+        state.currentWarehouse = action.payload.warehouse || action.payload;
       })
       .addCase(fetchWarehouseById.rejected, (state, action) => {
         state.loading = false;
@@ -246,15 +318,16 @@ const warehouseSlice = createSlice({
 
       // Create warehouse
       .addCase(createWarehouse.pending, (state) => {
-        state.loading = true;
+        state.isCreating = true;
         state.error = null;
       })
       .addCase(createWarehouse.fulfilled, (state, action) => {
-        state.loading = false;
-        state.warehouses.push(action.payload);
+        state.isCreating = false;
+        state.lastCreatedWarehouse = action.payload.warehouse || action.payload;
+        state.warehouses.push(action.payload.warehouse || action.payload);
       })
       .addCase(createWarehouse.rejected, (state, action) => {
-        state.loading = false;
+        state.isCreating = false;
         state.error = action.payload;
       })
 
@@ -265,11 +338,22 @@ const warehouseSlice = createSlice({
       })
       .addCase(updateWarehouse.fulfilled, (state, action) => {
         state.loading = false;
+        const updatedWarehouse = action.payload.warehouse || action.payload;
+
+        // Update in warehouses list
         const index = state.warehouses.findIndex(
-          (w) => w.warehouse_id === action.payload.warehouse_id
+          (w) => w.warehouse_id === updatedWarehouse.warehouse_id
         );
         if (index !== -1) {
-          state.warehouses[index] = action.payload;
+          state.warehouses[index] = updatedWarehouse;
+        }
+
+        // Update current warehouse if it's the same
+        if (
+          state.currentWarehouse &&
+          state.currentWarehouse.warehouse_id === updatedWarehouse.warehouse_id
+        ) {
+          state.currentWarehouse = updatedWarehouse;
         }
       })
       .addCase(updateWarehouse.rejected, (state, action) => {
@@ -299,6 +383,7 @@ export const {
   setFilteredWarehouses,
   setUseMockData,
   clearError,
+  clearLastCreated,
 } = warehouseSlice.actions;
 
 export default warehouseSlice.reducer;

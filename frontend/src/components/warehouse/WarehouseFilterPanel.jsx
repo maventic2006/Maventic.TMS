@@ -5,7 +5,7 @@ import { Card, CardContent } from "../ui/Card";
 import { Input, Label } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { StatusSelect } from "../ui/Select";
-import { Checkbox } from "../ui/Checkbox";
+import { Checkbox } from "../ui/checkbox";
 
 const WarehouseFilterPanel = ({
   filters,
@@ -39,7 +39,7 @@ const WarehouseFilterPanel = ({
           >
             <CardContent className="p-0 relative">
               {/* Filter Input Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
                 <div className="space-y-2 group">
                   <Label
                     htmlFor="warehouseId"
@@ -95,10 +95,7 @@ const WarehouseFilterPanel = ({
               </div>
 
               {/* Facility Checkboxes Row */}
-              <div className="space-y-2 group mb-6">
-                <Label className="text-sm text-[#0D1A33] font-semibold">
-                  Facilities:
-                </Label>
+              <div className="space-y-2 flex justify-between items-center group mb-2">
                 <div className="flex flex-wrap items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <Checkbox
@@ -136,25 +133,24 @@ const WarehouseFilterPanel = ({
                     </span>
                   </label>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 border-t border-[#E5E7EB] pt-4">
-                <Button
-                  variant="outline"
-                  onClick={onClearFilters}
-                  className="border-[#E5E7EB] hover:bg-gray-50 text-[#4A5568] font-medium rounded-lg py-2.5 px-5 transition-all duration-200"
-                  style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
-                <Button
-                  onClick={onApplyFilters}
-                  className="bg-[#1D4ED8] hover:bg-[#1E40AF] text-white font-semibold rounded-lg py-2.5 px-5 transition-all duration-200"
-                >
-                  Apply Filters
-                </Button>
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={onClearFilters}
+                    className="border-[#E5E7EB] hover:bg-gray-50 text-[#4A5568] font-medium rounded-lg py-2.5 px-5 transition-all duration-200"
+                    style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                  <Button
+                    onClick={onApplyFilters}
+                    className="bg-[#1D4ED8] hover:bg-[#1E40AF] text-white font-semibold rounded-lg py-2.5 px-5 transition-all duration-200"
+                  >
+                    Apply Filters
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

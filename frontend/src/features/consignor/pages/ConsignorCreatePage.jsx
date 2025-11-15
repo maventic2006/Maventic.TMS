@@ -421,9 +421,26 @@ const ConsignorCreatePage = () => {
       formDataPayload.append('payload', JSON.stringify(cleanFormData));
       
       // Append all photo and document files
+      console.log('\n🔍 ===== FRONTEND FILE DEBUG =====');
+      console.log('Total files to upload:', Object.keys(files).length);
       Object.entries(files).forEach(([key, file]) => {
+        console.log(`  Appending file: ${key}`);
+        console.log(`    - name: ${file.name}`);
+        console.log(`    - type: ${file.type}`);
+        console.log(`    - size: ${file.size} bytes`);
         formDataPayload.append(key, file);
       });
+      
+      // Log FormData contents
+      console.log('\n📦 FormData contents:');
+      for (let [key, value] of formDataPayload.entries()) {
+        if (value instanceof File) {
+          console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
+        } else {
+          console.log(`  ${key}: ${typeof value === 'string' && value.length > 100 ? value.substring(0, 100) + '...' : value}`);
+        }
+      }
+      console.log('===========================\n');
 
       // Get API URL
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';

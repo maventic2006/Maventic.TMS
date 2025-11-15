@@ -12,6 +12,7 @@ import {
   XCircle,
   AlertCircle,
   User,
+  Download,
 } from "lucide-react";
 
 const GeneralInfoViewTab = ({ consignor }) => {
@@ -412,11 +413,56 @@ const GeneralInfoViewTab = ({ consignor }) => {
                                 : isDocumentExpiringSoon(consignor.nda_expiry_date)
                                 ? theme.colors.status.warning.text
                                 : theme.colors.status.success.text,
+                              marginBottom: "8px",
                             }}
                           >
                             Expires: {formatDate(consignor.nda_expiry_date)}
                           </div>
                         )}
+                        <button
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "6px 12px",
+                            backgroundColor: theme.colors.button.primary.background,
+                            color: theme.colors.button.primary.text,
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                          }}
+                          onClick={async () => {
+                            try {
+                              const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                              const response = await fetch(
+                                `${apiUrl}/api/consignors/${consignor.customer_id}/general/nda/download`,
+                                { credentials: 'include' }
+                              );
+
+                              if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                              }
+
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `NDA_${consignor.customer_id}`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                            } catch (error) {
+                              console.error("Error downloading NDA:", error);
+                              alert("Failed to download NDA document");
+                            }
+                          }}
+                        >
+                          <Download size={14} style={{ marginRight: "4px" }} />
+                          Download NDA
+                        </button>
                       </div>
                     ) : (
                       <div style={{ display: "flex", alignItems: "center" }}>
@@ -458,11 +504,56 @@ const GeneralInfoViewTab = ({ consignor }) => {
                                 : isDocumentExpiringSoon(consignor.msa_expiry_date)
                                 ? theme.colors.status.warning.text
                                 : theme.colors.status.success.text,
+                              marginBottom: "8px",
                             }}
                           >
                             Expires: {formatDate(consignor.msa_expiry_date)}
                           </div>
                         )}
+                        <button
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "6px 12px",
+                            backgroundColor: theme.colors.button.primary.background,
+                            color: theme.colors.button.primary.text,
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                          }}
+                          onClick={async () => {
+                            try {
+                              const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                              const response = await fetch(
+                                `${apiUrl}/api/consignors/${consignor.customer_id}/general/msa/download`,
+                                { credentials: 'include' }
+                              );
+
+                              if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                              }
+
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `MSA_${consignor.customer_id}`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                            } catch (error) {
+                              console.error("Error downloading MSA:", error);
+                              alert("Failed to download MSA document");
+                            }
+                          }}
+                        >
+                          <Download size={14} style={{ marginRight: "4px" }} />
+                          Download MSA
+                        </button>
                       </div>
                     ) : (
                       <div style={{ display: "flex", alignItems: "center" }}>

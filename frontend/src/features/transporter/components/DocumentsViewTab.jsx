@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   FileText,
   Download,
@@ -9,13 +9,17 @@ import {
   Flag,
   Hash,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import { Country } from "country-state-city";
 import CollapsibleSection from "../../../components/ui/CollapsibleSection";
+import api from "../../../utils/api";
 
 const DocumentsViewTab = ({ formData, transporterData }) => {
   const data = formData || transporterData;
   const documents = data?.documents || [];
+  const [previewDocument, setPreviewDocument] = useState(null);
+  const [loadingDocument, setLoadingDocument] = useState(null);
 
   // Helper function to convert country code to country name
   const getCountryName = (countryCode) => {
@@ -63,6 +67,76 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const handleViewDocument = async (documentUniqueId, fileName, fileType) => {
+    try {
+      setLoadingDocument(documentUniqueId);
+      const response = await api.get(
+        `/transporter/document/${documentUniqueId}`
+      );
+
+      if (response.data.success && response.data.data.fileData) {
+        setPreviewDocument({
+          fileName: fileName,
+          fileType: fileType,
+          fileData: response.data.data.fileData,
+        });
+      } else {
+        alert("No file data available for this document");
+      }
+    } catch (error) {
+      console.error("Error fetching document:", error);
+      alert("Failed to load document. Please try again.");
+    } finally {
+      setLoadingDocument(null);
+    }
+  };
+
+  const handleDownloadDocument = async (
+    documentUniqueId,
+    fileName,
+    fileType
+  ) => {
+    try {
+      setLoadingDocument(documentUniqueId);
+      const response = await api.get(
+        `/transporter/document/${documentUniqueId}`
+      );
+
+      if (response.data.success && response.data.data.fileData) {
+        // Create a download link
+        const base64Data = response.data.data.fileData;
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: fileType });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert("No file data available for this document");
+      }
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      alert("Failed to download document. Please try again.");
+    } finally {
+      setLoadingDocument(null);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
   };
 
   return (
@@ -253,14 +327,52 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium">
-                        <Eye className="w-4 h-4" />
-                        View
+                      <button
+                        onClick={() =>
+                          handleViewDocument(
+                            document.documentUniqueId,
+                            document.fileName,
+                            document.fileType
+                          )
+                        }
+                        disabled={loadingDocument === document.documentUniqueId}
+                        className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingDocument === document.documentUniqueId ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-4 h-4" />
+                            View
+                          </>
+                        )}
                       </button>
 
-                      <button className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium">
-                        <Download className="w-4 h-4" />
-                        Download
+                      <button
+                        onClick={() =>
+                          handleDownloadDocument(
+                            document.documentUniqueId,
+                            document.fileName,
+                            document.fileType
+                          )
+                        }
+                        disabled={loadingDocument === document.documentUniqueId}
+                        className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingDocument === document.documentUniqueId ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                            Loading...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-4 h-4" />
+                            Download
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -322,6 +434,79 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
             </CollapsibleSection>
           );
         })
+      )}
+
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {previewDocument.fileName}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-4">
+              {previewDocument.fileType?.startsWith("image/") ? (
+                <img
+                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  alt={previewDocument.fileName}
+                  className="max-w-full h-auto mx-auto"
+                />
+              ) : previewDocument.fileType === "application/pdf" ? (
+                <iframe
+                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  className="w-full h-[600px] border-0"
+                  title={previewDocument.fileName}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {previewDocument.fileName}
+                  </p>
+                  <button
+                    onClick={() =>
+                      handleDownloadDocument(
+                        previewDocument.documentUniqueId,
+                        previewDocument.fileName,
+                        previewDocument.fileType
+                      )
+                    }
+                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download File
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={closePreview}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

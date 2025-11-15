@@ -96,9 +96,9 @@ const ContactViewTab = ({ consignor }) => {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                   {/* Photo */}
-                  {contact.photo ? (
+                  {contact.contact_photo ? (
                     <img
-                      src={contact.photo}
+                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/consignors/${consignor.customer_id}/contacts/${contact.contact_id}/photo`}
                       alt={contact.name}
                       style={{
                         width: "48px",
@@ -107,22 +107,28 @@ const ContactViewTab = ({ consignor }) => {
                         objectFit: "cover",
                         border: `2px solid ${theme.colors.card.border}`,
                       }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: "48px",
-                        height: "48px",
-                        borderRadius: "50%",
-                        backgroundColor: theme.colors.primary.background + "20",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                      onError={(e) => {
+                        // Fallback to default avatar on error
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
                       }}
-                    >
-                      <User size={24} style={{ color: theme.colors.primary.background }} />
-                    </div>
-                  )}
+                    />
+                  ) : null}
+                  
+                  {/* Default Avatar (shown when no photo or error) */}
+                  <div
+                    style={{
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "50%",
+                      backgroundColor: theme.colors.primary.background + "20",
+                      display: contact.contact_photo ? "none" : "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <User size={24} style={{ color: theme.colors.primary.background }} />
+                  </div>
 
                   {/* Name and Designation */}
                   <div style={{ textAlign: "left" }}>
@@ -193,31 +199,29 @@ const ContactViewTab = ({ consignor }) => {
                     >
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginTop: "20px" }}>
                         {/* Contact ID */}
-                        {contact.contact_id && (
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: theme.colors.text.secondary,
-                                marginBottom: "6px",
-                              }}
-                            >
-                              Contact ID
-                            </label>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                color: theme.colors.text.primary,
-                                fontWeight: "500",
-                                margin: 0,
-                              }}
-                            >
-                              {contact.contact_id}
-                            </p>
-                          </div>
-                        )}
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              color: theme.colors.text.secondary,
+                              marginBottom: "6px",
+                            }}
+                          >
+                            Contact ID
+                          </label>
+                          <p
+                            style={{
+                              fontSize: "14px",
+                              color: theme.colors.text.primary,
+                              fontWeight: "500",
+                              margin: 0,
+                            }}
+                          >
+                            {contact.contact_id || "N/A"}
+                          </p>
+                        </div>
 
                         {/* Phone Number */}
                         <div>
@@ -247,20 +251,20 @@ const ContactViewTab = ({ consignor }) => {
                         </div>
 
                         {/* Email */}
-                        {contact.email && (
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: theme.colors.text.secondary,
-                                marginBottom: "6px",
-                              }}
-                            >
-                              <Mail size={14} style={{ display: "inline", marginRight: "4px" }} />
-                              Email
-                            </label>
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              color: theme.colors.text.secondary,
+                              marginBottom: "6px",
+                            }}
+                          >
+                            <Mail size={14} style={{ display: "inline", marginRight: "4px" }} />
+                            Email
+                          </label>
+                          {contact.email ? (
                             <a
                               href={`mailto:${contact.email}`}
                               style={{
@@ -271,8 +275,18 @@ const ContactViewTab = ({ consignor }) => {
                             >
                               {contact.email}
                             </a>
-                          </div>
-                        )}
+                          ) : (
+                            <p
+                              style={{
+                                fontSize: "14px",
+                                color: theme.colors.text.primary,
+                                margin: 0,
+                              }}
+                            >
+                              N/A
+                            </p>
+                          )}
+                        </div>
 
                         {/* Role */}
                         <div>
@@ -300,47 +314,45 @@ const ContactViewTab = ({ consignor }) => {
                         </div>
 
                         {/* Team */}
-                        {contact.team && (
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: theme.colors.text.secondary,
-                                marginBottom: "6px",
-                              }}
-                            >
-                              <Users size={14} style={{ display: "inline", marginRight: "4px" }} />
-                              Team
-                            </label>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                color: theme.colors.text.primary,
-                                margin: 0,
-                              }}
-                            >
-                              {contact.team}
-                            </p>
-                          </div>
-                        )}
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              color: theme.colors.text.secondary,
+                              marginBottom: "6px",
+                            }}
+                          >
+                            <Users size={14} style={{ display: "inline", marginRight: "4px" }} />
+                            Team
+                          </label>
+                          <p
+                            style={{
+                              fontSize: "14px",
+                              color: theme.colors.text.primary,
+                              margin: 0,
+                            }}
+                          >
+                            {contact.team || "N/A"}
+                          </p>
+                        </div>
 
                         {/* LinkedIn */}
-                        {contact.linkedin_link && (
-                          <div style={{ gridColumn: "1 / -1" }}>
-                            <label
-                              style={{
-                                display: "block",
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: theme.colors.text.secondary,
-                                marginBottom: "6px",
-                              }}
-                            >
-                              <Linkedin size={14} style={{ display: "inline", marginRight: "4px" }} />
-                              LinkedIn Profile
-                            </label>
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              color: theme.colors.text.secondary,
+                              marginBottom: "6px",
+                            }}
+                          >
+                            <Linkedin size={14} style={{ display: "inline", marginRight: "4px" }} />
+                            LinkedIn Profile
+                          </label>
+                          {contact.linkedin_link ? (
                             <a
                               href={contact.linkedin_link}
                               target="_blank"
@@ -351,10 +363,20 @@ const ContactViewTab = ({ consignor }) => {
                                 textDecoration: "none",
                               }}
                             >
-                              {contact.linkedin_link}
+                              View Profile
                             </a>
-                          </div>
-                        )}
+                          ) : (
+                            <p
+                              style={{
+                                fontSize: "14px",
+                                color: theme.colors.text.primary,
+                                margin: 0,
+                              }}
+                            >
+                              N/A
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </motion.div>

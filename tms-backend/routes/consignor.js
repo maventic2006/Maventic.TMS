@@ -12,7 +12,10 @@ const {
   createConsignor,
   updateConsignor,
   deleteConsignor,
-  getMasterData
+  getMasterData,
+  downloadDocument,
+  downloadContactPhoto,
+  downloadGeneralDocument
 } = require('../controllers/consignorController');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -147,6 +150,38 @@ router.delete(
   authenticateToken,
   checkProductOwnerAccess,
   deleteConsignor
+);
+
+// ============================================================================
+// DOCUMENT DOWNLOAD ROUTES
+// ============================================================================
+
+// 7️⃣ Download consignor document
+// GET /api/consignors/:customerId/documents/:documentId/download
+router.get(
+  '/:customerId/documents/:documentId/download',
+  authenticateToken,
+  checkProductOwnerAccess,
+  downloadDocument
+);
+
+// 8️⃣ Download contact photo
+// GET /api/consignors/:customerId/contacts/:contactId/photo
+router.get(
+  '/:customerId/contacts/:contactId/photo',
+  authenticateToken,
+  checkProductOwnerAccess,
+  downloadContactPhoto
+);
+
+// 9️⃣ Download NDA or MSA document
+// GET /api/consignors/:customerId/general/:fileType/download
+// fileType: 'nda' | 'msa'
+router.get(
+  '/:customerId/general/:fileType/download',
+  authenticateToken,
+  checkProductOwnerAccess,
+  downloadGeneralDocument
 );
 
 // Error handling middleware for multer errors

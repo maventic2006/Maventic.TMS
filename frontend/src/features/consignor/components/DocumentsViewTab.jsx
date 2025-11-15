@@ -398,59 +398,86 @@ const DocumentsViewTab = ({ consignor }) => {
                         )}
 
                         {/* Action Buttons */}
-                        {document.file_url && (
-                          <div
+                        <div
+                          style={{
+                            marginTop: "16px",
+                            display: "flex",
+                            gap: "12px",
+                          }}
+                        >
+                          <button
                             style={{
-                              marginTop: "16px",
                               display: "flex",
-                              gap: "12px",
+                              alignItems: "center",
+                              padding: "8px 16px",
+                              backgroundColor: theme.colors.button.primary.background,
+                              color: theme.colors.button.primary.text,
+                              border: "none",
+                              borderRadius: "8px",
+                              fontSize: "14px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              transition: "all 0.2s",
+                            }}
+                            onClick={async () => {
+                              try {
+                                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                                const url = `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${document.document_unique_id}/download`;
+                                window.open(url, "_blank");
+                              } catch (error) {
+                                console.error("Error viewing document:", error);
+                                alert("Failed to view document");
+                              }
                             }}
                           >
-                            <button
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                padding: "8px 16px",
-                                backgroundColor: theme.colors.button.primary.background,
-                                color: theme.colors.button.primary.text,
-                                border: "none",
-                                borderRadius: "8px",
-                                fontSize: "14px",
-                                fontWeight: "500",
-                                cursor: "pointer",
-                                transition: "all 0.2s",
-                              }}
-                              onClick={() => window.open(document.file_url, "_blank")}
-                            >
-                              <Eye size={16} style={{ marginRight: "6px" }} />
-                              View Document
-                            </button>
-                            <button
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                padding: "8px 16px",
-                                backgroundColor: "transparent",
-                                color: theme.colors.button.primary.background,
-                                border: `1px solid ${theme.colors.button.primary.background}`,
-                                borderRadius: "8px",
-                                fontSize: "14px",
-                                fontWeight: "500",
-                                cursor: "pointer",
-                                transition: "all 0.2s",
-                              }}
-                              onClick={() => {
-                                const link = document.createElement("a");
-                                link.href = document.file_url;
-                                link.download = document.document_number || "document";
-                                link.click();
-                              }}
-                            >
-                              <Download size={16} style={{ marginRight: "6px" }} />
-                              Download
-                            </button>
-                          </div>
-                        )}
+                            <Eye size={16} style={{ marginRight: "6px" }} />
+                            View Document
+                          </button>
+                          <button
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              padding: "8px 16px",
+                              backgroundColor: "transparent",
+                              color: theme.colors.button.primary.background,
+                              border: `1px solid ${theme.colors.button.primary.background}`,
+                              borderRadius: "8px",
+                              fontSize: "14px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              transition: "all 0.2s",
+                            }}
+                            onClick={async () => {
+                              try {
+                                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                                const response = await fetch(
+                                  `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${document.document_unique_id}/download`,
+                                  { credentials: 'include' }
+                                );
+
+                                if (!response.ok) {
+                                  throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+
+                                const blob = await response.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = document.document_number || 'document';
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                window.URL.revokeObjectURL(url);
+                              } catch (error) {
+                                console.error("Error downloading document:", error);
+                                alert("Failed to download document");
+                              }
+                            }}
+                          >
+                            <Download size={16} style={{ marginRight: "6px" }} />
+                            Download
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
                   )}
