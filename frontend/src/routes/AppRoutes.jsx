@@ -11,6 +11,9 @@ import Dashboard from "../features/dashboard/Dashboard";
 import IndentPage from "../features/indent/IndentPage";
 import TransporterDetailsPage from "../features/transporter/TransporterDetailsPage";
 import CreateTransporterPage from "../features/transporter/CreateTransporterPage";
+import ConsignorMaintenance from "../pages/ConsignorMaintenance";
+import ConsignorDetailsPage from "../features/consignor/pages/ConsignorDetailsPage";
+import ConsignorCreatePage from "../features/consignor/pages/ConsignorCreatePage";
 
 // Protected Route component
 import ProtectedRoute from "./ProtectedRoute";
@@ -79,6 +82,34 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roles={["product_owner"]}>
             <WarehouseMaintenance />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Consignor Management Routes */}
+      <Route
+        path="/consignor"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConsignorMaintenance />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/consignor/create"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConsignorCreatePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/consignor/details/:id"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConsignorDetailsPage />
           </ProtectedRoute>
         }
       />

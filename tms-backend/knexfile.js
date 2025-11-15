@@ -10,6 +10,16 @@ module.exports = {
       password: process.env.DB_PASSWORD || "",
       database: process.env.DB_NAME || "tms_dev",
     },
+    pool: {
+      min: 2,
+      max: 10,
+      acquireTimeoutMillis: 30000,
+      createTimeoutMillis: 30000,
+      destroyTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+      reapIntervalMillis: 1000,
+      createRetryIntervalMillis: 100,
+    },
     migrations: {
       directory: "./migrations",
     },

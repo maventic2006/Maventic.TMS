@@ -1,0 +1,713 @@
+/**
+ * Consignor Service
+ * API service layer for consignor management
+ * Integrated with backend API
+ */
+
+import api from "../utils/api";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+/**
+ * Get all consignors with pagination and filters
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @param {object} filters - Filter object
+ * @returns {Promise} - Consignors data
+ */
+export const getConsignors = async (page = 1, limit = 25, filters = {}) => {
+  try {
+    const params = {
+      page,
+      limit,
+      ...filters
+    };
+
+    const response = await api.get(`/consignors`, { params });
+    
+    // Backend returns: { success: true, data: [...], meta: {...} }
+    if (response.data.success) {
+      return {
+        data: response.data.data,
+        ...response.data.meta
+      };
+    }
+    
+    throw new Error(response.data.error?.message || 'Failed to fetch consignors');
+  } catch (error) {
+    console.error('getConsignors error:', error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Get single consignor by ID
+ * @param {string} customerId - Customer ID
+ * @returns {Promise} - Consignor data
+ */
+export const getConsignorById = async (customerId) => {
+  try {
+    const response = await api.get(`/consignors/${customerId}`);
+    
+    // Backend returns: { success: true, data: { general: {...}, contacts: [...], organization: {...}, documents: [...] } }
+    if (response.data.success) {
+      return response.data.data;
+    }
+    
+    throw new Error(response.data.error?.message || 'Failed to fetch consignor');
+  } catch (error) {
+    console.error('getConsignorById error:', error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Create new consignor with file uploads
+ * @param {object} consignorData - Consignor data
+ * @param {object} files - Files to upload (optional)
+ * @returns {Promise} - Created consignor
+ */
+export const createConsignor = async (consignorData, files = {}) => {
+  try {
+    const formData = new FormData();
+    
+    // Add JSON payload
+    formData.append('payload', JSON.stringify(consignorData));
+    
+    // Add files if provided
+    Object.entries(files).forEach(([key, file]) => {
+      if (file) {
+        formData.append(key, file);
+      }
+    });
+
+    const response = await api.post(`/consignors`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    
+    // Backend returns: { success: true, data: {...} }
+    if (response.data.success) {
+      return response.data.data;
+    }
+    
+    throw new Error(response.data.error?.message || 'Failed to create consignor');
+  } catch (error) {
+    console.error('createConsignor error:', error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Update existing consignor
+ * @param {string} customerId - Customer ID
+ * @param {object} data - Updated data
+ * @param {object} files - Files to upload (optional)
+ * @returns {Promise} - Updated consignor
+ */
+export const updateConsignor = async (customerId, data, files = {}) => {
+  try {
+    const formData = new FormData();
+    
+    // Add JSON payload
+    formData.append('payload', JSON.stringify(data));
+    
+    // Add files if provided
+    Object.entries(files).forEach(([key, file]) => {
+      if (file) {
+        formData.append(key, file);
+      }
+    });
+
+    const response = await api.put(`/consignors/${customerId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    
+    // Backend returns: { success: true, data: {...} }
+    if (response.data.success) {
+      return response.data.data;
+    }
+    
+    throw new Error(response.data.error?.message || 'Failed to update consignor');
+  } catch (error) {
+    console.error('updateConsignor error:', error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Delete consignor (soft delete)
+ * @param {string} customerId - Customer ID
+ * @returns {Promise} - Deletion result
+ */
+export const deleteConsignor = async (customerId) => {
+  try {
+    const response = await api.delete(`/consignors/${customerId}`);
+    
+    // Backend returns: { success: true, data: {...} }
+    if (response.data.success) {
+      return response.data.data;
+    }
+    
+    throw new Error(response.data.error?.message || 'Failed to delete consignor');
+  } catch (error) {
+    console.error('deleteConsignor error:', error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Get master data for dropdowns
+ * @returns {Promise} - Master data (industries, currencies, document types, etc.)
+ */
+export const getMasterData = async () => {
+  try {
+    const response = await api.get(`/consignors/master-data`);
+    
+    // Backend returns: { success: true, data: { industries: [...], currencies: [...], documentTypes: [...] } }
+    if (response.data.success) {
+      const backendData = response.data.data;
+      
+      // Transform backend format to frontend format
+      return {
+        industryTypes: backendData.industries.map(item => ({
+          value: item.id,
+          label: item.name
+        })),
+        currencyTypes: backendData.currencies.map(item => ({
+          value: item.id,
+          label: `${item.code} - ${item.name}`,
+          symbol: item.symbol
+        })),
+        paymentTerms: [
+          { value: "NET15", label: "NET 15 Days" },
+          { value: "NET30", label: "NET 30 Days" },
+          { value: "NET45", label: "NET 45 Days" },
+          { value: "NET60", label: "NET 60 Days" },
+          { value: "NET90", label: "NET 90 Days" },
+          { value: "COD", label: "Cash on Delivery" },
+          { value: "ADVANCE", label: "Advance Payment" },
+          { value: "LC", label: "Letter of Credit" }
+        ],
+        documentTypes: backendData.documentTypes.map(item => ({
+          value: item.id,
+          label: item.name || item.id
+        })),
+        countries: [
+          { value: "IN", label: "India" },
+          { value: "US", label: "United States" },
+          { value: "GB", label: "United Kingdom" },
+          { value: "DE", label: "Germany" },
+          { value: "FR", label: "France" },
+          { value: "CN", label: "China" },
+          { value: "JP", label: "Japan" },
+          { value: "AU", label: "Australia" },
+          { value: "CA", label: "Canada" },
+          { value: "SG", label: "Singapore" }
+        ]
+      };
+    }
+    
+    throw new Error(response.data.error?.message || 'Failed to fetch master data');
+  } catch (error) {
+    console.error('getMasterData error:', error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Upload document for consignor
+ * @param {string} customerId - Customer ID
+ * @param {FormData} formData - Form data with file and metadata
+ * @param {function} onProgress - Progress callback
+ * @returns {Promise} - Upload result
+ */
+export const uploadDocument = async (customerId, formData, onProgress) => {
+  try {
+    const response = await api.post(
+      `/consignors/${customerId}/documents`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(percentCompleted);
+          }
+        }
+      }
+    );
+    
+    if (response.data.success) {
+      return response.data.data;
+    }
+    
+    throw new Error(response.data.error?.message || 'Failed to upload document');
+  } catch (error) {
+    console.error('uploadDocument error:', error);
+    throw error.response?.data || error;
+  }
+};
+
+export default {
+  getConsignors,
+  getConsignorById,
+  createConsignor,
+  updateConsignor,
+  deleteConsignor,
+  getMasterData,
+  uploadDocument
+};
+
+// Mock data for development
+const MOCK_CONSIGNORS = [
+  {
+    customer_id: "CONS001",
+    customer_name: "Acme Corporation",
+    search_term: "ACME",
+    industry_type: "Manufacturing",
+    currency_type: "USD",
+    payment_term: "NET30",
+    remark: "Premium client with excellent payment history",
+    upload_nda: "DOC001",
+    upload_msa: "DOC002",
+    website_url: "https://www.acmecorp.com",
+    name_on_po: "Acme Corp",
+    approved_by: "John Smith",
+    approved_date: "2025-01-15",
+    address_id: "ADDR001",
+    nda_expiry_date: "2026-01-15",
+    msa_expiry_date: "2026-06-30",
+    created_at: "2025-01-01T10:00:00Z",
+    created_by: "ADMIN",
+    updated_at: "2025-01-15T14:30:00Z",
+    updated_by: "ADMIN",
+    status: "Active",
+    contacts: [
+      {
+        contact_id: "CONT001",
+        customer_id: "CONS001",
+        contact_designation: "CEO",
+        contact_name: "Jane Doe",
+        contact_number: "9876543210",
+        contact_role: "Decision Maker",
+        contact_team: "Executive",
+        country_code: "+91",
+        email_id: "jane.doe@acmecorp.com",
+        linkedin_link: "https://linkedin.com/in/janedoe",
+      },
+    ],
+    organization: {
+      company_code: "ACME-MFG-001",
+      business_area: "Manufacturing Division, Export Operations",
+    },
+    documents: [
+      {
+        document_unique_id: "CDOC001",
+        document_id: "DOC001",
+        document_type_id: "DT001",
+        document_number: "NDA-2025-001",
+        valid_from: "2025-01-01",
+        valid_to: "2026-01-01",
+      },
+    ],
+  },
+  {
+    customer_id: "CONS002",
+    customer_name: "Global Logistics Ltd",
+    search_term: "GLOBAL",
+    industry_type: "Logistics",
+    currency_type: "EUR",
+    payment_term: "NET45",
+    remark: "Large volume shipper",
+    upload_nda: "DOC003",
+    upload_msa: "DOC004",
+    website_url: "https://www.globallogistics.com",
+    name_on_po: "Global Logistics",
+    approved_by: "Sarah Johnson",
+    approved_date: "2025-02-01",
+    address_id: "ADDR002",
+    nda_expiry_date: "2026-02-01",
+    msa_expiry_date: "2026-07-31",
+    created_at: "2025-01-10T09:00:00Z",
+    created_by: "MANAGER",
+    updated_at: "2025-02-01T11:00:00Z",
+    updated_by: "MANAGER",
+    status: "Active",
+    contacts: [],
+    organization: {
+      company_code: "GLB-LOG-002",
+      business_area: "International Shipping, Warehousing",
+    },
+    documents: [],
+  },
+  {
+    customer_id: "CONS003",
+    customer_name: "Tech Innovations Inc",
+    search_term: "TECH",
+    industry_type: "Technology",
+    currency_type: "USD",
+    payment_term: "NET60",
+    remark: "New client - pending full verification",
+    upload_nda: null,
+    upload_msa: null,
+    website_url: "https://www.techinnovations.com",
+    name_on_po: "Tech Innovations",
+    approved_by: null,
+    approved_date: null,
+    address_id: "ADDR003",
+    nda_expiry_date: null,
+    msa_expiry_date: null,
+    created_at: "2025-03-01T08:30:00Z",
+    created_by: "SALES",
+    updated_at: "2025-03-05T10:15:00Z",
+    updated_by: "SALES",
+    status: "Pending",
+    contacts: [],
+    organization: {
+      company_code: "TECH-INN-003",
+      business_area: "Software Development, IT Services",
+    },
+    documents: [],
+  },
+];
+
+const MOCK_MASTER_DATA = {
+  industryTypes: [
+    { value: "Manufacturing", label: "Manufacturing" },
+    { value: "Logistics", label: "Logistics" },
+    { value: "Technology", label: "Technology" },
+    { value: "Retail", label: "Retail" },
+    { value: "Healthcare", label: "Healthcare" },
+    { value: "Finance", label: "Finance" },
+    { value: "Construction", label: "Construction" },
+    { value: "Agriculture", label: "Agriculture" },
+  ],
+  currencyTypes: [
+    { value: "USD", label: "USD - US Dollar" },
+    { value: "EUR", label: "EUR - Euro" },
+    { value: "GBP", label: "GBP - British Pound" },
+    { value: "INR", label: "INR - Indian Rupee" },
+    { value: "JPY", label: "JPY - Japanese Yen" },
+    { value: "CNY", label: "CNY - Chinese Yuan" },
+  ],
+  paymentTerms: [
+    { value: "NET15", label: "NET 15 Days" },
+    { value: "NET30", label: "NET 30 Days" },
+    { value: "NET45", label: "NET 45 Days" },
+    { value: "NET60", label: "NET 60 Days" },
+    { value: "NET90", label: "NET 90 Days" },
+    { value: "COD", label: "Cash on Delivery" },
+    { value: "ADVANCE", label: "Advance Payment" },
+  ],
+  documentTypes: [
+    { value: "DT001", label: "NDA - Non-Disclosure Agreement" },
+    { value: "DT002", label: "MSA - Master Service Agreement" },
+    { value: "DT003", label: "GST Certificate" },
+    { value: "DT004", label: "PAN Card" },
+    { value: "DT005", label: "Business License" },
+    { value: "DT006", label: "Insurance Certificate" },
+  ],
+  countries: [
+    { value: "IN", label: "India" },
+    { value: "US", label: "United States" },
+    { value: "GB", label: "United Kingdom" },
+    { value: "DE", label: "Germany" },
+    { value: "FR", label: "France" },
+    { value: "CN", label: "China" },
+  ],
+};
+
+// Flag to toggle between mock and real API
+const USE_MOCK_DATA = false; // Backend is ready - using real API
+
+/**
+ * Get all consignors with pagination and filters
+ * @param {number} page - Page number
+ * @param {number} limit - Items per page
+ * @param {object} filters - Filter object
+ * @returns {Promise} - Consignors data
+ */
+export const getConsignors = async (page = 1, limit = 25, filters = {}) => {
+  if (USE_MOCK_DATA) {
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Apply filters
+    let filtered = [...MOCK_CONSIGNORS];
+
+    if (filters.customerId) {
+      filtered = filtered.filter((c) =>
+        c.customer_id.toLowerCase().includes(filters.customerId.toLowerCase())
+      );
+    }
+
+    if (filters.customerName) {
+      filtered = filtered.filter((c) =>
+        c.customer_name.toLowerCase().includes(filters.customerName.toLowerCase())
+      );
+    }
+
+    if (filters.industryType) {
+      filtered = filtered.filter((c) => c.industry_type === filters.industryType);
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter((c) => c.status === filters.status);
+    }
+
+    // Pagination
+    const total = filtered.length;
+    const pages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const data = filtered.slice(startIndex, endIndex);
+
+    return {
+      data,
+      page,
+      limit,
+      total,
+      pages,
+    };
+  }
+
+  // Real API call (when backend is ready)
+  const response = await api.get(`/consignors`, {
+    params: { page, limit, ...filters },
+  });
+  return response.data;
+};
+
+/**
+ * Get single consignor by ID
+ * @param {string} customerId - Customer ID
+ * @returns {Promise} - Consignor data
+ */
+export const getConsignorById = async (customerId) => {
+  if (USE_MOCK_DATA) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const consignor = MOCK_CONSIGNORS.find((c) => c.customer_id === customerId);
+    if (!consignor) {
+      throw new Error("Consignor not found");
+    }
+    
+    // Transform flat structure to nested structure expected by component
+    return {
+      consignorId: consignor.customer_id,
+      general: {
+        customer_name: consignor.customer_name,
+        search_term: consignor.search_term,
+        industry_type: consignor.industry_type,
+        currency_type: consignor.currency_type,
+        payment_term: consignor.payment_term,
+        remark: consignor.remark,
+        upload_nda: consignor.upload_nda,
+        upload_msa: consignor.upload_msa,
+        website_url: consignor.website_url,
+        name_on_po: consignor.name_on_po,
+        approved_by: consignor.approved_by,
+        approved_date: consignor.approved_date,
+        address_id: consignor.address_id,
+        nda_expiry_date: consignor.nda_expiry_date,
+        msa_expiry_date: consignor.msa_expiry_date,
+        created_at: consignor.created_at,
+        created_by: consignor.created_by,
+        updated_at: consignor.updated_at,
+        updated_by: consignor.updated_by,
+        status: consignor.status,
+      },
+      contacts: consignor.contacts || [],
+      organization: consignor.organization || {},
+      documents: consignor.documents || [],
+    };
+  }
+
+  const response = await api.get(`/consignors/${customerId}`);
+  return response.data;
+};
+
+/**
+ * Create new consignor
+ * @param {object} consignorData - Consignor data
+ * @returns {Promise} - Created consignor
+ */
+export const createConsignor = async (consignorData) => {
+  if (USE_MOCK_DATA) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    
+    // Generate new customer ID
+    const newId = `CONS${String(MOCK_CONSIGNORS.length + 1).padStart(3, "0")}`;
+    
+    const newConsignor = {
+      ...consignorData,
+      customer_id: newId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: "USER",
+      updated_by: "USER",
+    };
+    
+    MOCK_CONSIGNORS.unshift(newConsignor);
+    return newConsignor;
+  }
+
+  const response = await api.post(`/consignors`, consignorData);
+  return response.data;
+};
+
+/**
+ * Update existing consignor
+ * @param {string} customerId - Customer ID
+ * @param {object} data - Updated data
+ * @returns {Promise} - Updated consignor
+ */
+export const updateConsignor = async (customerId, data) => {
+  if (USE_MOCK_DATA) {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    
+    const index = MOCK_CONSIGNORS.findIndex((c) => c.customer_id === customerId);
+    if (index === -1) {
+      throw new Error("Consignor not found");
+    }
+    
+    MOCK_CONSIGNORS[index] = {
+      ...MOCK_CONSIGNORS[index],
+      ...data,
+      updated_at: new Date().toISOString(),
+      updated_by: "USER",
+    };
+    
+    return MOCK_CONSIGNORS[index];
+  }
+
+  const response = await api.put(`/consignors/${customerId}`, data);
+  return response.data;
+};
+
+/**
+ * Delete consignor
+ * @param {string} customerId - Customer ID
+ * @returns {Promise}
+ */
+export const deleteConsignor = async (customerId) => {
+  if (USE_MOCK_DATA) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    
+    const index = MOCK_CONSIGNORS.findIndex((c) => c.customer_id === customerId);
+    if (index === -1) {
+      throw new Error("Consignor not found");
+    }
+    
+    MOCK_CONSIGNORS.splice(index, 1);
+    return { success: true };
+  }
+
+  const response = await api.delete(`/consignors/${customerId}`);
+  return response.data;
+};
+
+/**
+ * Upload document for consignor
+ * @param {string} customerId - Customer ID
+ * @param {FormData} formData - Form data with file
+ * @param {function} onProgress - Progress callback
+ * @returns {Promise} - Uploaded document info
+ */
+export const uploadDocument = async (customerId, formData, onProgress) => {
+  if (USE_MOCK_DATA) {
+    // Simulate upload progress
+    for (let i = 0; i <= 100; i += 10) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (onProgress) onProgress(i);
+    }
+    
+    return {
+      document_unique_id: `CDOC${Date.now()}`,
+      document_id: `DOC${Date.now()}`,
+      customer_id: customerId,
+      document_type_id: "DT001",
+      document_number: `DOC-${Date.now()}`,
+      valid_from: new Date().toISOString().split("T")[0],
+      valid_to: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0],
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  const response = await api.post(
+    `/consignors/${customerId}/documents`,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          onProgress(progress);
+        }
+      },
+    }
+  );
+  return response.data;
+};
+
+/**
+ * Get master data for consignor forms
+ * @returns {Promise} - Master data object
+ */
+export const getMasterData = async () => {
+  if (USE_MOCK_DATA) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    return MOCK_MASTER_DATA;
+  }
+
+  const response = await api.get(`/consignors/master-data`);
+  return response.data;
+};
+
+/**
+ * Get documents for a consignor
+ * @param {string} customerId - Customer ID
+ * @returns {Promise} - Documents array
+ */
+export const getConsignorDocuments = async (customerId) => {
+  if (USE_MOCK_DATA) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const consignor = MOCK_CONSIGNORS.find((c) => c.customer_id === customerId);
+    return consignor?.documents || [];
+  }
+
+  const response = await api.get(`/consignors/${customerId}/documents`);
+  return response.data;
+};
+
+/**
+ * Delete document
+ * @param {string} customerId - Customer ID
+ * @param {string} documentId - Document ID
+ * @returns {Promise}
+ */
+export const deleteDocument = async (customerId, documentId) => {
+  if (USE_MOCK_DATA) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return { success: true };
+  }
+
+  const response = await api.delete(
+    `/consignors/${customerId}/documents/${documentId}`
+  );
+  return response.data;
+};
+
+// Export mock data for testing
+export { MOCK_CONSIGNORS, MOCK_MASTER_DATA, USE_MOCK_DATA };

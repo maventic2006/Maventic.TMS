@@ -5,6 +5,9 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const http = require("http");
 const socketIO = require("socket.io");
+const path = require("path");
+const { comprehensiveHealthCheck } = require("./utils/databaseHealthCheck");
+const knex = require("./config/database");
 require("dotenv").config();
 
 const app = express();
@@ -22,7 +25,9 @@ const PORT = process.env.PORT || 5000;
 app.set("io", io);
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" } // Allow images to be loaded from different origins
+}));
 app.use(
   cors({
     origin: "http://localhost:5173", // Frontend URL
@@ -34,6 +39,9 @@ app.use(morgan("combined"));
 // Increase payload size limit to handle file uploads (default is 100kb)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Import routes
 const warehouseRoutes = require("./routes/warehouse");
@@ -118,6 +126,38 @@ io.on("connection", (socket) => {
   });
 });
 
+// Start server with database health check
+const startServer = async () => {
+  try {
+    // Check database connection before starting
+    console.log('\n🚀 ===== STARTING TMS BACKEND SERVER =====\n');
+    
+    const healthCheck = await comprehensiveHealthCheck();
+    
+    if (!healthCheck.success) {
+      console.error('\n❌ Failed to connect to database. Server cannot start.');
+      console.error('   Please fix the database connection and try again.\n');
+      process.exit(1);
+    }
+    
+    // Start HTTP server
+    server.listen(PORT, () => {
+      console.log('✅ ========================================');
+      console.log(`✅ Server running on port ${PORT}`);
+      console.log(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`✅ Frontend URL: http://localhost:5173`);
+      console.log(`✅ Backend URL: http://localhost:${PORT}`);
+      console.log('✅ ========================================\n');
+    });
+  } catch (error) {
+    console.error('\n❌ Server startup error:', error.message);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
+
 // Error handling for server
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
@@ -148,13 +188,8 @@ server.on('error', (error) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 TMS Backend server running on port ${PORT}`);
-  console.log(`📡 Socket.IO server running`);
-});
-
 // Graceful shutdown handling
-const gracefulShutdown = (signal) => {
+const gracefulShutdown = async (signal) => {
   console.log('');
   console.log(`⚠️  ${signal} received. Starting graceful shutdown...`);
   
@@ -166,11 +201,15 @@ const gracefulShutdown = (signal) => {
     io.close(() => {
       console.log('✅ Socket.IO connections closed');
       
-      // Close database connections (if any)
-      // knex.destroy() - uncomment if using knex
-      
-      console.log('✅ Graceful shutdown complete');
-      process.exit(0);
+      // Close database connections
+      knex.destroy().then(() => {
+        console.log('✅ Database connections closed');
+        console.log('✅ Graceful shutdown complete');
+        process.exit(0);
+      }).catch(err => {
+        console.error('❌ Error closing database connections:', err);
+        process.exit(1);
+      });
     });
   });
   

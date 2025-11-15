@@ -328,6 +328,9 @@ const TMSLandingPage = () => {
       } else if (item.title === "Driver Maintenance") {
         console.log("Navigating to /drivers");
         navigate("/drivers");
+      } else if (item.title === "Consignor Maintenance") {
+        console.log("Navigating to /consignor");
+        navigate("/consignor");
       }
       // Add more navigation handlers for other menu items as needed
     } catch (error) {

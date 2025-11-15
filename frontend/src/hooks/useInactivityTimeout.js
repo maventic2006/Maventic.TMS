@@ -11,14 +11,17 @@ import { refreshToken as refreshTokenAction, logoutUser } from '../redux/slices/
  * - Auto-refreshes token every 10 minutes if user is active
  * - Logs out user after 15 minutes of inactivity
  * - Syncs across all browser tabs
+ * - ONLY RUNS WHEN USER IS AUTHENTICATED
  * 
  * @param {number} inactivityTimeout - Timeout in milliseconds (default: 15 minutes)
  * @param {number} warningTime - Warning time before logout in milliseconds (default: 1 minute)
+ * @param {boolean} isAuthenticated - Whether user is authenticated (REQUIRED)
  * @returns {Object} - { showWarning, secondsRemaining, resetTimer, extendSession }
  */
 export const useInactivityTimeout = (
   inactivityTimeout = 15 * 60 * 1000, // 15 minutes
-  warningTime = 60 * 1000 // 1 minute warning
+  warningTime = 60 * 1000, // 1 minute warning
+  isAuthenticated = false // MUST pass authentication status
 ) => {
   const dispatch = useDispatch();
   const [showWarning, setShowWarning] = useState(false);
@@ -170,9 +173,17 @@ export const useInactivityTimeout = (
   }, [resetTimer]);
 
   /**
-   * Setup activity event listeners
+   * Setup activity event listeners - ONLY IF AUTHENTICATED
    */
   useEffect(() => {
+    // ⚠️ CRITICAL: Only run inactivity tracking if user is authenticated
+    if (!isAuthenticated) {
+      console.log('🔒 User not authenticated, skipping inactivity timeout');
+      return;
+    }
+
+    console.log('✅ Inactivity timeout initialized for authenticated user');
+    
     const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
     
     events.forEach((event) => {
@@ -187,6 +198,7 @@ export const useInactivityTimeout = (
 
     return () => {
       // Cleanup
+      console.log('🧹 Cleaning up inactivity timeout');
       events.forEach((event) => {
         window.removeEventListener(event, handleActivity);
       });
@@ -196,7 +208,7 @@ export const useInactivityTimeout = (
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       if (tokenRefreshIntervalRef.current) clearInterval(tokenRefreshIntervalRef.current);
     };
-  }, [handleActivity, resetTimer, setupTokenRefresh]);
+  }, [isAuthenticated, handleActivity, resetTimer, setupTokenRefresh]);
 
   return {
     showWarning,

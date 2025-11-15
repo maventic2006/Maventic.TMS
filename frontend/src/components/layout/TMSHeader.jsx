@@ -300,6 +300,8 @@ const TMSHeader = ({ theme }) => {
       navigate("/vehicles");
     } else if (item.title === "Driver Maintenance") {
       navigate("/drivers");
+    } else if (item.title === "Consignor Maintenance") {
+      navigate("/consignor");
     } else if (item.title === "Consignor WH Maintenance") {
       navigate("/warehouse");
     }

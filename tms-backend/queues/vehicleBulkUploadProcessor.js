@@ -476,6 +476,16 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
         if (ownershipDetails) {
           const ownershipId = `${vehicleId}OWN001`;
           
+          // Parse owner_sr_number as integer (database expects INTEGER type)
+          let ownerSrNumber = null;
+          if (ownershipDetails.Owner_Sr_Number) {
+            // Extract numeric value from string like "OWN00001" or just "1"
+            const numericMatch = String(ownershipDetails.Owner_Sr_Number).match(/\d+/);
+            if (numericMatch) {
+              ownerSrNumber = parseInt(numericMatch[0], 10);
+            }
+          }
+          
           ownershipRecords.push({
             vehicle_ownership_id: ownershipId,
             vehicle_id_code: vehicleId,
@@ -486,7 +496,7 @@ async function createVehiclesChunk(vehiclesChunk, batchId, userId) {
             registration_date: ownershipDetails.Registration_Date || null,
             registration_upto: ownershipDetails.Registration_Upto || null,
             purchase_date: ownershipDetails.Purchase_Date || null,
-            owner_sr_number: ownershipDetails.Owner_Sr_Number || null,
+            owner_sr_number: ownerSrNumber,
             state_code: ownershipDetails.State_Code || null,
             rto_code: ownershipDetails.RTO_Code || null,
             sale_amount: ownershipDetails.Sale_Amount || null,
