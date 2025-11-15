@@ -1,5 +1,5 @@
 ﻿import React from "react";
-import { Label } from "../../../components/ui/input";
+import { Label } from "../../../components/ui/Input";
 import ThemedSwitch from "../../../components/ui/themed/ThemedSwitch";
 
 const FacilitiesTab = ({ formData, setFormData, errors }) => {
