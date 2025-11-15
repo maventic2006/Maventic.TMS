@@ -41,6 +41,7 @@ import GeneralDetailsEditTab from "../components/warehouse/tabs/GeneralDetailsEd
 import FacilitiesEditTab from "../components/warehouse/tabs/FacilitiesEditTab";
 import AddressEditTab from "../components/warehouse/tabs/AddressEditTab";
 import DocumentsEditTab from "../components/warehouse/tabs/DocumentsEditTab";
+import GeofencingTab from "@/features/warehouse/components/GeofencingTab";
 
 const WarehouseDetails = () => {
   const { id } = useParams();
@@ -78,20 +79,13 @@ const WarehouseDetails = () => {
     },
     {
       id: 1,
-      name: "Facilities",
-      icon: Settings,
-      viewComponent: FacilitiesViewTab,
-      editComponent: FacilitiesEditTab,
-    },
-    {
-      id: 2,
       name: "Address",
       icon: MapPin,
       viewComponent: AddressViewTab,
       editComponent: AddressEditTab,
     },
     {
-      id: 3,
+      id: 2,
       name: "Documents",
       icon: FileText,
       viewComponent: DocumentsViewTab,

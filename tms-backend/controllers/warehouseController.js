@@ -5,6 +5,54 @@ const {
   validateWarehouseUpdate,
 } = require("../validation/warehouseValidation");
 
+// Helper: Generate unique warehouse ID (WH001, WH002, etc.)
+const generateWarehouseId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("warehouse_basic_information")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `WH${count.toString().padStart(3, "0")}`;
+
+    const existing = await trx("warehouse_basic_information")
+      .where("warehouse_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique warehouse ID after 100 attempts");
+};
+
+// Helper: Generate document unique ID
+const generateDocumentUniqueId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("warehouse_documents").count("* as count").first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `WDOC${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("warehouse_documents")
+      .where("document_unique_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique document ID after 100 attempts");
+};
+
 // @desc    Get warehouse list with filters and pagination
 // @route   GET /api/warehouse
 // @access  Private (Consignor, Admin, Super Admin)
@@ -214,30 +262,296 @@ const getWarehouseById = async (req, res) => {
 };
 
 // @desc    Create new warehouse
-// @route   POST /api/warehouse
+// @route   POST /api/warehouse or POST /api/warehouse/create
 // @access  Private (Consignor, Admin, Super Admin)
 const createWarehouse = async (req, res) => {
+  let trx;
   try {
     console.log("📦 Creating new warehouse");
-    console.log("Request body:", req.body);
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    console.log("User:", req.user);
 
-    // Validate request body
-    const validation = validateWarehouseCreate(req.body);
-    if (!validation.isValid) {
+    const { generalDetails, facilities, address, documents, subLocations } =
+      req.body;
+
+    // ========================================
+    // PHASE 1: VALIDATION
+    // ========================================
+
+    // Validate general details
+    if (
+      !generalDetails?.warehouseName ||
+      generalDetails.warehouseName.trim().length < 2 ||
+      generalDetails.warehouseName.length > 30
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed",
-        errors: validation.errors,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Warehouse name must be 2-30 characters",
+          field: "warehouseName",
+        },
       });
     }
 
-    // TODO: Implement warehouse creation logic
-    // For now, return a placeholder response
-    res.status(501).json({
-      success: false,
-      message: "Warehouse creation not yet implemented",
+    if (!generalDetails.warehouseType) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Warehouse type is required",
+          field: "warehouseType",
+        },
+      });
+    }
+
+    if (!generalDetails.materialType) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Material type is required",
+          field: "materialType",
+        },
+      });
+    }
+
+    if (
+      generalDetails.vehicleCapacity < 0 ||
+      !Number.isInteger(generalDetails.vehicleCapacity)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Vehicle capacity must be a non-negative integer",
+          field: "vehicleCapacity",
+        },
+      });
+    }
+
+    if (generalDetails.speedLimit < 1 || generalDetails.speedLimit > 200) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Speed limit must be between 1-200 KM/H",
+          field: "speedLimit",
+        },
+      });
+    }
+
+    // Validate address
+    if (!address) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Address information is required",
+          field: "address",
+        },
+      });
+    }
+
+    if (!address.country || !address.state || !address.city) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Country, state, and city are required",
+          field: "address",
+        },
+      });
+    }
+
+    if (!address.vatNumber || !/^[A-Z0-9]{8,20}$/.test(address.vatNumber)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "VAT number must be 8-20 alphanumeric characters",
+          field: "vatNumber",
+        },
+      });
+    }
+
+    if (!address.addressType) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Address type is required",
+          field: "addressType",
+        },
+      });
+    }
+
+    // Get consignor ID from logged-in user
+    const consignorId = req.user.consignor_id || "DEFAULT_CONSIGNOR";
+    const userId = req.user.user_id || "SYSTEM";
+
+    console.log("✅ Validation passed, starting database transaction");
+
+    // ========================================
+    // PHASE 2: DATABASE OPERATIONS
+    // ========================================
+
+    trx = await knex.transaction();
+
+    // Generate unique warehouse ID
+    const warehouseId = await generateWarehouseId(trx);
+    console.log("✅ Generated warehouse ID:", warehouseId);
+
+    // Insert warehouse basic information
+    await trx("warehouse_basic_information").insert({
+      warehouse_id: warehouseId,
+      consignor_id: consignorId,
+      warehouse_type: generalDetails.warehouseType,
+      material_type_id: generalDetails.materialType,
+      warehouse_name1: generalDetails.warehouseName.trim(),
+      warehouse_name2: generalDetails.warehouseName2?.trim() || null,
+      language: generalDetails.language || "EN",
+      vehicle_capacity: generalDetails.vehicleCapacity,
+      virtual_yard_in: generalDetails.virtualYardIn || false,
+      radius_virtual_yard_in: generalDetails.radiusVirtualYardIn || 0,
+      speed_limit: generalDetails.speedLimit || 20,
+      weigh_bridge_availability: facilities?.weighBridge || false,
+      gatepass_system_available: facilities?.gatepassSystem || false,
+      fuel_availability: facilities?.fuelAvailability || false,
+      staging_area: facilities?.stagingArea || false,
+      driver_waiting_area: facilities?.driverWaitingArea || false,
+      gate_in_checklist_auth: facilities?.gateInChecklistAuth || false,
+      gate_out_checklist_auth: facilities?.gateOutChecklistAuth || false,
+      status: "ACTIVE",
+      created_by: userId,
+      created_at: knex.fn.now(),
+    });
+
+    console.log("✅ Warehouse basic information inserted");
+
+    // Insert address
+    const addressId = `ADDR${Date.now().toString().slice(-6)}`;
+    await trx("tms_address").insert({
+      address_id: addressId,
+      user_reference_id: warehouseId,
+      user_type: "WH",
+      address_type: address.addressType,
+      country: address.country,
+      state: address.state,
+      city: address.city,
+      district: address.district || null,
+      street1: address.street1,
+      street2: address.street2 || null,
+      postal_code: address.postalCode || null,
+      vat_number: address.vatNumber,
+      tin_pan: address.tinPan || null,
+      tan: address.tan || null,
+      is_primary: address.isPrimary !== false,
+      status: "ACTIVE",
+      created_by: userId,
+      created_at: knex.fn.now(),
+    });
+
+    console.log("✅ Address inserted");
+
+    // Insert documents if provided
+    if (documents && documents.length > 0) {
+      for (const doc of documents) {
+        if (doc.documentType && doc.documentNumber) {
+          const documentId = await generateDocumentUniqueId(trx);
+          await trx("warehouse_documents").insert({
+            document_unique_id: documentId,
+            warehouse_id: warehouseId,
+            document_type: doc.documentType,
+            document_number: doc.documentNumber,
+            valid_from: doc.validFrom || null,
+            valid_to: doc.validTo || null,
+            file_name: doc.fileName || null,
+            file_type: doc.fileType || null,
+            file_data: doc.fileData || null,
+            status: doc.status !== false ? "ACTIVE" : "INACTIVE",
+            created_by: userId,
+            created_at: knex.fn.now(),
+          });
+        }
+      }
+      console.log(`✅ ${documents.length} documents inserted`);
+    }
+
+    // Insert sub-locations (geofencing) if provided
+    if (subLocations && subLocations.length > 0) {
+      for (let i = 0; i < subLocations.length; i++) {
+        const subLoc = subLocations[i];
+        if (subLoc.subLocationType && subLoc.coordinates?.length > 0) {
+          const subLocationHdrId = await generateSubLocationHeaderId(trx);
+
+          // Insert header
+          await trx("warehouse_sub_location_header").insert({
+            sub_location_hdr_id: subLocationHdrId,
+            warehouse_id: warehouseId,
+            consignor_id: consignorId,
+            sub_location_id: subLoc.subLocationType,
+            warehouse_sub_location_description: subLoc.description || null,
+            status: "ACTIVE",
+            created_by: userId,
+            created_at: knex.fn.now(),
+          });
+
+          // Insert coordinates
+          for (let j = 0; j < subLoc.coordinates.length; j++) {
+            const coord = subLoc.coordinates[j];
+            await trx("warehouse_sub_location_item").insert({
+              geo_fence_item_id: `${subLocationHdrId}_${j + 1}`,
+              sub_location_hdr_id: subLocationHdrId,
+              warehouse_id: warehouseId,
+              latitude: coord.latitude,
+              longitude: coord.longitude,
+              sequence: j + 1,
+              status: "ACTIVE",
+              created_by: userId,
+              created_at: knex.fn.now(),
+            });
+          }
+        }
+      }
+      console.log(
+        `✅ ${subLocations.length} sub-locations with geofencing inserted`
+      );
+    }
+
+    // Commit transaction
+    await trx.commit();
+    console.log("✅ Transaction committed successfully");
+
+    // Fetch the created warehouse with all related data
+    const createdWarehouse = await knex("warehouse_basic_information as w")
+      .leftJoin("tms_address as addr", function () {
+        this.on("w.warehouse_id", "=", "addr.user_reference_id").andOn(
+          "addr.user_type",
+          "=",
+          knex.raw("'WH'")
+        );
+      })
+      .select(
+        "w.*",
+        "addr.country",
+        "addr.state",
+        "addr.city",
+        "addr.street1",
+        "addr.postal_code"
+      )
+      .where("w.warehouse_id", warehouseId)
+      .first();
+
+    res.status(201).json({
+      success: true,
+      message: "Warehouse created successfully",
+      warehouse: createdWarehouse,
     });
   } catch (error) {
+    // Rollback transaction on error
+    if (trx) await trx.rollback();
+
     console.error("❌ Error creating warehouse:", error);
     res.status(500).json({
       success: false,
@@ -245,6 +559,33 @@ const createWarehouse = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+// Helper: Generate sub-location header ID
+const generateSubLocationHeaderId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("warehouse_sub_location_header")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `WSLH${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("warehouse_sub_location_header")
+      .where("sub_location_hdr_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique sub-location header ID after 100 attempts"
+  );
 };
 
 // @desc    Update warehouse

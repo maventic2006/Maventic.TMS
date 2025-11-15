@@ -31,4 +31,7 @@ router.get("/:id", authorizeRoles(allowedRoles), getWarehouseById);
 // PUT /api/warehouse/:id - Update warehouse
 router.put("/:id", authorizeRoles(allowedRoles), updateWarehouse);
 
+// POST /api/warehouse/create - Alternative create endpoint (for explicit clarity)
+router.post("/create", authorizeRoles(allowedRoles), createWarehouse);
+
 module.exports = router;

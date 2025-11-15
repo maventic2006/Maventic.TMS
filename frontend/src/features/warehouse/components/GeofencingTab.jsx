@@ -1,251 +1,279 @@
-import React from "react";
-import { Label, Input } from "../../../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../../components/ui/select";
-import { Button } from "../../../components/ui/button";
-import { Plus, Trash2, MapPin } from "lucide-react";
+import React, { useState } from "react";
+import { Plus, Trash2, MapPin, CheckCircle } from "lucide-react";
 
 const GeofencingTab = ({ formData, setFormData, errors, masterData }) => {
-  const addSubLocation = () => {
+  const [coordinates, setCoordinates] = useState([]);
+  const [isPolygonComplete, setIsPolygonComplete] = useState(false);
+
+  const addCoordinate = () => {
+    const newCoord = {
+      sequence: coordinates.length + 1,
+      latitude: "",
+      longitude: "",
+    };
+    setCoordinates([...coordinates, newCoord]);
+    setIsPolygonComplete(false);
+  };
+
+  const removeCoordinate = (index) => {
+    const updated = coordinates.filter((_, i) => i !== index);
+    // Re-sequence
+    const resequenced = updated.map((coord, i) => ({
+      ...coord,
+      sequence: i + 1,
+    }));
+    setCoordinates(resequenced);
+    setIsPolygonComplete(false);
+  };
+
+  const handleCoordinateChange = (index, field, value) => {
+    const updated = coordinates.map((coord, i) =>
+      i === index ? { ...coord, [field]: value } : coord
+    );
+    setCoordinates(updated);
+  };
+
+  const handleCompleteGeofencing = () => {
+    if (coordinates.length < 3) {
+      alert("A polygon requires at least 3 coordinate points.");
+      return;
+    }
+
+    // Validate that all coordinates have lat/long
+    const invalid = coordinates.some(
+      (coord) => !coord.latitude || !coord.longitude
+    );
+    if (invalid) {
+      alert("Please fill in all latitude and longitude values.");
+      return;
+    }
+
+    // Update formData with completed coordinates
     setFormData((prev) => ({
       ...prev,
       subLocations: [
-        ...prev.subLocations,
         {
-          subLocationType: "",
-          description: "",
-          coordinates: [
-            { latitude: "", longitude: "", sequence: 1 },
-            { latitude: "", longitude: "", sequence: 2 },
-            { latitude: "", longitude: "", sequence: 3 },
-          ],
+          subLocationType: "GEOFENCE",
+          description: "Warehouse Geofencing Area",
+          coordinates: coordinates,
         },
       ],
     }));
-  };
-  const removeSubLocation = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      subLocations: prev.subLocations.filter((_, i) => i !== index),
-    }));
-  };
-  const handleSubLocationChange = (index, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      subLocations: prev.subLocations.map((loc, i) =>
-        i === index ? { ...loc, [field]: value } : loc
-      ),
-    }));
-  };
-  const addCoordinate = (subLocationIndex) => {
-    setFormData((prev) => ({
-      ...prev,
-      subLocations: prev.subLocations.map((loc, i) =>
-        i === subLocationIndex
-          ? {
-              ...loc,
-              coordinates: [
-                ...loc.coordinates,
-                {
-                  latitude: "",
-                  longitude: "",
-                  sequence: loc.coordinates.length + 1,
-                },
-              ],
-            }
-          : loc
-      ),
-    }));
-  };
-  const removeCoordinate = (subLocationIndex, coordIndex) => {
-    setFormData((prev) => ({
-      ...prev,
-      subLocations: prev.subLocations.map((loc, i) =>
-        i === subLocationIndex
-          ? {
-              ...loc,
-              coordinates: loc.coordinates.filter((_, ci) => ci !== coordIndex),
-            }
-          : loc
-      ),
-    }));
-  };
-  const handleCoordinateChange = (
-    subLocationIndex,
-    coordIndex,
-    field,
-    value
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      subLocations: prev.subLocations.map((loc, i) =>
-        i === subLocationIndex
-          ? {
-              ...loc,
-              coordinates: loc.coordinates.map((coord, ci) =>
-                ci === coordIndex ? { ...coord, [field]: value } : coord
-              ),
-            }
-          : loc
-      ),
-    }));
+
+    setIsPolygonComplete(true);
   };
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
+    <div className="bg-white rounded-xl p-4">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-[#0D1A33]">
-            Geofencing / Sub-Locations
+          <h3 className="text-sm font-semibold text-[#0D1A33]">
+            Geofencing Configuration
           </h3>
-          <p className="text-sm text-gray-600">
-            Define warehouse sub-locations with GPS coordinates (optional)
+          <p className="text-xs text-gray-500">
+            Define warehouse boundaries using GPS coordinates (min 3 points for
+            polygon)
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={addSubLocation}
-          className="bg-[#10B981] hover:bg-[#059669] text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Sub-Location
-        </Button>
+        {isPolygonComplete && (
+          <div className="flex items-center gap-2 text-green-600">
+            <CheckCircle className="w-5 h-5" />
+            <span className="text-sm font-medium">Polygon Complete</span>
+          </div>
+        )}
       </div>
-      {formData.subLocations.length === 0 && (
-        <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <MapPin className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-          <p className="text-gray-600">No sub-locations added yet.</p>
-        </div>
-      )}
-      {formData.subLocations.map((subLocation, subIndex) => (
-        <div
-          key={subIndex}
-          className="p-6 bg-gray-50 rounded-lg border space-y-4"
-        >
-          <div className="flex justify-between items-center">
-            <h4 className="font-semibold">Sub-Location {subIndex + 1}</h4>
-            <Button
+
+      {/* Split Screen Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[600px]">
+        {/* LEFT SIDE: Coordinate Table */}
+        <div className="flex flex-col border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-[#0D1A33]">
+              Coordinate Points
+            </h4>
+            <button
               type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => removeSubLocation(subIndex)}
+              onClick={addCoordinate}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[#10B981] hover:bg-[#059669] text-white rounded transition-colors"
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Remove
-            </Button>
+              <Plus className="w-3 h-3" />
+              Add Point
+            </button>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Sub-Location Type</Label>
-              <Select
-                value={subLocation.subLocationType}
-                onValueChange={(value) =>
-                  handleSubLocationChange(subIndex, "subLocationType", value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {masterData?.subLocationTypes?.map((type) => (
-                    <SelectItem
-                      key={type.sub_location_id}
-                      value={type.sub_location_id}
-                    >
-                      {type.warehouse_sub_location_description}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input
-                value={subLocation.description}
-                onChange={(e) =>
-                  handleSubLocationChange(
-                    subIndex,
-                    "description",
-                    e.target.value
-                  )
-                }
-                placeholder="Enter description"
-              />
-            </div>
-          </div>
-          <div className="space-y-4 mt-4">
-            <div className="flex justify-between">
-              <Label>GPS Coordinates (min 3)</Label>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => addCoordinate(subIndex)}
-              >
-                <Plus className="w-3 h-3 mr-1" />
-                Add Point
-              </Button>
-            </div>
-            {subLocation.coordinates.map((coord, coordIndex) => (
-              <div
-                key={coordIndex}
-                className="grid grid-cols-3 gap-4 p-4 bg-white rounded border"
-              >
-                <div className="space-y-1">
-                  <Label className="text-xs">Latitude</Label>
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    value={coord.latitude}
-                    onChange={(e) =>
-                      handleCoordinateChange(
-                        subIndex,
-                        coordIndex,
-                        "latitude",
-                        e.target.value
-                      )
-                    }
-                    placeholder="e.g., 19.076090"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Longitude</Label>
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    value={coord.longitude}
-                    onChange={(e) =>
-                      handleCoordinateChange(
-                        subIndex,
-                        coordIndex,
-                        "longitude",
-                        e.target.value
-                      )
-                    }
-                    placeholder="e.g., 72.877426"
-                  />
-                </div>
-                <div className="flex items-end">
-                  {subLocation.coordinates.length > 3 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeCoordinate(subIndex, coordIndex)}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  )}
-                </div>
+
+          <div className="flex-1 overflow-auto">
+            {coordinates.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+                <MapPin className="w-12 h-12 text-gray-300 mb-3" />
+                <p className="text-sm text-gray-500 mb-2">
+                  No coordinates added yet
+                </p>
+                <p className="text-xs text-gray-400">
+                  Click "Add Point" to manually add GPS coordinates
+                </p>
               </div>
-            ))}
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[#0D1A33] uppercase tracking-wider border-b">
+                      Seq
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[#0D1A33] uppercase tracking-wider border-b">
+                      Latitude <span className="text-red-500">*</span>
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[#0D1A33] uppercase tracking-wider border-b">
+                      Longitude <span className="text-red-500">*</span>
+                    </th>
+                    <th className="px-3 py-2 text-center text-xs font-semibold text-[#0D1A33] uppercase tracking-wider border-b">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {coordinates.map((coord, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-sm text-gray-700">
+                        {coord.sequence}
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          step="0.000001"
+                          value={coord.latitude}
+                          onChange={(e) =>
+                            handleCoordinateChange(
+                              index,
+                              "latitude",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g., 19.076090"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          step="0.000001"
+                          value={coord.longitude}
+                          onChange={(e) =>
+                            handleCoordinateChange(
+                              index,
+                              "longitude",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g., 72.877426"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeCoordinate(index)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-white bg-red-500 hover:bg-red-600 rounded transition-colors"
+                          title="Remove coordinate"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {coordinates.length > 0 && (
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={handleCompleteGeofencing}
+                disabled={coordinates.length < 3}
+                className={`w-full px-4 py-2 text-sm font-medium rounded transition-colors ${
+                  coordinates.length >= 3
+                    ? "bg-[#3B82F6] hover:bg-[#2563EB] text-white"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                {isPolygonComplete
+                  ? "Polygon Completed ✓"
+                  : `Complete Geofencing (${coordinates.length}/3 min)`}
+              </button>
+              {coordinates.length < 3 && (
+                <p className="text-xs text-amber-600 mt-2 text-center">
+                  Add at least {3 - coordinates.length} more point(s) to form a
+                  polygon
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT SIDE: Map Placeholder */}
+        <div className="flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+            <h4 className="text-sm font-semibold text-[#0D1A33]">Map View</h4>
+          </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-full max-w-md space-y-4">
+              <div className="w-20 h-20 mx-auto bg-gray-200 rounded-full flex items-center justify-center">
+                <MapPin className="w-10 h-10 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-700">
+                Google Maps Integration Pending
+              </h3>
+              <div className="space-y-2 text-sm text-gray-600">
+                <p>
+                  <strong>Status:</strong> Google Maps API key required
+                </p>
+                <p className="text-xs">
+                  To enable interactive map features with click-to-add points
+                  and polygon drawing:
+                </p>
+                <ul className="text-xs text-left list-disc list-inside space-y-1 bg-white p-4 rounded border border-gray-200">
+                  <li>Obtain Google Maps API key</li>
+                  <li>Install @react-google-maps/api package</li>
+                  <li>Add VITE_GOOGLE_MAPS_API_KEY to .env file</li>
+                  <li>Enable Maps JavaScript API in Google Cloud Console</li>
+                </ul>
+              </div>
+              <div className="pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  <strong>Current Mode:</strong> Manual coordinate entry
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Use the table on the left to manually input GPS coordinates
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      ))}
+      </div>
+
+      {/* Instructions */}
+      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <h5 className="text-sm font-semibold text-blue-900 mb-2">
+          📍 How to use Geofencing:
+        </h5>
+        <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
+          <li>Click "Add Point" to manually add GPS coordinate points</li>
+          <li>
+            Enter Latitude and Longitude values for each point (use Google Maps
+            to find coordinates)
+          </li>
+          <li>A minimum of 3 points is required to form a valid polygon</li>
+          <li>
+            Click "Complete Geofencing" when you've added all boundary points
+          </li>
+          <li>
+            The coordinates will define the virtual fence for warehouse yard-in
+            detection
+          </li>
+        </ul>
+      </div>
     </div>
   );
 };

@@ -21,7 +21,8 @@ frontend/
 │   │   ├── forms/              # Reusable form elements
 │   │   ├── charts/             # Graphs & analytics components
 │   │   ├── transporter/        # Transporter-specific list components
-│   │   └── driver/             # Driver-specific list components
+│   │   ├── driver/             # Driver-specific list components
+│   │   └── warehouse/          # Warehouse-specific list/details tab components
 │   ├── features/               # Feature-based modules (one per domain)
 │   │   ├── auth/               # Login, JWT management, role-based access
 │   │   ├── dashboard/          # KPI Cards, Graphs, Analytics
@@ -52,6 +53,16 @@ frontend/
 │   │   │   │   ├── DriverCreatePage.jsx
 │   │   │   │   └── DriverDetailsPage.jsx
 │   │   │   └── validation.js   # Zod validation schemas
+│   │   ├── warehouse/          # Warehouse CRUD operations
+│   │   │   ├── components/     # Tab components (Edit & View modes)
+│   │   │   │   ├── GeneralDetailsTab.jsx
+│   │   │   │   ├── FacilitiesTab.jsx
+│   │   │   │   ├── AddressTab.jsx
+│   │   │   │   ├── DocumentsTab.jsx
+│   │   │   │   └── GeofencingTab.jsx
+│   │   │   ├── pages/
+│   │   │   │   └── WarehouseCreatePage.jsx
+│   │   │   └── validation.js   # Zod validation schemas
 │   │   ├── indent/             # Indent management
 │   │   ├── rfq/                # Request for quotation
 │   │   ├── contract/           # Contract management
@@ -61,7 +72,9 @@ frontend/
 │   ├── pages/                  # Top-level pages (not feature-specific)
 │   │   ├── TMSLandingPage.jsx
 │   │   ├── TransporterMaintenance.jsx  # List/table view
-│   │   └── DriverMaintenance.jsx       # List/table view
+│   │   ├── DriverMaintenance.jsx       # List/table view
+│   │   ├── WarehouseMaintenance.jsx    # List/table view
+│   │   └── WarehouseDetails.jsx        # Warehouse details with tabs
 │   ├── redux/                  # State management with RTK
 │   │   ├── store.js            # Root store configuration
 │   │   └── slices/             # Redux slices (one per feature)
@@ -69,6 +82,7 @@ frontend/
 │   │       ├── uiSlice.js
 │   │       ├── transporterSlice.js
 │   │       ├── driverSlice.js
+│   │       ├── warehouseSlice.js
 │   │       ├── dashboardSlice.js
 │   │       ├── indentSlice.js
 │   │       ├── rfqSlice.js

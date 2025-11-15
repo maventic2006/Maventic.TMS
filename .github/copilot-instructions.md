@@ -24,7 +24,8 @@ docs/                             # All implementation documentation
 ├── VAT_GST_FILTER_FIX.md
 ├── TRANSPORTER_LIST_NAVIGATION_FIX.md
 ├── FUZZY_SEARCH_FIX.md
-└── TRANSPORTER_LIST_TAN_NA_UPDATE.md
+├── TRANSPORTER_LIST_TAN_NA_UPDATE.md
+└── WAREHOUSE_CREATE_COMPLETE_FIX.md
 
 frontend/                         # React + Vite frontend application
 ├── src/
@@ -34,7 +35,8 @@ frontend/                         # React + Vite frontend application
 │   │   ├── forms/                # Form components
 │   │   ├── charts/               # Chart components
 │   │   ├── transporter/          # Transporter-specific list components
-│   │   └── driver/               # Driver-specific list components
+│   │   ├── driver/               # Driver-specific list components
+│   │   └── warehouse/            # Warehouse-specific list/details tab components
 │   ├── features/                 # Feature-based modules
 │   │   ├── auth/                 # Authentication module
 │   │   ├── transporter/          # Transporter CRUD module
@@ -45,6 +47,10 @@ frontend/                         # React + Vite frontend application
 │   │   │   ├── components/       # 8 Edit + 8 View tabs
 │   │   │   ├── pages/            # Create & Details pages
 │   │   │   └── validation.js
+│   │   ├── warehouse/            # Warehouse CRUD module
+│   │   │   ├── components/       # 5 Edit tabs (General, Facilities, Address, Documents, Geofencing)
+│   │   │   ├── pages/            # Create & Details pages
+│   │   │   └── validation.js
 │   │   ├── dashboard/
 │   │   ├── indent/
 │   │   ├── rfq/
@@ -53,7 +59,9 @@ frontend/                         # React + Vite frontend application
 │   │   └── epod/
 │   ├── pages/                    # Top-level maintenance/list pages
 │   │   ├── TransporterMaintenance.jsx
-│   │   └── DriverMaintenance.jsx
+│   │   ├── DriverMaintenance.jsx
+│   │   ├── WarehouseMaintenance.jsx
+│   │   └── WarehouseDetails.jsx
 │   ├── redux/                    # State management with RTK
 │   │   ├── slices/               # Feature slices
 │   │   └── store.js
@@ -136,7 +144,6 @@ tms-backend/                      # Node.js + Express backend API
   - Details Page with view/edit modes and tab-based interface
   - List/Maintenance page with filters, search, and pagination
   - Validation error handling with inline errors and toast notifications
-<<<<<<< Updated upstream
   - **Components**: 4 Edit tabs + 4 View tabs (General, Address, Serviceable Areas, Documents)
   - All view tabs have collapsible sections for better UX
 - **Driver Management** (`features/driver/`) - Complete CRUD with validation
@@ -154,7 +161,14 @@ tms-backend/                      # Node.js + Express backend API
     - BlacklistMappingTab / BlacklistMappingViewTab
     - AdditionalTab / AdditionalViewTab
   - All view tabs have collapsible sections with framer-motion animations
-=======
+- **Warehouse Management** (`features/warehouse/`) - Complete CRUD with validation
+  - Create Warehouse Page with multi-step form (5 tabs)
+  - Details Page with view/edit modes and tab-based interface (4 view tabs)
+  - List/Maintenance page with filters, search, and pagination
+  - Validation error handling with inline errors and toast notifications
+  - **Components**: 5 Edit tabs (General Details, Facilities, Address, Documents, Geofencing)
+  - **View Tabs**: 4 tabs (GeneralDetailsViewTab, FacilitiesViewTab, AddressViewTab, DocumentsViewTab)
+  - All view tabs have collapsible sections for better UX
 - **Vehicle Management** (`features/vehicle/`) - Complete vehicle master maintenance (Phase 1A-C COMPLETED + UI Modernization)
   - List Page with modern UI, proper table headers, and full pagination (25 vehicles per page)
   - Smart pagination with First/Previous/Next/Last controls and page number display
@@ -167,7 +181,6 @@ tms-backend/                      # Node.js + Express backend API
   - Responsive design with mobile cards and desktop table views
   - Status tracking (Active, Maintenance, Blacklisted, Pending Approval, etc.)
   - Multi-step form with validation and progress indicator
->>>>>>> Stashed changes
 - **Dashboard** (`features/dashboard/`) - KPI cards and analytics
 - **Indent** (`features/indent/`) - Indent management module
 - **RFQ** (`features/rfq/`) - Request for quotation module
@@ -183,17 +196,16 @@ tms-backend/                      # Node.js + Express backend API
 - **Form Components** (`forms/`) - Reusable form elements
 - **Chart Components** (`charts/`) - Data visualization
 - **Transporter Components** (`transporter/`) - SearchBar, FilterPanel, ListTable, TopActionBar, PaginationBar, StatusPill
-<<<<<<< Updated upstream
 - **Driver Components** (`driver/`) - SearchBar, FilterPanel, ListTable, TopActionBar, PaginationBar, StatusPill (shared list components)
-=======
+- **Warehouse Components** (`warehouse/`) - TopActionBar, WarehouseListTable, FilterPanel, PaginationBar, StatusPill, GeneralDetailsViewTab, FacilitiesViewTab, AddressViewTab, DocumentsViewTab (view tabs with collapsible sections)
 - **Vehicle Components** (`vehicle/`) - VehicleListTable (with headers), VehicleFilterPanel (animated), TopActionBar (modernized), PaginationBar (smart display), VehicleStatusPill
->>>>>>> Stashed changes
 
 #### State Management (Redux)
 
 - **authSlice** - JWT tokens, user info, role-based permissions
 - **transporterSlice** - Transporter CRUD, master data, validation state
 - **driverSlice** - Driver CRUD, master data, validation state
+- **warehouseSlice** - Warehouse CRUD, master data, validation state
 - **uiSlice** - Sidebar state, toast notifications, theme preferences
 - **dashboardSlice** - Dashboard data and KPIs
 - **indentSlice** - Indent management state
@@ -211,6 +223,7 @@ tms-backend/                      # Node.js + Express backend API
 - ✅ Toast notification system for success/error messages
 - ✅ Driver details page collapsible sections - All view tabs implement collapsible sections with framer-motion
 - ✅ Driver create page completion - All 8 tabs have complete input fields for data entry
+- ✅ Warehouse create page complete - Backend route conflict fixed, full CRUD implementation with 5-table transaction
 
 ### Backend API (Node.js + Express)
 
@@ -253,6 +266,12 @@ tms-backend/                      # Node.js + Express backend API
   - GET `/api/driver/master-data` - Gender, blood group, license types, document types, etc.
   - GET `/api/driver/states/:countryCode` - States by country
   - GET `/api/driver/cities/:countryCode/:stateCode` - Cities by country and state
+- **Warehouse Management** (`controllers/warehouseController.js`, `routes/warehouse.js`)
+  - GET `/api/warehouse` - List with pagination, filters, search
+  - POST `/api/warehouse/create` - Create with comprehensive validation (explicit route to avoid conflict)
+  - GET `/api/warehouse/:id` - Get details by warehouse ID
+  - PUT `/api/warehouse/:id` - Update with validation
+  - GET `/api/warehouse/master-data` - Warehouse types, material types, document types, etc.
 - **Route Modules**: auth, transporter, driver, consignor, materials, users, vehicles, warehouse
 
 #### Database Architecture

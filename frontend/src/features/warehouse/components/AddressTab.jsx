@@ -1,13 +1,9 @@
 ﻿import React, { useState, useEffect } from "react";
-import { Label, Input } from "../../../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../../components/ui/select";
 import { Country, State, City } from "country-state-city";
+import {
+  CustomSelect,
+  GlobalDropdownProvider,
+} from "../../../components/ui/Select";
 
 const AddressTab = ({ formData, setFormData, errors, masterData }) => {
   const [countries] = useState(Country.getAllCountries());
@@ -64,239 +60,249 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Country */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="country"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            Country <span className="text-red-500">*</span>
-          </Label>
-          <Select
-            value={formData.address.country}
-            onValueChange={(value) => handleChange("country", value)}
-          >
-            <SelectTrigger
-              className={errors?.["address.country"] ? "border-red-500" : ""}
-            >
-              <SelectValue placeholder="Select country" />
-            </SelectTrigger>
-            <SelectContent>
-              {countries.map((country) => (
-                <SelectItem key={country.isoCode} value={country.isoCode}>
-                  {country.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors?.["address.country"] && (
-            <p className="text-xs text-red-500">{errors["address.country"]}</p>
-          )}
-        </div>
+    <GlobalDropdownProvider>
+      <div className="bg-white rounded-xl p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Country */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Country <span className="text-red-500">*</span>
+            </label>
+            <CustomSelect
+              value={formData.address.country}
+              onValueChange={(value) => handleChange("country", value)}
+              options={countries}
+              getOptionLabel={(option) => option.name}
+              getOptionValue={(option) => option.isoCode}
+              placeholder="Select country"
+              error={errors?.["address.country"]}
+              required
+              searchable
+            />
+            {errors?.["address.country"] && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors["address.country"]}
+              </p>
+            )}
+          </div>
 
-        {/* State */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="state"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            State <span className="text-red-500">*</span>
-          </Label>
-          <Select
-            value={formData.address.state}
-            onValueChange={(value) => handleChange("state", value)}
-            disabled={!formData.address.country}
-          >
-            <SelectTrigger
-              className={errors?.["address.state"] ? "border-red-500" : ""}
-            >
-              <SelectValue placeholder="Select state" />
-            </SelectTrigger>
-            <SelectContent>
-              {states.map((state) => (
-                <SelectItem key={state.isoCode} value={state.isoCode}>
-                  {state.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors?.["address.state"] && (
-            <p className="text-xs text-red-500">{errors["address.state"]}</p>
-          )}
-        </div>
+          {/* State */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              State <span className="text-red-500">*</span>
+            </label>
+            <CustomSelect
+              value={formData.address.state}
+              onValueChange={(value) => handleChange("state", value)}
+              options={states}
+              getOptionLabel={(option) => option.name}
+              getOptionValue={(option) => option.isoCode}
+              placeholder="Select state"
+              disabled={!formData.address.country}
+              error={errors?.["address.state"]}
+              required
+              searchable
+            />
+            {errors?.["address.state"] && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors["address.state"]}
+              </p>
+            )}
+          </div>
 
-        {/* City */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="city"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            City <span className="text-red-500">*</span>
-          </Label>
-          <Select
-            value={formData.address.city}
-            onValueChange={(value) => handleChange("city", value)}
-            disabled={!formData.address.state}
-          >
-            <SelectTrigger
-              className={errors?.["address.city"] ? "border-red-500" : ""}
-            >
-              <SelectValue placeholder="Select city" />
-            </SelectTrigger>
-            <SelectContent>
-              {cities.map((city) => (
-                <SelectItem key={city.name} value={city.name}>
-                  {city.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors?.["address.city"] && (
-            <p className="text-xs text-red-500">{errors["address.city"]}</p>
-          )}
-        </div>
+          {/* City */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              City <span className="text-red-500">*</span>
+            </label>
+            <CustomSelect
+              value={formData.address.city}
+              onValueChange={(value) => handleChange("city", value)}
+              options={cities}
+              getOptionLabel={(option) => option.name}
+              getOptionValue={(option) => option.name}
+              placeholder="Select city"
+              disabled={!formData.address.state}
+              error={errors?.["address.city"]}
+              required
+              searchable
+            />
+            {errors?.["address.city"] && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors["address.city"]}
+              </p>
+            )}
+          </div>
 
-        {/* District */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="district"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            District
-          </Label>
-          <Input
-            id="district"
-            value={formData.address.district}
-            onChange={(e) => handleChange("district", e.target.value)}
-            placeholder="Enter district"
-          />
-        </div>
+          {/* District */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              District
+            </label>
+            <input
+              type="text"
+              value={formData.address.district}
+              onChange={(e) => handleChange("district", e.target.value)}
+              placeholder="Enter district"
+              className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
+            />
+          </div>
 
-        {/* Street 1 */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="street1"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            Street Address 1 <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="street1"
-            value={formData.address.street1}
-            onChange={(e) => handleChange("street1", e.target.value)}
-            placeholder="Enter street address"
-            className={errors?.["address.street1"] ? "border-red-500" : ""}
-          />
-          {errors?.["address.street1"] && (
-            <p className="text-xs text-red-500">{errors["address.street1"]}</p>
-          )}
-        </div>
+          {/* Street 1 */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Street Address 1 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.address.street1}
+              onChange={(e) => handleChange("street1", e.target.value)}
+              placeholder="Enter street address"
+              className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
+                errors?.["address.street1"]
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-[#E5E7EB] focus:border-[#3B82F6]"
+              }`}
+            />
+            {errors?.["address.street1"] && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors["address.street1"]}
+              </p>
+            )}
+          </div>
 
-        {/* Street 2 */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="street2"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            Street Address 2
-          </Label>
-          <Input
-            id="street2"
-            value={formData.address.street2}
-            onChange={(e) => handleChange("street2", e.target.value)}
-            placeholder="Enter additional address details"
-          />
-        </div>
+          {/* Street 2 */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Street Address 2
+            </label>
+            <input
+              type="text"
+              value={formData.address.street2}
+              onChange={(e) => handleChange("street2", e.target.value)}
+              placeholder="Enter additional address details"
+              className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
+            />
+          </div>
 
-        {/* Postal Code */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="postalCode"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            Postal Code (PIN)
-          </Label>
-          <Input
-            id="postalCode"
-            value={formData.address.postalCode}
-            onChange={(e) => handleChange("postalCode", e.target.value)}
-            placeholder="Enter postal code"
-            maxLength={6}
-            className={errors?.["address.postalCode"] ? "border-red-500" : ""}
-          />
-          {errors?.["address.postalCode"] && (
-            <p className="text-xs text-red-500">
-              {errors["address.postalCode"]}
-            </p>
-          )}
-        </div>
+          {/* Postal Code */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Postal Code (PIN)
+            </label>
+            <input
+              type="text"
+              value={formData.address.postalCode}
+              onChange={(e) => handleChange("postalCode", e.target.value)}
+              placeholder="Enter postal code"
+              maxLength={6}
+              className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
+                errors?.["address.postalCode"]
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-[#E5E7EB] focus:border-[#3B82F6]"
+              }`}
+            />
+            {errors?.["address.postalCode"] && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors["address.postalCode"]}
+              </p>
+            )}
+          </div>
 
-        {/* VAT Number - Mandatory */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="vatNumber"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            VAT Number <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="vatNumber"
-            value={formData.address.vatNumber}
-            onChange={(e) =>
-              handleChange("vatNumber", e.target.value.toUpperCase())
-            }
-            placeholder="Enter VAT number"
-            maxLength={20}
-            className={errors?.["address.vatNumber"] ? "border-red-500" : ""}
-          />
-          {errors?.["address.vatNumber"] && (
-            <p className="text-xs text-red-500">
-              {errors["address.vatNumber"]}
-            </p>
-          )}
-          <p className="text-xs text-gray-500">8-20 alphanumeric characters</p>
-        </div>
-
-        {/* Address Type - Mandatory */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="addressType"
-            className="text-sm font-semibold text-[#0D1A33]"
-          >
-            Address Type <span className="text-red-500">*</span>
-          </Label>
-          <Select
-            value={formData.address.addressType}
-            onValueChange={(value) => handleChange("addressType", value)}
-          >
-            <SelectTrigger
-              className={
-                errors?.["address.addressType"] ? "border-red-500" : ""
+          {/* VAT Number - Mandatory */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              VAT Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.address.vatNumber}
+              onChange={(e) =>
+                handleChange("vatNumber", e.target.value.toUpperCase())
               }
-            >
-              <SelectValue placeholder="Select address type" />
-            </SelectTrigger>
-            <SelectContent>
-              {masterData?.addressTypes?.map((type) => (
-                <SelectItem
-                  key={type.address_type_id}
-                  value={type.address_type_id}
-                >
-                  {type.address}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors?.["address.addressType"] && (
-            <p className="text-xs text-red-500">
-              {errors["address.addressType"]}
+              placeholder="Enter VAT number"
+              maxLength={20}
+              className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
+                errors?.["address.vatNumber"]
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-[#E5E7EB] focus:border-[#3B82F6]"
+              }`}
+            />
+            {errors?.["address.vatNumber"] && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors["address.vatNumber"]}
+              </p>
+            )}
+            <p className="text-xs text-gray-500">
+              8-20 alphanumeric characters
             </p>
-          )}
+          </div>
+
+          {/* TIN/PAN - Optional */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              TIN/PAN
+            </label>
+            <input
+              type="text"
+              value={formData.address.tinPan || ""}
+              onChange={(e) =>
+                handleChange("tinPan", e.target.value.toUpperCase())
+              }
+              placeholder="Enter TIN/PAN"
+              maxLength={50}
+              className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
+            />
+            <p className="text-xs text-gray-500">
+              Tax Identification Number / Permanent Account Number
+            </p>
+          </div>
+
+          {/* TAN - Optional */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              TAN
+            </label>
+            <input
+              type="text"
+              value={formData.address.tan || ""}
+              onChange={(e) =>
+                handleChange("tan", e.target.value.toUpperCase())
+              }
+              placeholder="Enter TAN"
+              maxLength={50}
+              className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
+            />
+            <p className="text-xs text-gray-500">
+              Tax Deduction and Collection Account Number
+            </p>
+          </div>
+
+          {/* Address Type - Mandatory */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Address Type <span className="text-red-500">*</span>
+            </label>
+            <CustomSelect
+              value={formData.address.addressType}
+              onValueChange={(value) => handleChange("addressType", value)}
+              options={masterData?.addressTypes || []}
+              getOptionLabel={(option) => option.address}
+              getOptionValue={(option) => option.address_type_id}
+              placeholder="Select address type"
+              error={errors?.["address.addressType"]}
+              required
+              searchable
+            />
+            {errors?.["address.addressType"] && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors["address.addressType"]}
+              </p>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </GlobalDropdownProvider>
   );
 };
 

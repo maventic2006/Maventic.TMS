@@ -176,14 +176,16 @@ export const createWarehouse = createAsyncThunk(
   "warehouse/createWarehouse",
   async (warehouseData, { rejectWithValue }) => {
     try {
-      const response = await api.post(
-        API_ENDPOINTS.WAREHOUSE.CREATE,
-        warehouseData
-      );
+      console.log("📦 Creating warehouse via API:", warehouseData);
+      const response = await api.post("/warehouse/create", warehouseData);
       return response.data;
     } catch (error) {
+      console.error("❌ Create warehouse error:", error.response?.data);
       return rejectWithValue(
-        error.response?.data?.message || "Failed to create warehouse"
+        error.response?.data?.error || {
+          message:
+            error.response?.data?.message || "Failed to create warehouse",
+        }
       );
     }
   }

@@ -28,6 +28,7 @@ import VehicleDetailsPage from "./features/vehicle/VehicleDetailsPage";
 import CreateVehiclePage from "./features/vehicle/CreateVehiclePage";
 import WarehouseMaintenance from "./pages/WarehouseMaintenance";
 import WarehouseDetails from "./pages/WarehouseDetails";
+import WarehouseCreatePage from "./features/warehouse/pages/WarehouseCreatePage";
 import SessionExpiryWarningModal from "./components/auth/SessionExpiryWarningModal";
 import {
   verifyToken,
@@ -479,6 +480,16 @@ function App() {
                       <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                         <Layout>
                           <WarehouseMaintenance />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/warehouse/create"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <WarehouseCreatePage />
                         </Layout>
                       </PrivateRoute>
                     }

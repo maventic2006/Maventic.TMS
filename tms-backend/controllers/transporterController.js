@@ -15,7 +15,8 @@ const generateTransporterId = async () => {
 };
 
 // Collision-resistant ID generation - checks if ID exists before returning
-const generateAddressId = async (trx = knex) => {
+// Uses in-memory tracking to avoid duplicates within same transaction
+const generateAddressId = async (trx = knex, generatedIds = new Set()) => {
   let attempts = 0;
   const maxAttempts = 100;
 
@@ -26,12 +27,14 @@ const generateAddressId = async (trx = knex) => {
 
     console.log(`  🔍 Checking address ID: ${newId} (attempt ${attempts + 1})`);
 
-    // Check if this ID already exists
-    const existing = await trx("tms_address")
+    // Check if this ID already exists in database OR in current generation batch
+    const existsInDb = await trx("tms_address")
       .where("address_id", newId)
       .first();
-    if (!existing) {
+
+    if (!existsInDb && !generatedIds.has(newId)) {
       console.log(`  ✅ Address ID ${newId} is unique`);
+      generatedIds.add(newId); // Track this ID to prevent duplicates in same batch
       return newId;
     }
 
@@ -42,7 +45,7 @@ const generateAddressId = async (trx = knex) => {
   throw new Error("Failed to generate unique address ID after 100 attempts");
 };
 
-const generateContactId = async (trx = knex) => {
+const generateContactId = async (trx = knex, generatedIds = new Set()) => {
   let attempts = 0;
   const maxAttempts = 100;
 
@@ -51,10 +54,13 @@ const generateContactId = async (trx = knex) => {
     const count = parseInt(result.count) + 1 + attempts;
     const newId = `TC${count.toString().padStart(4, "0")}`;
 
-    const existing = await trx("transporter_contact")
+    // Check if this ID already exists in database OR in current generation batch
+    const existsInDb = await trx("transporter_contact")
       .where("tcontact_id", newId)
       .first();
-    if (!existing) {
+
+    if (!existsInDb && !generatedIds.has(newId)) {
+      generatedIds.add(newId); // Track this ID to prevent duplicates in same batch
       return newId;
     }
 
@@ -116,7 +122,7 @@ const generateServiceAreaItemId = async (trx = knex) => {
   );
 };
 
-const generateDocumentId = async (trx = knex) => {
+const generateDocumentId = async (trx = knex, generatedIds = new Set()) => {
   let attempts = 0;
   const maxAttempts = 100;
 
@@ -127,10 +133,13 @@ const generateDocumentId = async (trx = knex) => {
     const count = parseInt(result.count) + 1 + attempts;
     const newId = `DOC${count.toString().padStart(4, "0")}`;
 
-    const existing = await trx("transporter_documents")
+    // Check if this ID already exists in database OR in current generation batch
+    const existsInDb = await trx("transporter_documents")
       .where("document_id", newId)
       .first();
-    if (!existing) {
+
+    if (!existsInDb && !generatedIds.has(newId)) {
+      generatedIds.add(newId); // Track this ID to prevent duplicates in same batch
       return newId;
     }
 
@@ -620,23 +629,25 @@ const createTransporter = async (req, res) => {
     try {
       // All validations passed, start creating the transporter
       const transporterId = await generateTransporterId();
-      const currentUser = req.user?.userId || "SYSTEM";
+      const currentUser = req.user?.user_id || "SYSTEM";
       const currentTimestamp = new Date();
 
       // Pre-generate all IDs to avoid race conditions
       console.log("🔑 Generating unique IDs...");
       const addressIds = [];
+      const generatedAddressIds = new Set(); // Track generated IDs to prevent duplicates
       for (let i = 0; i < addresses.length; i++) {
-        const newAddressId = await generateAddressId(trx);
+        const newAddressId = await generateAddressId(trx, generatedAddressIds);
         console.log(`  📍 Generated address ID ${i + 1}: ${newAddressId}`);
         addressIds.push(newAddressId);
       }
 
       const contactIds = [];
+      const generatedContactIds = new Set(); // Track generated IDs to prevent duplicates
       let contactIndex = 0;
       for (const address of addresses) {
         for (const contact of address.contacts) {
-          contactIds.push(await generateContactId(trx));
+          contactIds.push(await generateContactId(trx, generatedContactIds));
           contactIndex++;
         }
       }
@@ -678,8 +689,9 @@ const createTransporter = async (req, res) => {
       }
 
       const documentIds = [];
+      const generatedDocumentIds = new Set(); // Track generated IDs to prevent duplicates
       for (let i = 0; i < documents.length; i++) {
-        documentIds.push(await generateDocumentId(trx));
+        documentIds.push(await generateDocumentId(trx, generatedDocumentIds));
       }
 
       // 1. Create transporter general info
@@ -1362,7 +1374,7 @@ const updateTransporter = async (req, res) => {
       }
     }
 
-    const currentUser = req.user?.userId || "SYSTEM";
+    const currentUser = req.user?.user_id || "SYSTEM";
     const currentTimestamp = new Date();
 
     // Update general details if provided
@@ -1882,22 +1894,29 @@ const getTransporters = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Build base query with contacts
+    // Build base query - Get one row per transporter with primary address and first contact
     let query = knex("transporter_general_info as tgi")
       .leftJoin("tms_address as addr", function () {
-        this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
-          "addr.user_type",
-          "=",
-          knex.raw("'TRANSPORTER'")
-        );
+        this.on("tgi.transporter_id", "=", "addr.user_reference_id")
+          .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"))
+          .andOn("addr.is_primary", "=", knex.raw("1")); // Get only primary address
       })
-      .leftJoin("transporter_contact as tc", function () {
-        this.on("tgi.transporter_id", "=", "tc.transporter_id").andOn(
-          "tc.status",
-          "=",
-          knex.raw("'ACTIVE'")
-        );
-      })
+      .leftJoin(
+        knex.raw(`(
+          SELECT tc1.*
+          FROM transporter_contact tc1
+          INNER JOIN (
+            SELECT transporter_id, MIN(tcontact_id) as min_contact_id, MIN(contact_unique_id) as min_unique_id
+            FROM transporter_contact
+            WHERE status = 'ACTIVE'
+            GROUP BY transporter_id
+          ) tc2 ON tc1.transporter_id = tc2.transporter_id 
+               AND tc1.tcontact_id = tc2.min_contact_id
+               AND tc1.contact_unique_id = tc2.min_unique_id
+        ) as tc`),
+        "tgi.transporter_id",
+        "tc.transporter_id"
+      )
       .select(
         "tgi.transporter_id",
         "tgi.business_name",
@@ -1921,35 +1940,8 @@ const getTransporters = async (req, res) => {
         "addr.tin_pan",
         "addr.tan",
         knex.raw(
-          "CONCAT(addr.street_1, ', ', addr.city, ', ', addr.state, ', ', addr.country) as address"
+          "CONCAT(COALESCE(addr.street_1, ''), ', ', COALESCE(addr.city, ''), ', ', COALESCE(addr.state, ''), ', ', COALESCE(addr.country, '')) as address"
         ),
-        "tc.contact_person_name",
-        "tc.phone_number",
-        "tc.email_id"
-      )
-      .groupBy(
-        "tgi.transporter_id",
-        "tgi.business_name",
-        "tgi.trans_mode_road",
-        "tgi.trans_mode_rail",
-        "tgi.trans_mode_air",
-        "tgi.trans_mode_sea",
-        "tgi.active_flag",
-        "tgi.from_date",
-        "tgi.to_date",
-        "tgi.avg_rating",
-        "tgi.status",
-        "tgi.created_by",
-        "tgi.created_on",
-        "tgi.updated_on",
-        "addr.country",
-        "addr.state",
-        "addr.city",
-        "addr.district",
-        "addr.vat_number",
-        "addr.tin_pan",
-        "addr.tan",
-        "addr.street_1",
         "tc.contact_person_name",
         "tc.phone_number",
         "tc.email_id"
@@ -2019,22 +2011,21 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    // Get total count for pagination - create a fresh query without SELECT fields
-    let countQuery = knex("transporter_general_info as tgi")
-      .leftJoin("tms_address as addr", function () {
+    // Get total count for pagination - count distinct transporters only
+    let countQuery = knex("transporter_general_info as tgi");
+
+    // For filters that need address or contact data, we join but count distinct transporter_id
+    let needsAddressJoin = search || state || city || vatGst || tan;
+
+    if (needsAddressJoin) {
+      countQuery = countQuery.leftJoin("tms_address as addr", function () {
         this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
           "addr.user_type",
           "=",
           knex.raw("'TRANSPORTER'")
         );
-      })
-      .leftJoin("transporter_contact as tc", function () {
-        this.on("tgi.transporter_id", "=", "tc.transporter_id").andOn(
-          "tc.status",
-          "=",
-          knex.raw("'ACTIVE'")
-        );
       });
+    }
 
     // Apply the same filters to count query
     if (search) {

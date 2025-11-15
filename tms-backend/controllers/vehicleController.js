@@ -1,4 +1,4 @@
-﻿const db = require('../config/database');
+const db = require('../config/database');
 
 /**
  * Vehicle Controller
@@ -409,8 +409,8 @@ const createVehicle = async (req, res) => {
       leasing_flag: vehicleData.leasing_flag || false,
       avg_running_speed: vehicleData.avg_running_speed || 0,
       max_running_speed: vehicleData.max_running_speed || 0,
-      created_by: req.user?.userId || 'SYSTEM',
-      updated_by: req.user?.userId || 'SYSTEM',
+      created_by: req.user?.user_id || 'SYSTEM',
+      updated_by: req.user?.user_id || 'SYSTEM',
       status: 'ACTIVE'
     });
     
@@ -434,8 +434,8 @@ const createVehicle = async (req, res) => {
         present_address_id: ownershipDetails.presentAddressId,
         permanent_address_id: ownershipDetails.permanentAddressId,
         sale_amount: ownershipDetails.saleAmount || 0,
-        created_by: req.user?.userId || 'SYSTEM',
-        updated_by: req.user?.userId || 'SYSTEM',
+        created_by: req.user?.user_id || 'SYSTEM',
+        updated_by: req.user?.user_id || 'SYSTEM',
         status: 'ACTIVE'
       });
     }
@@ -452,8 +452,8 @@ const createVehicle = async (req, res) => {
         upcoming_service_date: maintenanceHistory.upcomingServiceDate,
         type_of_service: maintenanceHistory.typeOfService,
         service_expense: maintenanceHistory.serviceExpense || 0,
-        created_by: req.user?.userId || 'SYSTEM',
-        updated_by: req.user?.userId || 'SYSTEM',
+        created_by: req.user?.user_id || 'SYSTEM',
+        updated_by: req.user?.user_id || 'SYSTEM',
         status: 'ACTIVE'
       });
     }
@@ -467,8 +467,8 @@ const createVehicle = async (req, res) => {
         sequence_number: sequenceNumber,
         time_period: serviceFrequency.timePeriod,
         km_drove: serviceFrequency.kmDrove || 0,
-        created_by: req.user?.userId || 'SYSTEM',
-        updated_by: req.user?.userId || 'SYSTEM',
+        created_by: req.user?.user_id || 'SYSTEM',
+        updated_by: req.user?.user_id || 'SYSTEM',
         status: 'ACTIVE'
       });
     }
@@ -493,8 +493,8 @@ const createVehicle = async (req, res) => {
           valid_from: doc.validFrom,
           valid_to: doc.validTo,
           remarks: doc.remarks,
-          created_by: req.user?.userId || 'SYSTEM',
-          updated_by: req.user?.userId || 'SYSTEM',
+          created_by: req.user?.user_id || 'SYSTEM',
+          updated_by: req.user?.user_id || 'SYSTEM',
           status: 'ACTIVE'
         });
         
@@ -511,8 +511,8 @@ const createVehicle = async (req, res) => {
             is_verified: false,
             valid_from: doc.validFrom,
             valid_to: doc.validTo,
-            created_by: req.user?.userId || 'SYSTEM',
-            updated_by: req.user?.userId || 'SYSTEM',
+            created_by: req.user?.user_id || 'SYSTEM',
+            updated_by: req.user?.user_id || 'SYSTEM',
             created_at: new Date(),
             updated_at: new Date(),
             status: 'ACTIVE'
@@ -940,7 +940,7 @@ const updateVehicle = async (req, res) => {
         leasing_flag: vehicleData.leasing_flag || false,
         avg_running_speed: vehicleData.avg_running_speed || 0,
         max_running_speed: vehicleData.max_running_speed || 0,
-        updated_by: req.user?.userId || 'SYSTEM',
+        updated_by: req.user?.user_id || 'SYSTEM',
         updated_at: db.fn.now()
       });
 
@@ -982,7 +982,7 @@ const updateVehicle = async (req, res) => {
             present_address_id: ownershipDetails.presentAddressId,
             permanent_address_id: ownershipDetails.permanentAddressId,
             sale_amount: ownershipDetails.saleAmount || 0,
-            updated_by: req.user?.userId || 'SYSTEM',
+            updated_by: req.user?.user_id || 'SYSTEM',
             updated_at: db.fn.now()
           });
       } else {
@@ -1003,8 +1003,8 @@ const updateVehicle = async (req, res) => {
           present_address_id: ownershipDetails.presentAddressId,
           permanent_address_id: ownershipDetails.permanentAddressId,
           sale_amount: ownershipDetails.saleAmount || 0,
-          created_by: req.user?.userId || 'SYSTEM',
-          updated_by: req.user?.userId || 'SYSTEM',
+          created_by: req.user?.user_id || 'SYSTEM',
+          updated_by: req.user?.user_id || 'SYSTEM',
           status: 'ACTIVE'
         });
       }
@@ -1025,7 +1025,7 @@ const updateVehicle = async (req, res) => {
             upcoming_service_date: maintenanceHistory.upcomingServiceDate,
             type_of_service: maintenanceHistory.typeOfService,
             service_expense: maintenanceHistory.serviceExpense || 0,
-            updated_by: req.user?.userId || 'SYSTEM',
+            updated_by: req.user?.user_id || 'SYSTEM',
             updated_at: db.fn.now()
           });
       } else {
@@ -1038,8 +1038,8 @@ const updateVehicle = async (req, res) => {
           upcoming_service_date: maintenanceHistory.upcomingServiceDate,
           type_of_service: maintenanceHistory.typeOfService,
           service_expense: maintenanceHistory.serviceExpense || 0,
-          created_by: req.user?.userId || 'SYSTEM',
-          updated_by: req.user?.userId || 'SYSTEM',
+          created_by: req.user?.user_id || 'SYSTEM',
+          updated_by: req.user?.user_id || 'SYSTEM',
           status: 'ACTIVE'
         });
       }
@@ -1059,7 +1059,7 @@ const updateVehicle = async (req, res) => {
               valid_from: doc.validFrom,
               valid_to: doc.validTo,
               remarks: doc.remarks,
-              updated_by: req.user?.userId || 'SYSTEM',
+              updated_by: req.user?.user_id || 'SYSTEM',
               updated_at: db.fn.now()
             });
 
@@ -1078,7 +1078,7 @@ const updateVehicle = async (req, res) => {
                   file_name: doc.fileName,
                   file_type: doc.fileType || 'application/pdf',
                   file_xstring_value: doc.fileData,
-                  updated_by: req.user?.userId || 'SYSTEM',
+                  updated_by: req.user?.user_id || 'SYSTEM',
                   updated_at: db.fn.now()
                 });
             } else {
@@ -1093,8 +1093,8 @@ const updateVehicle = async (req, res) => {
                 is_verified: false,
                 valid_from: doc.validFrom,
                 valid_to: doc.validTo,
-                created_by: req.user?.userId || 'SYSTEM',
-                updated_by: req.user?.userId || 'SYSTEM',
+                created_by: req.user?.user_id || 'SYSTEM',
+                updated_by: req.user?.user_id || 'SYSTEM',
                 created_at: new Date(),
                 updated_at: new Date(),
                 status: 'ACTIVE'
@@ -1119,8 +1119,8 @@ const updateVehicle = async (req, res) => {
             valid_from: doc.validFrom,
             valid_to: doc.validTo,
             remarks: doc.remarks,
-            created_by: req.user?.userId || 'SYSTEM',
-            updated_by: req.user?.userId || 'SYSTEM',
+            created_by: req.user?.user_id || 'SYSTEM',
+            updated_by: req.user?.user_id || 'SYSTEM',
             status: 'ACTIVE'
           });
           
@@ -1137,8 +1137,8 @@ const updateVehicle = async (req, res) => {
               is_verified: false,
               valid_from: doc.validFrom,
               valid_to: doc.validTo,
-              created_by: req.user?.userId || 'SYSTEM',
-              updated_by: req.user?.userId || 'SYSTEM',
+              created_by: req.user?.user_id || 'SYSTEM',
+              updated_by: req.user?.user_id || 'SYSTEM',
               created_at: new Date(),
               updated_at: new Date(),
               status: 'ACTIVE'
@@ -1196,7 +1196,7 @@ const deleteVehicle = async (req, res) => {
       .where('vehicle_id_code_hdr', id)
       .update({
         status: 'INACTIVE',
-        updated_by: req.user?.userId || 'SYSTEM',
+        updated_by: req.user?.user_id || 'SYSTEM',
         updated_at: db.fn.now()
       });
 
@@ -1400,7 +1400,7 @@ const getMasterData = async (req, res) => {
       { value: 'NONE', label: 'None' },
     ];
 
-    // ✅ Coverage Types - Get from database
+    // ? Coverage Types - Get from database
     const coverageTypes = await db('coverage_type_master')
       .where('status', 'ACTIVE')
       .select('coverage_type_id as value', 'coverage_type as label')
@@ -1430,7 +1430,7 @@ const getMasterData = async (req, res) => {
         vehicleConditions,
         loadingCapacityUnits,
         doorTypes,
-        coverageTypes // ✅ Added coverage types
+        coverageTypes // ? Added coverage types
       }
     });
 

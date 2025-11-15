@@ -81,6 +81,8 @@ const WarehouseCreatePage = () => {
       street2: "",
       postalCode: "",
       vatNumber: "",
+      tinPan: "",
+      tan: "",
       addressType: "",
       isPrimary: true,
     },
@@ -117,24 +119,18 @@ const WarehouseCreatePage = () => {
     },
     {
       id: 1,
-      name: "Facilities",
-      icon: Settings,
-      component: FacilitiesTab,
-    },
-    {
-      id: 2,
       name: "Address",
       icon: MapPin,
       component: AddressTab,
     },
     {
-      id: 3,
+      id: 2,
       name: "Documents",
       icon: FileText,
       component: DocumentsTab,
     },
     {
-      id: 4,
+      id: 3,
       name: "Geofencing",
       icon: Map,
       component: GeofencingTab,
@@ -404,8 +400,32 @@ const WarehouseCreatePage = () => {
       return;
     }
 
+    // Transform form data to match backend API expectations
+    const apiPayload = {
+      generalDetails: {
+        warehouseName: formData.generalDetails.warehouseName,
+        warehouseName2: formData.generalDetails.warehouseName2,
+        warehouseType: formData.generalDetails.warehouseType,
+        materialType: formData.generalDetails.materialType,
+        language: formData.generalDetails.language || "EN",
+        vehicleCapacity: parseInt(formData.generalDetails.vehicleCapacity) || 0,
+        virtualYardIn: formData.generalDetails.virtualYardIn || false,
+        radiusVirtualYardIn:
+          parseFloat(formData.generalDetails.radiusVirtualYardIn) || 0,
+        speedLimit: parseInt(formData.generalDetails.speedLimit) || 20,
+      },
+      facilities: formData.facilities,
+      address: formData.address,
+      documents: formData.documents.filter(
+        (doc) => doc.documentType && doc.documentNumber
+      ),
+      subLocations: formData.subLocations || [],
+    };
+
+    console.log("📦 Submitting warehouse data:", apiPayload);
+
     // Submit valid data
-    dispatch(createWarehouse(formData));
+    dispatch(createWarehouse(apiPayload));
   };
 
   const handleBulkUpload = useCallback(() => {
