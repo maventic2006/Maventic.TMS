@@ -4,6 +4,7 @@ const {
   validateWarehouseCreate,
   validateWarehouseUpdate,
 } = require("../validation/warehouseValidation");
+const { validateDocumentNumber } = require("../utils/documentValidation");
 
 // Helper: Generate unique warehouse ID (WH001, WH002, etc.)
 const generateWarehouseId = async (trx = knex) => {
@@ -30,8 +31,8 @@ const generateWarehouseId = async (trx = knex) => {
   throw new Error("Failed to generate unique warehouse ID after 100 attempts");
 };
 
-// Helper: Generate document unique ID
-const generateDocumentUniqueId = async (trx = knex) => {
+// Helper: Generate document ID (for warehouse_documents table)
+const generateDocumentId = async (trx = knex, generatedIds = new Set()) => {
   let attempts = 0;
   const maxAttempts = 100;
 
@@ -40,10 +41,13 @@ const generateDocumentUniqueId = async (trx = knex) => {
     const count = parseInt(result.count) + 1 + attempts;
     const newId = `WDOC${count.toString().padStart(4, "0")}`;
 
-    const existing = await trx("warehouse_documents")
+    // Check if this ID already exists in database (check document_unique_id as it's the PK)
+    const existsInDb = await trx("warehouse_documents")
       .where("document_unique_id", newId)
       .first();
-    if (!existing) {
+
+    if (!existsInDb && !generatedIds.has(newId)) {
+      generatedIds.add(newId); // Track this ID to prevent duplicates in same batch
       return newId;
     }
 
@@ -51,6 +55,13 @@ const generateDocumentUniqueId = async (trx = knex) => {
   }
 
   throw new Error("Failed to generate unique document ID after 100 attempts");
+};
+
+// Helper: Generate document upload ID (for document_upload table)
+const generateDocumentUploadId = async () => {
+  const result = await knex("document_upload").count("* as count").first();
+  const count = parseInt(result.count) + 1;
+  return `DU${count.toString().padStart(4, "0")}`;
 };
 
 // @desc    Get warehouse list with filters and pagination
@@ -89,10 +100,23 @@ const getWarehouseList = async (req, res) => {
           knex.raw("'WH'")
         );
       })
+      .leftJoin(
+        "warehouse_type_master as wtm",
+        "w.warehouse_type",
+        "wtm.warehouse_type_id"
+      )
+      .leftJoin(
+        "material_types_master as mtm",
+        "w.material_type_id",
+        "mtm.material_types_id"
+      )
       .select(
         "w.warehouse_id",
         "w.consignor_id",
         "w.warehouse_type",
+        "wtm.warehouse_type as warehouse_type_name",
+        "w.material_type_id",
+        "mtm.material_types as material_type_name",
         "w.warehouse_name1",
         knex.raw("0 as geo_fencing"), // Field doesn't exist in table, default to 0
         "w.weigh_bridge_availability",
@@ -199,7 +223,7 @@ const getWarehouseList = async (req, res) => {
 
     // Get paginated results
     const warehouses = await query
-      .orderBy("w.created_at", "desc")
+      .orderBy("w.warehouse_id", "asc")
       .limit(limit)
       .offset(offset);
 
@@ -234,7 +258,21 @@ const getWarehouseById = async (req, res) => {
     console.log(`📦 Fetching warehouse: ${id}`);
 
     const warehouse = await knex("warehouse_basic_information as w")
-      .select("w.*")
+      .leftJoin(
+        "warehouse_type_master as wtm",
+        "w.warehouse_type",
+        "wtm.warehouse_type_id"
+      )
+      .leftJoin(
+        "material_types_master as mtm",
+        "w.material_type_id",
+        "mtm.material_types_id"
+      )
+      .select(
+        "w.*",
+        "wtm.warehouse_type as warehouse_type_name",
+        "mtm.material_types as material_type_name"
+      )
       .where("w.warehouse_id", id)
       .first();
 
@@ -247,9 +285,135 @@ const getWarehouseById = async (req, res) => {
 
     console.log(`✅ Warehouse found: ${warehouse.warehouse_name1}`);
 
+    // Fetch address data with LEFT JOIN
+    const address = await knex("tms_address as addr")
+      .leftJoin(
+        "address_type_master as atm",
+        "addr.address_type_id",
+        "atm.address_type_id"
+      )
+      .where("addr.user_reference_id", id)
+      .where("addr.user_type", "WH")
+      .where("addr.status", "ACTIVE")
+      .select(
+        "addr.address_id",
+        "addr.address_type_id",
+        "atm.address as address_type_name",
+        "addr.country",
+        "addr.state",
+        "addr.city",
+        "addr.district",
+        "addr.street_1",
+        "addr.street_2",
+        "addr.postal_code",
+        "addr.vat_number",
+        "addr.tin_pan",
+        "addr.tan",
+        "addr.is_primary"
+      )
+      .first();
+
+    console.log(`📍 Address data: ${address ? "Found" : "Not found"}`);
+
+    // Fetch documents with LEFT JOIN to document_upload and document_name_master
+    const documents = await knex("warehouse_documents as wd")
+      .leftJoin("document_upload as du", "wd.document_id", "du.document_id")
+      .leftJoin(
+        "document_name_master as dnm",
+        "wd.document_type_id",
+        "dnm.doc_name_master_id"
+      )
+      .where("wd.warehouse_id", id)
+      .where("wd.status", "ACTIVE")
+      .select(
+        "wd.document_unique_id",
+        "wd.document_type_id",
+        "dnm.document_name as documentTypeName",
+        "wd.document_number",
+        "wd.valid_from",
+        "wd.valid_to",
+        "wd.active",
+        "du.file_name",
+        "du.file_type",
+        "du.file_xstring_value as file_data"
+      );
+
+    console.log(`📄 Found ${documents.length} documents for warehouse ${id}`);
+
+    // Fetch geofencing data
+    const geofencing = await knex("warehouse_sub_location_header as wslh")
+      .leftJoin(
+        "warehouse_sub_location_item as wsli",
+        "wslh.sub_location_hdr_id",
+        "wsli.sub_location_hdr_id"
+      )
+      .leftJoin(
+        "warehouse_sub_location_master as wslm",
+        "wslh.sub_location_id",
+        "wslm.sub_location_id"
+      )
+      .where("wslh.warehouse_unique_id", id)
+      .where("wslh.status", "ACTIVE")
+      .select(
+        "wslh.sub_location_hdr_id",
+        "wslh.sub_location_id",
+        "wslm.warehouse_sub_location_description as subLocationType",
+        "wslh.description as description",
+        "wsli.geo_fence_item_id",
+        "wsli.latitude",
+        "wsli.longitude",
+        "wsli.sequence"
+      )
+      .orderBy("wslh.sub_location_hdr_id")
+      .orderBy("wsli.sequence");
+
+    console.log(`🗺️ Found ${geofencing.length} geofencing coordinates`);
+
+    // Group geofencing data by sub-location header
+    const groupedGeofencing = geofencing.reduce((acc, item) => {
+      if (!acc[item.sub_location_hdr_id]) {
+        acc[item.sub_location_hdr_id] = {
+          subLocationHdrId: item.sub_location_hdr_id,
+          subLocationId: item.sub_location_id,
+          subLocationType: item.subLocationType,
+          description: item.description,
+          coordinates: [],
+        };
+      }
+      if (item.geo_fence_item_id) {
+        acc[item.sub_location_hdr_id].coordinates.push({
+          latitude: item.latitude,
+          longitude: item.longitude,
+          sequence: item.sequence,
+        });
+      }
+      return acc;
+    }, {});
+
+    const subLocations = Object.values(groupedGeofencing);
+
+    // Map documents to response format
+    const mappedDocuments = documents.map((doc) => ({
+      documentUniqueId: doc.document_unique_id,
+      documentType: doc.documentTypeName || doc.document_type_id,
+      documentTypeId: doc.document_type_id,
+      documentNumber: doc.document_number,
+      validFrom: doc.valid_from,
+      validTo: doc.valid_to,
+      status: doc.active,
+      fileName: doc.file_name,
+      fileType: doc.file_type,
+      fileData: doc.file_data, // Base64 encoded file content
+    }));
+
     res.json({
       success: true,
-      warehouse,
+      warehouse: {
+        ...warehouse,
+        address: address || null,
+        documents: mappedDocuments,
+        subLocations: subLocations,
+      },
     });
   } catch (error) {
     console.error("❌ Error fetching warehouse:", error);
@@ -330,12 +494,12 @@ const createWarehouse = async (req, res) => {
       });
     }
 
-    if (generalDetails.speedLimit < 1 || generalDetails.speedLimit > 200) {
+    if (generalDetails.speedLimit < 1 || generalDetails.speedLimit > 80) {
       return res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Speed limit must be between 1-200 KM/H",
+          message: "Speed limit must be between 1-80 KM/H",
           field: "speedLimit",
         },
       });
@@ -364,7 +528,10 @@ const createWarehouse = async (req, res) => {
       });
     }
 
-    if (!address.vatNumber || !/^[A-Z0-9]{8,20}$/.test(address.vatNumber)) {
+    if (
+      !address.vatNumber ||
+      !/^[A-Z0-9]{8,20}$/.test(address.vatNumber.trim().toUpperCase())
+    ) {
       return res.status(400).json({
         success: false,
         error: {
@@ -373,6 +540,55 @@ const createWarehouse = async (req, res) => {
           field: "vatNumber",
         },
       });
+    }
+
+    // Normalize VAT number to uppercase
+    address.vatNumber = address.vatNumber.trim().toUpperCase();
+
+    // Validate postal code (must be exactly 6 digits)
+    if (!address.postalCode || !/^\d{6}$/.test(address.postalCode)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Postal code must be exactly 6 digits",
+          field: "postalCode",
+        },
+      });
+    }
+
+    // Validate TIN/PAN if provided (optional, but must match PAN format if entered)
+    if (address.tinPan && address.tinPan.trim() !== "") {
+      const panRegex = /^[A-Z]{5}\d{4}[A-Z]$/;
+      if (!panRegex.test(address.tinPan.trim().toUpperCase())) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message:
+              "TIN/PAN must match format: 5 letters + 4 digits + 1 letter (e.g., ABCDE1234F)",
+            field: "tinPan",
+            expectedFormat: "ABCDE1234F",
+          },
+        });
+      }
+    }
+
+    // Validate TAN if provided (optional, but must match TAN format if entered)
+    if (address.tan && address.tan.trim() !== "") {
+      const tanRegex = /^[A-Z]{4}\d{5}[A-Z]$/;
+      if (!tanRegex.test(address.tan.trim().toUpperCase())) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message:
+              "TAN must match format: 4 letters + 5 digits + 1 letter (e.g., ASDF12345N)",
+            field: "tan",
+            expectedFormat: "ASDF12345N",
+          },
+        });
+      }
     }
 
     if (!address.addressType) {
@@ -386,8 +602,119 @@ const createWarehouse = async (req, res) => {
       });
     }
 
+    // Validate documents if provided
+    if (documents && documents.length > 0) {
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
+
+        // Validate document type
+        if (!doc.documentType) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Document type is required",
+              field: `documents[${i}].documentType`,
+            },
+          });
+        }
+
+        // Validate document number
+        if (!doc.documentNumber) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Document number is required",
+              field: `documents[${i}].documentNumber`,
+            },
+          });
+        }
+
+        // Fetch document type name for validation
+        const docTypeInfo = await knex("document_name_master")
+          .where("doc_name_master_id", doc.documentType)
+          .first();
+
+        if (docTypeInfo) {
+          // Validate document number format based on document type
+          const validation = validateDocumentNumber(
+            doc.documentNumber,
+            docTypeInfo.document_name
+          );
+
+          if (!validation.isValid) {
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: validation.message,
+                field: `documents[${i}].documentNumber`,
+                expectedFormat: validation.format,
+              },
+            });
+          }
+
+          // Clean and normalize document number after validation
+          doc.documentNumber = doc.documentNumber.trim().toUpperCase();
+        }
+
+        // Validate valid from date
+        if (!doc.validFrom) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Valid from date is required",
+              field: `documents[${i}].validFrom`,
+            },
+          });
+        }
+
+        // Validate valid from date is not in future
+        const validFromDate = new Date(doc.validFrom);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (validFromDate > today) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Valid from date cannot be in the future",
+              field: `documents[${i}].validFrom`,
+            },
+          });
+        }
+
+        // Validate valid to date
+        if (!doc.validTo) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Valid to date is required",
+              field: `documents[${i}].validTo`,
+            },
+          });
+        }
+
+        // Validate date range (validTo must be after validFrom)
+        const validToDate = new Date(doc.validTo);
+        if (validToDate <= validFromDate) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Valid to date must be after valid from date",
+              field: `documents[${i}].validTo`,
+            },
+          });
+        }
+      }
+    }
+
     // Get consignor ID from logged-in user
-    const consignorId = req.user.consignor_id || "DEFAULT_CONSIGNOR";
+    const consignorId = req.user.consignor_id || "SYSTEM";
     const userId = req.user.user_id || "SYSTEM";
 
     console.log("✅ Validation passed, starting database transaction");
@@ -413,12 +740,12 @@ const createWarehouse = async (req, res) => {
       language: generalDetails.language || "EN",
       vehicle_capacity: generalDetails.vehicleCapacity,
       virtual_yard_in: generalDetails.virtualYardIn || false,
-      radius_virtual_yard_in: generalDetails.radiusVirtualYardIn || 0,
+      radius_for_virtual_yard_in: generalDetails.radiusVirtualYardIn || 0,
       speed_limit: generalDetails.speedLimit || 20,
       weigh_bridge_availability: facilities?.weighBridge || false,
       gatepass_system_available: facilities?.gatepassSystem || false,
       fuel_availability: facilities?.fuelAvailability || false,
-      staging_area: facilities?.stagingArea || false,
+      staging_area_for_goods_organization: facilities?.stagingArea || false,
       driver_waiting_area: facilities?.driverWaitingArea || false,
       gate_in_checklist_auth: facilities?.gateInChecklistAuth || false,
       gate_out_checklist_auth: facilities?.gateOutChecklistAuth || false,
@@ -435,13 +762,14 @@ const createWarehouse = async (req, res) => {
       address_id: addressId,
       user_reference_id: warehouseId,
       user_type: "WH",
-      address_type: address.addressType,
+      // address_type: address.addressType,
+      address_type_id: "AT001", // Default address type
       country: address.country,
       state: address.state,
       city: address.city,
       district: address.district || null,
-      street1: address.street1,
-      street2: address.street2 || null,
+      street_1: address.street1,
+      street_2: address.street2 || null,
       postal_code: address.postalCode || null,
       vat_number: address.vatNumber,
       tin_pan: address.tinPan || null,
@@ -456,23 +784,52 @@ const createWarehouse = async (req, res) => {
 
     // Insert documents if provided
     if (documents && documents.length > 0) {
+      const generatedDocumentIds = new Set(); // Track generated IDs in this batch
+
       for (const doc of documents) {
         if (doc.documentType && doc.documentNumber) {
-          const documentId = await generateDocumentUniqueId(trx);
+          // Generate document ID for warehouse_documents table
+          const documentId = await generateDocumentId(
+            trx,
+            generatedDocumentIds
+          );
+          // Use documentId directly as document_unique_id (max 10 chars: WDOC0001)
+          const documentUniqueId = documentId;
+
+          // Insert warehouse document metadata
           await trx("warehouse_documents").insert({
-            document_unique_id: documentId,
+            document_unique_id: documentUniqueId,
             warehouse_id: warehouseId,
-            document_type: doc.documentType,
+            document_id: documentId,
+            document_type_id: doc.documentType, // This is the documentTypeId from frontend
             document_number: doc.documentNumber,
             valid_from: doc.validFrom || null,
             valid_to: doc.validTo || null,
-            file_name: doc.fileName || null,
-            file_type: doc.fileType || null,
-            file_data: doc.fileData || null,
-            status: doc.status !== false ? "ACTIVE" : "INACTIVE",
+            active: doc.status !== false,
             created_by: userId,
             created_at: knex.fn.now(),
+            status: "ACTIVE",
           });
+
+          // If file is uploaded, save to document_upload table
+          if (doc.fileData) {
+            const docUploadId = await generateDocumentUploadId();
+
+            await trx("document_upload").insert({
+              document_id: docUploadId,
+              file_name: doc.fileName,
+              file_type: doc.fileType,
+              file_xstring_value: doc.fileData, // base64 encoded file data
+              system_reference_id: documentUniqueId,
+              is_verified: false,
+              valid_from: doc.validFrom,
+              valid_to: doc.validTo,
+              created_by: userId,
+              updated_by: userId,
+              created_at: knex.fn.now(),
+              updated_at: knex.fn.now(),
+            });
+          }
         }
       }
       console.log(`✅ ${documents.length} documents inserted`);
@@ -488,10 +845,10 @@ const createWarehouse = async (req, res) => {
           // Insert header
           await trx("warehouse_sub_location_header").insert({
             sub_location_hdr_id: subLocationHdrId,
-            warehouse_id: warehouseId,
+            warehouse_unique_id: warehouseId,
             consignor_id: consignorId,
             sub_location_id: subLoc.subLocationType,
-            warehouse_sub_location_description: subLoc.description || null,
+            description: subLoc.description || null,
             status: "ACTIVE",
             created_by: userId,
             created_at: knex.fn.now(),
@@ -503,7 +860,6 @@ const createWarehouse = async (req, res) => {
             await trx("warehouse_sub_location_item").insert({
               geo_fence_item_id: `${subLocationHdrId}_${j + 1}`,
               sub_location_hdr_id: subLocationHdrId,
-              warehouse_id: warehouseId,
               latitude: coord.latitude,
               longitude: coord.longitude,
               sequence: j + 1,
@@ -523,7 +879,7 @@ const createWarehouse = async (req, res) => {
     await trx.commit();
     console.log("✅ Transaction committed successfully");
 
-    // Fetch the created warehouse with all related data
+    // Fetch the created warehouse with all related data including type names
     const createdWarehouse = await knex("warehouse_basic_information as w")
       .leftJoin("tms_address as addr", function () {
         this.on("w.warehouse_id", "=", "addr.user_reference_id").andOn(
@@ -532,13 +888,31 @@ const createWarehouse = async (req, res) => {
           knex.raw("'WH'")
         );
       })
+      .leftJoin(
+        "warehouse_type_master as wtm",
+        "w.warehouse_type",
+        "wtm.warehouse_type_id"
+      )
+      .leftJoin(
+        "material_types_master as mtm",
+        "w.material_type_id",
+        "mtm.material_types_id"
+      )
+      .leftJoin(
+        "address_type_master as atm",
+        "addr.address_type_id",
+        "atm.address_type_id"
+      )
       .select(
         "w.*",
         "addr.country",
         "addr.state",
         "addr.city",
-        "addr.street1",
-        "addr.postal_code"
+        "addr.street_1",
+        "addr.postal_code",
+        "wtm.warehouse_type as warehouse_type_name",
+        "mtm.material_types as material_type_name",
+        "atm.address as address_type_name"
       )
       .where("w.warehouse_id", warehouseId)
       .first();
@@ -652,8 +1026,20 @@ const getMasterData = async (req, res) => {
       .where("status", "ACTIVE")
       .orderBy("warehouse_sub_location_description");
 
+    // Get document types
+    const documentTypes = await knex("document_type_master")
+      .select("document_type_id as value", "document_type as label")
+      .where("status", "ACTIVE")
+      .orderBy("document_type");
+
+    // Get document names
+    const documentNames = await knex("document_name_master")
+      .select("doc_name_master_id as value", "document_name as label")
+      .where("status", "ACTIVE")
+      .orderBy("document_name");
+
     console.log(
-      `✅ Found ${warehouseTypes.length} warehouse types, ${materialTypes.length} material types, ${addressTypes.length} address types, ${subLocationTypes.length} sub-location types`
+      `✅ Found ${warehouseTypes.length} warehouse types, ${materialTypes.length} material types, ${addressTypes.length} address types, ${subLocationTypes.length} sub-location types, ${documentTypes.length} document types, ${documentNames.length} document names`
     );
 
     res.json({
@@ -662,6 +1048,8 @@ const getMasterData = async (req, res) => {
       materialTypes,
       addressTypes,
       subLocationTypes,
+      documentTypes,
+      documentNames,
     });
   } catch (error) {
     console.error("❌ Error fetching master data:", error);
@@ -673,10 +1061,85 @@ const getMasterData = async (req, res) => {
   }
 };
 
+// @desc    Get document file by document unique ID
+// @route   GET /api/warehouse/document/:documentId
+// @access  Private (Consignor, Admin, Super Admin)
+const getDocumentFile = async (req, res) => {
+  try {
+    const { documentId } = req.params;
+
+    console.log(`🔍 Fetching warehouse document file for ID: ${documentId}`);
+
+    // Fetch document details with file data
+    const document = await knex("warehouse_documents as wd")
+      .leftJoin(
+        "document_upload as du",
+        "wd.document_unique_id",
+        "du.system_reference_id"
+      )
+      .leftJoin(
+        "document_name_master as dnm",
+        "wd.document_type_id",
+        "dnm.doc_name_master_id"
+      )
+      .where("wd.document_unique_id", documentId)
+      .where("wd.status", "ACTIVE")
+      .select(
+        "wd.document_type_id",
+        "dnm.document_name as documentTypeName",
+        "wd.document_number",
+        "wd.valid_from",
+        "wd.valid_to",
+        "wd.active",
+        "du.file_name",
+        "du.file_type",
+        "du.file_xstring_value as fileData"
+      )
+      .first();
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Document not found",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const response = {
+      documentType: document.documentTypeName || document.document_type_id,
+      documentNumber: document.document_number,
+      fileName: document.file_name,
+      fileType: document.file_type,
+      fileData: document.fileData, // Include base64 file data
+    };
+
+    res.json({
+      success: true,
+      data: response,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error fetching warehouse document file:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch document file",
+        details: error.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   getWarehouseList,
   getWarehouseById,
   createWarehouse,
   updateWarehouse,
   getMasterData,
+  getDocumentFile,
 };

@@ -24,6 +24,7 @@ import {
   User,
   Calendar,
   Hash,
+  Map,
 } from "lucide-react";
 
 import { getComponentTheme } from "../utils/theme";
@@ -32,16 +33,15 @@ import EmptyState from "../components/ui/EmptyState";
 
 // Import warehouse tab components
 import GeneralDetailsViewTab from "../components/warehouse/tabs/GeneralDetailsViewTab";
-import FacilitiesViewTab from "../components/warehouse/tabs/FacilitiesViewTab";
 import AddressViewTab from "../components/warehouse/tabs/AddressViewTab";
 import DocumentsViewTab from "../components/warehouse/tabs/DocumentsViewTab";
+import GeofencingViewTab from "../components/warehouse/tabs/GeofencingViewTab";
 
 // Import edit components for edit mode
-import GeneralDetailsEditTab from "../components/warehouse/tabs/GeneralDetailsEditTab";
-import FacilitiesEditTab from "../components/warehouse/tabs/FacilitiesEditTab";
-import AddressEditTab from "../components/warehouse/tabs/AddressEditTab";
-import DocumentsEditTab from "../components/warehouse/tabs/DocumentsEditTab";
-import GeofencingTab from "@/features/warehouse/components/GeofencingTab";
+import GeneralDetailsEditTab from "../features/warehouse/components/GeneralDetailsTab";
+import AddressEditTab from "../features/warehouse/components/AddressTab";
+import DocumentsEditTab from "../features/warehouse/components/DocumentsTab";
+import GeofencingEditTab from "../features/warehouse/components/GeofencingTab";
 
 const WarehouseDetails = () => {
   const { id } = useParams();
@@ -59,9 +59,9 @@ const WarehouseDetails = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
     0: false, // General Details
-    1: false, // Facilities
-    2: false, // Address
-    3: false, // Documents
+    1: false, // Address
+    2: false, // Documents
+    3: false, // Geofencing
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -90,6 +90,13 @@ const WarehouseDetails = () => {
       icon: FileText,
       viewComponent: DocumentsViewTab,
       editComponent: DocumentsEditTab,
+    },
+    {
+      id: 3,
+      name: "Geofencing",
+      icon: Map,
+      viewComponent: GeofencingViewTab,
+      editComponent: GeofencingEditTab,
     },
   ];
 
@@ -128,7 +135,21 @@ const WarehouseDetails = () => {
     }
   }, [activeTab, isEditMode]);
 
-  const handleEditToggle = () => {
+  const handleEditToggle = (e) => {
+    // Prevent any default behavior
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    console.log("🔍 handleEditToggle called", {
+      isEditMode,
+      hasUnsavedChanges,
+      currentWarehouse: currentWarehouse?.warehouse_id,
+      user: user?.user_id,
+      role,
+    });
+
     if (isEditMode && hasUnsavedChanges) {
       // Show confirmation dialog for unsaved changes
       const confirmCancel = window.confirm(
@@ -136,11 +157,13 @@ const WarehouseDetails = () => {
       );
 
       if (!confirmCancel) {
+        console.log("🔍 User cancelled edit toggle");
         return;
       }
     }
 
     if (isEditMode) {
+      console.log("🔍 Cancelling edit mode - resetting form data");
       // Cancel edit mode - reset form data
       setEditFormData(currentWarehouse);
       setValidationErrors({});
@@ -151,8 +174,12 @@ const WarehouseDetails = () => {
         3: false,
       });
       setHasUnsavedChanges(false);
+    } else {
+      console.log("🔍 Entering edit mode");
     }
+
     setIsEditMode(!isEditMode);
+    console.log("🔍 Edit mode toggled to:", !isEditMode);
   };
 
   const validateAllSections = (formData) => {
@@ -525,6 +552,7 @@ const WarehouseDetails = () => {
             {isEditMode ? (
               <>
                 <button
+                  type="button"
                   onClick={handleEditToggle}
                   className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105"
                 >
@@ -533,6 +561,7 @@ const WarehouseDetails = () => {
                 </button>
 
                 <button
+                  type="button"
                   onClick={handleSaveChanges}
                   disabled={loading}
                   className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
@@ -552,6 +581,7 @@ const WarehouseDetails = () => {
               </>
             ) : (
               <button
+                type="button"
                 onClick={handleEditToggle}
                 className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
               >

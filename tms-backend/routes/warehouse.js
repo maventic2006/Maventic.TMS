@@ -6,6 +6,7 @@ const {
   createWarehouse,
   updateWarehouse,
   getMasterData,
+  getDocumentFile,
 } = require("../controllers/warehouseController");
 const { authenticateToken, authorizeRoles } = require("../middleware/auth");
 
@@ -17,6 +18,13 @@ const allowedRoles = ["consignor", "admin", "product_owner"]; // Using product_o
 
 // GET /api/warehouse/master-data - Get master data (warehouse types, etc.)
 router.get("/master-data", authorizeRoles(allowedRoles), getMasterData);
+
+// GET /api/warehouse/document/:documentId - Get document file by document unique ID
+router.get(
+  "/document/:documentId",
+  authorizeRoles(allowedRoles),
+  getDocumentFile
+);
 
 // GET /api/warehouse - Get paginated warehouse list with filters (matches transporter pattern)
 router.get("/", authorizeRoles(allowedRoles), getWarehouseList);

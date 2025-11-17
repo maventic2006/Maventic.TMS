@@ -1,8 +1,12 @@
 ﻿import React from "react";
+import { useDispatch } from "react-redux";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { CustomSelect } from "@/components/ui/Select";
+import { addToast } from "../../../redux/slices/uiSlice";
+import { TOAST_TYPES } from "../../../utils/constants";
 
 const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
+  const dispatch = useDispatch();
   const addDocument = () => {
     setFormData((prev) => ({
       ...prev,
@@ -40,25 +44,69 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
 
   const handleFileUpload = (index, event) => {
     const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData((prev) => ({
-          ...prev,
-          documents: prev.documents.map((doc, i) =>
-            i === index
-              ? {
-                  ...doc,
-                  fileName: file.name,
-                  fileType: file.type,
-                  fileData: reader.result.split(",")[1], // Base64 string without data URL prefix
-                }
-              : doc
-          ),
-        }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // File validation
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (file.size > maxSize) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "File size must be less than 5MB",
+          duration: 4000,
+        })
+      );
+      event.target.value = "";
+      return;
     }
+
+    if (!allowedTypes.includes(file.type)) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "Only JPEG, PNG, GIF, PDF, DOC, and DOCX files are allowed",
+          duration: 4000,
+        })
+      );
+      event.target.value = "";
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({
+        ...prev,
+        documents: prev.documents.map((doc, i) =>
+          i === index
+            ? {
+                ...doc,
+                fileName: file.name,
+                fileType: file.type,
+                fileData: reader.result.split(",")[1], // Base64 string without data URL prefix
+              }
+            : doc
+        ),
+      }));
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: `File "${file.name}" uploaded successfully`,
+          duration: 2000,
+        })
+      );
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -120,9 +168,9 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
                       onValueChange={(value) =>
                         handleDocumentChange(index, "documentType", value)
                       }
-                      options={masterData?.documentTypes || []}
-                      getOptionLabel={(option) => option.document_type_name}
-                      getOptionValue={(option) => option.document_type_id}
+                      options={masterData?.documentNames || []}
+                      getOptionLabel={(option) => option.label}
+                      getOptionValue={(option) => option.value}
                       placeholder="Select document type"
                       error={errors?.[`documents.${index}.documentType`]}
                       required

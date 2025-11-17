@@ -217,10 +217,14 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
             <input
               type="text"
               value={formData.address.vatNumber}
-              onChange={(e) =>
-                handleChange("vatNumber", e.target.value.toUpperCase())
-              }
-              placeholder="Enter VAT number"
+              onChange={(e) => {
+                // Allow only alphanumeric characters and convert to uppercase
+                const cleaned = e.target.value
+                  .replace(/[^A-Z0-9]/gi, "")
+                  .toUpperCase();
+                handleChange("vatNumber", cleaned);
+              }}
+              placeholder="Enter VAT number (alphanumeric only)"
               maxLength={20}
               className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
                 errors?.["address.vatNumber"]
@@ -234,7 +238,8 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
               </p>
             )}
             <p className="text-xs text-gray-500">
-              8-20 alphanumeric characters
+              8-20 alphanumeric characters (automatically converted to
+              uppercase)
             </p>
           </div>
 
