@@ -32,6 +32,7 @@ import WarehouseCreatePage from "./features/warehouse/pages/WarehouseCreatePage"
 import ConsignorMaintenance from "./pages/ConsignorMaintenance";
 import ConsignorDetailsPage from "./pages/ConsignorDetailsPage";
 import ConsignorCreatePage from "./features/consignor/pages/ConsignorCreatePage";
+import SuperAdminApprovalList from "./pages/SuperAdminApprovalList";
 import SessionExpiryWarningModal from "./components/auth/SessionExpiryWarningModal";
 import {
   verifyToken,
@@ -526,6 +527,18 @@ function App() {
                       <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                         <Layout>
                           <ConsignorDetailsPage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  {/* Super Admin Approval List Route */}
+                  <Route
+                    path="/approvals/super-admin"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <SuperAdminApprovalList />
                         </Layout>
                       </PrivateRoute>
                     }

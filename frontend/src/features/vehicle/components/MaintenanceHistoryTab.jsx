@@ -21,10 +21,6 @@ const MaintenanceHistoryTab = ({ formData, setFormData, errors }) => {
       typeOfService: "",
       serviceExpense: 0,
       serviceRemark: "",
-      odometerReading: 0,
-      serviceCenter: "",
-      technician: "",
-      invoiceNumber: "",
       partsReplaced: "",
     };
 
@@ -110,11 +106,7 @@ const MaintenanceHistoryTab = ({ formData, setFormData, errors }) => {
                       <th className="pb-3 pl-4 min-w-[150px]">Service Date</th>
                       <th className="pb-3 pl-4 min-w-[150px]">Upcoming Service</th>
                       <th className="pb-3 pl-4 min-w-[200px]">Type of Service</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Odometer Reading</th>
                       <th className="pb-3 pl-4 min-w-[150px]">Service Expense</th>
-                      <th className="pb-3 pl-4 min-w-[200px]">Service Center</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Technician</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Invoice Number</th>
                       <th className="pb-3 pl-4 min-w-[250px]">Service Remark</th>
                       <th className="pb-3 w-12"></th>
                     </tr>
@@ -191,21 +183,6 @@ const MaintenanceHistoryTab = ({ formData, setFormData, errors }) => {
                           <td className="px-3">
                             <input
                               type="number"
-                              value={service.odometerReading || 0}
-                              onChange={(e) =>
-                                updateService(index, "odometerReading", parseInt(e.target.value) || 0)
-                              }
-                              placeholder="10000"
-                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.maintenanceHistory?.[index]?.odometerReading
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <input
-                              type="number"
                               value={service.serviceExpense || 0}
                               onChange={(e) =>
                                 updateService(index, "serviceExpense", parseFloat(e.target.value) || 0)
@@ -213,51 +190,6 @@ const MaintenanceHistoryTab = ({ formData, setFormData, errors }) => {
                               placeholder="50000"
                               className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors?.maintenanceHistory?.[index]?.serviceExpense
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <input
-                              type="text"
-                              value={service.serviceCenter || ""}
-                              onChange={(e) =>
-                                updateService(index, "serviceCenter", e.target.value)
-                              }
-                              placeholder="Service center"
-                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.maintenanceHistory?.[index]?.serviceCenter
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <input
-                              type="text"
-                              value={service.technician || ""}
-                              onChange={(e) =>
-                                updateService(index, "technician", e.target.value)
-                              }
-                              placeholder="Technician name"
-                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.maintenanceHistory?.[index]?.technician
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <input
-                              type="text"
-                              value={service.invoiceNumber || ""}
-                              onChange={(e) =>
-                                updateService(index, "invoiceNumber", e.target.value)
-                              }
-                              placeholder="Invoice number"
-                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.maintenanceHistory?.[index]?.invoiceNumber
                                   ? "border-red-500"
                                   : "border-gray-300"
                               }`}

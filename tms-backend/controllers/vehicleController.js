@@ -155,6 +155,62 @@ const generateSequenceNumber = async (vehicleId) => {
   }
 };
 
+/**
+ * Generate unique Vehicle Owner User ID
+ * Format: VO0001, VO0002, etc.
+ */
+const generateVehicleOwnerUserId = async () => {
+  try {
+    const result = await db('user_master')
+      .where('user_id', 'like', 'VO%')
+      .max('user_id as max_id')
+      .first();
+    
+    if (!result.max_id) {
+      return 'VO0001';
+    }
+    
+    const numPart = parseInt(result.max_id.substring(2)) + 1;
+    return 'VO' + numPart.toString().padStart(4, '0');
+  } catch (error) {
+    console.error('Error generating vehicle owner user ID:', error);
+    throw new Error('Failed to generate vehicle owner user ID');
+  }
+};
+
+/**
+ * Generate unique Approval Flow ID
+ * Format: AF0001, AF0002, etc.
+ */
+const generateApprovalFlowId = async () => {
+  try {
+    const result = await db('approval_flow_trans')
+      .max('approval_flow_trans_id as max_id')
+      .first();
+    
+    if (!result.max_id) {
+      return 'AF0001';
+    }
+    
+    const numPart = parseInt(result.max_id.substring(2)) + 1;
+    return 'AF' + numPart.toString().padStart(4, '0');
+  } catch (error) {
+    console.error('Error generating approval flow ID:', error);
+    throw new Error('Failed to generate approval flow ID');
+  }
+};
+
+/**
+ * Generate initial password for vehicle owner
+ * Format: {RegistrationNumber}@{Random4Digits}
+ * Example: MH12AB1234@4729
+ */
+const generateVehicleOwnerPassword = (registrationNumber) => {
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
+  const cleanRegNo = registrationNumber.replace(/\s+/g, '').substring(0, 15);
+  return `${cleanRegNo}@${randomNum}`;
+};
+
 // ============================================================================
 // VALIDATION FUNCTIONS
 // ============================================================================
@@ -521,13 +577,95 @@ const createVehicle = async (req, res) => {
       }
     }
     
+    // ========================================================================
+    // CREATE VEHICLE OWNER USER (NEW)
+    // ========================================================================
+    
+    const bcrypt = require('bcrypt');
+    const currentUser = req.user;
+    const creatorUserId = currentUser?.user_id || 'SYSTEM';
+    const creatorName = currentUser?.name || currentUser?.user_id || 'System';
+    
+    // Generate vehicle owner user ID
+    const vehicleOwnerUserId = await generateVehicleOwnerUserId();
+    
+    // Generate initial password
+    const initialPassword = generateVehicleOwnerPassword(
+      vehicleData.vehicle_registration_number || `VEH${vehicleId.substring(3)}`
+    );
+    const hashedPassword = await bcrypt.hash(initialPassword, 10);
+    
+    // Cross-approval logic
+    let pendingWithUserId, pendingWithName;
+    if (creatorUserId === 'PO001') {
+      pendingWithUserId = 'PO002';
+      pendingWithName = 'Product Owner 2';
+    } else if (creatorUserId === 'PO002') {
+      pendingWithUserId = 'PO001';
+      pendingWithName = 'Product Owner 1';
+    } else {
+      pendingWithUserId = 'PO001';
+      pendingWithName = 'Product Owner 1';
+    }
+    
+    // Insert vehicle owner user
+    await trx('user_master').insert({
+      user_id: vehicleOwnerUserId,
+      user_type_id: 'UT005',
+      user_full_name: `Vehicle Owner - ${vehicleId}`,
+      email_id: `${vehicleOwnerUserId.toLowerCase()}@vehicle.tms.com`,
+      mobile_number: '0000000000',
+      from_date: new Date(),
+      is_active: false,
+      password: hashedPassword,
+      password_type: 'initial',
+      created_by_user_id: creatorUserId,
+      status: 'PENDING',
+      created_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    });
+    
+    console.log(`✅ Vehicle Owner user created: ${vehicleOwnerUserId}`);
+    
+    // Create approval flow entry
+    const approvalFlowId = await generateApprovalFlowId();
+    
+    await trx('approval_flow_trans').insert({
+      approval_flow_trans_id: approvalFlowId,
+      approval_config_id: 'AC0004',
+      approval_type_id: 'AT004',
+      user_id_reference_id: vehicleOwnerUserId,
+      s_status: 'Pending for Approval',
+      approver_level: 1,
+      pending_with_role_id: 'RL001',
+      pending_with_user_id: pendingWithUserId,
+      pending_with_name: pendingWithName,
+      created_by_user_id: creatorUserId,
+      created_by_name: creatorName,
+      created_at: db.fn.now(),
+      updated_at: db.fn.now(),
+    });
+    
+    console.log(`✅ Approval flow created: ${approvalFlowId} → Pending with ${pendingWithUserId}`);
+    
+    // ========================================================================
+    // COMMIT TRANSACTION
+    // ========================================================================
+    
     await trx.commit();
     
     res.status(201).json({
       success: true,
-      message: 'Vehicle created successfully',
+      message: 'Vehicle created successfully. Vehicle Owner user created and pending approval.',
       data: {
-        vehicleId: vehicleId
+        vehicleId: vehicleId,
+        userApproval: {
+          userId: vehicleOwnerUserId,
+          userType: 'Independent Vehicle Owner',
+          initialPassword: initialPassword,
+          status: 'Pending for Approval',
+          pendingWith: pendingWithName,
+        }
       }
     });
     
@@ -556,40 +694,67 @@ const getAllVehicles = async (req, res) => {
       page = 1,
       limit = 25,
       search = '',
+      registrationNumber = '',
       vehicleType = '',
+      make = '',
+      model = '',
+      yearFrom = '',
+      yearTo = '',
       status = '',
+      registrationState = '',
       fuelType = '',
+      leasingFlag = '',
+      towingCapacityMin = '',
+      towingCapacityMax = '',
       ownership = '',
+      gpsEnabled = '',
+      vehicleCondition = '',
+      engineType = '',
+      emissionStandard = '',
+      bodyType = '',
       sortBy = 'created_at',
       sortOrder = 'asc' // Changed to 'asc' so newest vehicles appear at the end of the list
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build query
+    // Build query without the non-existent vehicle_capacity_details table
     let query = db('vehicle_basic_information_hdr as vbih')
       .leftJoin('vehicle_ownership_details as vod', 'vbih.vehicle_id_code_hdr', 'vod.vehicle_id_code')
       .leftJoin('vehicle_type_master as vtm', 'vbih.vehicle_type_id', 'vtm.vehicle_type_id')
+      .leftJoin('fuel_type_master as ftm', 'vbih.fuel_type_id', 'ftm.fuel_type_id')
       .select(
-        'vbih.vehicle_id_code_hdr',
-        'vbih.vehicle_registration_number',
-        'vbih.maker_brand_description',
-        'vbih.maker_model',
-        'vbih.vin_chassis_no',
-        'vbih.vehicle_type_id',
-        'vtm.vehicle_type_description',
+        'vbih.vehicle_id_code_hdr as vehicleId',
+        'vbih.vehicle_registration_number as registrationNumber',
+        'vbih.maker_brand_description as make',
+        'vbih.maker_model as model',
+        'vbih.vin_chassis_no as vin',
+        'vbih.vehicle_type_id as vehicleTypeId',
+        'vtm.vehicle_type_description as vehicleType',
         'vbih.vehicle_category',
-        'vbih.fuel_type_id',
+        'vbih.fuel_type_id as fuelTypeId',
+        'ftm.fuel_type as fuelType', // Get fuel type name from master
         'vbih.transmission_type',
-        'vbih.manufacturing_month_year',
-        'vbih.gross_vehicle_weight_kg',
-        'vbih.gps_tracker_imei_number',
-        'vbih.gps_tracker_active_flag',
+        'vbih.manufacturing_month_year as year',
+        'vbih.gross_vehicle_weight_kg as gvw',
+        'vbih.gps_tracker_imei_number as gpsIMEI',
+        'vbih.gps_tracker_active_flag as gpsEnabled',
         'vbih.blacklist_status',
-        'vbih.status as vehicle_status',
+        'vbih.status',
         'vbih.created_at',
+        'vbih.leasing_flag as leasingFlag',
+        'vbih.vehicle_condition',
+        'vbih.fuel_tank_capacity as fuelCapacity',
+        'vbih.engine_type_id',
+        'vbih.emission_standard',
+        'vbih.body_type_desc as bodyType',
+        'vbih.vehicle_colour as color',
+        'vbih.engine_number',
+        'vbih.vehicle_registered_at as registrationState',
         'vod.ownership_name',
-        'vod.registration_date'
+        'vod.registration_date',
+        // Get towing capacity from the basic info header table
+        'vbih.towing_capacity as towingCapacity'
       );
 
     // Apply search filter
@@ -599,21 +764,94 @@ const getAllVehicles = async (req, res) => {
           .orWhere('vbih.vehicle_registration_number', 'like', `%${search}%`)
           .orWhere('vbih.maker_brand_description', 'like', `%${search}%`)
           .orWhere('vbih.maker_model', 'like', `%${search}%`)
-          .orWhere('vbih.vin_chassis_no', 'like', `%${search}%`);
+          .orWhere('vbih.vin_chassis_no', 'like', `%${search}%`)
+          .orWhere('vbih.engine_number', 'like', `%${search}%`)
+          .orWhere('vtm.vehicle_type_description', 'like', `%${search}%`)
+          .orWhere('ftm.fuel_type', 'like', `%${search}%`)
+          .orWhere('vod.ownership_name', 'like', `%${search}%`);
       });
     }
 
     // Apply filters
+    if (registrationNumber) {
+      query = query.where('vbih.vehicle_registration_number', 'like', `%${registrationNumber}%`);
+    }
+
     if (vehicleType) {
       query = query.where('vbih.vehicle_type_id', vehicleType);
+    }
+
+    if (make) {
+      query = query.where('vbih.maker_brand_description', 'like', `%${make}%`);
+    }
+
+    if (model) {
+      query = query.where('vbih.maker_model', 'like', `%${model}%`);
+    }
+
+    if (yearFrom) {
+      query = query.where('vbih.manufacturing_month_year', '>=', yearFrom);
+    }
+
+    if (yearTo) {
+      query = query.where('vbih.manufacturing_month_year', '<=', yearTo);
     }
 
     if (status) {
       query = query.where('vbih.status', status);
     }
 
+    if (registrationState) {
+      query = query.where('vbih.vehicle_registered_at', 'like', `%${registrationState}%`);
+    }
+
     if (fuelType) {
-      query = query.where('vbih.fuel_type_id', fuelType);
+      // Check if it's an ID or name
+      if (fuelType.startsWith('FT')) {
+        query = query.where('vbih.fuel_type_id', fuelType);
+      } else {
+        query = query.where('ftm.fuel_type', 'like', `%${fuelType}%`);
+      }
+    }
+
+    if (leasingFlag) {
+      // Convert string to boolean for database query
+      const isLeased = leasingFlag === 'true' || leasingFlag === '1';
+      query = query.where('vbih.leasing_flag', isLeased);
+    }
+
+    if (gpsEnabled) {
+      // Convert string to boolean for database query
+      const gpsActive = gpsEnabled === 'true' || gpsEnabled === '1';
+      query = query.where('vbih.gps_tracker_active_flag', gpsActive);
+    }
+
+    if (ownership) {
+      query = query.where('vod.ownership_name', 'like', `%${ownership}%`);
+    }
+
+    if (vehicleCondition) {
+      query = query.where('vbih.vehicle_condition', vehicleCondition);
+    }
+
+    if (engineType) {
+      query = query.where('vbih.engine_type_id', engineType);
+    }
+
+    if (emissionStandard) {
+      query = query.where('vbih.emission_standard', emissionStandard);
+    }
+
+    if (bodyType) {
+      query = query.where('vbih.body_type_desc', 'like', `%${bodyType}%`);
+    }
+
+    if (towingCapacityMin) {
+      query = query.where('vbih.towing_capacity', '>=', parseInt(towingCapacityMin));
+    }
+
+    if (towingCapacityMax) {
+      query = query.where('vbih.towing_capacity', '<=', parseInt(towingCapacityMax));
     }
 
     // Get total count for pagination
@@ -628,14 +866,48 @@ const getAllVehicles = async (req, res) => {
 
     const vehicles = await query;
 
+    // Transform the data to match frontend expectations
+    const transformedVehicles = vehicles.map(vehicle => ({
+      vehicleId: vehicle.vehicleId,
+      registrationNumber: vehicle.registrationNumber || 'N/A',
+      make: vehicle.make,
+      model: vehicle.model,
+      vin: vehicle.vin,
+      vehicleTypeId: vehicle.vehicleTypeId,
+      vehicleType: vehicle.vehicleType,
+      vehicleCategory: vehicle.vehicle_category,
+      fuelTypeId: vehicle.fuelTypeId,
+      fuelType: vehicle.fuelType, // Now comes from master table
+      transmissionType: vehicle.transmission_type,
+      year: vehicle.year ? new Date(vehicle.year).getFullYear() : null,
+      gvw: vehicle.gvw,
+      gpsIMEI: vehicle.gpsIMEI,
+      gpsEnabled: Boolean(vehicle.gpsEnabled), // Convert 0/1 to boolean
+      blacklistStatus: vehicle.blacklist_status,
+      status: vehicle.status,
+      createdAt: vehicle.created_at,
+      leasingFlag: Boolean(vehicle.leasingFlag), // Convert 0/1 to boolean
+      vehicleCondition: vehicle.vehicle_condition,
+      fuelCapacity: parseFloat(vehicle.fuelCapacity) || 0,
+      engineTypeId: vehicle.engine_type_id,
+      emissionStandard: vehicle.emission_standard,
+      bodyType: vehicle.bodyType,
+      color: vehicle.color,
+      engineNumber: vehicle.engine_number,
+      registrationState: vehicle.registrationState,
+      ownershipName: vehicle.ownership_name,
+      registrationDate: vehicle.registration_date,
+      towingCapacity: parseFloat(vehicle.towingCapacity) || 0
+    }));
+
     res.json({
       success: true,
-      data: vehicles,
+      data: transformedVehicles,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total: parseInt(total),
-        totalPages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limit)
       }
     });
 
@@ -722,6 +994,23 @@ const getVehicleById = async (req, res) => {
         .first();
       vehicleTypeDesc = vehicleType?.vehicle_type_description;
     }
+
+    // ========================================================================
+    // FETCH USER APPROVAL STATUS (UPDATED - NO DIRECT VEHICLE_ID IN USER_MASTER)
+    // ========================================================================
+    
+    let userApprovalStatus = null;
+    
+    // Since there's no direct vehicle_id in user_master, we need to find vehicle owner users
+    // by the vehicle owner user ID pattern or use a different approach
+    // For now, we'll skip this section until proper mapping table is implemented
+    
+    // TODO: Implement proper vehicle-user relationship mapping
+    // This could be done via:
+    // 1. A separate vehicle_user_mapping table, or
+    // 2. Storing vehicle reference in approval_flow_trans table
+    
+    console.log(`⚠️  Vehicle owner user lookup skipped - no direct relationship in user_master`);
 
     // Format response
     const response = {
@@ -825,6 +1114,7 @@ const getVehicleById = async (req, res) => {
       blacklistStatus: vehicle.blacklist_status,
       createdAt: vehicle.created_at,
       updatedAt: vehicle.updated_at,
+      userApprovalStatus: userApprovalStatus,
     };
 
     res.json({

@@ -81,4 +81,17 @@ module.exports = {
   // General Errors
   VALIDATION_ERROR: "Please check the submitted data and fix the errors",
   SERVER_ERROR: "Server error. Please try again later",
+  
+  // Field Length Errors
+  FIELD_TOO_LONG: "Field exceeds maximum allowed length",
+  CUSTOMER_NAME_TOO_LONG: "Customer name cannot exceed 100 characters",
+  CONTACT_ROLE_TOO_LONG: "Contact role cannot exceed 100 characters",
+  CONTACT_TEAM_TOO_LONG: "Contact team cannot exceed 100 characters",
+  DOCUMENT_FILE_NAME_TOO_LONG: "Document file name cannot exceed 500 characters. Please rename the file.",
+  LINKEDIN_LINK_TOO_LONG: "LinkedIn link cannot exceed 500 characters",
+  EMAIL_TOO_LONG: "Email address cannot exceed 100 characters",
+  PHONE_NUMBER_TOO_LONG: "Phone number cannot exceed 20 characters",
+  ADDRESS_TOO_LONG: "Address line cannot exceed 200 characters",
+  REMARK_TOO_LONG: "Remark cannot exceed 255 characters",
+  WEBSITE_URL_TOO_LONG: "Website URL cannot exceed 200 characters",
 };

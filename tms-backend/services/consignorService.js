@@ -4,6 +4,7 @@
  */
 
 const knex = require('../config/database');
+const bcrypt = require('bcrypt');
 const {
   consignorCreateSchema,
   consignorUpdateSchema,
@@ -109,6 +110,65 @@ const isCompanyCodeUnique = async (companyCode, excludeCustomerId = null) => {
 
   const existing = await query.first();
   return !existing;
+};
+
+/**
+ * Generate Consignor Admin User ID (format: CA0001, CA0002, etc.)
+ */
+const generateConsignorAdminUserId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("user_master")
+      .where("user_id", "like", "CA%")
+      .orderBy("user_id", "desc")
+      .first();
+
+    let nextNumber = 1;
+    if (result && result.user_id) {
+      const currentNumber = parseInt(result.user_id.substring(2));
+      nextNumber = currentNumber + 1;
+    }
+
+    const newId = `CA${(nextNumber + attempts).toString().padStart(4, "0")}`;
+
+    // Check if ID already exists
+    const exists = await trx("user_master").where("user_id", newId).first();
+    if (!exists) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique Consignor Admin user ID");
+};
+
+/**
+ * Generate Approval Flow Transaction ID (format: AF0001, AF0002, etc.)
+ */
+const generateApprovalFlowId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("approval_flow_trans").count("* as count").first();
+    const count = parseInt(result.count) + 1;
+    const newId = `AF${(count + attempts).toString().padStart(4, "0")}`;
+
+    const existsInDb = await trx("approval_flow_trans")
+      .where("approval_flow_trans_id", newId)
+      .first();
+
+    if (!existsInDb) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique approval flow ID");
 };
 
 /**
@@ -219,6 +279,81 @@ const getConsignorList = async (queryParams) => {
 };
 
 /**
+ * Get warehouses mapped to a consignor with filters
+ */
+const getConsignorWarehouses = async (customerId, filters = {}) => {
+  try {
+    const { search, status, warehouse_type, page = 1, limit = 10 } = filters;
+
+    // Build base query - join consignor_warehouse_mapping with warehouse_basic_information
+    let query = knex('consignor_warehouse_mapping as cwm')
+      .leftJoin('warehouse_basic_information as wbi', 'cwm.warehouse_id', 'wbi.warehouse_id')
+      .where('cwm.customer_id', customerId)
+      .select(
+        'cwm.mapping_id',
+        'cwm.warehouse_id',
+        'cwm.customer_id',
+        'cwm.status as mapping_status',
+        'cwm.created_at as mapped_at',
+        'wbi.warehouse_name',
+        'wbi.warehouse_type',
+        'wbi.contact_person',
+        'wbi.contact_number',
+        'wbi.email_id',
+        'wbi.city',
+        'wbi.state',
+        'wbi.country',
+        'wbi.status as warehouse_status'
+      );
+
+    // Apply filters
+    if (search) {
+      query = query.where(function() {
+        this.where('wbi.warehouse_name', 'like', `%${search}%`)
+          .orWhere('wbi.warehouse_id', 'like', `%${search}%`)
+          .orWhere('wbi.city', 'like', `%${search}%`);
+      });
+    }
+
+    if (status) {
+      query = query.where('cwm.status', status);
+    }
+
+    if (warehouse_type) {
+      query = query.where('wbi.warehouse_type', warehouse_type);
+    }
+
+    // Get total count
+    const countQuery = query.clone().count('* as total').first();
+    const { total } = await countQuery;
+
+    // Apply pagination
+    const offset = (page - 1) * limit;
+    const warehouses = await query
+      .orderBy('cwm.created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
+
+    console.log(`🏭 Found ${warehouses.length} warehouses for consignor ${customerId}`);
+
+    return {
+      data: warehouses,
+      meta: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: parseInt(total),
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPrevPage: page > 1
+      }
+    };
+  } catch (error) {
+    console.error('Get consignor warehouses error:', error);
+    throw error;
+  }
+};
+
+/**
  * Get Consignor by ID with all related data
  */
 const getConsignorById = async (customerId) => {
@@ -296,7 +431,50 @@ const getConsignorById = async (customerId) => {
     }
 
     console.log(`📸 Found ${contacts.length} contacts for customer ${customerId}`);
-    console.log(`📋 NDA: ${consignor.upload_nda}, MSA: ${consignor.upload_msa}`);
+    
+    // 🔍 DETAILED NDA/MSA DEBUG
+    console.log('\n� ===== NDA/MSA DEBUG =====');
+    console.log('NDA Document ID:', consignor.upload_nda);
+    console.log('NDA Expiry Date:', consignor.nda_expiry_date);
+    console.log('MSA Document ID:', consignor.upload_msa);
+    console.log('MSA Expiry Date:', consignor.msa_expiry_date);
+    console.log('Type of upload_nda:', typeof consignor.upload_nda);
+    console.log('Type of upload_msa:', typeof consignor.upload_msa);
+    console.log('===========================\n');
+
+    // Get user approval status if exists
+    let userApprovalStatus = null;
+    try {
+      const consignorUser = await knex("user_master")
+        .where("consignor_id", customerId)
+        .where("user_type_id", "UT006") // Consignor Admin
+        .first();
+
+      if (consignorUser) {
+        // Get approval flow information
+        const approvalFlow = await knex("approval_flow_trans")
+          .where("user_id_reference_id", consignorUser.user_id)
+          .where("approval_type_id", "AT002") // Consignor Admin
+          .orderBy("created_at", "desc")
+          .first();
+
+        userApprovalStatus = {
+          userId: consignorUser.user_id,
+          userEmail: consignorUser.email_id,
+          userMobile: consignorUser.mobile_number,
+          userStatus: consignorUser.status,
+          isActive: consignorUser.is_active || false,
+          currentApprovalStatus: approvalFlow?.s_status || "Not in Approval Flow",
+          pendingWith: approvalFlow?.pending_with_name || null,
+          pendingWithUserId: approvalFlow?.pending_with_user_id || null,
+        };
+        
+        console.log(`👤 Found user approval status for ${consignorUser.user_id}`);
+      }
+    } catch (approvalError) {
+      console.warn('⚠️  Could not fetch approval status:', approvalError.message);
+      // Don't fail the whole request if approval status fetch fails
+    }
 
     // Construct response with frontend field names
     return {
@@ -312,10 +490,8 @@ const getConsignorById = async (customerId) => {
         name_on_po: consignor.name_on_po,
         approved_by: consignor.approved_by,
         approved_date: consignor.approved_date,
-        upload_nda: consignor.upload_nda,          // Add NDA document ID
-        nda_expiry_date: consignor.nda_expiry_date, // Add NDA expiry
-        upload_msa: consignor.upload_msa,          // Add MSA document ID
-        msa_expiry_date: consignor.msa_expiry_date, // Add MSA expiry
+        upload_nda: consignor.upload_nda,          // NDA document ID
+        upload_msa: consignor.upload_msa,          // MSA document ID
         status: consignor.status
       },
       // Map database column names to frontend field names
@@ -348,7 +524,8 @@ const getConsignorById = async (customerId) => {
         file_name: d.file_name,                    // Original file name
         file_type: d.file_type,                    // MIME type
         status: 'ACTIVE'                           // Add status for frontend
-      }))
+      })),
+      userApprovalStatus // Add approval status to response
     };
   } catch (error) {
     console.error('Get consignor by ID error:', error);
@@ -581,7 +758,6 @@ const createConsignor = async (payload, files, userId) => {
           .where('customer_id', general.customer_id)
           .update({
             upload_nda: ndaDocId,
-            nda_expiry_date: general.nda_expiry_date || null,
             updated_by: userId,
             updated_at: knex.fn.now()
           });
@@ -613,7 +789,6 @@ const createConsignor = async (payload, files, userId) => {
           .where('customer_id', general.customer_id)
           .update({
             upload_msa: msaDocId,
-            msa_expiry_date: general.msa_expiry_date || null,
             updated_by: userId,
             updated_at: knex.fn.now()
           });
@@ -663,12 +838,133 @@ const createConsignor = async (payload, files, userId) => {
       }
     }
 
+    // ========================================
+    // PHASE 7: CREATE CONSIGNOR ADMIN USER & APPROVAL WORKFLOW
+    // ========================================
+
+    console.log("📝 Creating Consignor Admin user for approval workflow...");
+
+    // Generate user ID for Consignor Admin
+    const consignorAdminUserId = await generateConsignorAdminUserId(trx);
+    console.log(`  Generated user ID: ${consignorAdminUserId}`);
+
+    // Get creator details from user context
+    const creatorUserId = userId;
+    
+    // Get creator name from database
+    const creator = await trx("user_master").where("user_id", userId).first();
+    const creatorName = creator?.user_full_name || "System";
+
+    // Generate initial password (based on customer name + random number)
+    const customerNameClean = general.customer_name.replace(/[^a-zA-Z0-9]/g, "");
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const initialPassword = `${customerNameClean}@${randomNum}`;
+    const hashedPassword = await bcrypt.hash(initialPassword, 10);
+
+    // Extract contact details from first contact
+    const primaryContact = contacts && contacts.length > 0 ? contacts[0] : null;
+    const userEmail = primaryContact?.email || `${general.customer_id.toLowerCase()}@consignor.com`;
+    const userMobile = primaryContact?.number || "0000000000";
+
+    // Create user in user_master with Pending for Approval status
+    await trx("user_master").insert({
+      user_id: consignorAdminUserId,
+      user_type_id: "UT006", // Consignor Admin
+      user_full_name: `${general.customer_name} - Admin`,
+      email_id: userEmail,
+      mobile_number: userMobile,
+      consignor_id: general.customer_id, // Link to consignor
+      is_active: false, // Inactive until approved
+      created_by_user_id: creatorUserId,
+      password: hashedPassword,
+      password_type: "initial",
+      status: "Pending for Approval", // Critical: Set to pending
+      created_by: creatorUserId,
+      updated_by: creatorUserId,
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+    });
+
+    console.log(`  ✅ Created user: ${consignorAdminUserId} (Pending for Approval)`);
+
+    // Get approval configuration for Consignor Admin (Level 1 only)
+    const approvalConfig = await trx("approval_configuration")
+      .where({
+        approval_type_id: "AT002", // Consignor Admin
+        approver_level: 1,
+        status: "ACTIVE",
+      })
+      .first();
+
+    if (!approvalConfig) {
+      throw new Error("Approval configuration not found for Consignor Admin. Please run migration to add AC0002.");
+    }
+
+    // Determine pending approver (Product Owner who did NOT create this)
+    // If PO001 created, pending with PO002; if PO002 created, pending with PO001
+    let pendingWithUserId = null;
+    let pendingWithName = null;
+
+    if (creatorUserId === "PO001") {
+      const po2 = await trx("user_master").where("user_id", "PO002").first();
+      pendingWithUserId = "PO002";
+      pendingWithName = po2?.user_full_name || "Product Owner 2";
+    } else if (creatorUserId === "PO002") {
+      const po1 = await trx("user_master").where("user_id", "PO001").first();
+      pendingWithUserId = "PO001";
+      pendingWithName = po1?.user_full_name || "Product Owner 1";
+    } else {
+      // If creator is neither PO1 nor PO2, default to PO001
+      const po1 = await trx("user_master").where("user_id", "PO001").first();
+      pendingWithUserId = "PO001";
+      pendingWithName = po1?.user_full_name || "Product Owner 1";
+    }
+
+    // Generate approval flow trans ID
+    const approvalFlowId = await generateApprovalFlowId(trx);
+
+    // Create approval flow transaction entry
+    await trx("approval_flow_trans").insert({
+      approval_flow_trans_id: approvalFlowId,
+      approval_config_id: approvalConfig.approval_config_id,
+      approval_type_id: "AT002", // Consignor Admin
+      user_id_reference_id: consignorAdminUserId,
+      s_status: "Pending for Approval",
+      approver_level: 1,
+      pending_with_role_id: "RL001", // Product Owner role
+      pending_with_user_id: pendingWithUserId,
+      pending_with_name: pendingWithName,
+      created_by_user_id: creatorUserId,
+      created_by_name: creatorName,
+      created_by: creatorUserId,
+      updated_by: creatorUserId,
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
+      status: "ACTIVE",
+    });
+
+    console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+    console.log(`  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`);
+    console.log(`  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`);
+
     // Commit transaction
     await trx.commit();
 
-    // Fetch and return complete consignor data
+    // Fetch and return complete consignor data with approval info
     const createdConsignor = await getConsignorById(general.customer_id);
-    return createdConsignor;
+    
+    // Add approval info to response
+    return {
+      ...createdConsignor,
+      approvalInfo: {
+        userId: consignorAdminUserId,
+        userEmail: userEmail,
+        initialPassword: initialPassword,
+        approvalStatus: "Pending for Approval",
+        pendingWith: pendingWithName,
+        pendingWithUserId: pendingWithUserId,
+      }
+    };
   } catch (error) {
     // Rollback transaction on error
     await trx.rollback();
@@ -1096,5 +1392,6 @@ module.exports = {
   getMasterData,
   getDocumentFile,
   getContactPhoto,
-  getGeneralDocument
+  getGeneralDocument,
+  getConsignorWarehouses
 };

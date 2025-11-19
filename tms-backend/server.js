@@ -89,6 +89,7 @@ const vehicleRoutes = require("./routes/vehicles");
 const userRoutes = require("./routes/users");
 const materialRoutes = require("./routes/materials");
 const transporterRoutes = require("./routes/transporter");
+const approvalRoutes = require("./routes/approval");
 const bulkUploadRoutes = require("./routes/bulkUploadRoutes");
 const bulkUploadQueue = require("./queues/bulkUploadQueue");
 const { processBulkUpload } = require("./queues/bulkUploadProcessor");
@@ -111,7 +112,6 @@ driverBulkUploadQueue.process(async (job) => {
   return await processDriverBulkUpload(job, io);
 });
 const driverRoutes = require("./routes/driver");
-const approvalRoutes = require("./routes/approval");
 
 // Routes
 app.use("/api/warehouse", warehouseRoutes);
@@ -127,7 +127,7 @@ app.use("/api/vehicle/bulk-upload", vehicleBulkUploadRoutes);
 app.use("/api/driver-bulk-upload", driverBulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
-app.use("/api/approval", approvalRoutes);
+app.use("/api/approvals", approvalRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

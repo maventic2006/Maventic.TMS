@@ -11,7 +11,7 @@ import { TOAST_TYPES } from "../../utils/constants";
  * Displays approval status and action buttons (Approve/Reject) for Transporter Admin users
  * Only visible to Product Owners who did NOT create the transporter
  */
-const ApprovalActionBar = ({ userApprovalStatus, transporterId }) => {
+const ApprovalActionBar = ({ userApprovalStatus, transporterId, onRefreshData }) => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { isApproving, isRejecting } = useSelector((state) => state.approval);
@@ -87,8 +87,10 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId }) => {
         })
       );
 
-      // Refresh page to show updated status
-      window.location.reload();
+      // Refresh data to show updated status (instead of page reload)
+      if (onRefreshData) {
+        onRefreshData();
+      }
     } catch (error) {
       dispatch(
         addToast({
@@ -126,8 +128,10 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId }) => {
       setShowRejectModal(false);
       setRejectRemarks("");
 
-      // Refresh page to show updated status
-      window.location.reload();
+      // Refresh data to show updated status (instead of page reload)
+      if (onRefreshData) {
+        onRefreshData();
+      }
     } catch (error) {
       dispatch(
         addToast({

@@ -132,6 +132,27 @@ const createConsignor = async (req, res) => {
     );
 
     console.log('✅ Consignor created successfully');
+    
+    // Extract approval info if present
+    if (consignor.approvalInfo) {
+      const { approvalInfo, ...consignorData } = consignor;
+      
+      return res.status(201).json({
+        success: true,
+        data: {
+          ...consignorData,
+          userId: approvalInfo.userId,
+          userEmail: approvalInfo.userEmail,
+          initialPassword: approvalInfo.initialPassword,
+          message: "Consignor created successfully. Consignor Admin user created and pending approval.",
+          approvalStatus: approvalInfo.approvalStatus,
+          pendingWith: approvalInfo.pendingWith,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+    
+    // Fallback for backward compatibility (if no approval info)
     return successResponse(res, consignor, null, 201);
   } catch (error) {
     console.error('❌ Create consignor error:', error);
@@ -355,6 +376,26 @@ const downloadGeneralDocument = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/consignors/:customerId/warehouses
+ * Get list of warehouses mapped to a consignor with filters
+ */
+const getConsignorWarehouses = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    console.log(`\n🏭 ===== GET CONSIGNOR WAREHOUSES: ${customerId} =====`);
+    console.log('Query params:', req.query);
+
+    const result = await consignorService.getConsignorWarehouses(customerId, req.query);
+
+    console.log(`✅ Retrieved ${result.data.length} warehouses`);
+    return successResponse(res, result.data, result.meta, 200);
+  } catch (error) {
+    console.error('❌ Get consignor warehouses error:', error);
+    return internalServerErrorResponse(res, error);
+  }
+};
+
 module.exports = {
   getConsignors,
   getConsignorById,
@@ -364,5 +405,6 @@ module.exports = {
   getMasterData,
   downloadDocument,
   downloadContactPhoto,
-  downloadGeneralDocument
+  downloadGeneralDocument,
+  getConsignorWarehouses
 };

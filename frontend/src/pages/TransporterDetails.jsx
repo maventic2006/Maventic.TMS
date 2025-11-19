@@ -48,7 +48,11 @@ const TransporterDetails = () => {
 
   // Fetch transporter data
   useEffect(() => {
-    const fetchTransporterDetails = async () => {
+    fetchTransporterDetails();
+  }, [id]);
+
+  // Fetch transporter data function
+  const fetchTransporterDetails = async () => {
       try {
         setLoading(true);
         const response = await transporterAPI.getTransporter(id);
@@ -101,15 +105,19 @@ const TransporterDetails = () => {
       } finally {
         setLoading(false);
       }
-    };
+    // };
 
     if (id) {
       fetchTransporterDetails();
     }
-  }, [id]);
+  }
 
   const handleBackClick = () => {
     navigate('/transporters');
+  };
+
+  const handleRefreshData = () => {
+    fetchTransporterDetails();
   };
 
   const handleTabChange = (tabId) => {
@@ -158,7 +166,7 @@ const TransporterDetails = () => {
               </div>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
                 <Button 
-                  onClick={() => window.location.reload()} 
+                  onClick={handleRefreshData} 
                   className="bg-primary-accent hover:bg-blue-600 text-white px-4 py-2 text-sm"
                 >
                   Try Again

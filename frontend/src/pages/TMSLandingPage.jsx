@@ -334,6 +334,9 @@ const TMSLandingPage = () => {
       } else if (item.title === "Consignor Maintenance") {
         console.log("Navigating to /consignor");
         navigate("/consignor");
+      } else if (item.title === "Super Admin Approval List") {
+        console.log("Navigating to /approvals/super-admin");
+        navigate("/approvals/super-admin");
       }
       // Add more navigation handlers for other menu items as needed
     } catch (error) {

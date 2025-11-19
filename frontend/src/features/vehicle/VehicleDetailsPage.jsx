@@ -42,6 +42,9 @@ import MaintenanceHistoryTab from "./components/MaintenanceHistoryTab";
 import ServiceFrequencyTab from "./components/ServiceFrequencyTab";
 import DocumentsTab from "./components/DocumentsTab";
 
+// Import approval component
+import VehicleApprovalActionBar from "../../components/approval/VehicleApprovalActionBar";
+
 const VehicleDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -126,6 +129,13 @@ const VehicleDetailsPage = () => {
     }
   }, [id, dispatch]);
 
+  // Refresh data function for approval actions
+  const handleRefreshData = () => {
+    if (id) {
+      dispatch(fetchVehicleById(id));
+    }
+  };
+
   // Populate formData when entering edit mode
   useEffect(() => {
     if (currentVehicle && isEditMode) {
@@ -150,6 +160,11 @@ const VehicleDetailsPage = () => {
           gpsProvider: currentVehicle.gpsProvider || "",
           currentDriver: currentVehicle.currentDriver || "",
           usageType: currentVehicle.usageType || "",
+          vehicleRegisteredAtCountry: currentVehicle.vehicleRegisteredAtCountry || "",
+          vehicleRegisteredAtState: currentVehicle.vehicleRegisteredAtState || "",
+          avgRunningSpeed: currentVehicle.avgRunningSpeed || "",
+          maxRunningSpeed: currentVehicle.maxRunningSpeed || "",
+          taxesAndFees: currentVehicle.taxesAndFees || "",
         },
         specifications: {
           engineNumber: currentVehicle.engineNumber || "",
@@ -271,6 +286,10 @@ const VehicleDetailsPage = () => {
         taxes_and_fees: frontendData.basicInformation.taxesAndFees || 0,
         mileage: frontendData.basicInformation.mileage || 0,
         leasing_flag: frontendData.basicInformation.leasingFlag || false,
+        vehicle_registered_at_country: frontendData.basicInformation.vehicleRegisteredAtCountry || "",
+        vehicle_registered_at_state: frontendData.basicInformation.vehicleRegisteredAtState || "",
+        avg_running_speed: frontendData.basicInformation.avgRunningSpeed || 0,
+        max_running_speed: frontendData.basicInformation.maxRunningSpeed || 0,
       },
       specifications: {
         engine_type_id: frontendData.specifications.engineType || "",
@@ -503,6 +522,15 @@ const VehicleDetailsPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* User Approval Bar (if vehicle has pending approval) */}
+            {currentVehicle.userApprovalStatus && (
+              <VehicleApprovalActionBar
+                userApprovalStatus={currentVehicle.userApprovalStatus}
+                vehicleId={id}
+                onRefreshData={handleRefreshData}
+              />
+            )}
+            
             {isEditMode ? (
               <>
                 <button

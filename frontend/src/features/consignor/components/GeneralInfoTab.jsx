@@ -26,10 +26,10 @@ const GeneralInfoTab = ({
     if (file) {
       if (type === "nda") {
         setNdaFile(file);
-        handleInputChange("upload_nda", file.name);
+        handleInputChange("upload_nda", file); // ✅ Store File object, not filename
       } else if (type === "msa") {
         setMsaFile(file);
-        handleInputChange("upload_msa", file.name);
+        handleInputChange("upload_msa", file); // ✅ Store File object, not filename
       }
     }
   };

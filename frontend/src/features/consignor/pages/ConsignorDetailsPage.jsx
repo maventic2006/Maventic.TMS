@@ -24,24 +24,28 @@ import {
   User,
   Calendar,
   Hash,
+  Warehouse,
 } from "lucide-react";
 
 import { getComponentTheme } from "../../../utils/theme";
 import { validateTab } from "../validation";
 import { TOAST_TYPES } from "../../../utils/constants";
 import EmptyState from "../../../components/ui/EmptyState";
+import ConsignorApprovalActionBar from "../../../components/approval/ConsignorApprovalActionBar";
 
 // Import view tab components
 import GeneralInfoViewTab from "../components/GeneralInfoViewTab";
 import ContactViewTab from "../components/ContactViewTab";
 import OrganizationViewTab from "../components/OrganizationViewTab";
 import DocumentsViewTab from "../components/DocumentsViewTab";
+import WarehouseListViewTab from "../components/WarehouseListViewTab";
 
 // Import edit components for edit mode
 import GeneralInfoTab from "../components/GeneralInfoTab";
 import ContactTab from "../components/ContactTab";
 import OrganizationTab from "../components/OrganizationTab";
 import DocumentsTab from "../components/DocumentsTab";
+import WarehouseListTab from "../components/WarehouseListTab";
 
 const ConsignorDetailsPage = () => {
   const { id } = useParams();
@@ -61,6 +65,7 @@ const ConsignorDetailsPage = () => {
     1: false, // Contact Information
     2: false, // Organization Details
     3: false, // Documents
+    4: false, // Warehouse List
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -96,6 +101,13 @@ const ConsignorDetailsPage = () => {
       icon: FileText,
       viewComponent: DocumentsViewTab,
       editComponent: DocumentsTab,
+    },
+    {
+      id: 4,
+      name: "Warehouse List",
+      icon: Warehouse,
+      viewComponent: WarehouseListViewTab,
+      editComponent: WarehouseListTab,
     },
   ];
 
@@ -141,6 +153,13 @@ const ConsignorDetailsPage = () => {
     }
   }, [activeTab, isEditMode]);
 
+  // Refresh data function for approval actions
+  const handleRefreshData = () => {
+    if (id) {
+      dispatch(fetchConsignorById(id));
+    }
+  };
+
   const handleEditToggle = () => {
     if (isEditMode && hasUnsavedChanges) {
       // Show confirmation dialog for unsaved changes
@@ -162,6 +181,7 @@ const ConsignorDetailsPage = () => {
         1: false,
         2: false,
         3: false,
+        4: false,
       });
       setHasUnsavedChanges(false);
     }
@@ -209,6 +229,7 @@ const ConsignorDetailsPage = () => {
         1: false,
         2: false,
         3: false,
+        4: false,
       });
 
       // Validate all sections
@@ -227,6 +248,7 @@ const ConsignorDetailsPage = () => {
             errors.organization &&
             Object.keys(errors.organization).length > 0,
           3: errors.documents && Object.keys(errors.documents).length > 0,
+          4: false, // Warehouse List - no validation for now
         };
         setTabErrors(newTabErrors);
 
@@ -257,6 +279,7 @@ const ConsignorDetailsPage = () => {
         1: false,
         2: false,
         3: false,
+        4: false,
       });
       dispatch(clearError());
 
@@ -351,6 +374,7 @@ const ConsignorDetailsPage = () => {
           1: tabWithError === 1,
           2: tabWithError === 2,
           3: tabWithError === 3,
+          4: false, // Warehouse List - no validation for now
         };
         setTabErrors(newTabErrors);
 
@@ -509,6 +533,19 @@ const ConsignorDetailsPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Approval Action Bar - Inline in Header */}
+            {currentConsignor.userApprovalStatus && (
+              <>
+                {console.log("🎯 ConsignorDetailsPage - Passing userApprovalStatus:", currentConsignor.userApprovalStatus)}
+                {console.log("🎯 ConsignorDetailsPage - Current user from Redux:", user)}
+                <ConsignorApprovalActionBar
+                  userApprovalStatus={currentConsignor.userApprovalStatus}
+                  consignorId={id}
+                  onRefreshData={handleRefreshData}
+                />
+              </>
+            )}
+
             {isEditMode ? (
               <>
                 <button

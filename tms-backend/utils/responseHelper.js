@@ -4,6 +4,79 @@
  */
 
 /**
+ * Field Length Information Map
+ * Maps database column names to their maximum lengths for better error messages
+ */
+const FIELD_LENGTH_INFO = {
+  // Consignor fields
+  'customer_name': { maxLength: 100, friendlyName: 'Customer Name' },
+  'search_term': { maxLength: 100, friendlyName: 'Search Term' },
+  'industry_type': { maxLength: 30, friendlyName: 'Industry Type' },
+  'currency_type': { maxLength: 30, friendlyName: 'Currency Type' },
+  'payment_term': { maxLength: 10, friendlyName: 'Payment Term' },
+  'remark': { maxLength: 255, friendlyName: 'Remark' },
+  'website_url': { maxLength: 200, friendlyName: 'Website URL' },
+  'name_on_po': { maxLength: 30, friendlyName: 'Name on PO' },
+  'approved_by': { maxLength: 30, friendlyName: 'Approved By' },
+  'company_code': { maxLength: 10, friendlyName: 'Company Code' },
+  
+  // Contact fields
+  'contact_name': { maxLength: 100, friendlyName: 'Contact Name' },
+  'contact_role': { maxLength: 100, friendlyName: 'Contact Role' },
+  'contact_team': { maxLength: 100, friendlyName: 'Contact Team' },
+  'phone_number': { maxLength: 20, friendlyName: 'Phone Number' },
+  'alternate_phone_number': { maxLength: 20, friendlyName: 'Alternate Phone Number' },
+  'email': { maxLength: 100, friendlyName: 'Email' },
+  'alternate_email': { maxLength: 100, friendlyName: 'Alternate Email' },
+  'linkedin_link': { maxLength: 500, friendlyName: 'LinkedIn Link' },
+  'designation': { maxLength: 50, friendlyName: 'Designation' },
+  
+  // Document fields
+  'file_name': { maxLength: 500, friendlyName: 'Document File Name' },
+  'document_number': { maxLength: 50, friendlyName: 'Document Number' },
+  'document_type': { maxLength: 50, friendlyName: 'Document Type' },
+  'issuing_authority': { maxLength: 100, friendlyName: 'Issuing Authority' },
+  
+  // Address fields
+  'address_line_1': { maxLength: 200, friendlyName: 'Address Line 1' },
+  'address_line_2': { maxLength: 200, friendlyName: 'Address Line 2' },
+  'city': { maxLength: 100, friendlyName: 'City' },
+  'state': { maxLength: 100, friendlyName: 'State' },
+  'country': { maxLength: 100, friendlyName: 'Country' },
+  'postal_code': { maxLength: 20, friendlyName: 'Postal Code' },
+  
+  // Driver fields
+  'full_name': { maxLength: 100, friendlyName: 'Driver Full Name' },
+  'driver_id': { maxLength: 10, friendlyName: 'Driver ID' },
+  'license_number': { maxLength: 50, friendlyName: 'License Number' },
+  
+  // Transporter fields
+  'business_name': { maxLength: 100, friendlyName: 'Business Name' },
+  'vat_number': { maxLength: 50, friendlyName: 'VAT Number' },
+  'tan_number': { maxLength: 50, friendlyName: 'TAN Number' },
+  
+  // Vehicle fields
+  'registration_number': { maxLength: 20, friendlyName: 'Vehicle Registration Number' },
+  'chassis_number': { maxLength: 50, friendlyName: 'Chassis Number' },
+  'engine_number': { maxLength: 50, friendlyName: 'Engine Number' },
+  'make': { maxLength: 50, friendlyName: 'Vehicle Make' },
+  'model': { maxLength: 50, friendlyName: 'Vehicle Model' },
+  
+  // Warehouse fields
+  'warehouse_name': { maxLength: 100, friendlyName: 'Warehouse Name' },
+  'warehouse_code': { maxLength: 20, friendlyName: 'Warehouse Code' }
+};
+
+/**
+ * Get field length information for error messages
+ * @param {string} columnName - Database column name
+ * @returns {object|null} - Field info or null if not found
+ */
+const getFieldLengthInfo = (columnName) => {
+  return FIELD_LENGTH_INFO[columnName] || null;
+};
+
+/**
  * Success Response Format
  * @param {Object} res - Express response object
  * @param {Object} data - Response data
@@ -95,21 +168,89 @@ const databaseErrorResponse = (res, error) => {
 
   // Foreign key constraint violation
   if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.errno === 1452) {
+    // MySQL error format: "Cannot add or update a child row: a foreign key constraint fails 
+    // (`database`.`table`, CONSTRAINT `constraint_name` FOREIGN KEY (`column`) REFERENCES `ref_table` (`ref_column`))"
+    
+    // Try to extract detailed information from the error message
+    const constraintMatch = error.sqlMessage?.match(/CONSTRAINT `([^`]+)`/);
+    const foreignKeyMatch = error.sqlMessage?.match(/FOREIGN KEY \(`([^`]+)`\) REFERENCES `([^`]+)` \(`([^`]+)`\)/);
+    const tableMatch = error.sqlMessage?.match(/`[^`]+`\.`([^`]+)`/);
+    
+    let message = 'Referenced record does not exist.';
+    const details = [];
+    
+    if (foreignKeyMatch && tableMatch) {
+      const columnName = foreignKeyMatch[1];
+      const refTable = foreignKeyMatch[2];
+      const refColumn = foreignKeyMatch[3];
+      const table = tableMatch[1];
+      
+      message = `Foreign key constraint failed: The value provided for '${columnName}' does not exist in '${refTable}' table.`;
+      
+      details.push({
+        table: table,
+        column: columnName,
+        referencedTable: refTable,
+        referencedColumn: refColumn,
+        constraint: constraintMatch ? constraintMatch[1] : null,
+        message: `Invalid reference: The value for '${columnName}' must exist in '${refTable}.${refColumn}'`,
+        code: 'FOREIGN_KEY_VIOLATION'
+      });
+      
+      console.log(`\n❌ FOREIGN KEY VIOLATION DETAILS:`);
+      console.log(`   Table: ${table}`);
+      console.log(`   Column: ${columnName}`);
+      console.log(`   Referenced Table: ${refTable}`);
+      console.log(`   Referenced Column: ${refColumn}`);
+      console.log(`   Constraint: ${constraintMatch ? constraintMatch[1] : 'N/A'}`);
+      console.log(`   SQL Message: ${error.sqlMessage}\n`);
+    }
+    
     return errorResponse(
       res,
       'FOREIGN_KEY_VIOLATION',
-      'Referenced record does not exist.',
-      [],
+      message,
+      details,
       400
     );
   }
 
   // Data too long error
   if (error.code === 'ER_DATA_TOO_LONG' || error.errno === 1406) {
+    // MySQL error message format: "Data too long for column 'column_name' at row N"
+    const match = error.sqlMessage?.match(/Data too long for column '([^']+)' at row (\d+)/i);
+    
+    if (match) {
+      const columnName = match[1];
+      const rowNumber = match[2];
+      
+      // Get field type information if available
+      const fieldInfo = getFieldLengthInfo(columnName);
+      const friendlyName = fieldInfo ? fieldInfo.friendlyName : columnName;
+      const maxLength = fieldInfo ? fieldInfo.maxLength : 'unknown';
+      
+      const details = [{
+        field: columnName,
+        friendlyName: friendlyName,
+        maxLength: fieldInfo ? fieldInfo.maxLength : null,
+        message: `Data exceeds maximum allowed length${fieldInfo ? ` (max: ${maxLength} characters)` : ''}`,
+        code: 'DATA_TOO_LONG'
+      }];
+      
+      return errorResponse(
+        res,
+        'DATA_TOO_LONG',
+        `Field '${friendlyName}' exceeds maximum allowed length of ${maxLength} characters. Please shorten your input.`,
+        details,
+        400
+      );
+    }
+    
+    // Fallback if we can't parse the error message
     return errorResponse(
       res,
       'DATA_TOO_LONG',
-      'One or more fields exceed maximum length.',
+      'One or more fields exceed maximum length. Please check your input data.',
       [],
       400
     );

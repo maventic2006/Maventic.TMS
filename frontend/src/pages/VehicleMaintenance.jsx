@@ -11,15 +11,24 @@ import { fetchVehicles } from "../redux/slices/vehicleSlice";
 import { openVehicleBulkUploadModal } from "../redux/slices/vehicleBulkUploadSlice";
 import { getPageTheme } from "../theme.config";
 
-// Fuzzy search utility
+// Enhanced fuzzy search utility with better field handling
 const fuzzySearch = (searchText, vehicles) => {
   if (!searchText || searchText.trim() === "") {
-    return vehicles;
+    return vehicles || [];
+  }
+
+  if (!vehicles || !Array.isArray(vehicles)) {
+    return [];
   }
 
   const searchLower = searchText.toLowerCase().trim();
 
   return vehicles.filter((vehicle) => {
+    if (!vehicle || typeof vehicle !== 'object') {
+      return false;
+    }
+
+    // Define searchable fields based on actual transformed data structure
     const searchableFields = [
       vehicle.vehicleId,
       vehicle.registrationNumber,
@@ -27,19 +36,27 @@ const fuzzySearch = (searchText, vehicles) => {
       vehicle.make,
       vehicle.model,
       vehicle.year?.toString(),
+      vehicle.fuelType,
+      vehicle.transmission,
       vehicle.status,
       vehicle.ownership,
-      vehicle.transporterId,
-      vehicle.transporterName,
       vehicle.ownerName,
-      vehicle.currentDriver,
+      vehicle.vehicleCondition,
       vehicle.engineNumber,
-      vehicle.chassisNumber,
+      vehicle.chassisNumber, // Maps to vin from backend
+      vehicle.gpsDeviceId,   // Maps to gpsIMEI from backend
     ];
 
     return searchableFields.some((field) => {
-      if (field === null || field === undefined) return false;
-      return String(field).toLowerCase().includes(searchLower);
+      if (field === null || field === undefined || field === "N/A") {
+        return false;
+      }
+      try {
+        return String(field).toLowerCase().includes(searchLower);
+      } catch (error) {
+        console.warn("Fuzzy search field conversion error:", field, error);
+        return false;
+      }
     });
   });
 };
@@ -67,6 +84,12 @@ const VehicleMaintenance = () => {
     registrationState: "",
     fuelType: "",
     leasingFlag: "",
+    gpsEnabled: "",
+    ownership: "",
+    vehicleCondition: "",
+    engineType: "",
+    emissionStandard: "",
+    bodyType: "",
     towingCapacityMin: "",
     towingCapacityMax: "",
   });
@@ -82,6 +105,12 @@ const VehicleMaintenance = () => {
     registrationState: "",
     fuelType: "",
     leasingFlag: "",
+    gpsEnabled: "",
+    ownership: "",
+    vehicleCondition: "",
+    engineType: "",
+    emissionStandard: "",
+    bodyType: "",
     towingCapacityMin: "",
     towingCapacityMax: "",
   });
@@ -129,6 +158,24 @@ const VehicleMaintenance = () => {
       if (appliedFilters.leasingFlag) {
         params.leasingFlag = appliedFilters.leasingFlag;
       }
+      if (appliedFilters.gpsEnabled) {
+        params.gpsEnabled = appliedFilters.gpsEnabled;
+      }
+      if (appliedFilters.ownership) {
+        params.ownership = appliedFilters.ownership;
+      }
+      if (appliedFilters.vehicleCondition) {
+        params.vehicleCondition = appliedFilters.vehicleCondition;
+      }
+      if (appliedFilters.engineType) {
+        params.engineType = appliedFilters.engineType;
+      }
+      if (appliedFilters.emissionStandard) {
+        params.emissionStandard = appliedFilters.emissionStandard;
+      }
+      if (appliedFilters.bodyType) {
+        params.bodyType = appliedFilters.bodyType;
+      }
       if (appliedFilters.towingCapacityMin) {
         params.towingCapacityMin = appliedFilters.towingCapacityMin;
       }
@@ -148,9 +195,7 @@ const VehicleMaintenance = () => {
 
   const handleApplyFilters = useCallback(() => {
     setAppliedFilters({ ...filters });
-    // Reset to page 1 when filters change
-    dispatch(fetchVehicles({ ...filters, page: 1, limit: 25 }));
-  }, [filters, dispatch]);
+  }, [filters]);
 
   const handleClearFilters = useCallback(() => {
     const emptyFilters = {
@@ -164,30 +209,100 @@ const VehicleMaintenance = () => {
       registrationState: "",
       fuelType: "",
       leasingFlag: "",
+      gpsEnabled: "",
+      ownership: "",
+      vehicleCondition: "",
+      engineType: "",
+      emissionStandard: "",
+      bodyType: "",
       towingCapacityMin: "",
       towingCapacityMax: "",
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
-    // Reset to page 1 when clearing filters
-    dispatch(fetchVehicles({ page: 1, limit: 25 }));
-  }, [dispatch]);
+  }, []);
 
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);
   }, []);
 
-  const handlePageChange = useCallback((page) => {
-    const params = {
-      page,
-      limit: 25,
-      ...appliedFilters,
-    };
-    dispatch(fetchVehicles(params));
-  }, [dispatch, appliedFilters]);
+  const handlePageChange = useCallback(
+    (page) => {
+      // Build params using only appliedFilters
+      const params = {
+        page,
+        limit: 25,
+      };
+
+      if (appliedFilters.registrationNumber) {
+        params.registrationNumber = appliedFilters.registrationNumber;
+      }
+      if (appliedFilters.vehicleType) {
+        params.vehicleType = appliedFilters.vehicleType;
+      }
+      if (appliedFilters.make) {
+        params.make = appliedFilters.make;
+      }
+      if (appliedFilters.model) {
+        params.model = appliedFilters.model;
+      }
+      if (appliedFilters.yearFrom) {
+        params.yearFrom = appliedFilters.yearFrom;
+      }
+      if (appliedFilters.yearTo) {
+        params.yearTo = appliedFilters.yearTo;
+      }
+      if (appliedFilters.status) {
+        params.status = appliedFilters.status;
+      }
+      if (appliedFilters.registrationState) {
+        params.registrationState = appliedFilters.registrationState;
+      }
+      if (appliedFilters.fuelType) {
+        params.fuelType = appliedFilters.fuelType;
+      }
+      if (appliedFilters.leasingFlag) {
+        params.leasingFlag = appliedFilters.leasingFlag;
+      }
+      if (appliedFilters.gpsEnabled) {
+        params.gpsEnabled = appliedFilters.gpsEnabled;
+      }
+      if (appliedFilters.ownership) {
+        params.ownership = appliedFilters.ownership;
+      }
+      if (appliedFilters.vehicleCondition) {
+        params.vehicleCondition = appliedFilters.vehicleCondition;
+      }
+      if (appliedFilters.engineType) {
+        params.engineType = appliedFilters.engineType;
+      }
+      if (appliedFilters.emissionStandard) {
+        params.emissionStandard = appliedFilters.emissionStandard;
+      }
+      if (appliedFilters.bodyType) {
+        params.bodyType = appliedFilters.bodyType;
+      }
+      if (appliedFilters.towingCapacityMin) {
+        params.towingCapacityMin = appliedFilters.towingCapacityMin;
+      }
+      if (appliedFilters.towingCapacityMax) {
+        params.towingCapacityMax = appliedFilters.towingCapacityMax;
+      }
+
+      dispatch(fetchVehicles(params));
+    },
+    [dispatch, appliedFilters]
+  );
 
   const filteredVehicles = useMemo(() => {
-    return fuzzySearch(searchText, vehicles);
+    // Ensure we have valid vehicles array
+    const vehicleArray = Array.isArray(vehicles) ? vehicles : [];
+    
+    if (!searchText || searchText.trim() === "") {
+      return vehicleArray;
+    }
+    
+    return fuzzySearch(searchText, vehicleArray);
   }, [searchText, vehicles]);
 
   const handleVehicleClick = useCallback(
@@ -241,11 +356,17 @@ const VehicleMaintenance = () => {
           vehicles={filteredVehicles}
           loading={isFetching}
           onVehicleClick={handleVehicleClick}
+          // Pagination props (matching TransporterListTable)
+          currentPage={pagination.page}
+          totalPages={pagination.pages}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
+          onPageChange={handlePageChange}
+          // Count props
           filteredCount={filteredVehicles.length}
+          // Search props
           searchText={searchText}
           onSearchChange={handleSearchChange}
-          pagination={pagination}
-          onPageChange={handlePageChange}
         />
 
         {error && (

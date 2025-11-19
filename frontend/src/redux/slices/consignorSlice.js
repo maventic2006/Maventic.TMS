@@ -203,7 +203,7 @@ const consignorSlice = createSlice({
           page: action.payload.page || 1,
           limit: action.payload.limit || 25,
           total: action.payload.total || 0,
-          pages: action.payload.pages || 1,
+          pages: action.payload.totalPages || 1, // Backend returns 'totalPages', not 'pages'
         };
       })
       .addCase(fetchConsignors.rejected, (state, action) => {
@@ -225,18 +225,20 @@ const consignorSlice = createSlice({
         console.log('Raw API payload:', action.payload);
         
         // Flatten nested structure from backend
-        // Backend returns: { general: {...}, contacts: [...], organization: {...}, documents: [...] }
-        // Frontend expects: { ...general, contacts: [...], organization: {...}, documents: [...] }
-        const { general, contacts, organization, documents } = action.payload;
+        // Backend returns: { general: {...}, contacts: [...], organization: {...}, documents: [...], userApprovalStatus: {...} }
+        // Frontend expects: { ...general, contacts: [...], organization: {...}, documents: [...], userApprovalStatus: {...} }
+        const { general, contacts, organization, documents, userApprovalStatus } = action.payload;
         
         const flattenedData = {
           ...general,           // Spread general fields to top level
           contacts,             // Keep contacts array
           organization,         // Keep organization object
-          documents            // Keep documents array
+          documents,            // Keep documents array
+          userApprovalStatus    // Keep user approval status for approval flow
         };
         
         console.log('Flattened data:', flattenedData);
+        console.log('userApprovalStatus included?', !!flattenedData.userApprovalStatus);
         console.log('✅ Data should now be accessible at top level');
         console.log('===================================');
         

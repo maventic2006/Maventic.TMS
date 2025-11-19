@@ -61,6 +61,12 @@ const CreateVehiclePage = () => {
       gpsIMEI: "",
       gpsProvider: "",
       currentDriver: "",
+      usageType: "",
+      vehicleRegisteredAtCountry: "",
+      vehicleRegisteredAtState: "",
+      avgRunningSpeed: "",
+      maxRunningSpeed: "",
+      taxesAndFees: "",
     },
     specifications: {
       engineNumber: "",

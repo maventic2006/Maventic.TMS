@@ -17,7 +17,18 @@ import {
 
 const GeneralInfoViewTab = ({ consignor }) => {
   const theme = getPageTheme("tab");
-  console.log("THEME OBJECT:", theme);
+  
+  // 🔍 COMPREHENSIVE DEBUG LOGGING FOR NDA/MSA
+  console.log('\n🔍 ===== GENERAL INFO VIEW TAB DEBUG =====');
+  console.log('Full consignor object:', consignor);
+  console.log('consignor keys:', Object.keys(consignor || {}));
+  console.log('upload_nda:', consignor?.upload_nda);
+  console.log('upload_msa:', consignor?.upload_msa);
+  console.log('Type of upload_nda:', typeof consignor?.upload_nda);
+  console.log('Type of upload_msa:', typeof consignor?.upload_msa);
+  console.log('Truthy check upload_nda:', !!consignor?.upload_nda);
+  console.log('Truthy check upload_msa:', !!consignor?.upload_msa);
+  console.log('===================================\n');
 
   const [expandedSections, setExpandedSections] = useState({
     basic: true,
@@ -401,24 +412,9 @@ const GeneralInfoViewTab = ({ consignor }) => {
                         <div style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
                           <CheckCircle size={16} style={{ color: theme.colors.status.success.text, marginRight: "6px" }} />
                           <span style={{ fontSize: "13px", color: theme.colors.text.secondary }}>
-                            {consignor.upload_nda}
+                            Document ID: {consignor.upload_nda}
                           </span>
                         </div>
-                        {consignor.nda_expiry_date && (
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              color: isDocumentExpired(consignor.nda_expiry_date)
-                                ? theme.colors.status.error.text
-                                : isDocumentExpiringSoon(consignor.nda_expiry_date)
-                                ? theme.colors.status.warning.text
-                                : theme.colors.status.success.text,
-                              marginBottom: "8px",
-                            }}
-                          >
-                            Expires: {formatDate(consignor.nda_expiry_date)}
-                          </div>
-                        )}
                         <button
                           style={{
                             display: "flex",
@@ -492,24 +488,9 @@ const GeneralInfoViewTab = ({ consignor }) => {
                         <div style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}>
                           <CheckCircle size={16} style={{ color: theme.colors.status.success.text, marginRight: "6px" }} />
                           <span style={{ fontSize: "13px", color: theme.colors.text.secondary }}>
-                            {consignor.upload_msa}
+                            Document ID: {consignor.upload_msa}
                           </span>
                         </div>
-                        {consignor.msa_expiry_date && (
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              color: isDocumentExpired(consignor.msa_expiry_date)
-                                ? theme.colors.status.error.text
-                                : isDocumentExpiringSoon(consignor.msa_expiry_date)
-                                ? theme.colors.status.warning.text
-                                : theme.colors.status.success.text,
-                              marginBottom: "8px",
-                            }}
-                          >
-                            Expires: {formatDate(consignor.msa_expiry_date)}
-                          </div>
-                        )}
                         <button
                           style={{
                             display: "flex",

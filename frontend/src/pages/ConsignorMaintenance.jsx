@@ -26,66 +26,116 @@ const ConsignorMaintenance = () => {
   // Local state
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [searchText, setSearchText] = useState(""); // Fuzzy search state
+  const [localFilters, setLocalFilters] = useState({
+    customerId: "",
+    customerName: "",
+    industryType: "",
+    status: "",
+  });
+  const [appliedFilters, setAppliedFilters] = useState({
+    customerId: "",
+    customerName: "",
+    industryType: "",
+    status: "",
+  });
 
   // Fetch consignors on component mount
   useEffect(() => {
     dispatch(fetchConsignors({ page: 1, limit: 25 }));
   }, [dispatch]);
 
-  // Fetch consignors when filters or pagination change
+  // Fetch consignors when APPLIED filters or pagination change
   useEffect(() => {
-    const params = {
+    // Build filter object with mapped parameter names
+    const filterParams = {};
+    
+    // Map frontend field names to backend parameter names
+    if (appliedFilters.customerId) {
+      filterParams.customer_id = appliedFilters.customerId;
+    }
+    if (appliedFilters.customerName) {
+      filterParams.search = appliedFilters.customerName;
+    }
+    if (appliedFilters.industryType) {
+      filterParams.industry_type = appliedFilters.industryType;
+    }
+    if (appliedFilters.status) {
+      filterParams.status = appliedFilters.status;
+    }
+
+    // Redux thunk expects { page, limit, filters }
+    dispatch(fetchConsignors({
       page: pagination.page,
       limit: pagination.limit || 25,
-    };
+      filters: filterParams
+    }));
+  }, [dispatch, appliedFilters, pagination.page, pagination.limit]);
 
-    // Add filter parameters
-    if (filters.customerId) {
-      params.customerId = filters.customerId;
-    }
-    if (filters.customerName) {
-      params.customerName = filters.customerName;
-    }
-    if (filters.industryType) {
-      params.industryType = filters.industryType;
-    }
-    if (filters.status) {
-      params.status = filters.status;
-    }
-
-    dispatch(fetchConsignors(params));
-  }, [dispatch, filters, pagination.page, pagination.limit]);
-
-  // Handle filter changes
+  // Handle filter changes (only updates local state, not applied)
   const handleFilterChange = useCallback(
     (newFilters) => {
-      dispatch(setReduxFilters(newFilters));
+      setLocalFilters(newFilters);
     },
-    [dispatch]
+    []
   );
+
+  // Handle apply filters - this actually triggers the API call
+  const handleApplyFilters = useCallback(() => {
+    // Copy local filters to applied filters
+    setAppliedFilters({ ...localFilters });
+    // Also update Redux for consistency
+    dispatch(setReduxFilters(localFilters));
+  }, [localFilters, dispatch]);
 
   // Handle clear filters
   const handleClearFilters = useCallback(() => {
+    const emptyFilters = {
+      customerId: "",
+      customerName: "",
+      industryType: "",
+      status: "",
+    };
+    setLocalFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
     dispatch(clearFilters());
   }, [dispatch]);
 
   // Handle page change
   const handlePageChange = useCallback(
     (page) => {
-      dispatch(fetchConsignors({ ...filters, page, limit: pagination.limit || 25 }));
+      // Build filter object with mapped parameter names
+      const filterParams = {};
+      if (appliedFilters.customerId) filterParams.customer_id = appliedFilters.customerId;
+      if (appliedFilters.customerName) filterParams.search = appliedFilters.customerName;
+      if (appliedFilters.industryType) filterParams.industry_type = appliedFilters.industryType;
+      if (appliedFilters.status) filterParams.status = appliedFilters.status;
+      
+      dispatch(fetchConsignors({ 
+        page, 
+        limit: pagination.limit || 25,
+        filters: filterParams
+      }));
     },
-    [dispatch, filters, pagination.limit]
+    [dispatch, appliedFilters, pagination.limit]
   );
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
+      // Build filter object with mapped parameter names
+      const filterParams = {};
+      if (appliedFilters.customerId) filterParams.customer_id = appliedFilters.customerId;
+      if (appliedFilters.customerName) filterParams.search = appliedFilters.customerName;
+      if (appliedFilters.industryType) filterParams.industry_type = appliedFilters.industryType;
+      if (appliedFilters.status) filterParams.status = appliedFilters.status;
+      
       await dispatch(
         fetchConsignors({
-          ...filters,
           page: pagination.page,
           limit: pagination.limit || 25,
+          filters: filterParams
         })
       ).unwrap();
     } catch (error) {
@@ -93,7 +143,7 @@ const ConsignorMaintenance = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [dispatch, filters, pagination.page, pagination.limit]);
+  }, [dispatch, appliedFilters, pagination.page, pagination.limit]);
 
   // Handle create new consignor - matches vehicle pattern exactly
   const handleCreateNew = useCallback(() => {
@@ -109,6 +159,44 @@ const ConsignorMaintenance = () => {
   const handleToggleFilters = useCallback(() => {
     setShowFilters((prev) => !prev);
   }, []);
+
+  // Handle fuzzy search - client-side filtering on visible table fields only
+  const handleSearchChange = useCallback((value) => {
+    setSearchText(value);
+  }, []);
+
+  // Apply fuzzy search to filter consignors based on visible table fields
+  const filteredConsignors = React.useMemo(() => {
+    if (!searchText.trim()) {
+      return consignors; // Return all consignors if no search text
+    }
+
+    const searchLower = searchText.toLowerCase();
+
+    return consignors.filter((consignor) => {
+      // Search in visible table fields only:
+      // 1. Customer ID
+      // 2. Customer Name
+      // 3. Industry Type
+      // 4. Currency
+      // 5. Payment Term
+      // 6. Status
+      
+      const searchableFields = [
+        consignor.customer_id,
+        consignor.customer_name,
+        consignor.industry_type,
+        consignor.currency_type,
+        consignor.payment_term,
+        consignor.status,
+      ];
+
+      // Check if any field contains the search text
+      return searchableFields.some((field) =>
+        field?.toString().toLowerCase().includes(searchLower)
+      );
+    });
+  }, [consignors, searchText]);
 
   return (
     <div
@@ -139,8 +227,9 @@ const ConsignorMaintenance = () => {
 
         {/* Filter Panel */}
         <ConsignorFilterPanel
-          filters={filters}
+          filters={localFilters}
           onFilterChange={handleFilterChange}
+          onApplyFilters={handleApplyFilters}
           onClearFilters={handleClearFilters}
           showFilters={showFilters}
         />
@@ -170,14 +259,16 @@ const ConsignorMaintenance = () => {
 
         {/* Consignor List Table */}
         <ConsignorListTable
-          consignors={consignors}
+          consignors={filteredConsignors}
           loading={isFetching}
           currentPage={pagination.page}
           totalPages={pagination.pages}
           totalItems={pagination.total}
           itemsPerPage={pagination.limit || 25}
           onPageChange={handlePageChange}
-          filteredCount={consignors.length}
+          filteredCount={filteredConsignors.length}
+          searchText={searchText}
+          onSearchChange={handleSearchChange}
         />
 
         {/* Pagination Bar */}

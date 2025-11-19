@@ -1,66 +1,39 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const {
-  getApprovalConfiguration,
-  getPendingApprovals,
-  getApprovalHistory,
-  approveUser,
-  rejectUser,
-} = require("../controllers/approvalController");
-const { authenticateToken } = require("../middleware/auth");
+const approvalController = require('../controllers/approvalController');
+const { authenticateToken } = require('../middleware/auth');
 
-// Middleware to check if user is product owner
-const checkProductOwnerAccess = (req, res, next) => {
-  const userType = req.user?.user_type_id;
+/**
+ * Get approval list with filters
+ * GET /api/approvals
+ * Query params: requestType, dateFrom, dateTo, status, page, limit
+ */
+router.get('/', authenticateToken, approvalController.getApprovals);
 
-  // UT001 is Product Owner
-  if (userType !== "UT001") {
-    return res.status(403).json({
-      success: false,
-      error: {
-        code: "ACCESS_DENIED",
-        message: "Only product owners can access approval functions",
-      },
-    });
-  }
+/**
+ * Get master data for approval types
+ * GET /api/approvals/master-data
+ */
+router.get('/master-data', authenticateToken, approvalController.getMasterData);
 
-  next();
-};
+/**
+ * Approve a request
+ * POST /api/approvals/:id/approve
+ */
+router.post('/:id/approve', authenticateToken, approvalController.approveRequest);
 
-// All approval routes require authentication and product owner access
-router.get(
-  "/config/:approvalTypeId",
-  authenticateToken,
-  checkProductOwnerAccess,
-  getApprovalConfiguration
-);
+/**
+ * Reject a request (REMARKS MANDATORY)
+ * POST /api/approvals/:id/reject
+ * Body: { remarks: string (required) }
+ */
+router.post('/:id/reject', authenticateToken, approvalController.rejectRequest);
 
-router.get(
-  "/pending",
-  authenticateToken,
-  checkProductOwnerAccess,
-  getPendingApprovals
-);
-
-router.get(
-  "/history/:userId",
-  authenticateToken,
-  checkProductOwnerAccess,
-  getApprovalHistory
-);
-
-router.post(
-  "/approve/:userId",
-  authenticateToken,
-  checkProductOwnerAccess,
-  approveUser
-);
-
-router.post(
-  "/reject/:userId",
-  authenticateToken,
-  checkProductOwnerAccess,
-  rejectUser
-);
+/**
+ * Send back a request (REMARKS MANDATORY)
+ * POST /api/approvals/:id/sendBack
+ * Body: { remarks: string (required) }
+ */
+router.post('/:id/sendBack', authenticateToken, approvalController.sendBackRequest);
 
 module.exports = router;

@@ -16,6 +16,19 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
     }));
   };
 
+  // Helper function to handle numeric inputs with leading zeros
+  const handleNumericChange = (field, value) => {
+    // Allow empty string
+    if (value === '') {
+      handleChange(field, '');
+      return;
+    }
+    
+    // Remove leading zeros but keep single zero
+    const cleanedValue = value.replace(/^0+(?=\d)/, '') || '0';
+    handleChange(field, cleanedValue);
+  };
+
   const data = formData.capacityDetails || {};
 
   // Auto-calculate payload capacity when GVW or unladen weight changes
@@ -40,7 +53,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.unladenWeight || 0}
-            onChange={(e) => handleChange("unladenWeight", parseFloat(e.target.value) || 0)}
+            onChange={(e) => handleNumericChange("unladenWeight", e.target.value)}
             min="0"
             step="0.01"
             placeholder="7000"
@@ -59,7 +72,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.gvw || ""}
-            onChange={(e) => handleChange("gvw", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("gvw", e.target.value)}
             min="0"
             step="0.01"
             placeholder="25000"
@@ -90,7 +103,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.volumeCapacity || ""}
-            onChange={(e) => handleChange("volumeCapacity", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("volumeCapacity", e.target.value)}
             min="0"
             step="0.01"
             placeholder="45"
@@ -106,7 +119,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.cargoWidth || ""}
-            onChange={(e) => handleChange("cargoWidth", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("cargoWidth", e.target.value)}
             min="0"
             step="0.01"
             placeholder="2.5"
@@ -122,7 +135,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.cargoHeight || ""}
-            onChange={(e) => handleChange("cargoHeight", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("cargoHeight", e.target.value)}
             min="0"
             step="0.01"
             placeholder="3"
@@ -138,7 +151,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.cargoLength || ""}
-            onChange={(e) => handleChange("cargoLength", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("cargoLength", e.target.value)}
             min="0"
             step="0.01"
             placeholder="10"
@@ -154,7 +167,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.towingCapacity || ""}
-            onChange={(e) => handleChange("towingCapacity", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("towingCapacity", e.target.value)}
             min="0"
             step="0.01"
             placeholder="5000"
@@ -170,7 +183,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.tireLoadRating || ""}
-            onChange={(e) => handleChange("tireLoadRating", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("tireLoadRating", e.target.value)}
             min="0"
             step="0.01"
             placeholder="1500"
@@ -200,7 +213,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.fuelTankCapacity || ""}
-            onChange={(e) => handleChange("fuelTankCapacity", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("fuelTankCapacity", e.target.value)}
             min="0"
             step="0.1"
             placeholder="400"
@@ -216,7 +229,7 @@ const CapacityDetailsTab = ({ formData, setFormData, errors }) => {
           <input
             type="number"
             value={data.seatingCapacity || ""}
-            onChange={(e) => handleChange("seatingCapacity", parseInt(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("seatingCapacity", e.target.value)}
             min="0"
             step="1"
             placeholder="2"

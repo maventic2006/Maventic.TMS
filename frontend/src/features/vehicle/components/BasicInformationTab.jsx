@@ -1,6 +1,7 @@
 ﻿import React from "react";
 import { Info, Truck } from "lucide-react";
 import { CustomSelect } from "../../../components/ui/Select";
+import { Country, State } from "country-state-city";
 
 const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
   const handleChange = (field, value) => {
@@ -11,6 +12,19 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
         [field]: value,
       },
     }));
+  };
+
+  // Helper function to handle numeric inputs with leading zeros
+  const handleNumericChange = (field, value) => {
+    // Allow empty string
+    if (value === '') {
+      handleChange(field, '');
+      return;
+    }
+    
+    // Remove leading zeros but keep single zero
+    const cleanedValue = value.replace(/^0+(?=\d)/, '') || '0';
+    handleChange(field, cleanedValue);
   };
 
   const data = formData.basicInformation || {};
@@ -32,6 +46,24 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
     { value: 'UT003', label: 'RENTAL' },
     { value: 'UT004', label: 'LEASE' }
   ];
+
+  // Country and state options for registration location
+  const countryOptions = Country.getAllCountries().map(country => ({
+    value: country.isoCode,
+    label: country.name
+  }));
+
+  const stateOptions = data.vehicleRegisteredAtCountry ? 
+    State.getStatesOfCountry(data.vehicleRegisteredAtCountry).map(state => ({
+      value: state.isoCode, 
+      label: state.name
+    })) : [];
+
+  const handleCountryChange = (countryCode) => {
+    handleChange("vehicleRegisteredAtCountry", countryCode);
+    // Clear state when country changes
+    handleChange("vehicleRegisteredAtState", "");
+  };
 
   return (
     <div className="space-y-5">
@@ -94,7 +126,7 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="number"
             value={data.year || currentYear}
-            onChange={(e) => handleChange("year", parseInt(e.target.value) || currentYear)}
+            onChange={(e) => handleNumericChange("year", e.target.value)}
             min="1990"
             max={currentYear + 1}
             placeholder={currentYear.toString()}
@@ -228,7 +260,7 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="number"
             value={data.avgRunningSpeed || ""}
-            onChange={(e) => handleChange("avgRunningSpeed", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("avgRunningSpeed", e.target.value)}
             min="0"
             step="0.1"
             placeholder="60"
@@ -244,7 +276,7 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="number"
             value={data.maxRunningSpeed || ""}
-            onChange={(e) => handleChange("maxRunningSpeed", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("maxRunningSpeed", e.target.value)}
             min="0"
             step="0.1"
             placeholder="100"
@@ -268,6 +300,39 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           {errors.usageType && <p className="mt-1 text-xs text-red-600">{errors.usageType}</p>}
         </div>
 
+        {/* Vehicle Registered at Country */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Vehicle Registered at Country
+          </label>
+          <CustomSelect
+            value={data.vehicleRegisteredAtCountry || ""}
+            onChange={handleCountryChange}
+            options={countryOptions}
+            placeholder="Select Country"
+            error={errors.vehicleRegisteredAtCountry}
+            className="w-full"
+          />
+          {errors.vehicleRegisteredAtCountry && <p className="mt-1 text-xs text-red-600">{errors.vehicleRegisteredAtCountry}</p>}
+        </div>
+
+        {/* Vehicle Registered at State */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+            Vehicle Registered at State
+          </label>
+          <CustomSelect
+            value={data.vehicleRegisteredAtState || ""}
+            onChange={(value) => handleChange("vehicleRegisteredAtState", value)}
+            options={stateOptions}
+            placeholder="Select State"
+            error={errors.vehicleRegisteredAtState}
+            className="w-full"
+            disabled={!data.vehicleRegisteredAtCountry}
+          />
+          {errors.vehicleRegisteredAtState && <p className="mt-1 text-xs text-red-600">{errors.vehicleRegisteredAtState}</p>}
+        </div>
+
         {/* Safety Inspection Date */}
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -289,7 +354,7 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="number"
             value={data.taxesAndFees || ""}
-            onChange={(e) => handleChange("taxesAndFees", parseFloat(e.target.value) || "")}
+            onChange={(e) => handleNumericChange("taxesAndFees", e.target.value)}
             min="0"
             step="0.01"
             placeholder="50000"

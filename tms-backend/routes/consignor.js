@@ -15,7 +15,8 @@ const {
   getMasterData,
   downloadDocument,
   downloadContactPhoto,
-  downloadGeneralDocument
+  downloadGeneralDocument,
+  getConsignorWarehouses
 } = require('../controllers/consignorController');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -182,6 +183,15 @@ router.get(
   authenticateToken,
   checkProductOwnerAccess,
   downloadGeneralDocument
+);
+
+// 🔟 Get warehouses mapped to consignor
+// GET /api/consignors/:customerId/warehouses
+router.get(
+  '/:customerId/warehouses',
+  authenticateToken,
+  checkProductOwnerAccess,
+  getConsignorWarehouses
 );
 
 // Error handling middleware for multer errors

@@ -26,6 +26,10 @@ const ConsignorFilterPanel = ({
     onClearFilters();
   };
 
+  const handleApply = () => {
+    onApplyFilters();
+  };
+
   // Count active filters
   const activeFilterCount = Object.values(filters).filter(
     (value) => value && value !== ""
@@ -130,6 +134,24 @@ const ConsignorFilterPanel = ({
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+        <button
+          onClick={handleClearAll}
+          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <X className="w-4 h-4" />
+          Clear All
+        </button>
+        <button
+          onClick={handleApply}
+          className="flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+        >
+          <Filter className="w-4 h-4" />
+          Apply Filters
+        </button>
       </div>
     </div>
   );
