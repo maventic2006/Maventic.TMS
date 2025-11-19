@@ -148,21 +148,22 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId }) => {
     <>
       {/* Approval Status Badge and Actions */}
       <div className="flex items-center gap-3">
-        {/* Status Badge */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 font-medium text-sm ${statusBadge.color}`}
-        >
-          <StatusIcon className="w-4 h-4" />
-          <span>{statusBadge.text}</span>
-        </motion.div>
+        {pendingWith !== user?.user_full_name && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 font-medium text-sm ${statusBadge.color}`}
+          >
+            <StatusIcon className="w-4 h-4" />
+            <span>{statusBadge.text}</span>
+          </motion.div>
+        )}
 
         {/* Pending With Info (only if pending) */}
         {(currentApprovalStatus === "PENDING" ||
           currentApprovalStatus === "Pending for Approval") &&
-          pendingWith && (
+          pendingWith !== user?.user_full_name && (
             <motion.div
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}

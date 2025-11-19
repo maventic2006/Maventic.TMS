@@ -89,7 +89,7 @@ export const rejectUser = createAsyncThunk(
         return rejectWithValue("Remarks are required when rejecting a user");
       }
 
-      const response = await api.post(`/api/approval/reject/${userId}`, {
+      const response = await api.post(`/approval/reject/${userId}`, {
         remarks: remarks,
       });
 

@@ -150,10 +150,30 @@ const generateDocumentId = async (trx = knex, generatedIds = new Set()) => {
   throw new Error("Failed to generate unique document ID after 100 attempts");
 };
 
-const generateDocumentUploadId = async () => {
-  const result = await knex("document_upload").count("* as count").first();
-  const count = parseInt(result.count) + 1;
-  return `DU${count.toString().padStart(4, "0")}`;
+// const generateDocumentUploadId = async () => {
+//   const result = await knex("document_upload").count("* as count").first();
+//   const count = parseInt(result.count) + 1;
+//   return `DU${count.toString().padStart(4, "0")}`;
+// };
+
+const generateDocumentUploadId = async (trx) => {
+  const result = await trx("document_upload")
+    .select("document_id")
+    .whereNotNull("document_id")
+    .andWhere("document_id", "like", "DU%")
+    .orderByRaw("CAST(SUBSTRING(document_id, 3) AS UNSIGNED) DESC")
+    .first();
+
+  let next = 1;
+
+  if (result?.document_id) {
+    const numeric = parseInt(result.document_id.substring(2)); // Skip "DU"
+    if (!isNaN(numeric)) {
+      next = numeric + 1;
+    }
+  }
+
+  return `DU${next.toString().padStart(4, "0")}`;
 };
 
 // Generate Transporter Admin User ID (format: TA0001, TA0002, etc.)
@@ -915,7 +935,7 @@ const createTransporter = async (req, res) => {
 
         // If file is uploaded, save to document_upload table
         if (doc.fileData) {
-          const docUploadId = await generateDocumentUploadId();
+          const docUploadId = await generateDocumentUploadId(trx);
 
           await trx("document_upload").insert({
             document_id: docUploadId,
@@ -960,8 +980,8 @@ const createTransporter = async (req, res) => {
         /[^a-zA-Z0-9]/g,
         ""
       );
-      const randomNum = Math.floor(1000 + Math.random() * 9000);
-      const initialPassword = `${businessNameClean}@${randomNum}`;
+      // const randomNum = Math.floor(1000 + Math.random() * 9000);
+      const initialPassword = `${businessNameClean}@123`;
       const hashedPassword = await bcrypt.hash(initialPassword, 10);
 
       // Extract contact details from first address (primary contact)

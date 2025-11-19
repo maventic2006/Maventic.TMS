@@ -212,25 +212,41 @@ const WarehouseCreatePage = () => {
   // Handle successful creation
   useEffect(() => {
     if (lastCreatedWarehouse && !isCreating) {
+      // Extract data from the response (could be nested in 'data' object)
+      const warehouseData = lastCreatedWarehouse.data || lastCreatedWarehouse;
+      const warehouseId =
+        warehouseData.warehouse?.warehouse_id ||
+        warehouseData.warehouseId ||
+        "Generated";
+      const userId = warehouseData.userId;
+      const approvalStatus = warehouseData.approvalStatus;
+      const pendingWith = warehouseData.pendingWith;
+
+      const toastDetails = [`Warehouse ID: ${warehouseId}`];
+
+      // Add user approval info if available
+      if (userId) {
+        toastDetails.push(`Manager User ID: ${userId}`);
+        if (approvalStatus === "PENDING" && pendingWith) {
+          toastDetails.push(`Approval pending with: ${pendingWith}`);
+        }
+      }
+
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: "Warehouse created successfully!",
-          details: [
-            `Warehouse ID: ${
-              lastCreatedWarehouse.warehouseId ||
-              lastCreatedWarehouse.warehouse_id ||
-              "Generated"
-            }`,
-          ],
-          duration: 3000,
+          message: userId
+            ? "Warehouse created successfully! Manager user created and pending approval."
+            : "Warehouse created successfully!",
+          details: toastDetails,
+          duration: 5000, // Longer duration for approval message
         })
       );
 
       const timer = setTimeout(() => {
         dispatch(clearLastCreated());
         navigate("/warehouse");
-      }, 2000);
+      }, 3000); // Longer delay for user to read approval message
 
       return () => clearTimeout(timer);
     }

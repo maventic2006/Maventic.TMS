@@ -9,11 +9,24 @@ import {
 const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
   const { user } = useSelector((state) => state.auth);
 
+  // Safe navigation - ensure formData has the expected structure
+  const generalDetails = formData?.generalDetails || {
+    warehouseName: "",
+    warehouseName2: "",
+    warehouseType: "",
+    materialType: "",
+    language: "EN",
+    vehicleCapacity: 0,
+    speedLimit: 20,
+    virtualYardIn: false,
+    radiusVirtualYardIn: 0,
+  };
+
   const handleChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
       generalDetails: {
-        ...prev.generalDetails,
+        ...(prev?.generalDetails || {}),
         [field]: value,
       },
     }));
@@ -47,7 +60,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
             </label>
             <input
               type="text"
-              value={formData.generalDetails.warehouseName}
+              value={generalDetails.warehouseName || ""}
               onChange={(e) => handleChange("warehouseName", e.target.value)}
               placeholder="Enter warehouse name"
               maxLength={30}
@@ -71,7 +84,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
             </label>
             <input
               type="text"
-              value={formData.generalDetails.warehouseName2}
+              value={generalDetails.warehouseName2 || ""}
               onChange={(e) => handleChange("warehouseName2", e.target.value)}
               placeholder="Enter warehouse name 2"
               maxLength={30}
@@ -94,15 +107,23 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
               Warehouse Type <span className="text-red-500">*</span>
             </label>
             <CustomSelect
-              value={formData.generalDetails.warehouseType}
+              value={generalDetails.warehouseType || ""}
               onValueChange={(value) => handleChange("warehouseType", value)}
               options={masterData?.warehouseTypes || []}
               getOptionLabel={(option) => option.warehouse_type}
               getOptionValue={(option) => option.warehouse_type_id}
-              placeholder="Select warehouse type"
+              placeholder={
+                masterData?.warehouseTypes?.length > 0
+                  ? "Select warehouse type"
+                  : "Loading..."
+              }
               error={errors?.["generalDetails.warehouseType"]}
               required
               searchable
+              disabled={
+                !masterData?.warehouseTypes ||
+                masterData.warehouseTypes.length === 0
+              }
             />
             {errors?.["generalDetails.warehouseType"] && (
               <p className="text-sm text-red-500 flex items-center gap-1">
@@ -117,15 +138,23 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
               Material Type <span className="text-red-500">*</span>
             </label>
             <CustomSelect
-              value={formData.generalDetails.materialType}
+              value={generalDetails.materialType || ""}
               onValueChange={(value) => handleChange("materialType", value)}
               options={masterData?.materialTypes || []}
               getOptionLabel={(option) => option.material_types}
               getOptionValue={(option) => option.material_types_id}
-              placeholder="Select material type"
+              placeholder={
+                masterData?.materialTypes?.length > 0
+                  ? "Select material type"
+                  : "Loading..."
+              }
               error={errors?.["generalDetails.materialType"]}
               required
               searchable
+              disabled={
+                !masterData?.materialTypes ||
+                masterData.materialTypes.length === 0
+              }
             />
             {errors?.["generalDetails.materialType"] && (
               <p className="text-sm text-red-500 flex items-center gap-1">
@@ -144,7 +173,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
             </label>
             <input
               type="text"
-              value={formData.generalDetails.language}
+              value={generalDetails.language || "EN"}
               onChange={(e) => handleChange("language", e.target.value)}
               placeholder="EN"
               maxLength={10}
@@ -160,7 +189,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
             <input
               type="number"
               min="0"
-              value={formData.generalDetails.vehicleCapacity}
+              value={generalDetails.vehicleCapacity || 0}
               onChange={(e) =>
                 handleChange("vehicleCapacity", parseInt(e.target.value) || 0)
               }
@@ -181,7 +210,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
               type="number"
               min="1"
               max="200"
-              value={formData.generalDetails.speedLimit}
+              value={generalDetails.speedLimit || 20}
               onChange={(e) =>
                 handleChange("speedLimit", parseInt(e.target.value) || 20)
               }
@@ -197,7 +226,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
               Virtual Yard-In
             </label>
             <Switch
-              checked={formData.generalDetails.virtualYardIn}
+              checked={generalDetails.virtualYardIn || false}
               onCheckedChange={(checked) =>
                 handleChange("virtualYardIn", checked)
               }
@@ -209,7 +238,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
           </div>
 
           {/* Radius for Virtual Yard-In - Optional, shown only if Virtual Yard-In is enabled */}
-          {formData.generalDetails.virtualYardIn && (
+          {generalDetails.virtualYardIn && (
             <div className="space-y-1">
               <label className="block text-xs font-medium text-[#0D1A33]">
                 Radius for Virtual Yard-In (KM)
@@ -218,7 +247,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
                 type="number"
                 min="0"
                 step="0.01"
-                value={formData.generalDetails.radiusVirtualYardIn}
+                value={generalDetails.radiusVirtualYardIn || 0}
                 onChange={(e) =>
                   handleChange(
                     "radiusVirtualYardIn",

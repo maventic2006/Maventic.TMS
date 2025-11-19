@@ -108,10 +108,30 @@ const generateAccidentId = async (trx = knex) => {
   );
 };
 
-const generateDocumentUploadId = async () => {
-  const result = await knex("document_upload").count("* as count").first();
-  const count = parseInt(result.count) + 1;
-  return `DU${count.toString().padStart(4, "0")}`;
+// const generateDocumentUploadId = async () => {
+//   const result = await knex("document_upload").count("* as count").first();
+//   const count = parseInt(result.count) + 1;
+//   return `DU${count.toString().padStart(4, "0")}`;
+// };
+
+const generateDocumentUploadId = async (trx) => {
+  const result = await trx("document_upload")
+    .select("document_id")
+    .whereNotNull("document_id")
+    .andWhere("document_id", "like", "DU%")
+    .orderByRaw("CAST(SUBSTRING(document_id, 3) AS UNSIGNED) DESC")
+    .first();
+
+  let next = 1;
+
+  if (result?.document_id) {
+    const numeric = parseInt(result.document_id.substring(2)); // Skip "DU"
+    if (!isNaN(numeric)) {
+      next = numeric + 1;
+    }
+  }
+
+  return `DU${next.toString().padStart(4, "0")}`;
 };
 
 // Validation functions
@@ -463,6 +483,110 @@ const createDriver = async (req, res) => {
     }
 
     // Validate documents if provided
+    // if (documents && documents.length > 0) {
+    //   for (let i = 0; i < documents.length; i++) {
+    //     const doc = documents[i];
+
+    //     if (!doc.documentType) {
+    //       await trx.rollback();
+    //       return res.status(400).json({
+    //         success: false,
+    //         error: {
+    //           code: "VALIDATION_ERROR",
+    //           message: `Document ${i + 1}: Document type is required`,
+    //           field: `documents[${i}].documentType`,
+    //         },
+    //         timestamp: new Date().toISOString(),
+    //       });
+    //     }
+
+    //     if (!doc.documentNumber || doc.documentNumber.trim().length === 0) {
+    //       await trx.rollback();
+    //       return res.status(400).json({
+    //         success: false,
+    //         error: {
+    //           code: "VALIDATION_ERROR",
+    //           message: `Document ${i + 1}: Document number is required`,
+    //           field: `documents[${i}].documentNumber`,
+    //         },
+    //         timestamp: new Date().toISOString(),
+    //       });
+    //     }
+
+    //     // Validate document name exists in document_name_master and resolve ID
+    //     const docNameInfo = await trx("document_name_master")
+    //       .where(function () {
+    //         this.where("doc_name_master_id", doc.documentType).orWhere(
+    //           "document_name",
+    //           doc.documentType
+    //         );
+    //       })
+    //       .where("status", "ACTIVE")
+    //       .first();
+
+    //     if (!docNameInfo) {
+    //       await trx.rollback();
+    //       return res.status(400).json({
+    //         success: false,
+    //         error: {
+    //           code: "VALIDATION_ERROR",
+    //           message: `Document ${i + 1}: Invalid document type "${
+    //             doc.documentType
+    //           }"`,
+    //           field: `documents[${i}].documentType`,
+    //         },
+    //         timestamp: new Date().toISOString(),
+    //       });
+    //     }
+
+    //     // Store resolved ID and name for later use
+    //     doc.documentTypeId = docNameInfo.doc_name_master_id;
+    //     doc.documentTypeName = docNameInfo.document_name;
+
+    //     // Validate document number format
+    //     const docValidation = validateDocumentNumber(
+    //       doc.documentNumber,
+    //       doc.documentTypeName
+    //     );
+    //     if (!docValidation.isValid) {
+    //       await trx.rollback();
+    //       return res.status(400).json({
+    //         success: false,
+    //         error: {
+    //           code: "VALIDATION_ERROR",
+    //           message: `Document ${i + 1}: ${docValidation.message}`,
+    //           field: `documents[${i}].documentNumber`,
+    //         },
+    //         timestamp: new Date().toISOString(),
+    //       });
+    //     }
+
+    //     // Check for duplicate document number
+    //     const existingDocCheck = await trx("driver_documents")
+    //       .where("document_type_id", doc.documentTypeId)
+    //       .where("document_number", doc.documentNumber)
+    //       .first();
+
+    //     if (existingDocCheck) {
+    //       await trx.rollback();
+    //       return res.status(400).json({
+    //         success: false,
+    //         error: {
+    //           code: "DUPLICATE_DOCUMENT",
+    //           message: `Document ${i + 1}: ${doc.documentTypeName} number ${
+    //             doc.documentNumber
+    //           } already exists`,
+    //           field: `documents[${i}].documentNumber`,
+    //         },
+    //         timestamp: new Date().toISOString(),
+    //       });
+    //     }
+    //   }
+    // }
+
+    // ========================================
+    // DOCUMENT VALIDATION + DRIVER LICENSE CHECK
+    // ========================================
     if (documents && documents.length > 0) {
       for (let i = 0; i < documents.length; i++) {
         const doc = documents[i];
@@ -493,7 +617,7 @@ const createDriver = async (req, res) => {
           });
         }
 
-        // Validate document name exists in document_name_master and resolve ID
+        // Validate document exists in master
         const docNameInfo = await trx("document_name_master")
           .where(function () {
             this.where("doc_name_master_id", doc.documentType).orWhere(
@@ -519,11 +643,11 @@ const createDriver = async (req, res) => {
           });
         }
 
-        // Store resolved ID and name for later use
+        // Store resolved details
         doc.documentTypeId = docNameInfo.doc_name_master_id;
         doc.documentTypeName = docNameInfo.document_name;
 
-        // Validate document number format
+        // Validate document format
         const docValidation = validateDocumentNumber(
           doc.documentNumber,
           doc.documentTypeName
@@ -541,7 +665,63 @@ const createDriver = async (req, res) => {
           });
         }
 
-        // Check for duplicate document number
+        // ============================================
+        // 🔍 DRIVER LICENSE AUTHENTICATION API CHECK
+        // ============================================
+        if (doc.documentTypeName.toLowerCase() === "driver license") {
+          console.log("🔍 Validating Driver License using external API...");
+
+          try {
+            const apiResponse = await fetch(
+              "https://api.maventic.in/mapi/getDLDetails",
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  dlnumber: doc.documentNumber,
+                  dob: basicInfo.dateOfBirth,
+                }),
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+
+            const result = await apiResponse.json();
+            console.log("📡 DL API Response:", result);
+
+            // Expected: API will return some 'valid' or 'status' field
+            if (!result || result.status !== "SUCCESS") {
+              await trx.rollback();
+              return res.status(400).json({
+                success: false,
+                error: {
+                  code: "INVALID_DL",
+                  message:
+                    result?.message ||
+                    "Entered Driver License number is invalid. Please check and try again.",
+                  field: `documents[${i}].documentNumber`,
+                },
+                toastMessage:
+                  result?.message ||
+                  "Invalid Driver License number. Please verify before submitting.",
+                timestamp: new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.error("❌ DL API ERROR:", err);
+            await trx.rollback();
+            return res.status(500).json({
+              success: false,
+              error: {
+                code: "DL_API_ERROR",
+                message: "Unable to validate Driver License at the moment.",
+              },
+              toastMessage:
+                "Driver License validation service unavailable. Try again later.",
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+
+        // Check duplicate DL
         const existingDocCheck = await trx("driver_documents")
           .where("document_type_id", doc.documentTypeId)
           .where("document_number", doc.documentNumber)
@@ -778,11 +958,11 @@ const createDriver = async (req, res) => {
 
         // If file data is provided, insert into document_upload table
         if (doc.fileData) {
-          const docUploadId = await generateDocumentUploadId();
+          const docUploadId = await generateDocumentUploadId(trx);
 
           await trx("document_upload").insert({
-            document_upload_unique_id: docUploadId,
-            document_id: documentId,
+            // document_upload_unique_id: docUploadId,
+            document_id: docUploadId,
             file_name: doc.fileName || null,
             file_type: doc.fileType || null,
             file_xstring_value: doc.fileData,
@@ -885,6 +1065,300 @@ const createDriver = async (req, res) => {
     });
   }
 };
+
+// ======================================================
+// 🎯 DRIVER LICENSE VALIDATION LOGIC
+// ======================================================
+// const validateDriverLicenseNumber = (number) => {
+//   // EXAMPLE RULE: DL Format = 2 Letters + 2 Digits + 11 Digits
+//   // KA01 20240000123  → KA0120240000123
+//   const regex = /^[A-Z]{2}[0-9]{2}[0-9]{11}$/;
+
+//   if (!regex.test(number)) {
+//     return {
+//       isValid: false,
+//       message:
+//         "Invalid Driver License Number. Please check the format. (e.g., KA0120240000123)",
+//     };
+//   }
+
+//   return { isValid: true };
+// };
+
+// // ======================================================
+// // 🎯 UNIFIED VALIDATION RESPONSE HANDLER
+// // ======================================================
+// const validationError = (res, field, message) => {
+//   return res.status(400).json({
+//     success: false,
+//     error: {
+//       code: "VALIDATION_ERROR",
+//       message,
+//       field,
+//     },
+//     timestamp: new Date().toISOString(),
+//   });
+// };
+
+// // ======================================================
+// // 🎯 DOCUMENT VALIDATION LOGIC
+// // ======================================================
+// const validateDocuments = async (trx, documents) => {
+//   if (!documents || documents.length === 0) return { isValid: true };
+
+//   for (let i = 0; i < documents.length; i++) {
+//     const doc = documents[i];
+
+//     if (!doc.documentType) {
+//       return {
+//         isValid: false,
+//         field: `documents[${i}].documentType`,
+//         message: `Document ${i + 1}: Document type is required`,
+//       };
+//     }
+
+//     if (!doc.documentNumber || doc.documentNumber.trim().length === 0) {
+//       return {
+//         isValid: false,
+//         field: `documents[${i}].documentNumber`,
+//         message: `Document ${i + 1}: Document number is required`,
+//       };
+//     }
+
+//     // Get document type from master
+//     const docInfo = await trx("document_name_master")
+//       .where(function () {
+//         this.where("doc_name_master_id", doc.documentType).orWhere(
+//           "document_name",
+//           doc.documentType
+//         );
+//       })
+//       .where("status", "ACTIVE")
+//       .first();
+
+//     if (!docInfo) {
+//       return {
+//         isValid: false,
+//         field: `documents[${i}].documentType`,
+//         message: `Document ${i + 1}: Invalid document type`,
+//       };
+//     }
+
+//     // Attach normalized values
+//     doc.documentTypeId = docInfo.doc_name_master_id;
+//     doc.documentTypeName = docInfo.document_name;
+
+//     // ================================
+//     // 🎯 SPECIAL VALIDATION FOR DRIVER LICENSE
+//     // ================================
+//     if (doc.documentTypeName.toLowerCase() === "driver license") {
+//       const dlCheck = validateDriverLicenseNumber(doc.documentNumber);
+
+//       if (!dlCheck.isValid) {
+//         return {
+//           isValid: false,
+//           field: `documents[${i}].documentNumber`,
+//           message: `Document ${i + 1}: ${dlCheck.message}`,
+//         };
+//       }
+//     }
+
+//     // Duplicate check
+//     const duplicate = await trx("driver_documents")
+//       .where("document_type_id", doc.documentTypeId)
+//       .where("document_number", doc.documentNumber)
+//       .first();
+
+//     if (duplicate) {
+//       return {
+//         isValid: false,
+//         field: `documents[${i}].documentNumber`,
+//         message: `Document ${i + 1}: ${
+//           doc.documentTypeName
+//         } number already exists`,
+//       };
+//     }
+//   }
+
+//   return { isValid: true };
+// };
+
+// const createDriver = async (req, res) => {
+//   const trx = await knex.transaction();
+
+//   try {
+//     const { basicInfo, addresses, documents, history, accidents } = req.body;
+
+//     // ----------------------------------------------------
+//     // 1. BASIC INFO VALIDATION
+//     // ----------------------------------------------------
+//     if (!basicInfo.fullName || basicInfo.fullName.trim().length < 2)
+//       return validationError(res, "fullName", ERROR.DRIVER_NAME_TOO_SHORT);
+
+//     const dobResult = validateDateOfBirth(basicInfo.dateOfBirth);
+//     if (!dobResult.isValid)
+//       return validationError(res, "dateOfBirth", dobResult.message);
+
+//     if (!validatePhoneNumber(basicInfo.phoneNumber))
+//       return validationError(res, "phoneNumber", ERROR.DRIVER_PHONE_INVALID);
+
+//     if (basicInfo.emailId && !validateEmail(basicInfo.emailId))
+//       return validationError(res, "emailId", ERROR.DRIVER_EMAIL_INVALID);
+
+//     if (
+//       basicInfo.alternatePhoneNumber &&
+//       !validatePhoneNumber(basicInfo.alternatePhoneNumber)
+//     )
+//       return validationError(
+//         res,
+//         "alternatePhoneNumber",
+//         ERROR.ALTERNATE_PHONE_DRIVER_INVALID
+//       );
+
+//     if (!basicInfo.emergencyContact)
+//       return validationError(
+//         res,
+//         "emergencyContact",
+//         ERROR.EMERGENCY_CONTACT_REQUIRED
+//       );
+
+//     if (!validatePhoneNumber(basicInfo.emergencyContact))
+//       return validationError(
+//         res,
+//         "emergencyContact",
+//         ERROR.EMERGENCY_CONTACT_INVALID
+//       );
+
+//     // Duplicate phone
+//     const phoneExists = await trx("driver_basic_information")
+//       .where("phone_number", basicInfo.phoneNumber)
+//       .first();
+//     if (phoneExists)
+//       return validationError(res, "phoneNumber", ERROR.DUPLICATE_PHONE_DRIVER);
+
+//     // Duplicate Email
+//     if (basicInfo.emailId) {
+//       const emailExists = await trx("driver_basic_information")
+//         .where("email_id", basicInfo.emailId)
+//         .first();
+
+//       if (emailExists)
+//         return validationError(res, "emailId", ERROR.DUPLICATE_EMAIL_DRIVER);
+//     }
+
+//     // ----------------------------------------------------
+//     // 2. ADDRESS VALIDATION
+//     // ----------------------------------------------------
+//     if (!addresses || addresses.length === 0)
+//       return validationError(res, "addresses", ERROR.ADDRESS_REQUIRED);
+
+//     for (let i = 0; i < addresses.length; i++) {
+//       const a = addresses[i];
+
+//       if (!a.addressTypeId)
+//         return validationError(
+//           res,
+//           `addresses[${i}].addressTypeId`,
+//           ERROR.ADDRESS_TYPE_REQUIRED
+//         );
+//       if (!a.country)
+//         return validationError(
+//           res,
+//           `addresses[${i}].country`,
+//           ERROR.COUNTRY_REQUIRED
+//         );
+//       if (!a.state)
+//         return validationError(
+//           res,
+//           `addresses[${i}].state`,
+//           ERROR.STATE_REQUIRED
+//         );
+//       if (!a.city)
+//         return validationError(
+//           res,
+//           `addresses[${i}].city`,
+//           ERROR.CITY_REQUIRED
+//         );
+//       if (!a.postalCode)
+//         return validationError(
+//           res,
+//           `addresses[${i}].postalCode`,
+//           ERROR.POSTAL_CODE_REQUIRED
+//         );
+//       if (!validatePostalCode(a.postalCode))
+//         return validationError(
+//           res,
+//           `addresses[${i}].postalCode`,
+//           ERROR.POSTAL_CODE_INVALID
+//         );
+//     }
+
+//     // ----------------------------------------------------
+//     // 3. DOCUMENT VALIDATION (INCL. DRIVER LICENSE)
+//     // ----------------------------------------------------
+//     const docValidation = await validateDocuments(trx, documents);
+//     if (!docValidation.isValid)
+//       return validationError(res, docValidation.field, docValidation.message);
+
+//     // ----------------------------------------------------
+//     // (4 & 5) HISTORY + ACCIDENT VALIDATION — SAME STYLE
+//     // KEEP as-is (omitted for brevity)
+//     // ----------------------------------------------------
+
+//     // ----------------------------------------------------
+//     // 6. INSERT INTO DATABASE (After full validation success)
+//     // ----------------------------------------------------
+
+//     // Insert basic info → get driver_id
+//     const [driverId] = await trx("driver_basic_information")
+//       .insert({
+//         full_name: basicInfo.fullName,
+//         phone_number: basicInfo.phoneNumber,
+//         email_id: basicInfo.emailId ?? null,
+//         date_of_birth: basicInfo.dateOfBirth,
+//         emergency_contact: basicInfo.emergencyContact,
+//       })
+//       .returning("driver_id");
+
+//     // Insert addresses
+//     for (const a of addresses) {
+//       await trx("driver_addresses").insert({
+//         driver_id: driverId.driver_id,
+//         address_type_id: a.addressTypeId,
+//         country: a.country,
+//         state: a.state,
+//         city: a.city,
+//         postal_code: a.postalCode,
+//         address_line_1: a.addressLine1,
+//         address_line_2: a.addressLine2,
+//       });
+//     }
+
+//     // Insert documents
+//     for (const doc of documents) {
+//       await trx("driver_documents").insert({
+//         driver_id: driverId.driver_id,
+//         document_type_id: doc.documentTypeId,
+//         document_number: doc.documentNumber,
+//       });
+//     }
+
+//     await trx.commit();
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Driver created successfully",
+//       driverId: driverId.driver_id,
+//     });
+//   } catch (err) {
+//     console.error("❌ DRIVER CREATE ERROR:", err);
+//     await trx.rollback();
+//     return res.status(500).json({
+//       success: false,
+//       message: "Something went wrong while creating the driver.",
+//     });
+//   }
+// };
 
 // Update Driver Controller
 const updateDriver = async (req, res) => {

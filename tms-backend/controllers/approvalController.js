@@ -59,6 +59,13 @@ const getPendingApprovals = async (req, res) => {
           knex.raw("LENGTH(um.user_id) = 6")
         );
       })
+      .leftJoin("warehouse_basic_information as wbi", function () {
+        this.on(knex.raw("um.user_id LIKE 'CW%'")).andOn(
+          "um.consignor_id",
+          "=",
+          "wbi.consignor_id"
+        );
+      })
       .where("aft.pending_with_user_id", userId)
       .where("aft.s_status", "PENDING")
       .select(
@@ -76,10 +83,13 @@ const getPendingApprovals = async (req, res) => {
         "um.email_id as user_email",
         "um.mobile_number as user_mobile",
         "um.user_type_id",
+        "um.consignor_id",
         "atm.approval_type as approval_category",
         "atm.approval_name",
         "tgi.business_name as transporter_business_name",
-        "tgi.transporter_id"
+        "tgi.transporter_id",
+        "wbi.warehouse_name1 as warehouse_name",
+        "wbi.warehouse_id"
       )
       .orderBy("aft.created_at", "desc");
 
@@ -97,7 +107,6 @@ const getPendingApprovals = async (req, res) => {
     });
   }
 };
-
 /**
  * Get Approval History for a Specific User
  * @route GET /api/approval/history/:userId

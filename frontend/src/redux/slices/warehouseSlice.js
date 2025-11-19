@@ -98,6 +98,12 @@ const initialState = {
   },
   useMockData: false, // Flag to switch between mock and real data - now using real API
 
+  // Approval state (for warehouse manager users)
+  userApprovalStatus: null,
+  approvalHistory: [],
+  isApproving: false,
+  isRejecting: false,
+
   // Bulk upload state
   bulkUpload: {
     isModalOpen: false,
@@ -430,7 +436,15 @@ const warehouseSlice = createSlice({
         state.loading = false;
         state.warehouses = action.payload.warehouses || action.payload;
         state.filteredWarehouses = action.payload.warehouses || action.payload;
-        state.pagination = action.payload.pagination || state.pagination;
+        // ✅ FIX: Properly update pagination from API response
+        if (action.payload.pagination) {
+          state.pagination = {
+            page: action.payload.pagination.page || 1,
+            limit: action.payload.pagination.limit || 25,
+            total: action.payload.pagination.total || 0,
+            totalPages: action.payload.pagination.totalPages || 0,
+          };
+        }
       })
       .addCase(fetchWarehouses.rejected, (state, action) => {
         state.loading = false;
@@ -445,6 +459,9 @@ const warehouseSlice = createSlice({
       .addCase(fetchWarehouseById.fulfilled, (state, action) => {
         state.loading = false;
         state.currentWarehouse = action.payload.warehouse || action.payload;
+        // Store approval status if available
+        state.userApprovalStatus = action.payload.userApprovalStatus || null;
+        state.approvalHistory = action.payload.approvalHistory || [];
       })
       .addCase(fetchWarehouseById.rejected, (state, action) => {
         state.loading = false;

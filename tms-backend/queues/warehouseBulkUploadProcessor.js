@@ -97,6 +97,7 @@ async function parseWarehouseExcel(filePath) {
   const subLocItemSheet = workbook.getWorksheet("Sub Location Item");
 
   const warehouses = {};
+  const warehouseNameToRefId = {}; // Map warehouse name to row-based refId for sub-location lookups
 
   // Parse Sheet 1: Warehouse Basic Information
   basicInfoSheet.eachRow((row, rowNumber) => {
@@ -105,8 +106,11 @@ async function parseWarehouseExcel(filePath) {
     const warehouseName1 = row.getCell(5).value; // Column E
     if (!warehouseName1) return;
 
-    warehouses[warehouseName1] = {
-      refId: warehouseName1, // Use warehouse name as reference
+    // Use row number as unique reference ID (safer than warehouse name which can be very long)
+    const refId = `WH-ROW-${rowNumber}`;
+
+    warehouses[refId] = {
+      refId: refId, // Use row number as reference (guaranteed unique and short)
       basicInfo: {
         warehouseType: row.getCell(4).value, // Column D
         warehouseName1: row.getCell(5).value, // Column E
@@ -147,6 +151,9 @@ async function parseWarehouseExcel(filePath) {
       subLocationHeaders: [],
       excelRowNumber: rowNumber,
     };
+
+    // Create mapping from warehouse name to refId for sub-location lookups
+    warehouseNameToRefId[warehouseName1] = refId;
   });
 
   // Parse Sheet 2: Sub Location Headers
@@ -158,12 +165,13 @@ async function parseWarehouseExcel(filePath) {
       const subLocationName = row.getCell(5).value; // Column E
       if (!warehouseName1 || !subLocationName) return;
 
-      if (warehouses[warehouseName1]) {
-        if (!warehouses[warehouseName1].subLocationHeaders) {
-          warehouses[warehouseName1].subLocationHeaders = [];
+      const refId = warehouseNameToRefId[warehouseName1];
+      if (refId && warehouses[refId]) {
+        if (!warehouses[refId].subLocationHeaders) {
+          warehouses[refId].subLocationHeaders = [];
         }
 
-        warehouses[warehouseName1].subLocationHeaders.push({
+        warehouses[refId].subLocationHeaders.push({
           subLocationType: row.getCell(4).value, // Column D
           subLocationName: row.getCell(5).value, // Column E
           description: row.getCell(6).value || null, // Column F
@@ -188,10 +196,9 @@ async function parseWarehouseExcel(filePath) {
       const warehouseName1 = row.getCell(2).value; // Column B
       if (!subLocationName || !warehouseName1) return;
 
-      if (warehouses[warehouseName1]) {
-        const subLocationHeader = warehouses[
-          warehouseName1
-        ].subLocationHeaders?.find(
+      const refId = warehouseNameToRefId[warehouseName1];
+      if (refId && warehouses[refId]) {
+        const subLocationHeader = warehouses[refId].subLocationHeaders?.find(
           (sl) => sl.subLocationName === subLocationName
         );
 
@@ -639,6 +646,32 @@ async function processWarehouseBulkUpload(jobData) {
       .where({ batch_id: batchId })
       .update({ total_rows: warehouses.length });
 
+    // If no warehouses found, mark as completed with 0 records
+    if (warehouses.length === 0) {
+      await knex("tms_warehouse_bulk_upload_batches")
+        .where({ batch_id: batchId })
+        .update({
+          status: "completed",
+          processed_timestamp: knex.fn.now(),
+        });
+
+      // Delete uploaded file
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      console.log(`✅ Batch ${batchId} completed with 0 warehouses`);
+      return {
+        success: true,
+        batchId,
+        totalRows: 0,
+        validCount: 0,
+        invalidCount: 0,
+        createdCount: 0,
+        creationFailedCount: 0,
+      };
+    }
+
     console.log(`✅ Step 2: Validating warehouse data`);
     let validCount = 0;
     let invalidCount = 0;
@@ -678,28 +711,40 @@ async function processWarehouseBulkUpload(jobData) {
     for (const warehouse of warehouses) {
       const hasErrors = allValidationErrors[warehouse.refId];
 
-      if (hasErrors) {
-        // Store invalid warehouse
-        await knex("tms_warehouse_bulk_upload_warehouses").insert({
-          batch_id: batchId,
-          warehouse_ref_id: warehouse.refId,
-          excel_row_number: warehouse.excelRowNumber,
-          validation_status: "invalid",
-          validation_errors: JSON.stringify(hasErrors),
-          data: JSON.stringify(warehouse),
-        });
-        invalidCount++;
-      } else {
-        // Store valid warehouse
-        await knex("tms_warehouse_bulk_upload_warehouses").insert({
-          batch_id: batchId,
-          warehouse_ref_id: warehouse.refId,
-          excel_row_number: warehouse.excelRowNumber,
-          validation_status: "valid",
-          validation_errors: JSON.stringify([]),
-          data: JSON.stringify(warehouse),
-        });
-        validCount++;
+      try {
+        if (hasErrors) {
+          // Store invalid warehouse
+          await knex("tms_warehouse_bulk_upload_warehouses").insert({
+            batch_id: batchId,
+            warehouse_ref_id: warehouse.refId,
+            excel_row_number: warehouse.excelRowNumber,
+            validation_status: "invalid",
+            validation_errors: JSON.stringify(hasErrors),
+            data: JSON.stringify(warehouse),
+          });
+          invalidCount++;
+        } else {
+          // Store valid warehouse
+          await knex("tms_warehouse_bulk_upload_warehouses").insert({
+            batch_id: batchId,
+            warehouse_ref_id: warehouse.refId,
+            excel_row_number: warehouse.excelRowNumber,
+            validation_status: "valid",
+            validation_errors: JSON.stringify([]),
+            data: JSON.stringify(warehouse),
+          });
+          validCount++;
+        }
+      } catch (insertError) {
+        // If insertion fails due to database constraint, log it and continue
+        console.error(
+          `⚠️ Failed to store warehouse row ${warehouse.excelRowNumber}:`,
+          insertError.message
+        );
+        // Count as invalid if we couldn't store it
+        if (!hasErrors) {
+          invalidCount++;
+        }
       }
     }
 
@@ -726,7 +771,11 @@ async function processWarehouseBulkUpload(jobData) {
 
     for (const validWarehouse of validWarehouses) {
       try {
-        const warehouseData = JSON.parse(validWarehouse.data);
+        // Handle both JSON object and string (database might return either depending on driver)
+        const warehouseData =
+          typeof validWarehouse.data === "string"
+            ? JSON.parse(validWarehouse.data)
+            : validWarehouse.data;
 
         const result = await createWarehouseFromBulk(warehouseData, userId);
 
@@ -740,11 +789,10 @@ async function processWarehouseBulkUpload(jobData) {
       } catch (error) {
         console.error(`❌ Failed to create warehouse:`, error);
 
-        // Update validation status to show creation failed
+        // Mark as creation_failed instead of changing validation status
         await knex("tms_warehouse_bulk_upload_warehouses")
           .where({ id: validWarehouse.id })
           .update({
-            validation_status: "invalid",
             validation_errors: JSON.stringify([
               {
                 field: "creation",
@@ -762,10 +810,23 @@ async function processWarehouseBulkUpload(jobData) {
       `✅ Creation complete: ${createdCount} created, ${creationFailedCount} failed`
     );
 
-    // Update final batch status
+    // Recalculate final valid/invalid counts from database (in case any changed during creation)
+    const finalValidCount = await knex("tms_warehouse_bulk_upload_warehouses")
+      .where({ batch_id: batchId, validation_status: "valid" })
+      .count("* as count")
+      .first();
+
+    const finalInvalidCount = await knex("tms_warehouse_bulk_upload_warehouses")
+      .where({ batch_id: batchId, validation_status: "invalid" })
+      .count("* as count")
+      .first();
+
+    // Update final batch status with accurate counts
     await knex("tms_warehouse_bulk_upload_batches")
       .where({ batch_id: batchId })
       .update({
+        total_valid: parseInt(finalValidCount.count) || 0,
+        total_invalid: parseInt(finalInvalidCount.count) || 0,
         total_created: createdCount,
         total_creation_failed: creationFailedCount,
         status: "completed",

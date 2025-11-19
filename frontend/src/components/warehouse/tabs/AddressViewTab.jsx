@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Country, State, City } from "country-state-city";
 import {
   MapPin,
   Building,
@@ -20,6 +21,20 @@ const AddressViewTab = ({ warehouseData }) => {
       return <span className="text-gray-500 italic">N/A</span>;
     }
     return <span className="text-[#0D1A33] font-medium">{value}</span>;
+  };
+
+  // Helper function to get country name from ISO code
+  const getCountryName = (isoCode) => {
+    if (!isoCode) return null;
+    const country = Country.getCountryByCode(isoCode);
+    return country ? country.name : isoCode; // Fallback to code if not found
+  };
+
+  // Helper function to get state name from ISO code
+  const getStateName = (countryCode, stateCode) => {
+    if (!countryCode || !stateCode) return null;
+    const state = State.getStateByCodeAndCountry(stateCode, countryCode);
+    return state ? state.name : stateCode; // Fallback to code if not found
   };
 
   const toggleSection = (section) => {
@@ -114,7 +129,9 @@ const AddressViewTab = ({ warehouseData }) => {
               </label>
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-gray-400" />
-                {displayValue(address.country)}
+                {displayValue(
+                  getCountryName(address.country) || address.country
+                )}
               </div>
             </div>
 
@@ -124,7 +141,9 @@ const AddressViewTab = ({ warehouseData }) => {
               </label>
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-gray-400" />
-                {displayValue(address.state)}
+                {displayValue(
+                  getStateName(address.country, address.state) || address.state
+                )}
               </div>
             </div>
 
