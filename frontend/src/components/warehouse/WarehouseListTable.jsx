@@ -229,7 +229,9 @@ const WarehouseListTable = ({
                     </span>
                   </div>
                   <p className="text-sm text-[#0D1A33]">
-                    {displayValue(warehouse.warehouse_type)}
+                    {displayValue(
+                      warehouse.warehouse_type_name || warehouse.warehouse_type
+                    )}
                   </p>
                 </div>
               </div>
@@ -503,7 +505,10 @@ const WarehouseListTable = ({
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
-                      {displayValue(warehouse.warehouse_type)}
+                      {displayValue(
+                        warehouse.warehouse_type_name ||
+                          warehouse.warehouse_type
+                      )}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">

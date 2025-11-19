@@ -330,10 +330,61 @@ Before deploying to production:
 
 ---
 
+## 🐛 Troubleshooting
+
+### Issue: "Invalid user ID or password" for Product Owner 2
+
+**Problem**: Trying to login with `POWNER002` instead of `PO002`
+
+**Solution**:
+
+- ✅ Correct User ID: `PO002` (not POWNER002)
+- ✅ Password: `ProductOwner@123` (case-sensitive)
+
+### Issue: bcrypt/bcryptjs Mismatch (FIXED)
+
+**Problem**: Migration used `bcrypt` to hash passwords, but authController was using `bcryptjs` - these libraries produce incompatible hashes.
+
+**Fix Applied** (November 15, 2025):
+
+- Changed `authController.js` line 1 from `require("bcryptjs")` to `require("bcrypt")`
+- Now both migration and authController use the same bcrypt library
+- Passwords will now validate correctly
+
+**Verification**:
+
+```bash
+# Check authController uses bcrypt
+grep "require.*bcrypt" tms-backend/controllers/authController.js
+# Should show: const bcrypt = require("bcrypt");
+```
+
+### Issue: User Not Found in Database
+
+**Solution**: Run migrations to create Product Owner users
+
+```bash
+cd tms-backend
+npx knex migrate:latest
+```
+
+**Verify Users Exist**:
+
+```sql
+SELECT user_id, email_id, status, is_active
+FROM user_master
+WHERE user_id IN ('PO001', 'PO002');
+```
+
+Expected: 2 rows with status='ACTIVE' and is_active=true
+
+---
+
 **Questions or Issues?**
 
 - Check implementation docs: `docs/APPROVAL_SYSTEM_IMPLEMENTATION.md`
 - Review test plan: `docs/APPROVAL_SYSTEM_TEST_PLAN.md`
+- Login credentials: `PRODUCT_OWNER_CREDENTIALS.md`
 - Examine code comments in:
   - `approvalController.js`
   - `ApprovalActionBar.jsx`
@@ -343,4 +394,5 @@ Before deploying to production:
 
 **Implementation Completed By**: AI Agent (Beast Mode 3.1)  
 **Date**: November 15, 2025  
-**Status**: ✅ Ready for QA Testing
+**Status**: ✅ Ready for QA Testing  
+**Fix Applied**: bcrypt/bcryptjs mismatch resolved (November 15, 2025)

@@ -175,7 +175,6 @@ exports.getApprovals = async (req, res) => {
     });
   }
 };
-
 /**
  * Approve a request
  * POST /api/approvals/:id/approve

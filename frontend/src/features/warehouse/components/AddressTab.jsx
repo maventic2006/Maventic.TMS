@@ -10,28 +10,40 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
 
-  useEffect(() => {
-    if (formData.address.country) {
-      const countryStates = State.getStatesOfCountry(formData.address.country);
-      setStates(countryStates);
-    }
-  }, [formData.address.country]);
+  // Safe navigation - ensure formData has the expected structure
+  const address = formData?.address || {
+    country: "",
+    state: "",
+    city: "",
+    district: "",
+    street1: "",
+    street2: "",
+    postalCode: "",
+    vatNumber: "",
+    tinPan: "",
+    tan: "",
+    addressType: "",
+  };
 
   useEffect(() => {
-    if (formData.address.country && formData.address.state) {
-      const stateCities = City.getCitiesOfState(
-        formData.address.country,
-        formData.address.state
-      );
+    if (address.country) {
+      const countryStates = State.getStatesOfCountry(address.country);
+      setStates(countryStates);
+    }
+  }, [address.country]);
+
+  useEffect(() => {
+    if (address.country && address.state) {
+      const stateCities = City.getCitiesOfState(address.country, address.state);
       setCities(stateCities);
     }
-  }, [formData.address.country, formData.address.state]);
+  }, [address.country, address.state]);
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
       address: {
-        ...prev.address,
+        ...(prev?.address || {}),
         [field]: value,
       },
     }));
@@ -41,7 +53,7 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
       setFormData((prev) => ({
         ...prev,
         address: {
-          ...prev.address,
+          ...(prev?.address || {}),
           country: value,
           state: "",
           city: "",
@@ -51,7 +63,7 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
       setFormData((prev) => ({
         ...prev,
         address: {
-          ...prev.address,
+          ...(prev?.address || {}),
           state: value,
           city: "",
         },
@@ -69,7 +81,7 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
               Country <span className="text-red-500">*</span>
             </label>
             <CustomSelect
-              value={formData.address.country}
+              value={address.country || ""}
               onValueChange={(value) => handleChange("country", value)}
               options={countries}
               getOptionLabel={(option) => option.name}
@@ -92,13 +104,13 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
               State <span className="text-red-500">*</span>
             </label>
             <CustomSelect
-              value={formData.address.state}
+              value={address.state || ""}
               onValueChange={(value) => handleChange("state", value)}
               options={states}
               getOptionLabel={(option) => option.name}
               getOptionValue={(option) => option.isoCode}
               placeholder="Select state"
-              disabled={!formData.address.country}
+              disabled={!address.country}
               error={errors?.["address.state"]}
               required
               searchable
@@ -116,13 +128,13 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
               City <span className="text-red-500">*</span>
             </label>
             <CustomSelect
-              value={formData.address.city}
+              value={address.city || ""}
               onValueChange={(value) => handleChange("city", value)}
               options={cities}
               getOptionLabel={(option) => option.name}
               getOptionValue={(option) => option.name}
               placeholder="Select city"
-              disabled={!formData.address.state}
+              disabled={!address.state}
               error={errors?.["address.city"]}
               required
               searchable
@@ -141,23 +153,25 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
             </label>
             <input
               type="text"
-              value={formData.address.district}
+              value={address.district || ""}
               onChange={(e) => handleChange("district", e.target.value)}
               placeholder="Enter district"
+              maxLength={30}
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
             />
           </div>
 
-          {/* Street 1 */}
+          {/* Street 1 - Mandatory */}
           <div className="space-y-1">
             <label className="block text-xs font-medium text-[#0D1A33]">
-              Street Address 1 <span className="text-red-500">*</span>
+              Street 1 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={formData.address.street1}
+              value={address.street1 || ""}
               onChange={(e) => handleChange("street1", e.target.value)}
-              placeholder="Enter street address"
+              placeholder="Enter street 1"
+              maxLength={50}
               className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
                 errors?.["address.street1"]
                   ? "border-red-500 focus:border-red-500"
@@ -171,31 +185,32 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
             )}
           </div>
 
-          {/* Street 2 */}
+          {/* Street 2 - Optional */}
           <div className="space-y-1">
             <label className="block text-xs font-medium text-[#0D1A33]">
-              Street Address 2
+              Street 2
             </label>
             <input
               type="text"
-              value={formData.address.street2}
+              value={address.street2 || ""}
               onChange={(e) => handleChange("street2", e.target.value)}
-              placeholder="Enter additional address details"
+              placeholder="Enter street 2"
+              maxLength={50}
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
             />
           </div>
 
-          {/* Postal Code */}
+          {/* Postal Code - Mandatory */}
           <div className="space-y-1">
             <label className="block text-xs font-medium text-[#0D1A33]">
-              Postal Code (PIN)
+              Postal Code <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={formData.address.postalCode}
+              value={address.postalCode || ""}
               onChange={(e) => handleChange("postalCode", e.target.value)}
               placeholder="Enter postal code"
-              maxLength={6}
+              maxLength={10}
               className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
                 errors?.["address.postalCode"]
                   ? "border-red-500 focus:border-red-500"
@@ -209,19 +224,22 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
             )}
           </div>
 
-          {/* VAT Number - Mandatory */}
+          {/* VAT Number - Mandatory, Auto-generate from state & other info */}
           <div className="space-y-1">
             <label className="block text-xs font-medium text-[#0D1A33]">
-              VAT Number <span className="text-red-500">*</span>
+              VAT Number (GST) <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={formData.address.vatNumber}
+              value={address.vatNumber || ""}
               onChange={(e) =>
-                handleChange("vatNumber", e.target.value.toUpperCase())
+                handleChange(
+                  "vatNumber",
+                  e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()
+                )
               }
-              placeholder="Enter VAT number"
-              maxLength={20}
+              placeholder="Enter VAT/GST number"
+              maxLength={15}
               className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
                 errors?.["address.vatNumber"]
                   ? "border-red-500 focus:border-red-500"
@@ -234,7 +252,8 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
               </p>
             )}
             <p className="text-xs text-gray-500">
-              8-20 alphanumeric characters
+              Format: 15 alphanumeric characters (auto-uppercase, special
+              characters stripped)
             </p>
           </div>
 
@@ -245,16 +264,14 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
             </label>
             <input
               type="text"
-              value={formData.address.tinPan || ""}
-              onChange={(e) =>
-                handleChange("tinPan", e.target.value.toUpperCase())
-              }
-              placeholder="Enter TIN/PAN"
-              maxLength={50}
+              value={address.tinPan || ""}
+              onChange={(e) => handleChange("tinPan", e.target.value)}
+              placeholder="Enter TIN/PAN number"
+              maxLength={15}
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
             />
             <p className="text-xs text-gray-500">
-              Tax Identification Number / Permanent Account Number
+              Tax Identification Number (TIN) / Permanent Account Number (PAN)
             </p>
           </div>
 
@@ -265,12 +282,10 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
             </label>
             <input
               type="text"
-              value={formData.address.tan || ""}
-              onChange={(e) =>
-                handleChange("tan", e.target.value.toUpperCase())
-              }
-              placeholder="Enter TAN"
-              maxLength={50}
+              value={address.tan || ""}
+              onChange={(e) => handleChange("tan", e.target.value)}
+              placeholder="Enter TAN number"
+              maxLength={15}
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
             />
             <p className="text-xs text-gray-500">
@@ -284,7 +299,7 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
               Address Type <span className="text-red-500">*</span>
             </label>
             <CustomSelect
-              value={formData.address.addressType}
+              value={address.addressType || ""}
               onValueChange={(value) => handleChange("addressType", value)}
               options={masterData?.addressTypes || []}
               getOptionLabel={(option) => option.address}

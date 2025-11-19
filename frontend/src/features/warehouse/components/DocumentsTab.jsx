@@ -1,13 +1,21 @@
 ﻿import React from "react";
+import { useDispatch } from "react-redux";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { CustomSelect } from "@/components/ui/Select";
+import { addToast } from "../../../redux/slices/uiSlice";
+import { TOAST_TYPES } from "../../../utils/constants";
 
 const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
+  const dispatch = useDispatch();
+
+  // Safe navigation - ensure formData has the expected structure
+  const documents = formData?.documents || [];
+
   const addDocument = () => {
     setFormData((prev) => ({
       ...prev,
       documents: [
-        ...prev.documents,
+        ...(prev?.documents || []),
         {
           documentType: "",
           documentNumber: "",
@@ -25,14 +33,14 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
   const removeDocument = (index) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.filter((_, i) => i !== index),
+      documents: (prev?.documents || []).filter((_, i) => i !== index),
     }));
   };
 
   const handleDocumentChange = (index, field, value) => {
     setFormData((prev) => ({
       ...prev,
-      documents: prev.documents.map((doc, i) =>
+      documents: (prev?.documents || []).map((doc, i) =>
         i === index ? { ...doc, [field]: value } : doc
       ),
     }));
@@ -40,25 +48,69 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
 
   const handleFileUpload = (index, event) => {
     const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData((prev) => ({
-          ...prev,
-          documents: prev.documents.map((doc, i) =>
-            i === index
-              ? {
-                  ...doc,
-                  fileName: file.name,
-                  fileType: file.type,
-                  fileData: reader.result.split(",")[1], // Base64 string without data URL prefix
-                }
-              : doc
-          ),
-        }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // File validation
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (file.size > maxSize) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "File size must be less than 5MB",
+          duration: 4000,
+        })
+      );
+      event.target.value = "";
+      return;
     }
+
+    if (!allowedTypes.includes(file.type)) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "Only JPEG, PNG, GIF, PDF, DOC, and DOCX files are allowed",
+          duration: 4000,
+        })
+      );
+      event.target.value = "";
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({
+        ...prev,
+        documents: prev.documents.map((doc, i) =>
+          i === index
+            ? {
+                ...doc,
+                fileName: file.name,
+                fileType: file.type,
+                fileData: reader.result.split(",")[1], // Base64 string without data URL prefix
+              }
+            : doc
+        ),
+      }));
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: `File "${file.name}" uploaded successfully`,
+          duration: 2000,
+        })
+      );
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -79,7 +131,7 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
       </div>
 
       {/* Documents Table */}
-      {formData.documents.length === 0 ? (
+      {documents.length === 0 ? (
         <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
           <p className="text-gray-600 text-sm">
             No documents added yet. Click "Add Document" to start.
@@ -111,18 +163,18 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {formData.documents.map((document, index) => (
+              {documents.map((doc, index) => (
                 <tr key={index} className="hover:bg-gray-50 transition-colors">
                   {/* Document Type */}
                   <td className="px-3 py-2">
                     <CustomSelect
-                      value={document.documentType}
+                      value={doc.documentType}
                       onValueChange={(value) =>
                         handleDocumentChange(index, "documentType", value)
                       }
-                      options={masterData?.documentTypes || []}
-                      getOptionLabel={(option) => option.document_type_name}
-                      getOptionValue={(option) => option.document_type_id}
+                      options={masterData?.documentNames || []}
+                      getOptionLabel={(option) => option.label}
+                      getOptionValue={(option) => option.value}
                       placeholder="Select document type"
                       error={errors?.[`documents.${index}.documentType`]}
                       required
@@ -139,7 +191,7 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
                   <td className="px-3 py-2">
                     <input
                       type="text"
-                      value={document.documentNumber}
+                      value={doc.documentNumber}
                       onChange={(e) =>
                         handleDocumentChange(
                           index,
@@ -165,7 +217,7 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
                   <td className="px-3 py-2">
                     <input
                       type="date"
-                      value={document.validFrom}
+                      value={doc.validFrom || ""}
                       onChange={(e) =>
                         handleDocumentChange(index, "validFrom", e.target.value)
                       }
@@ -177,7 +229,7 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
                   <td className="px-3 py-2">
                     <input
                       type="date"
-                      value={document.validTo}
+                      value={doc.validTo || ""}
                       onChange={(e) =>
                         handleDocumentChange(index, "validTo", e.target.value)
                       }
@@ -190,11 +242,12 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() =>
-                          document
-                            .getElementById(`file-upload-${index}`)
-                            .click()
-                        }
+                        onClick={() => {
+                          const fileInput = window.document.getElementById(
+                            `file-upload-${index}`
+                          );
+                          if (fileInput) fileInput.click();
+                        }}
                         className="flex items-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded transition-colors"
                       >
                         <Upload className="w-3 h-3" />
@@ -207,12 +260,12 @@ const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
                         accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                         onChange={(e) => handleFileUpload(index, e)}
                       />
-                      {document.fileName && (
+                      {doc.fileName && (
                         <span
                           className="text-xs text-green-600 font-medium truncate max-w-[150px]"
-                          title={document.fileName}
+                          title={doc.fileName}
                         >
-                          {document.fileName}
+                          {doc.fileName}
                         </span>
                       )}
                     </div>

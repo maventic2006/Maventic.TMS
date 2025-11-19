@@ -21,11 +21,12 @@ import {
   fetchMasterData,
   clearError,
   clearLastCreated,
+  openBulkUploadModal,
 } from "../../../redux/slices/warehouseSlice";
-import { openModal } from "../../../redux/slices/bulkUploadSlice";
-import BulkUploadModal from "../../transporter/components/BulkUploadModal";
-import BulkUploadHistory from "../../transporter/components/BulkUploadHistory";
-import { createWarehouseSchema, validateFormSection } from "../validation";
+import WarehouseBulkUploadModal from "../components/WarehouseBulkUploadModal";
+import WarehouseBulkUploadHistory from "../components/WarehouseBulkUploadHistory";
+import { createWarehouseSchema } from "../validation";
+import { validateDocumentNumber } from "../../../utils/documentValidation";
 import { getComponentTheme } from "../../../utils/theme";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../../utils/constants";
 import { addToast } from "../../../redux/slices/uiSlice";
@@ -211,25 +212,41 @@ const WarehouseCreatePage = () => {
   // Handle successful creation
   useEffect(() => {
     if (lastCreatedWarehouse && !isCreating) {
+      // Extract data from the response (could be nested in 'data' object)
+      const warehouseData = lastCreatedWarehouse.data || lastCreatedWarehouse;
+      const warehouseId =
+        warehouseData.warehouse?.warehouse_id ||
+        warehouseData.warehouseId ||
+        "Generated";
+      const userId = warehouseData.userId;
+      const approvalStatus = warehouseData.approvalStatus;
+      const pendingWith = warehouseData.pendingWith;
+
+      const toastDetails = [`Warehouse ID: ${warehouseId}`];
+
+      // Add user approval info if available
+      if (userId) {
+        toastDetails.push(`Manager User ID: ${userId}`);
+        if (approvalStatus === "PENDING" && pendingWith) {
+          toastDetails.push(`Approval pending with: ${pendingWith}`);
+        }
+      }
+
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: "Warehouse created successfully!",
-          details: [
-            `Warehouse ID: ${
-              lastCreatedWarehouse.warehouseId ||
-              lastCreatedWarehouse.warehouse_id ||
-              "Generated"
-            }`,
-          ],
-          duration: 3000,
+          message: userId
+            ? "Warehouse created successfully! Manager user created and pending approval."
+            : "Warehouse created successfully!",
+          details: toastDetails,
+          duration: 5000, // Longer duration for approval message
         })
       );
 
       const timer = setTimeout(() => {
         dispatch(clearLastCreated());
         navigate("/warehouse");
-      }, 2000);
+      }, 3000); // Longer delay for user to read approval message
 
       return () => clearTimeout(timer);
     }
@@ -400,6 +417,51 @@ const WarehouseCreatePage = () => {
       return;
     }
 
+    // Additional validation: Document number format validation (requires masterData)
+    if (formData.documents && formData.documents.length > 0) {
+      for (let i = 0; i < formData.documents.length; i++) {
+        const doc = formData.documents[i];
+        if (doc.documentType && doc.documentNumber) {
+          // Find document type name from masterData.documentNames (not documentTypes)
+          const docType = masterData.documentNames?.find(
+            (dt) => dt.value === doc.documentType
+          );
+
+          if (docType) {
+            const validation = validateDocumentNumber(
+              doc.documentNumber,
+              docType.label // This is the actual document name like "GST Certificate"
+            );
+
+            if (!validation.isValid) {
+              // Set validation error
+              setValidationErrors({
+                documents: formData.documents.map((d, idx) =>
+                  idx === i ? { documentNumber: validation.message } : {}
+                ),
+              });
+
+              // Switch to documents tab
+              setActiveTab(2);
+              setTabErrors({ ...tabErrors, 2: true });
+
+              // Show toast
+              dispatch(
+                addToast({
+                  type: TOAST_TYPES.ERROR,
+                  message: validation.message,
+                  details: [`Document #${i + 1}: ${validation.message}`],
+                  duration: 8000,
+                })
+              );
+
+              return;
+            }
+          }
+        }
+      }
+    }
+
     // Transform form data to match backend API expectations
     const apiPayload = {
       generalDetails: {
@@ -429,7 +491,7 @@ const WarehouseCreatePage = () => {
   };
 
   const handleBulkUpload = useCallback(() => {
-    dispatch(openModal());
+    dispatch(openBulkUploadModal());
   }, [dispatch]);
 
   return (
@@ -646,8 +708,8 @@ const WarehouseCreatePage = () => {
       </div>
 
       {/* Bulk Upload Modal and History */}
-      <BulkUploadModal />
-      <BulkUploadHistory />
+      <WarehouseBulkUploadModal />
+      <WarehouseBulkUploadHistory />
     </div>
   );
 };

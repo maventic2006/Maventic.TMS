@@ -97,6 +97,24 @@ const initialState = {
     status: "",
   },
   useMockData: false, // Flag to switch between mock and real data - now using real API
+
+  // Approval state (for warehouse manager users)
+  userApprovalStatus: null,
+  approvalHistory: [],
+  isApproving: false,
+  isRejecting: false,
+
+  // Bulk upload state
+  bulkUpload: {
+    isModalOpen: false,
+    isHistoryModalOpen: false,
+    isUploading: false,
+    isDownloadingTemplate: false,
+    currentBatch: null,
+    batches: [],
+    statusCounts: { valid: 0, invalid: 0 },
+    pagination: { page: 1, limit: 10, total: 0, pages: 0 },
+  },
 };
 
 // Async thunks (will be implemented with real API later)
@@ -260,6 +278,112 @@ export const fetchMasterData = createAsyncThunk(
   }
 );
 
+// Bulk Upload Async Thunks
+export const downloadWarehouseBulkTemplate = createAsyncThunk(
+  "warehouse/downloadBulkTemplate",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/warehouse-bulk-upload/template", {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "Warehouse_Bulk_Upload_Template.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      return { success: true };
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || "Failed to download template"
+      );
+    }
+  }
+);
+
+export const uploadWarehouseBulk = createAsyncThunk(
+  "warehouse/uploadBulk",
+  async (file, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await api.post(
+        "/warehouse-bulk-upload/upload",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Failed to upload file");
+    }
+  }
+);
+
+export const fetchWarehouseBulkStatus = createAsyncThunk(
+  "warehouse/fetchBulkStatus",
+  async (batchId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        `/warehouse-bulk-upload/status/${batchId}`
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Failed to fetch status");
+    }
+  }
+);
+
+export const fetchWarehouseBulkHistory = createAsyncThunk(
+  "warehouse/fetchBulkHistory",
+  async ({ page = 1, limit = 10 }, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        `/warehouse-bulk-upload/history?page=${page}&limit=${limit}`
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || "Failed to fetch history");
+    }
+  }
+);
+
+export const downloadWarehouseBulkErrorReport = createAsyncThunk(
+  "warehouse/downloadErrorReport",
+  async (batchId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        `/warehouse-bulk-upload/error-report/${batchId}`,
+        {
+          responseType: "blob",
+        }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Warehouse_Error_Report_${batchId}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      return { success: true };
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || "Failed to download report"
+      );
+    }
+  }
+);
+
 // Warehouse slice
 const warehouseSlice = createSlice({
   name: "warehouse",
@@ -283,6 +407,23 @@ const warehouseSlice = createSlice({
     clearLastCreated: (state) => {
       state.lastCreatedWarehouse = null;
     },
+    // Bulk upload reducers
+    openBulkUploadModal: (state) => {
+      state.bulkUpload.isModalOpen = true;
+    },
+    closeBulkUploadModal: (state) => {
+      state.bulkUpload.isModalOpen = false;
+    },
+    openBulkUploadHistory: (state) => {
+      state.bulkUpload.isHistoryModalOpen = true;
+    },
+    closeBulkUploadHistory: (state) => {
+      state.bulkUpload.isHistoryModalOpen = false;
+    },
+    resetBulkUploadState: (state) => {
+      state.bulkUpload.currentBatch = null;
+      state.bulkUpload.statusCounts = { valid: 0, invalid: 0 };
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -295,7 +436,15 @@ const warehouseSlice = createSlice({
         state.loading = false;
         state.warehouses = action.payload.warehouses || action.payload;
         state.filteredWarehouses = action.payload.warehouses || action.payload;
-        state.pagination = action.payload.pagination || state.pagination;
+        // ✅ FIX: Properly update pagination from API response
+        if (action.payload.pagination) {
+          state.pagination = {
+            page: action.payload.pagination.page || 1,
+            limit: action.payload.pagination.limit || 25,
+            total: action.payload.pagination.total || 0,
+            totalPages: action.payload.pagination.totalPages || 0,
+          };
+        }
       })
       .addCase(fetchWarehouses.rejected, (state, action) => {
         state.loading = false;
@@ -310,6 +459,9 @@ const warehouseSlice = createSlice({
       .addCase(fetchWarehouseById.fulfilled, (state, action) => {
         state.loading = false;
         state.currentWarehouse = action.payload.warehouse || action.payload;
+        // Store approval status if available
+        state.userApprovalStatus = action.payload.userApprovalStatus || null;
+        state.approvalHistory = action.payload.approvalHistory || [];
       })
       .addCase(fetchWarehouseById.rejected, (state, action) => {
         state.loading = false;
@@ -373,6 +525,42 @@ const warehouseSlice = createSlice({
       .addCase(fetchMasterData.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // Download template
+      .addCase(downloadWarehouseBulkTemplate.pending, (state) => {
+        state.bulkUpload.isDownloadingTemplate = true;
+      })
+      .addCase(downloadWarehouseBulkTemplate.fulfilled, (state) => {
+        state.bulkUpload.isDownloadingTemplate = false;
+      })
+      .addCase(downloadWarehouseBulkTemplate.rejected, (state) => {
+        state.bulkUpload.isDownloadingTemplate = false;
+      })
+
+      // Upload file
+      .addCase(uploadWarehouseBulk.pending, (state) => {
+        state.bulkUpload.isUploading = true;
+      })
+      .addCase(uploadWarehouseBulk.fulfilled, (state, action) => {
+        state.bulkUpload.isUploading = false;
+        state.bulkUpload.currentBatch = action.payload;
+      })
+      .addCase(uploadWarehouseBulk.rejected, (state, action) => {
+        state.bulkUpload.isUploading = false;
+        state.error = action.payload;
+      })
+
+      // Fetch status
+      .addCase(fetchWarehouseBulkStatus.fulfilled, (state, action) => {
+        state.bulkUpload.currentBatch = action.payload.batch;
+        state.bulkUpload.statusCounts = action.payload.statusCounts;
+      })
+
+      // Fetch history
+      .addCase(fetchWarehouseBulkHistory.fulfilled, (state, action) => {
+        state.bulkUpload.batches = action.payload.batches;
+        state.bulkUpload.pagination = action.payload.pagination;
       });
   },
 });
@@ -384,6 +572,11 @@ export const {
   setUseMockData,
   clearError,
   clearLastCreated,
+  openBulkUploadModal,
+  closeBulkUploadModal,
+  openBulkUploadHistory,
+  closeBulkUploadHistory,
+  resetBulkUploadState,
 } = warehouseSlice.actions;
 
 export default warehouseSlice.reducer;

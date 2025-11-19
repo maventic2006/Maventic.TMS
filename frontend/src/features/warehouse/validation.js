@@ -1,5 +1,6 @@
 ﻿import { z } from "zod";
 import { ERROR_MESSAGES } from "../../utils/constants";
+import { validateDocumentNumber } from "../../utils/documentValidation";
 
 // Phone number validation
 const phoneNumberSchema = z
@@ -37,7 +38,7 @@ export const generalDetailsSchema = z.object({
   speedLimit: z.coerce
     .number()
     .min(1, "Speed limit must be at least 1 KM/H")
-    .max(200, "Speed limit cannot exceed 200 KM/H")
+    .max(80, "Speed limit cannot exceed 80 KM/H")
     .default(20),
 });
 
@@ -62,33 +63,87 @@ export const addressSchema = z.object({
   street2: z.string().optional(),
   postalCode: z
     .string()
-    .regex(/^\d{6}$/, ERROR_MESSAGES.POSTAL_CODE_INVALID)
-    .optional(),
+    .regex(/^\d{6}$/, "Postal code must be exactly 6 digits")
+    .min(1, "Postal code is required"),
   vatNumber: z
     .string()
     .min(1, "VAT number is required")
-    .regex(
-      /^[A-Z0-9]{8,20}$/,
+    .transform((val) => val.trim().toUpperCase()) // Convert to uppercase
+    .refine(
+      (val) => /^[A-Z0-9]{8,20}$/.test(val),
       "VAT number must be 8-20 alphanumeric characters"
+    ),
+  tinPan: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        // If empty or not provided, it's valid
+        if (!val || val.trim() === "") return true;
+        // If provided, must match PAN Card format: ABCDE1234F
+        const panRegex = /^[A-Z]{5}\d{4}[A-Z]$/;
+        return panRegex.test(val.trim().toUpperCase());
+      },
+      {
+        message:
+          "TIN/PAN must match format: 5 letters + 4 digits + 1 letter (e.g., ABCDE1234F)",
+      }
+    ),
+  tan: z
+    .string()
+    .optional()
+    .refine(
+      (val) => {
+        // If empty or not provided, it's valid
+        if (!val || val.trim() === "") return true;
+        // If provided, must match TAN format: ASDF12345N
+        const tanRegex = /^[A-Z]{4}\d{5}[A-Z]$/;
+        return tanRegex.test(val.trim().toUpperCase());
+      },
+      {
+        message:
+          "TAN must match format: 4 letters + 5 digits + 1 letter (e.g., ASDF12345N)",
+      }
     ),
   addressType: z.string().min(1, "Please select address type"),
   isPrimary: z.boolean().default(true),
 });
 
-// Document Schema
-export const documentSchema = z.object({
-  documentType: z.string().min(1, ERROR_MESSAGES.DOCUMENT_TYPE_REQUIRED),
-  documentNumber: z
-    .string()
-    .min(1, ERROR_MESSAGES.DOCUMENT_NUMBER_REQUIRED)
-    .regex(/^[A-Z0-9\-\/]+$/, ERROR_MESSAGES.DOCUMENT_NUMBER_INVALID),
-  validFrom: z.string().optional(),
-  validTo: z.string().optional(),
-  fileName: z.string().optional(),
-  fileType: z.string().optional(),
-  fileData: z.string().optional(),
-  status: z.boolean().default(true),
-});
+// Document Schema (basic validation - document number format validation happens in submit handler)
+export const documentSchema = z
+  .object({
+    documentType: z.string().min(1, ERROR_MESSAGES.DOCUMENT_TYPE_REQUIRED),
+    documentNumber: z
+      .string()
+      .min(1, ERROR_MESSAGES.DOCUMENT_NUMBER_REQUIRED)
+      .trim(),
+    validFrom: z
+      .string()
+      .min(1, "Valid from date is required")
+      .refine((date) => {
+        const selectedDate = new Date(date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return selectedDate <= today;
+      }, "Valid from date cannot be in the future"),
+    validTo: z.string().min(1, "Valid to date is required"),
+    fileName: z.string().optional(),
+    fileType: z.string().optional(),
+    fileData: z.string().optional(), // base64 encoded file data
+    status: z.boolean().default(true),
+  })
+  .refine(
+    (data) => {
+      // Validate that validTo is after validFrom
+      const validFrom = new Date(data.validFrom);
+      const validTo = new Date(data.validTo);
+      return validTo > validFrom;
+    },
+    {
+      message: "Valid to date must be after valid from date",
+      path: ["validTo"],
+    }
+  );
 
 // Geofencing/Sub-location Schema
 export const subLocationSchema = z.object({

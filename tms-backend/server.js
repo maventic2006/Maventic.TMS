@@ -98,6 +98,7 @@ const driverBulkUploadQueue = require("./queues/driverBulkUploadQueue");
 const {
   processDriverBulkUpload,
 } = require("./queues/driverBulkUploadProcessor");
+const warehouseBulkUploadRoutes = require("./routes/warehouseBulkUploadRoutes");
 
 // Setup bulk upload queue processor
 bulkUploadQueue.process(async (job) => {
@@ -125,6 +126,7 @@ app.use("/api/transporter", transporterRoutes);
 app.use("/api/bulk-upload", bulkUploadRoutes);
 app.use("/api/vehicle/bulk-upload", vehicleBulkUploadRoutes);
 app.use("/api/driver-bulk-upload", driverBulkUploadRoutes);
+app.use("/api/warehouse-bulk-upload", warehouseBulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
 app.use("/api/approvals", approvalRoutes);

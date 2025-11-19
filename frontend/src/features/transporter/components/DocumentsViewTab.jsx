@@ -379,7 +379,7 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
                 </div>
               )}
 
-              {/* Document Validity Status */}
+              {/* Document Validity Status
               <div
                 className={`rounded-lg p-4 ${
                   isExpired
@@ -430,7 +430,7 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
                     </p>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </CollapsibleSection>
           );
         })

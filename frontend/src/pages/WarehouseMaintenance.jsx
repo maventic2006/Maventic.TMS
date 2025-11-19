@@ -76,7 +76,7 @@ const WarehouseMaintenance = () => {
   useEffect(() => {
     const fetchData = () => {
       const params = {
-        page: pagination.page,
+        page: 1, // ✅ FIX: Always start from page 1 when filters change
         limit: pagination.limit || 25,
       };
 
@@ -104,17 +104,7 @@ const WarehouseMaintenance = () => {
     };
 
     fetchData();
-  }, [dispatch, appliedFilters, pagination.page]);
-
-  // Initial load
-  useEffect(() => {
-    dispatch(fetchWarehouses({ page: 1, limit: 25 }));
-  }, [dispatch]);
-
-  // Initial load
-  useEffect(() => {
-    dispatch(fetchWarehouses({ page: 1, limit: 25 }));
-  }, [dispatch]);
+  }, [dispatch, appliedFilters, pagination.limit]); // ✅ FIX: Removed pagination.page dependency
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({
@@ -232,7 +222,7 @@ const WarehouseMaintenance = () => {
             loading={loading}
             onWarehouseClick={handleWarehouseClick}
             currentPage={pagination.page || 1}
-            totalPages={pagination.pages || 1}
+            totalPages={pagination.totalPages || 1}
             totalItems={pagination.total || 0}
             itemsPerPage={pagination.limit || 25}
             onPageChange={handlePageChange}

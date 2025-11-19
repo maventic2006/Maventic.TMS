@@ -24,24 +24,27 @@ import {
   User,
   Calendar,
   Hash,
+  Map,
 } from "lucide-react";
 
 import { getComponentTheme } from "../utils/theme";
 import { TOAST_TYPES } from "../utils/constants";
 import EmptyState from "../components/ui/EmptyState";
 
+// Import warehouse approval component
+import WarehouseApprovalActionBar from "../components/warehouse/WarehouseApprovalActionBar";
+
 // Import warehouse tab components
 import GeneralDetailsViewTab from "../components/warehouse/tabs/GeneralDetailsViewTab";
-import FacilitiesViewTab from "../components/warehouse/tabs/FacilitiesViewTab";
 import AddressViewTab from "../components/warehouse/tabs/AddressViewTab";
 import DocumentsViewTab from "../components/warehouse/tabs/DocumentsViewTab";
+import GeofencingViewTab from "../components/warehouse/tabs/GeofencingViewTab";
 
 // Import edit components for edit mode
-import GeneralDetailsEditTab from "../components/warehouse/tabs/GeneralDetailsEditTab";
-import FacilitiesEditTab from "../components/warehouse/tabs/FacilitiesEditTab";
-import AddressEditTab from "../components/warehouse/tabs/AddressEditTab";
-import DocumentsEditTab from "../components/warehouse/tabs/DocumentsEditTab";
-import GeofencingTab from "@/features/warehouse/components/GeofencingTab";
+import GeneralDetailsEditTab from "../features/warehouse/components/GeneralDetailsTab";
+import AddressEditTab from "../features/warehouse/components/AddressTab";
+import DocumentsEditTab from "../features/warehouse/components/DocumentsTab";
+import GeofencingEditTab from "../features/warehouse/components/GeofencingTab";
 
 const WarehouseDetails = () => {
   const { id } = useParams();
@@ -49,9 +52,8 @@ const WarehouseDetails = () => {
   const dispatch = useDispatch();
 
   const { user, role } = useSelector((state) => state.auth);
-  const { warehouses, currentWarehouse, loading, error } = useSelector(
-    (state) => state.warehouse
-  );
+  const { warehouses, currentWarehouse, masterData, loading, error } =
+    useSelector((state) => state.warehouse);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -59,15 +61,113 @@ const WarehouseDetails = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
     0: false, // General Details
-    1: false, // Facilities
-    2: false, // Address
-    3: false, // Documents
+    1: false, // Address
+    2: false, // Documents
+    3: false, // Geofencing
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const actionButtonTheme = getComponentTheme("actionButton");
   const tabButtonTheme = getComponentTheme("tabButton");
   const theme = getPageTheme("tab");
+
+  // Helper: Transform flat backend structure to nested frontend structure
+  const transformToEditFormat = (warehouseData) => {
+    if (!warehouseData) return null;
+
+    // Extract the first address if it's an array, or use the address object
+    const address =
+      Array.isArray(warehouseData.address) && warehouseData.address.length > 0
+        ? warehouseData.address[0]
+        : warehouseData.address || {};
+
+    // Transform documents to edit format
+    const transformedDocuments = (warehouseData.documents || []).map((doc) => ({
+      documentUniqueId: doc.documentUniqueId || "", // ✅ PRESERVE document ID for updates
+      documentType: doc.documentTypeId || doc.documentType || "",
+      documentNumber: doc.documentNumber || "",
+      validFrom: doc.validFrom || "",
+      validTo: doc.validTo || "",
+      fileName: doc.fileName || "",
+      fileType: doc.fileType || "",
+      fileData: doc.fileData || "",
+      status: doc.status !== undefined ? doc.status : true,
+    }));
+
+    return {
+      generalDetails: {
+        warehouseName: warehouseData.warehouse_name1 || "",
+        warehouseName2: warehouseData.warehouse_name2 || "",
+        warehouseType: warehouseData.warehouse_type || "",
+        materialType: warehouseData.material_type_id || "",
+        language: warehouseData.language || "EN",
+        vehicleCapacity: warehouseData.vehicle_capacity || 0,
+        speedLimit: warehouseData.speed_limit || 20,
+        virtualYardIn: warehouseData.virtual_yard_in || false,
+        radiusVirtualYardIn: warehouseData.radius_virtual_yard_in || 0,
+      },
+      facilities: {
+        weighBridge: warehouseData.weigh_bridge || false,
+        geoFencing: warehouseData.geo_fencing || false,
+        gatePass: warehouseData.gate_pass || false,
+        fuelFilling: warehouseData.fuel_filling || false,
+      },
+      address: {
+        addressType: address.address_type_id || "",
+        country: address.country || "",
+        state: address.state || "",
+        city: address.city || "",
+        district: address.district || "",
+        street1: address.street_1 || address.street1 || "",
+        street2: address.street_2 || address.street2 || "",
+        postalCode: address.postal_code || address.postalCode || "",
+        vatNumber: address.vat_number || address.vatNumber || "",
+        tinPan: address.tin_pan || address.tinPan || "",
+        tan: address.tan || "",
+      },
+      documents: transformedDocuments,
+      geofencing: warehouseData.geofencing || warehouseData.subLocations || [],
+    };
+  };
+
+  // Helper: Transform nested frontend structure back to flat backend structure
+  const transformToBackendFormat = (editData) => {
+    if (!editData) return null;
+
+    return {
+      warehouse_name1: editData.generalDetails?.warehouseName || "",
+      warehouse_name2: editData.generalDetails?.warehouseName2 || "",
+      warehouse_type: editData.generalDetails?.warehouseType || "",
+      material_type_id: editData.generalDetails?.materialType || "",
+      language: editData.generalDetails?.language || "EN",
+      vehicle_capacity: editData.generalDetails?.vehicleCapacity || 0,
+      speed_limit: editData.generalDetails?.speedLimit || 20,
+      virtual_yard_in: editData.generalDetails?.virtualYardIn || false,
+      radius_virtual_yard_in: editData.generalDetails?.radiusVirtualYardIn || 0,
+      weigh_bridge: editData.facilities?.weighBridge || false,
+      geo_fencing: editData.facilities?.geoFencing || false,
+      gate_pass: editData.facilities?.gatePass || false,
+      fuel_filling: editData.facilities?.fuelFilling || false,
+      consignor_id: currentWarehouse?.consignor_id || user?.consignor_id || "",
+      address: editData.address
+        ? {
+            address_type_id: editData.address.addressType || "",
+            country: editData.address.country || "",
+            state: editData.address.state || "",
+            city: editData.address.city || "",
+            district: editData.address.district || "",
+            street_1: editData.address.street1 || "",
+            street_2: editData.address.street2 || "",
+            postal_code: editData.address.postalCode || "",
+            vat_number: editData.address.vatNumber || "",
+            tin_pan: editData.address.tinPan || "",
+            tan: editData.address.tan || "",
+          }
+        : {},
+      documents: editData.documents || [],
+      geofencing: editData.geofencing || [],
+    };
+  };
 
   const tabs = [
     {
@@ -91,6 +191,13 @@ const WarehouseDetails = () => {
       viewComponent: DocumentsViewTab,
       editComponent: DocumentsEditTab,
     },
+    {
+      id: 3,
+      name: "Geofencing",
+      icon: Map,
+      viewComponent: GeofencingViewTab,
+      editComponent: GeofencingEditTab,
+    },
   ];
 
   // Load warehouse data from API
@@ -108,7 +215,8 @@ const WarehouseDetails = () => {
   // Set edit form data when warehouse data is loaded
   useEffect(() => {
     if (currentWarehouse && !editFormData) {
-      setEditFormData(currentWarehouse);
+      // Transform flat backend structure to nested frontend structure
+      setEditFormData(transformToEditFormat(currentWarehouse));
     }
   }, [currentWarehouse, editFormData]);
 
@@ -149,8 +257,8 @@ const WarehouseDetails = () => {
     }
 
     if (isEditMode) {
-      // Cancel edit mode - reset form data
-      setEditFormData(currentWarehouse);
+      // Cancel edit mode - reset form data to transformed warehouse data
+      setEditFormData(transformToEditFormat(currentWarehouse));
       setValidationErrors({});
       setTabErrors({
         0: false,
@@ -162,19 +270,35 @@ const WarehouseDetails = () => {
     }
     setIsEditMode(!isEditMode);
   };
-
   const validateAllSections = (formData) => {
     const errors = {};
 
-    // Basic validation for required fields
-    if (!formData.warehouse_name1 || formData.warehouse_name1.trim() === "") {
+    // Basic validation for required fields - check NESTED structure
+    if (
+      !formData.generalDetails?.warehouseName ||
+      formData.generalDetails.warehouseName.trim() === ""
+    ) {
       if (!errors.general) errors.general = {};
-      errors.general.warehouse_name1 = "Warehouse name is required";
+      errors.general.warehouseName = "Warehouse name is required";
     }
 
-    if (!formData.consignor_id || formData.consignor_id.trim() === "") {
+    if (
+      !formData.generalDetails?.warehouseType ||
+      formData.generalDetails.warehouseType.trim() === ""
+    ) {
       if (!errors.general) errors.general = {};
-      errors.general.consignor_id = "Consignor ID is required";
+      errors.general.warehouseType = "Warehouse type is required";
+    }
+
+    // Address validation
+    if (!formData.address?.country || formData.address.country.trim() === "") {
+      if (!errors.address) errors.address = {};
+      errors.address.country = "Country is required";
+    }
+
+    if (!formData.address?.state || formData.address.state.trim() === "") {
+      if (!errors.address) errors.address = {};
+      errors.address.state = "State is required";
     }
 
     return errors;
@@ -206,6 +330,29 @@ const WarehouseDetails = () => {
         };
         setTabErrors(newTabErrors);
 
+        // Collect all error messages for user-friendly display
+        const errorMessages = [];
+        if (errors.general) {
+          Object.values(errors.general).forEach((msg) =>
+            errorMessages.push(msg)
+          );
+        }
+        if (errors.facilities) {
+          Object.values(errors.facilities).forEach((msg) =>
+            errorMessages.push(msg)
+          );
+        }
+        if (errors.address) {
+          Object.values(errors.address).forEach((msg) =>
+            errorMessages.push(msg)
+          );
+        }
+        if (errors.documents) {
+          Object.values(errors.documents).forEach((msg) =>
+            errorMessages.push(msg)
+          );
+        }
+
         // Find the first tab with errors and switch to it
         if (newTabErrors[0]) {
           setActiveTab(0);
@@ -217,10 +364,20 @@ const WarehouseDetails = () => {
           setActiveTab(3);
         }
 
+        // Show specific error message or first few errors
+        const errorMessage =
+          errorMessages.length === 1
+            ? errorMessages[0]
+            : errorMessages.length <= 3
+            ? errorMessages.join(", ")
+            : `${errorMessages.length} validation errors found: ${
+                errorMessages[0]
+              }, ${errorMessages[1]}, and ${errorMessages.length - 2} more...`;
+
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
-            message: "Please fix all validation errors before saving.",
+            message: errorMessage,
           })
         );
         return;
@@ -236,11 +393,14 @@ const WarehouseDetails = () => {
       });
       dispatch(clearError());
 
+      // Transform nested frontend structure to flat backend structure
+      const backendData = transformToBackendFormat(editFormData);
+
       // Call the update API
       const result = await dispatch(
         updateWarehouse({
           id: id,
-          data: editFormData,
+          data: backendData,
         })
       ).unwrap();
 
@@ -523,6 +683,9 @@ const WarehouseDetails = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Warehouse Approval Action Bar (only in view mode) */}
+            {!isEditMode && <WarehouseApprovalActionBar warehouseId={id} />}
+
             {hasUnsavedChanges && (
               <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 backdrop-blur-sm text-amber-300 border border-amber-400/30 rounded-xl font-medium text-sm">
                 <AlertTriangle className="w-4 h-4" />
@@ -661,6 +824,7 @@ const WarehouseDetails = () => {
                       <TabComponent
                         formData={isEditMode ? editFormData : currentWarehouse}
                         setFormData={isEditMode ? setEditFormData : undefined}
+                        masterData={masterData}
                         errors={
                           isEditMode
                             ? tab.id === 0
