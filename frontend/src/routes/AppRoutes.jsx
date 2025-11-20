@@ -40,8 +40,15 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Landing Page */}
-      <Route path="/" element={<TMSLandingPage />} />
+      {/* Landing Page - Protected */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <TMSLandingPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Protected Routes - All require product_owner role */}
       <Route

@@ -795,6 +795,30 @@ const authSlice = createSlice({
       .addCase(resetPassword.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
+      })
+
+      /* LOGOUT */
+      .addCase(logoutUser.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.isLoading = false;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.isPasswordReset = false;
+        state.role = null;
+        state.permissions = [];
+        clearAuthFromStorage();
+      })
+      .addCase(logoutUser.rejected, (state) => {
+        state.isLoading = false;
+        // Even if logout fails on server, clear local state
+        state.user = null;
+        state.isAuthenticated = false;
+        state.isPasswordReset = false;
+        state.role = null;
+        state.permissions = [];
+        clearAuthFromStorage();
       });
   },
 });
