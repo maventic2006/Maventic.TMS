@@ -241,31 +241,39 @@ const MOCK_VEHICLES = [
 // Transform backend vehicle data to frontend format
 const transformVehicleData = (backendData) => {
   return {
-    vehicleId: backendData.vehicle_id_code_hdr,
-    registrationNumber: backendData.vehicle_registration_number || backendData.registration_number,
-    vehicleType: backendData.vehicle_type_description || backendData.vehicle_type_id,
-    make: backendData.maker_brand_description,
-    model: backendData.maker_model,
-    year: backendData.manufacturing_month_year ? new Date(backendData.manufacturing_month_year).getFullYear() : null,
-    fuelType: backendData.fuel_type_id,
-    transmission: backendData.transmission_type,
-    engineNumber: backendData.engine_number || null,
-    chassisNumber: backendData.vin_chassis_no,
-    status: backendData.vehicle_status,
-    ownership: backendData.ownership_name || 'N/A',
-    ownerName: backendData.ownership_name,
+    vehicleId: backendData.vehicleId,
+    registrationNumber: backendData.registrationNumber,
+    vehicleType: backendData.vehicleType,
+    make: backendData.make,
+    model: backendData.model,
+    year: backendData.year,
+    fuelType: backendData.fuelType,
+    transmission: backendData.transmissionType,
+    engineNumber: backendData.engineNumber || null,
+    chassisNumber: backendData.vin,
+    status: backendData.status,
+    ownership: backendData.ownershipName || 'N/A',
+    ownerName: backendData.ownershipName,
     transporterId: null, // Not in current backend response
     transporterName: null, // Not in current backend response
-    gpsEnabled: backendData.gps_tracker_active_flag === 1,
-    gpsDeviceId: backendData.gps_tracker_imei_number,
+    gpsEnabled: backendData.gpsEnabled,
+    gpsDeviceId: backendData.gpsIMEI,
     currentDriver: null, // Not in current backend response
     capacity: {
-      weight: parseFloat(backendData.gross_vehicle_weight_kg) || 0,
+      weight: parseFloat(backendData.gvw) || 0,
       unit: 'TON'
     },
-    createdAt: backendData.created_at,
+    createdAt: backendData.createdAt,
     createdBy: backendData.created_by || 'N/A',
-    blacklistStatus: backendData.blacklist_status === 1,
+    blacklistStatus: backendData.blacklistStatus,
+    vehicleCondition: backendData.vehicleCondition,
+    towingCapacity: backendData.towingCapacity,
+    fuelCapacity: backendData.fuelCapacity,
+    leasingFlag: backendData.leasingFlag,
+    registrationState: backendData.registrationState,
+    engineTypeId: backendData.engineTypeId,
+    emissionStandard: backendData.emissionStandard,
+    bodyType: backendData.bodyType
   };
 };
 
@@ -446,6 +454,9 @@ const transformVehicleDetails = (backendData) => {
     // Timestamps
     createdAt: backendData.createdAt,
     updatedAt: backendData.updatedAt,
+    
+    // User Approval Status (NEW - for vehicle owner user approval flow)
+    userApprovalStatus: backendData.userApprovalStatus || null,
   };
 };
 

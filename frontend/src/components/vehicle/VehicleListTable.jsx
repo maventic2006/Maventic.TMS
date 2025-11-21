@@ -1,10 +1,10 @@
 ﻿import React from "react";
 import { motion } from "framer-motion";
-import { Truck, Loader2, Search } from "lucide-react";
+import { Truck, Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
 import { Card } from "../ui/Card";
+import { Button } from "../ui/Button";
 import VehicleStatusPill from "./VehicleStatusPill";
-import PaginationBar from "./PaginationBar";
 import { getPageTheme } from "../../theme.config";
 
 const theme = getPageTheme("list");
@@ -17,12 +17,23 @@ const VehicleListTable = ({
   vehicles,
   loading,
   onVehicleClick,
+  // Pagination props
+  currentPage,
+  totalPages,
+  totalItems,
+  itemsPerPage,
+  onPageChange,
+  // Count props
   filteredCount,
+  // Search props
   searchText,
   onSearchChange,
-  pagination,
-  onPageChange,
 }) => {
+  // Pagination calculations
+  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  // Determine if we should show "no results" message
   const showNoResults = !loading && vehicles.length === 0;
 
   return (
@@ -56,7 +67,7 @@ const VehicleListTable = ({
               type="text"
               value={searchText}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search by ID, registration, type..."
+              placeholder="Search vehicles by ID, make, model, fuel type, status..."
               className="pl-10 pr-4 py-2.5 w-full sm:w-80 rounded-lg focus:ring-2 focus:outline-none transition-all duration-200 text-sm"
               style={{
                 border: `1px solid ${theme.colors.search.border}`,
@@ -154,6 +165,18 @@ const VehicleListTable = ({
                     {vehicle.year}
                   </span>
                 </div>
+                <div>
+                  <span style={{ color: theme.colors.text.secondary }}>Fuel:</span>
+                  <span className="ml-2 font-semibold" style={{ color: theme.colors.text.primary }}>
+                    {vehicle.fuelType}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: theme.colors.text.secondary }}>Condition:</span>
+                  <span className="ml-2 font-semibold" style={{ color: theme.colors.text.primary }}>
+                    {displayValue(vehicle.vehicleCondition)}
+                  </span>
+                </div>
               </div>
             </motion.div>
           ))}
@@ -197,19 +220,31 @@ const VehicleListTable = ({
                   className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
                   style={{ color: theme.colors.table.header.text }}
                 >
+                  Model
+                </th>
+                <th 
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                  style={{ color: theme.colors.table.header.text }}
+                >
+                  Year
+                </th>
+                <th 
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                  style={{ color: theme.colors.table.header.text }}
+                >
                   Fuel Type
                 </th>
                 <th 
                   className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
                   style={{ color: theme.colors.table.header.text }}
                 >
-                  Towing Cap. (kg)
+                  Condition
                 </th>
                 <th 
-                  className="text-centerpx-4 py-3 text-xs font-bold uppercase tracking-wider"
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
                   style={{ color: theme.colors.table.header.text }}
                 >
-                  Vehicle Condition
+                  Towing Cap. (kg)
                 </th>
                 <th 
                   className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
@@ -266,16 +301,22 @@ const VehicleListTable = ({
                   <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
                     {vehicle.make}
                   </td>
+                  <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
+                    {displayValue(vehicle.model)}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
+                    {displayValue(vehicle.year)}
+                  </td>
                   <td className="px-4 py-2 text-center">
                     <span className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
                       {displayValue(vehicle.fuelType)}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-sm text-center font-semibold" style={{ color: theme.colors.text.primary }}>
-                    {displayValue(vehicle.towingCapacity)}
-                  </td>
                   <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
                     {displayValue(vehicle.vehicleCondition)}
+                  </td>
+                  <td className="px-4 py-2 text-sm text-center font-semibold" style={{ color: theme.colors.text.primary }}>
+                    {displayValue(vehicle.towingCapacity)}
                   </td>
                   <td className="px-4 py-2 text-sm text-center font-semibold" style={{ color: theme.colors.text.primary }}>
                     {displayValue(vehicle.fuelCapacity)}
@@ -290,15 +331,56 @@ const VehicleListTable = ({
         </div>
       )}
 
-      {/* Pagination */}
-      {!loading && !showNoResults && pagination && (
-        <PaginationBar
-          currentPage={pagination.page}
-          totalPages={pagination.pages}
-          totalItems={pagination.total}
-          itemsPerPage={pagination.limit}
-          onPageChange={onPageChange}
-        />
+      {/* Pagination Section */}
+      {totalItems > 0 && (
+        <div className="px-6 py-6 border-t border-[#E5E7EB] bg-white">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Left side - Results info */}
+            <span className="text-xs sm:text-sm text-[#4A5568] font-semibold">
+              <span className="hidden sm:inline">Showing </span>
+              <span className="text-[#0D1A33] font-bold">{startItem}</span>-
+              <span className="text-[#0D1A33] font-bold">{endItem}</span>
+              <span className="hidden sm:inline"> of </span>
+              <span className="sm:hidden">/</span>
+              <span className="text-[#1D4ED8] font-bold">{totalItems}</span>
+              <span className="hidden sm:inline"> vehicles</span>
+            </span>
+
+            {/* Right side - Pagination controls */}
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="hover:bg-[#1D4ED8]/10 hover:border-[#1D4ED8] hover:text-[#1D4ED8] rounded-lg transition-all duration-200 disabled:opacity-50 py-2.5 px-5"
+              >
+                <ChevronLeft className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Previous</span>
+              </Button>
+
+              <span
+                className="text-xs sm:text-sm text-[#0D1A33] px-5 py-2.5 bg-white rounded-lg border border-[#E5E7EB] font-semibold"
+                style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+              >
+                <span className="text-[#1D4ED8] font-bold">{currentPage}</span>
+                <span className="text-[#4A5568]">/</span>
+                <span className="text-[#0D1A33]">{totalPages}</span>
+              </span>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="hover:bg-[#1D4ED8]/10 hover:border-[#1D4ED8] hover:text-[#1D4ED8] rounded-lg transition-all duration-200 disabled:opacity-50 py-2.5 px-5"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="h-4 w-4 sm:ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </Card>
   );

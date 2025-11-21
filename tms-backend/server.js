@@ -5,6 +5,9 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const http = require("http");
 const socketIO = require("socket.io");
+const path = require("path");
+const { comprehensiveHealthCheck } = require("./utils/databaseHealthCheck");
+const knex = require("./config/database");
 require("dotenv").config();
 
 const app = express();
@@ -44,7 +47,9 @@ const PORT = process.env.PORT || 5000;
 app.set("io", io);
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" } // Allow images to be loaded from different origins
+}));
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -73,6 +78,9 @@ app.use(morgan("combined"));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Import routes
 const warehouseRoutes = require("./routes/warehouse");
 const consignorRoutes = require("./routes/consignor");
@@ -81,6 +89,7 @@ const vehicleRoutes = require("./routes/vehicles");
 const userRoutes = require("./routes/users");
 const materialRoutes = require("./routes/materials");
 const transporterRoutes = require("./routes/transporter");
+const approvalRoutes = require("./routes/approval");
 const bulkUploadRoutes = require("./routes/bulkUploadRoutes");
 const bulkUploadQueue = require("./queues/bulkUploadQueue");
 const { processBulkUpload } = require("./queues/bulkUploadProcessor");
@@ -104,7 +113,6 @@ driverBulkUploadQueue.process(async (job) => {
   return await processDriverBulkUpload(job, io);
 });
 const driverRoutes = require("./routes/driver");
-const approvalRoutes = require("./routes/approval");
 
 // Routes
 app.use("/api/warehouse", warehouseRoutes);
@@ -121,7 +129,7 @@ app.use("/api/driver-bulk-upload", driverBulkUploadRoutes);
 app.use("/api/warehouse-bulk-upload", warehouseBulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
-app.use("/api/approval", approvalRoutes);
+app.use("/api/approvals", approvalRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
@@ -160,6 +168,38 @@ io.on("connection", (socket) => {
   });
 });
 
+// Start server with database health check
+const startServer = async () => {
+  try {
+    // Check database connection before starting
+    console.log('\n🚀 ===== STARTING TMS BACKEND SERVER =====\n');
+    
+    const healthCheck = await comprehensiveHealthCheck();
+    
+    if (!healthCheck.success) {
+      console.error('\n❌ Failed to connect to database. Server cannot start.');
+      console.error('   Please fix the database connection and try again.\n');
+      process.exit(1);
+    }
+    
+    // Start HTTP server
+    server.listen(PORT, () => {
+      console.log('✅ ========================================');
+      console.log(`✅ Server running on port ${PORT}`);
+      console.log(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`✅ Frontend URL: http://localhost:5173`);
+      console.log(`✅ Backend URL: http://localhost:${PORT}`);
+      console.log('✅ ========================================\n');
+    });
+  } catch (error) {
+    console.error('\n❌ Server startup error:', error.message);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
+
 // Error handling for server
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE") {
@@ -188,11 +228,6 @@ server.on("error", (error) => {
     console.error("❌ Server error:", error);
     process.exit(1);
   }
-});
-
-server.listen(PORT, () => {
-  console.log(`🚀 TMS Backend server running on port ${PORT}`);
-  console.log(`📡 Socket.IO server running`);
 });
 
 // Graceful shutdown handling

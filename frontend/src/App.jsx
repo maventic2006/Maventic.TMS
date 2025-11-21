@@ -29,6 +29,10 @@ import CreateVehiclePage from "./features/vehicle/CreateVehiclePage";
 import WarehouseMaintenance from "./pages/WarehouseMaintenance";
 import WarehouseDetails from "./pages/WarehouseDetails";
 import WarehouseCreatePage from "./features/warehouse/pages/WarehouseCreatePage";
+import ConsignorMaintenance from "./pages/ConsignorMaintenance";
+import ConsignorDetailsPage from "./pages/ConsignorDetailsPage";
+import ConsignorCreatePage from "./features/consignor/pages/ConsignorCreatePage";
+import SuperAdminApprovalList from "./pages/SuperAdminApprovalList";
 import SessionExpiryWarningModal from "./components/auth/SessionExpiryWarningModal";
 import {
   verifyToken,
@@ -115,18 +119,6 @@ const AuthInitializer = ({ children }) => {
 
     return () => clearTimeout(backupTimer);
   }, [dispatch, hasInitialized]);
-
-  // Add a helper function to clear session (for testing)
-  useEffect(() => {
-    // Check if we need to clear session (for testing)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("clear") === "true") {
-      // For cookie-based auth, we need to call logout endpoint to clear cookies
-      dispatch(logoutUser()).then(() => {
-        window.location.href = "/";
-      });
-    }
-  }, [dispatch]);
 
   return children;
 };
@@ -268,13 +260,14 @@ const SessionManager = ({ children }) => {
   const { isAuthenticated } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
 
-  // Initialize tab synchronization
-  const { broadcastMessage } = useTabSync();
+  // Initialize tab synchronization - ONLY IF AUTHENTICATED
+  const { broadcastMessage } = useTabSync(isAuthenticated);
 
-  // Initialize inactivity timeout (only for authenticated users)
+  // Initialize inactivity timeout - ONLY IF AUTHENTICATED
   const { showWarning, secondsRemaining, extendSession } = useInactivityTimeout(
     15 * 60 * 1000, // 15 minutes timeout
-    60 * 1000 // 1 minute warning
+    60 * 1000, // 1 minute warning
+    isAuthenticated // Pass authentication status
   );
 
   // Handle warning modal close (logout)
@@ -500,6 +493,52 @@ function App() {
                       <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                         <Layout>
                           <WarehouseDetails />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  {/* Consignor Management Routes */}
+                  <Route
+                    path="/consignor"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <ConsignorMaintenance />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/consignor/create"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <ConsignorCreatePage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/consignor/details/:id"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <ConsignorDetailsPage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  {/* Super Admin Approval List Route */}
+                  <Route
+                    path="/approvals/super-admin"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <SuperAdminApprovalList />
                         </Layout>
                       </PrivateRoute>
                     }

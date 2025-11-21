@@ -147,6 +147,13 @@ const TransporterDetailsPage = () => {
     }
   }, [selectedTransporter, editFormData]);
 
+  // Refresh data function for approval actions
+  const handleRefreshData = () => {
+    if (id) {
+      dispatch(fetchTransporterById(id));
+    }
+  };
+
   // Track unsaved changes
   useEffect(() => {
     if (isEditMode && editFormData && selectedTransporter) {
@@ -530,6 +537,7 @@ const TransporterDetailsPage = () => {
               <ApprovalActionBar
                 userApprovalStatus={selectedTransporter.userApprovalStatus}
                 transporterId={selectedTransporter.transporterId}
+                onRefreshData={handleRefreshData}
               />
             )}
 

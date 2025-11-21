@@ -7,18 +7,22 @@ import { logoutUser, setCredentials } from "../redux/slices/authSlice";
  *
  * Features:
  * - Counts active tabs
- * - Logs out when all tabs are closed
+ * - Logs out when all tabs are closed (ONLY IF AUTHENTICATED)
  * - Syncs token refreshes across tabs
  * - Broadcasts logout to all tabs
+ * - ONLY RUNS WHEN USER IS AUTHENTICATED
  *
  * Uses BroadcastChannel API for modern browsers, falls back to localStorage events
+ * 
+ * @param {boolean} isAuthenticated - Whether user is authenticated (REQUIRED)
  */
-export const useTabSync = () => {
+export const useTabSync = (isAuthenticated = false) => {
   const dispatch = useDispatch();
   const tabIdRef = useRef(null);
   const channelRef = useRef(null);
   const heartbeatIntervalRef = useRef(null);
   const isRefreshingRef = useRef(false);
+  const isNavigatingRef = useRef(false);
 
   /**
    * Generate unique tab ID
@@ -67,9 +71,15 @@ export const useTabSync = () => {
    * Unregister this tab
    */
   const unregisterTab = useCallback(() => {
-    // Don't unregister if it's just a page refresh
-    if (isRefreshingRef.current) {
-      console.log("Page refresh detected, keeping session active");
+    // ⚠️ CRITICAL FIX: Don't logout if user is not authenticated
+    if (!isAuthenticated) {
+      console.log("🔒 User not authenticated, skipping tab unregister");
+      return;
+    }
+
+    // Don't unregister if it's just a page refresh or navigation
+    if (isRefreshingRef.current || isNavigatingRef.current) {
+      console.log("🔄 Page refresh/navigation detected, keeping session active");
       return;
     }
 
@@ -77,13 +87,15 @@ export const useTabSync = () => {
     delete tabs[tabIdRef.current];
     updateActiveTabs(tabs);
 
-    // Check if this was the last tab
+    // Check if this was the last tab - ONLY logout if truly closing all tabs
     if (Object.keys(tabs).length === 0) {
-      console.log("Last tab closing, logging out...");
+      console.log("🚪 Last tab closing, logging out...");
       sessionStorage.setItem("logoutReason", "All browser tabs closed");
       dispatch(logoutUser());
+    } else {
+      console.log(`📊 ${Object.keys(tabs).length} tabs still active`);
     }
-  }, [dispatch, getActiveTabs, updateActiveTabs]);
+  }, [isAuthenticated, dispatch, getActiveTabs, updateActiveTabs]);
 
   /**
    * Clean up stale tabs (tabs that haven't sent heartbeat in 10 seconds)
@@ -182,12 +194,20 @@ export const useTabSync = () => {
   );
 
   /**
-   * Setup tab synchronization
+   * Setup tab synchronization - ONLY IF AUTHENTICATED
    */
   useEffect(() => {
+    // ⚠️ CRITICAL: Only run tab sync if user is authenticated
+    if (!isAuthenticated) {
+      console.log("🔒 User not authenticated, skipping tab sync");
+      return;
+    }
+
+    console.log("✅ Tab sync initialized for authenticated user");
+
     // Generate unique tab ID
     tabIdRef.current = generateTabId();
-    console.log(`Tab ID: ${tabIdRef.current}`);
+    console.log(`📑 Tab ID: ${tabIdRef.current}`);
 
     // Register this tab
     registerTab();
@@ -196,11 +216,11 @@ export const useTabSync = () => {
     if (typeof BroadcastChannel !== "undefined") {
       channelRef.current = new BroadcastChannel("tms-auth-channel");
       channelRef.current.addEventListener("message", handleMessage);
-      console.log("BroadcastChannel initialized");
+      console.log("📡 BroadcastChannel initialized");
     } else {
       // Fallback to localStorage events
       window.addEventListener("storage", handleStorageEvent);
-      console.log("Using localStorage fallback for tab sync");
+      console.log("💾 Using localStorage fallback for tab sync");
     }
 
     // Send heartbeat every 5 seconds
@@ -211,6 +231,8 @@ export const useTabSync = () => {
 
     // Cleanup on unmount
     return () => {
+      console.log("🧹 Cleaning up tab sync");
+      
       // Clear heartbeat interval
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
@@ -228,6 +250,7 @@ export const useTabSync = () => {
       }
     };
   }, [
+    isAuthenticated,
     generateTabId,
     registerTab,
     unregisterTab,
@@ -239,18 +262,21 @@ export const useTabSync = () => {
 
   // Handle pagehide (tab/window closing) - more reliable than beforeunload
   useEffect(() => {
-    let isNavigating = false;
+    // ⚠️ CRITICAL: Only handle page hide if user is authenticated
+    if (!isAuthenticated) {
+      return;
+    }
 
     const handlePageHide = (event) => {
       // Only unregister if the page is being permanently discarded
       // persisted=true means page will be cached (bfcache), persisted=false means discarded
       // Also check if we detected a navigation/refresh
-      if (!event.persisted && !isNavigating) {
-        console.log("Tab closing, unregistering...");
+      if (!event.persisted && !isNavigatingRef.current && !isRefreshingRef.current) {
+        console.log("🚪 Tab closing, unregistering...");
         unregisterTab();
       } else {
         console.log(
-          "Page cached or navigating, keeping session:",
+          "🔄 Page cached or navigating, keeping session:",
           event.persisted ? "cached" : "navigating"
         );
       }
@@ -264,12 +290,15 @@ export const useTabSync = () => {
         setTimeout(() => {
           if (document.visibilityState === "visible") {
             // Page became visible again - it was just a tab switch
-            isNavigating = false;
+            isNavigatingRef.current = false;
           } else {
             // Still hidden after 100ms - likely navigating away or refreshing
-            isNavigating = true;
+            isNavigatingRef.current = true;
           }
         }, 100);
+      } else if (document.visibilityState === "visible") {
+        // Page became visible - reset navigation flag
+        isNavigatingRef.current = false;
       }
     };
 
@@ -277,9 +306,9 @@ export const useTabSync = () => {
     const handleBeforeUnload = () => {
       // If the page is still visible when beforeunload fires, it's likely a refresh
       if (document.visibilityState === "visible") {
-        isNavigating = true;
+        isNavigatingRef.current = true;
         isRefreshingRef.current = true;
-        console.log("Page refresh detected");
+        console.log("🔄 Page refresh detected");
       }
     };
 
@@ -292,7 +321,7 @@ export const useTabSync = () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [unregisterTab]);
+  }, [isAuthenticated, unregisterTab]);
 
   return {
     tabId: tabIdRef.current,

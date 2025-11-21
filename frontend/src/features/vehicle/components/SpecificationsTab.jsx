@@ -179,25 +179,6 @@ const SpecificationsTab = ({ formData, setFormData, errors, masterData }) => {
           />
           {errors.suspensionType && <p className="mt-1 text-xs text-red-600">{errors.suspensionType}</p>}
         </div>
-
-        {/* Weight/Dimensions */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-            Weight/Dimensions <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={data.weightDimensions || ""}
-            onChange={(e) => handleChange("weightDimensions", e.target.value)}
-            placeholder="e.g., 25000kg, 10m x 2.5m x 3m"
-            className={`w-full px-3 py-2 text-sm border ${
-              errors.weightDimensions ? "border-red-500" : "border-gray-300"
-            } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
-          />
-          {errors.weightDimensions && (
-            <p className="mt-1 text-xs text-red-600">{errors.weightDimensions}</p>
-          )}
-        </div>
       </div>
 
       {/* Information panel at the bottom */}

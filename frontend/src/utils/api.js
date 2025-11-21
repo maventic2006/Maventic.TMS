@@ -72,6 +72,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Handle 401 (Unauthorized) - redirect to login
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -86,13 +87,50 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Handle 403 (Forbidden) - token might be corrupted or expired
+    if (error.response?.status === 403 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const errorMessage = error.response?.data?.error?.details || error.response?.data?.message || '';
+      
+      // Check if it's a JWT error (malformed, expired, invalid)
+      if (errorMessage.includes('jwt') || errorMessage.includes('token')) {
+        console.warn("⚠️ JWT Token Error detected:", errorMessage);
+        console.log("🔄 Attempting to refresh authentication token...");
+        
+        try {
+          // Try to refresh the token
+          const refreshResponse = await api.post("/auth/refresh");
+          
+          if (refreshResponse.data.success) {
+            console.log("✅ Token refreshed successfully, retrying original request");
+            
+            // Retry the original request with the new token (cookie auto-included)
+            return api(originalRequest);
+          } else {
+            throw new Error("Token refresh failed");
+          }
+        } catch (refreshError) {
+          console.error("❌ Token refresh failed:", refreshError.response?.data || refreshError.message);
+          console.log("🔒 Redirecting to login due to authentication failure");
+          
+          // Clear any corrupted auth state and redirect to login
+          if (!window.location.pathname.includes("/login")) {
+            window.location.href = "/login";
+          }
+          return Promise.reject(refreshError);
+        }
+      }
+      
+      // If not a token error, just log and reject
+      console.error("🚫 Access denied (403):", error.response.data.message);
+      return Promise.reject(error);
+    }
+
     // Handle different error types
-    if (error.response?.status === 403) {
-      // Access denied
-      console.error("Access denied:", error.response.data.message);
-    } else if (error.response?.status >= 500) {
+    if (error.response?.status >= 500) {
       // Server error
-      console.error("Server error:", error.response.data.message);
+      console.error("🔴 Server error:", error.response.data.message);
     } else if (error.code === "ECONNABORTED" || error.message?.includes('timeout')) {
       // Timeout error - provide helpful message
       console.error("⏱️ Request timeout error:", {
@@ -194,10 +232,26 @@ export const vehicleAPI = {
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
     if (params.search) queryParams.append('search', params.search);
+    
+    // Basic filters
+    if (params.registrationNumber) queryParams.append('registrationNumber', params.registrationNumber);
     if (params.vehicleType) queryParams.append('vehicleType', params.vehicleType);
+    if (params.make) queryParams.append('make', params.make);
+    if (params.model) queryParams.append('model', params.model);
+    if (params.yearFrom) queryParams.append('yearFrom', params.yearFrom);
+    if (params.yearTo) queryParams.append('yearTo', params.yearTo);
     if (params.status) queryParams.append('status', params.status);
+    if (params.registrationState) queryParams.append('registrationState', params.registrationState);
     if (params.fuelType) queryParams.append('fuelType', params.fuelType);
+    if (params.leasingFlag) queryParams.append('leasingFlag', params.leasingFlag);
+    if (params.gpsEnabled) queryParams.append('gpsEnabled', params.gpsEnabled);
     if (params.ownership) queryParams.append('ownership', params.ownership);
+    if (params.vehicleCondition) queryParams.append('vehicleCondition', params.vehicleCondition);
+    if (params.engineType) queryParams.append('engineType', params.engineType);
+    if (params.emissionStandard) queryParams.append('emissionStandard', params.emissionStandard);
+    if (params.bodyType) queryParams.append('bodyType', params.bodyType);
+    if (params.towingCapacityMin) queryParams.append('towingCapacityMin', params.towingCapacityMin);
+    if (params.towingCapacityMax) queryParams.append('towingCapacityMax', params.towingCapacityMax);
     if (params.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
     

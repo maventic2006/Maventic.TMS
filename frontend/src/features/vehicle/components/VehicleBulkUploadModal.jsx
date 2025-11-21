@@ -10,6 +10,10 @@ import {
   resetVehicleUploadState,
   openVehicleHistoryModal,
   downloadVehicleErrorReport,
+  updateVehicleProgress,
+  updateVehicleBatchStatus,
+  handleVehicleBatchComplete,
+  handleVehicleBatchError,
 } from "../../../redux/slices/vehicleBulkUploadSlice";
 import socketService from "../../../services/socketService";
 
@@ -25,7 +29,6 @@ const VehicleBulkUploadModal = () => {
     uploadProgress,
     currentBatch,
     validationResults,
-    progressLogs,
     isDownloadingTemplate,
     isDownloadingErrorReport,
     error,
@@ -41,18 +44,53 @@ const VehicleBulkUploadModal = () => {
     }
   }, [isModalOpen]);
 
-  // Join batch room when batch is created
+  // Join batch room and listen to Socket.IO events when batch is created
   useEffect(() => {
     if (currentBatch?.batch_id) {
-      socketService.joinBatchRoom(currentBatch.batch_id);
+      const batchId = currentBatch.batch_id;
+      
+      // Join batch room
+      socketService.joinBatchRoom(batchId);
+      
+      // Listen to progress events
+      const handleProgress = (data) => {
+        if (data.batchId === batchId) {
+          dispatch(updateVehicleProgress({
+            progress: data.progress,
+            message: data.message,
+            type: data.type
+          }));
+        }
+      };
+      
+      // Listen to batch completion
+      const handleComplete = (data) => {
+        if (data.batchId === batchId) {
+          dispatch(handleVehicleBatchComplete(data));
+        }
+      };
+      
+      // Listen to errors
+      const handleError = (data) => {
+        if (data.batchId === batchId) {
+          dispatch(handleVehicleBatchError(data));
+        }
+      };
+      
+      // Register event listeners
+      socketService.on('vehicleBulkUploadProgress', handleProgress);
+      socketService.on('vehicleBulkUploadComplete', handleComplete);
+      socketService.on('vehicleBulkUploadError', handleError);
+      
+      // Cleanup on unmount or batch change
+      return () => {
+        socketService.off('vehicleBulkUploadProgress', handleProgress);
+        socketService.off('vehicleBulkUploadComplete', handleComplete);
+        socketService.off('vehicleBulkUploadError', handleError);
+        socketService.leaveBatchRoom(batchId);
+      };
     }
-
-    return () => {
-      if (currentBatch?.batch_id) {
-        socketService.leaveBatchRoom(currentBatch.batch_id);
-      }
-    };
-  }, [currentBatch?.batch_id]);
+  }, [currentBatch?.batch_id, dispatch]);
 
   // Close modal handler
   const handleClose = useCallback(() => {
@@ -146,39 +184,6 @@ const VehicleBulkUploadModal = () => {
       dispatch(downloadVehicleErrorReport(currentBatch.batch_id));
     }
   }, [currentBatch, dispatch]);
-
-  // Get log icon based on type
-  const getLogIcon = (type) => {
-    switch (type) {
-      case "success":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "error":
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      case "warning":
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <Info className="h-4 w-4 text-blue-500" />;
-    }
-  };
-
-  // Get log color based on type
-  const getLogColor = (type) => {
-    switch (type) {
-      case "success":
-        return "bg-green-50 border-green-200 text-green-800";
-      case "error":
-        return "bg-red-50 border-red-200 text-red-800";
-      case "warning":
-        return "bg-yellow-50 border-yellow-200 text-yellow-800";
-      default:
-        return "bg-blue-50 border-blue-200 text-blue-800";
-    }
-  };
-
-  // Format timestamp
-  const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString();
-  };
 
   // Modal footer
   const footer = (
@@ -305,7 +310,7 @@ const VehicleBulkUploadModal = () => {
           </div>
         )}
 
-        {/* Progress Bar */}
+        {/* Progress Bar - Only show during upload */}
         {isUploading && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
@@ -325,103 +330,176 @@ const VehicleBulkUploadModal = () => {
           </div>
         )}
 
-        {/* Progress Logs */}
-        {progressLogs.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-orange-600" />
-              Live Processing Log
-            </h4>
-            <div className="max-h-60 overflow-y-auto space-y-2 bg-gray-50 rounded-lg p-4 border border-gray-200">
-              {progressLogs.map((log, index) => (
-                <div
-                  key={index}
-                  className={`flex items-start gap-2 p-2 rounded border ${getLogColor(log.type)}`}
-                >
-                  {getLogIcon(log.type)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{log.message}</p>
-                    <p className="text-xs opacity-75">{formatTime(log.timestamp)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Validation Results */}
         {validationResults && currentBatch?.status === 'completed' && (
           <div className="space-y-4">
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+            {/* Main Results Summary */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+              <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2 text-lg">
+                <CheckCircle className="h-6 w-6 text-green-600" />
                 Batch Processing Complete
               </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-2xl font-bold text-green-600">
-                    {validationResults.valid || 0}
-                  </p>
-                  <p className="text-sm text-green-700">Valid Vehicles</p>
-                </div>
-                <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
-                  <p className="text-2xl font-bold text-red-600">
-                    {validationResults.invalid || 0}
-                  </p>
-                  <p className="text-sm text-red-700">Invalid Vehicles</p>
+              
+              {/* Validation Summary */}
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-3">
+                  <strong>Batch ID:</strong> {currentBatch.batch_id}
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                    <p className="text-3xl font-bold text-green-600">
+                      {validationResults.valid || 0}
+                    </p>
+                    <p className="text-sm font-medium text-green-700 mt-1">Valid Vehicles</p>
+                  </div>
+                  <div className="text-center p-4 bg-red-50 rounded-lg border-2 border-red-200">
+                    <p className="text-3xl font-bold text-red-600">
+                      {validationResults.invalid || 0}
+                    </p>
+                    <p className="text-sm font-medium text-red-700 mt-1">Invalid Vehicles</p>
+                  </div>
                 </div>
               </div>
-              {currentBatch?.total_created > 0 && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-blue-800">Successfully Created:</span>
-                    <span className="text-lg font-bold text-blue-600">{currentBatch.total_created}</span>
+
+              {/* Database Creation Summary */}
+              {currentBatch?.total_created !== undefined && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h5 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wide">
+                    Database Creation Status
+                  </h5>
+                  <div className="space-y-2">
+                    {/* Successfully Created */}
+                    {currentBatch.total_created > 0 && (
+                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-900">
+                            Successfully Created in Database
+                          </span>
+                        </div>
+                        <span className="text-xl font-bold text-blue-600">
+                          {currentBatch.total_created}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* Creation Failed */}
+                    {currentBatch.total_creation_failed > 0 && (
+                      <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-5 w-5 text-orange-600" />
+                          <span className="text-sm font-medium text-orange-900">
+                            Failed to Create (Database Error)
+                          </span>
+                        </div>
+                        <span className="text-xl font-bold text-orange-600">
+                          {currentBatch.total_creation_failed}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* No Creation Attempted */}
+                    {validationResults.valid > 0 && currentBatch.total_created === 0 && currentBatch.total_creation_failed === 0 && (
+                      <div className="flex items-center justify-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <Info className="h-5 w-5 text-gray-500 mr-2" />
+                        <span className="text-sm text-gray-600">
+                          Waiting for database creation...
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  {currentBatch.total_creation_failed > 0 && (
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-sm text-red-800">Creation Failed:</span>
-                      <span className="text-lg font-bold text-red-600">{currentBatch.total_creation_failed}</span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
 
-            {/* Error Report Download */}
+            {/* Error Report Download Section */}
             {validationResults.invalid > 0 && currentBatch?.error_report_path && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="h-5 w-5 text-yellow-600" />
-                  <h4 className="font-semibold text-yellow-900">
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-lg p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle className="h-6 w-6 text-yellow-600" />
+                  <h4 className="font-semibold text-yellow-900 text-lg">
                     Validation Errors Detected
                   </h4>
                 </div>
-                <p className="text-sm text-yellow-800 mb-3">
-                  {validationResults.invalid} vehicle(s) have validation errors. Download the
-                  error report to view details with highlighted cells and fix the issues.
+                <p className="text-sm text-yellow-900 mb-4 leading-relaxed">
+                  <strong>{validationResults.invalid} vehicle(s)</strong> have validation errors and were not created in the database. 
+                  Download the error report to view detailed error messages with highlighted cells in Excel format.
                 </p>
                 <Button
                   variant="outline"
-                  className="border-yellow-600 text-yellow-700 hover:bg-yellow-100"
+                  className="w-full sm:w-auto border-2 border-yellow-600 text-yellow-800 hover:bg-yellow-100 font-semibold"
                   onClick={handleDownloadErrorReport}
                   disabled={isDownloadingErrorReport}
                   loading={isDownloadingErrorReport}
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Error Report
+                  <Download className="h-5 w-5 mr-2" />
+                  Download Error Report (Excel)
                 </Button>
               </div>
             )}
 
-            {/* Success Message */}
-            {validationResults.valid > 0 && validationResults.invalid === 0 && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
+            {/* Complete Success Message */}
+            {validationResults.valid > 0 && 
+             validationResults.invalid === 0 && 
+             currentBatch?.total_created > 0 && 
+             currentBatch?.total_creation_failed === 0 && (
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="h-7 w-7 text-green-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-green-900">Success!</h4>
-                    <p className="text-sm text-green-800">
-                      All {currentBatch?.total_created || validationResults.valid} vehicle(s) have been successfully created in the database.
+                    <h4 className="font-bold text-green-900 text-lg mb-2">
+                      🎉 Perfect Upload! All Vehicles Created Successfully
+                    </h4>
+                    <p className="text-sm text-green-800 leading-relaxed">
+                      <strong>{currentBatch.total_created} vehicle(s)</strong> have been successfully validated and created in the database. 
+                      All data has been stored and is now available in the vehicle list.
+                    </p>
+                    <div className="mt-3 pt-3 border-t border-green-200">
+                      <p className="text-xs text-green-700 flex items-center gap-1">
+                        <Info className="h-4 w-4" />
+                        <span>You can now close this dialog and view your vehicles in the main list.</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Partial Success Message */}
+            {validationResults.valid > 0 && 
+             validationResults.invalid > 0 && 
+             currentBatch?.total_created > 0 && (
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-lg p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <Info className="h-7 w-7 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-blue-900 text-lg mb-2">
+                      Partial Success - Some Vehicles Created
+                    </h4>
+                    <p className="text-sm text-blue-800 leading-relaxed">
+                      <strong>{currentBatch.total_created} out of {validationResults.valid} valid vehicle(s)</strong> have been successfully 
+                      created in the database. Download the error report to fix issues with the remaining {validationResults.invalid} vehicle(s).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Complete Failure Message */}
+            {validationResults.valid === 0 && validationResults.invalid > 0 && (
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-lg p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-7 w-7 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-red-900 text-lg mb-2">
+                      Upload Failed - No Valid Vehicles Found
+                    </h4>
+                    <p className="text-sm text-red-800 leading-relaxed mb-3">
+                      All <strong>{validationResults.invalid} vehicle(s)</strong> in your upload have validation errors. 
+                      No data has been stored in the database.
+                    </p>
+                    <p className="text-xs text-red-700 bg-red-100 rounded px-2 py-1 inline-block">
+                      💡 Tip: Download the error report to see exactly what needs to be fixed.
                     </p>
                   </div>
                 </div>

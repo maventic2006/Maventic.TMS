@@ -16,15 +16,9 @@ const ServiceFrequencyTab = ({ formData, setFormData, errors }) => {
 
   const addFrequency = () => {
     const newFrequency = {
-      sequenceNumber: "", // Will be auto-generated
-      serviceName: "",
+      sequenceNumber: frequencyRecords.length + 1, // Auto-generate sequence number
       timePeriod: "",
       kmDrove: 0,
-      frequency: "",
-      lastServiceKm: 0,
-      nextServiceKm: 0,
-      lastServiceDate: "",
-      nextServiceDate: "",
     };
 
     const updatedRecords = [...frequencyRecords, newFrequency];
@@ -68,27 +62,6 @@ const ServiceFrequencyTab = ({ formData, setFormData, errors }) => {
     }));
   };
 
-  const serviceNames = [
-    { value: "Engine Oil Change", label: "Engine Oil Change" },
-    { value: "Air Filter Replacement", label: "Air Filter Replacement" },
-    { value: "Brake Pad Inspection", label: "Brake Pad Inspection" },
-    { value: "Tire Rotation", label: "Tire Rotation" },
-    { value: "Transmission Fluid", label: "Transmission Fluid" },
-    { value: "Coolant Flush", label: "Coolant Flush" },
-    { value: "Spark Plug Replacement", label: "Spark Plug Replacement" },
-    { value: "Battery Check", label: "Battery Check" },
-  ];
-
-  const frequencyOptions = [
-    { value: "Every 5,000 km", label: "Every 5,000 km" },
-    { value: "Every 10,000 km", label: "Every 10,000 km" },
-    { value: "Every 15,000 km", label: "Every 15,000 km" },
-    { value: "Every 20,000 km", label: "Every 20,000 km" },
-    { value: "Every 30,000 km", label: "Every 30,000 km" },
-    { value: "Every 40,000 km", label: "Every 40,000 km" },
-    { value: "Every 50,000 km", label: "Every 50,000 km" },
-  ];
-
   return (
     <div className="">
       <div className="grid grid-cols-1 gap-4">
@@ -115,13 +88,8 @@ const ServiceFrequencyTab = ({ formData, setFormData, errors }) => {
                   <thead>
                     <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
                       <th className="pb-3 w-12"></th>
-                      <th className="pb-3 pl-4 min-w-[200px]">Service Name</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Frequency</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Time Period</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Last Service (km)</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Next Service (km)</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Last Service Date</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Next Service Date</th>
+                      <th className="pb-3 pl-4 min-w-[150px]">Sequence Number</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">Time Period</th>
                       <th className="pb-3 pl-4 min-w-[150px]">KM Drove</th>
                       <th className="pb-3 w-12"></th>
                     </tr>
@@ -149,41 +117,19 @@ const ServiceFrequencyTab = ({ formData, setFormData, errors }) => {
                             />
                           </td>
                           <td className="px-3">
-                            <CustomSelect
-                              key={`serviceName-${index}-${frequency.serviceName}`}
-                              value={frequency.serviceName || ""}
-                              onValueChange={(value) =>
-                                updateFrequency(index, "serviceName", value)
+                            <input
+                              type="number"
+                              value={frequency.sequenceNumber || index + 1}
+                              onChange={(e) =>
+                                updateFrequency(index, "sequenceNumber", parseInt(e.target.value) || index + 1)
                               }
-                              options={serviceNames}
-                              placeholder="Select Service"
-                              getOptionLabel={(option) => option.label}
-                              getOptionValue={(option) => option.value}
-                              className={`min-w-[200px] text-xs ${
-                                errors?.serviceFrequency?.[index]?.serviceName
+                              placeholder={`${index + 1}`}
+                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
+                                errors?.serviceFrequency?.[index]?.sequenceNumber
                                   ? "border-red-500"
-                                  : ""
+                                  : "border-gray-300"
                               }`}
-                              error={errors?.serviceFrequency?.[index]?.serviceName}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <CustomSelect
-                              key={`frequency-${index}-${frequency.frequency}`}
-                              value={frequency.frequency || ""}
-                              onValueChange={(value) =>
-                                updateFrequency(index, "frequency", value)
-                              }
-                              options={frequencyOptions}
-                              placeholder="Select Frequency"
-                              getOptionLabel={(option) => option.label}
-                              getOptionValue={(option) => option.value}
-                              className={`min-w-[150px] text-xs ${
-                                errors?.serviceFrequency?.[index]?.frequency
-                                  ? "border-red-500"
-                                  : ""
-                              }`}
-                              error={errors?.serviceFrequency?.[index]?.frequency}
+                              disabled
                             />
                           </td>
                           <td className="px-3">
@@ -194,66 +140,8 @@ const ServiceFrequencyTab = ({ formData, setFormData, errors }) => {
                                 updateFrequency(index, "timePeriod", e.target.value)
                               }
                               placeholder="6 months"
-                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
+                              className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors?.serviceFrequency?.[index]?.timePeriod
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <input
-                              type="number"
-                              value={frequency.lastServiceKm || 0}
-                              onChange={(e) =>
-                                updateFrequency(index, "lastServiceKm", parseInt(e.target.value) || 0)
-                              }
-                              placeholder="40000"
-                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.serviceFrequency?.[index]?.lastServiceKm
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <input
-                              type="number"
-                              value={frequency.nextServiceKm || 0}
-                              onChange={(e) =>
-                                updateFrequency(index, "nextServiceKm", parseInt(e.target.value) || 0)
-                              }
-                              placeholder="50000"
-                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.serviceFrequency?.[index]?.nextServiceKm
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <input
-                              type="date"
-                              value={frequency.lastServiceDate || ""}
-                              onChange={(e) =>
-                                updateFrequency(index, "lastServiceDate", e.target.value)
-                              }
-                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.serviceFrequency?.[index]?.lastServiceDate
-                                  ? "border-red-500"
-                                  : "border-gray-300"
-                              }`}
-                            />
-                          </td>
-                          <td className="px-3">
-                            <input
-                              type="date"
-                              value={frequency.nextServiceDate || ""}
-                              onChange={(e) =>
-                                updateFrequency(index, "nextServiceDate", e.target.value)
-                              }
-                              className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.serviceFrequency?.[index]?.nextServiceDate
                                   ? "border-red-500"
                                   : "border-gray-300"
                               }`}
@@ -264,9 +152,9 @@ const ServiceFrequencyTab = ({ formData, setFormData, errors }) => {
                               type="number"
                               value={frequency.kmDrove || 0}
                               onChange={(e) =>
-                                updateFrequency(index, "kmDrove", parseInt(e.target.value) || 0)
+                                updateFrequency(index, "kmDrove", parseFloat(e.target.value) || 0)
                               }
-                              placeholder="10000"
+                              placeholder="40000"
                               className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors?.serviceFrequency?.[index]?.kmDrove
                                   ? "border-red-500"

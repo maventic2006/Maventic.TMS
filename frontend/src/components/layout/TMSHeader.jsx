@@ -292,6 +292,7 @@ const TMSHeader = ({ theme }) => {
   };
 
   const handleMenuItemClick = (item) => {
+    console.log("Menu item clicked:", item.title);
     setHoveredDropdown(null);
 
     if (item.title === "Transporter Maintenance") {
@@ -300,8 +301,13 @@ const TMSHeader = ({ theme }) => {
       navigate("/vehicles");
     } else if (item.title === "Driver Maintenance") {
       navigate("/drivers");
+    } else if (item.title === "Consignor Maintenance") {
+      navigate("/consignor");
     } else if (item.title === "Consignor WH Maintenance") {
       navigate("/warehouse");
+    } else if (item.title === "Super Admin Approval List") {
+      console.log("Navigating to /approvals/super-admin");
+      navigate("/approvals/super-admin");
     }
   };
 

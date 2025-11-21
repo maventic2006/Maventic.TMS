@@ -1,15 +1,15 @@
 ﻿// Vehicle Master Constants
 
-// Vehicle Types (array format for dropdowns)
+// Vehicle Types (array format for dropdowns) - matching database
 export const VEHICLE_TYPES = [
-  { value: "LCV", label: "Light Commercial Vehicle" },
-  { value: "MCV", label: "Medium Commercial Vehicle" },
-  { value: "HCV", label: "Heavy Commercial Vehicle" },
-  { value: "TRAILER", label: "Trailer" },
-  { value: "TANKER", label: "Tanker" },
-  { value: "REFRIGERATED", label: "Refrigerated Van" },
-  { value: "CONTAINER", label: "Container Truck" },
-  { value: "FLATBED", label: "Flatbed Truck" },
+  { value: "VT001", label: "HCV - Heavy Commercial Vehicle" },
+  { value: "VT002", label: "MCV - Medium Commercial Vehicle" },
+  { value: "VT003", label: "LCV - Light Commercial Vehicle" },
+  { value: "VT004", label: "TRAILER - Trailer" },
+  { value: "VT005", label: "CONTAINER - Container" },
+  { value: "VT006", label: "TANKER - Tanker" },
+  { value: "VT007", label: "REFRIGERATED - Refrigerated Vehicle" },
+  { value: "VT008", label: "FLATBED - Flatbed" },
 ];
 
 // Usage Types
@@ -39,14 +39,12 @@ export const VEHICLE_STATUS_OPTIONS = [
   { value: "DECOMMISSIONED", label: "Decommissioned" },
 ];
 
-// Fuel Types (array format for dropdowns)
+// Fuel Types (array format for dropdowns) - matching database  
 export const FUEL_TYPES = [
-  { value: "DIESEL", label: "Diesel" },
-  { value: "PETROL", label: "Petrol" },
-  { value: "CNG", label: "CNG" },
-  { value: "ELECTRIC", label: "Electric" },
-  { value: "HYBRID", label: "Hybrid" },
-  { value: "LPG", label: "LPG" },
+  { value: "FT001", label: "DIESEL" },
+  { value: "FT002", label: "CNG" },
+  { value: "FT003", label: "ELECTRIC" },
+  { value: "FT004", label: "LNG" },
 ];
 
 // Ownership Types (array format for dropdowns)

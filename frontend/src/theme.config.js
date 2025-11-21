@@ -420,6 +420,30 @@ export const tabPagesTheme = {
         border: "#E5E7EB",
       },
     },
+
+    status: {
+  success: {
+    background: "#D1FAE5",
+    text: "#10B981",
+    border: "#10B981",
+  },
+  warning: {
+    background: "#FEF3C7",
+    text: "#F59E0B",
+    border: "#F59E0B",
+  },
+  error: {
+    background: "#FEE2E2",
+    text: "#DC2626",
+    border: "#DC2626",
+  },
+  info: {
+    background: "#DBEAFE",
+    text: "#3B82F6",
+    border: "#3B82F6",
+  },
+},
+
   },
   
   typography: {

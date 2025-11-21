@@ -227,6 +227,14 @@ const WarehouseDetails = () => {
     }
   }, [currentWarehouse, editFormData]);
 
+  // Refresh data function for error recovery
+  const handleRefreshData = () => {
+    if (id) {
+      dispatch(fetchWarehouseById(id));
+      dispatch(fetchMasterData());
+    }
+  };
+
   // Track unsaved changes
   useEffect(() => {
     if (isEditMode && editFormData && currentWarehouse) {
@@ -570,7 +578,7 @@ const WarehouseDetails = () => {
           </div>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
             <button
-              onClick={() => window.location.reload()}
+              onClick={handleRefreshData}
               className="bg-[#1D4ED8] hover:bg-[#1E40AF] text-white px-4 py-2 text-sm rounded-lg font-medium transition-all duration-200"
             >
               Try Again

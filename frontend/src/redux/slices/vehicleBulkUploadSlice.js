@@ -287,24 +287,96 @@ const vehicleBulkUploadSlice = createSlice({
      * Update upload progress
      */
     updateVehicleProgress: (state, action) => {
-      state.uploadProgress = action.payload.progress;
-      if (action.payload.log) {
+      const { progress, message, type } = action.payload;
+      
+      // Update progress percentage
+      if (progress !== undefined) {
+        state.uploadProgress = progress;
+      }
+      
+      // Add progress log if message provided
+      if (message) {
         state.progressLogs.push({
           timestamp: new Date().toISOString(),
-          message: action.payload.log,
-          type: action.payload.type || "info",
+          message: message,
+          type: type || "info",
         });
+        
+        // Keep only last 50 logs to prevent memory issues
+        if (state.progressLogs.length > 50) {
+          state.progressLogs = state.progressLogs.slice(-50);
+        }
       }
     },
     
     /**
-     * Update batch status
+     * Update batch status from Socket.IO event
      */
     updateVehicleBatchStatus: (state, action) => {
       state.currentBatch = {
         ...state.currentBatch,
         ...action.payload,
       };
+      
+      // Update validation results if provided
+      if (action.payload.total_valid !== undefined || action.payload.total_invalid !== undefined) {
+        state.validationResults = {
+          valid: action.payload.total_valid || 0,
+          invalid: action.payload.total_invalid || 0,
+        };
+      }
+    },
+    
+    /**
+     * Handle batch completion from Socket.IO
+     */
+    handleVehicleBatchComplete: (state, action) => {
+      const { validCount, invalidCount, createdCount, failedCount, errorReportPath } = action.payload;
+      
+      state.isUploading = false;
+      state.uploadProgress = 100;
+      
+      state.validationResults = {
+        valid: validCount || 0,
+        invalid: invalidCount || 0,
+      };
+      
+      if (state.currentBatch) {
+        state.currentBatch.status = 'completed';
+        state.currentBatch.total_valid = validCount || 0;
+        state.currentBatch.total_invalid = invalidCount || 0;
+        state.currentBatch.total_created = createdCount || 0;
+        state.currentBatch.total_creation_failed = failedCount || 0;
+        state.currentBatch.error_report_path = errorReportPath || null;
+      }
+      
+      // Add completion log
+      state.progressLogs.push({
+        timestamp: new Date().toISOString(),
+        message: `Batch complete: ${createdCount} created, ${failedCount} failed, ${invalidCount} invalid`,
+        type: createdCount > 0 && invalidCount === 0 ? "success" : invalidCount > 0 ? "warning" : "error",
+      });
+    },
+    
+    /**
+     * Handle batch error from Socket.IO
+     */
+    handleVehicleBatchError: (state, action) => {
+      state.isUploading = false;
+      state.error = {
+        code: "BATCH_ERROR",
+        message: action.payload.message || "Batch processing failed",
+      };
+      
+      if (state.currentBatch) {
+        state.currentBatch.status = 'failed';
+      }
+      
+      state.progressLogs.push({
+        timestamp: new Date().toISOString(),
+        message: `Error: ${action.payload.message || "Unknown error"}`,
+        type: "error",
+      });
     },
     
     /**
@@ -459,6 +531,8 @@ export const {
   closeVehicleHistoryModal,
   updateVehicleProgress,
   updateVehicleBatchStatus,
+  handleVehicleBatchComplete,
+  handleVehicleBatchError,
   setVehicleValidationResults,
   resetVehicleUploadState,
   clearVehicleError,

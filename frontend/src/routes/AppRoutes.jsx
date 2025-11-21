@@ -6,6 +6,8 @@ import { useSelector } from "react-redux";
 import TMSLandingPage from "../pages/TMSLandingPage";
 import TransporterMaintenance from "../pages/TransporterMaintenance";
 import WarehouseMaintenance from "../pages/WarehouseMaintenance";
+import VehicleMaintenance from "../pages/VehicleMaintenance";
+import DriverMaintenance from "../pages/DriverMaintenance";
 import LoginPage from "../features/auth/LoginPage";
 import Dashboard from "../features/dashboard/Dashboard";
 import IndentPage from "../features/indent/IndentPage";
@@ -13,6 +15,10 @@ import TransporterDetailsPage from "../features/transporter/TransporterDetailsPa
 import CreateTransporterPage from "../features/transporter/CreateTransporterPage";
 import WarehouseCreatePage from "../features/warehouse/pages/WarehouseCreatePage";
 import WarehouseDetails from "../pages/WarehouseDetails";
+import ConsignorMaintenance from "../pages/ConsignorMaintenance";
+import ConsignorDetailsPage from "../features/consignor/pages/ConsignorDetailsPage";
+import ConsignorCreatePage from "../features/consignor/pages/ConsignorCreatePage";
+import SuperAdminApprovalList from "../pages/SuperAdminApprovalList";
 
 // Protected Route component
 import ProtectedRoute from "./ProtectedRoute";
@@ -34,8 +40,15 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Landing Page */}
-      <Route path="/" element={<TMSLandingPage />} />
+      {/* Landing Page - Protected */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <TMSLandingPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Protected Routes - All require product_owner role */}
       <Route
@@ -75,6 +88,26 @@ const AppRoutes = () => {
         }
       />
 
+      {/* Vehicle Management Routes */}
+      <Route
+        path="/vehicles"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <VehicleMaintenance />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Driver Management Routes */}
+      <Route
+        path="/drivers"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <DriverMaintenance />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Warehouse Management Routes */}
       <Route
         path="/warehouse"
@@ -103,12 +136,50 @@ const AppRoutes = () => {
         }
       />
 
+      {/* Consignor Management Routes */}
+      <Route
+        path="/consignor"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConsignorMaintenance />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/consignor/create"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConsignorCreatePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/consignor/details/:id"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConsignorDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Other Features */}
       <Route
         path="/indent"
         element={
           <ProtectedRoute roles={["product_owner"]}>
             <IndentPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Super Admin Approval List */}
+      <Route
+        path="/approvals/super-admin"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <SuperAdminApprovalList />
           </ProtectedRoute>
         }
       />

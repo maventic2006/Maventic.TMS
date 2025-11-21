@@ -1,252 +1,317 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import api from "../../utils/api";
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '../../utils/api';
 
-// Async thunks
+// Async Thunks
 
-/**
- * Fetch pending approvals for current user
- */
-export const fetchPendingApprovals = createAsyncThunk(
-  "approval/fetchPendingApprovals",
+// Fetch approvals with filters
+export const fetchApprovals = createAsyncThunk(
+  'approval/fetchApprovals',
+  async ({ page = 1, limit = 25, filters = {} }, { rejectWithValue }) => {
+    try {
+      const params = {
+        page,
+        limit,
+        ...filters
+      };
+      
+      const response = await api.get('/approvals', { params });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Approve request
+export const approveRequest = createAsyncThunk(
+  'approval/approveRequest',
+  async (approvalId, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/approvals/${approvalId}/approve`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Reject request (remarks mandatory)
+export const rejectRequest = createAsyncThunk(
+  'approval/rejectRequest',
+  async ({ approvalId, remarks }, { rejectWithValue }) => {
+    try {
+      if (!remarks || remarks.trim().length === 0) {
+        return rejectWithValue({
+          message: 'Remarks are required to reject this request',
+          field: 'remarks'
+        });
+      }
+
+      const response = await api.post(`/approvals/${approvalId}/reject`, {
+        remarks: remarks.trim()
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Send back request (remarks mandatory)
+export const sendBackRequest = createAsyncThunk(
+  'approval/sendBackRequest',
+  async ({ approvalId, remarks }, { rejectWithValue }) => {
+    try {
+      if (!remarks || remarks.trim().length === 0) {
+        return rejectWithValue({
+          message: 'Remarks are required to send back this request',
+          field: 'remarks'
+        });
+      }
+
+      const response = await api.post(`/approvals/${approvalId}/sendBack`, {
+        remarks: remarks.trim()
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Fetch master data
+export const fetchApprovalMasterData = createAsyncThunk(
+  'approval/fetchMasterData',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get("/api/approval/pending");
-
-      if (response.data.success) {
-        return response.data.data;
-      } else {
-        return rejectWithValue(
-          response.data.message || "Failed to fetch pending approvals"
-        );
-      }
+      const response = await api.get('/approvals/master-data');
+      return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || "Failed to fetch pending approvals"
-      );
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
 
-/**
- * Fetch approval history for a specific user
- */
-export const fetchApprovalHistory = createAsyncThunk(
-  "approval/fetchApprovalHistory",
-  async (userId, { rejectWithValue }) => {
-    try {
-      const response = await api.get(`/api/approval/history/${userId}`);
-
-      if (response.data.success) {
-        return response.data.data;
-      } else {
-        return rejectWithValue(
-          response.data.message || "Failed to fetch approval history"
-        );
-      }
-    } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || "Failed to fetch approval history"
-      );
-    }
-  }
-);
-
-/**
- * Approve a user
- */
+// Approve user (for Transporter Admin user approval workflow)
 export const approveUser = createAsyncThunk(
-  "approval/approveUser",
+  'approval/approveUser',
   async ({ userId, remarks }, { rejectWithValue }) => {
     try {
-      const response = await api.post(`/approval/approve/${userId}`, {
-        remarks: remarks || "",
+      const response = await api.post(`/approvals/user/${userId}/approve`, {
+        remarks
       });
-
-      if (response.data.success) {
-        return response.data.data;
-      } else {
-        return rejectWithValue(
-          response.data.message || "Failed to approve user"
-        );
-      }
+      return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || "Failed to approve user"
-      );
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
-/**
- * Reject a user
- */
+// Reject user (for Transporter Admin user approval workflow)
 export const rejectUser = createAsyncThunk(
-  "approval/rejectUser",
+  'approval/rejectUser',
   async ({ userId, remarks }, { rejectWithValue }) => {
     try {
-      // Validate remarks are provided
       if (!remarks || remarks.trim().length === 0) {
-        return rejectWithValue("Remarks are required when rejecting a user");
+        return rejectWithValue('Remarks are required to reject this user');
       }
 
-      const response = await api.post(`/approval/reject/${userId}`, {
-        remarks: remarks,
+      const response = await api.post(`/approvals/user/${userId}/reject`, {
+        remarks: remarks.trim()
       });
-
-      if (response.data.success) {
-        return response.data.data;
-      } else {
-        return rejectWithValue(
-          response.data.message || "Failed to reject user"
-        );
-      }
+      return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || "Failed to reject user"
-      );
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
-/**
- * Fetch approval configuration by type
- */
-export const fetchApprovalConfig = createAsyncThunk(
-  "approval/fetchApprovalConfig",
-  async (approvalTypeId, { rejectWithValue }) => {
-    try {
-      const response = await api.get(`/api/approval/config/${approvalTypeId}`);
-
-      if (response.data.success) {
-        return response.data.data;
-      } else {
-        return rejectWithValue(
-          response.data.message || "Failed to fetch approval configuration"
-        );
-      }
-    } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message ||
-          "Failed to fetch approval configuration"
-      );
-    }
-  }
-);
+// Initial State
+const initialState = {
+  approvals: [],
+  masterData: {
+    approvalTypes: []
+  },
+  pagination: {
+    page: 1,
+    limit: 25,
+    total: 0,
+    totalPages: 1
+  },
+  filters: {
+    requestType: '',
+    dateFrom: '',
+    dateTo: '',
+    status: 'Pending for Approval' // Default to pending only
+  },
+  isFetching: false,
+  isApproving: false,
+  isRejecting: false,
+  isSendingBack: false,
+  error: null,
+  actionError: null
+};
 
 // Slice
 const approvalSlice = createSlice({
-  name: "approval",
-  initialState: {
-    pendingApprovals: [],
-    approvalHistory: [],
-    approvalConfig: null,
-    isLoading: false,
-    isApproving: false,
-    isRejecting: false,
-    isFetchingHistory: false,
-    error: null,
-    successMessage: null,
-  },
+  name: 'approval',
+  initialState,
   reducers: {
+    // Set filters
+    setFilters: (state, action) => {
+      state.filters = { ...state.filters, ...action.payload };
+    },
+
+    // Clear filters
+    clearFilters: (state) => {
+      state.filters = {
+        requestType: '',
+        dateFrom: '',
+        dateTo: '',
+        status: 'Pending for Approval'
+      };
+    },
+
+    // Clear errors
     clearError: (state) => {
       state.error = null;
+      state.actionError = null;
     },
-    clearSuccessMessage: (state) => {
-      state.successMessage = null;
-    },
-    clearApprovalHistory: (state) => {
-      state.approvalHistory = [];
-    },
+
+    // Clear action error
+    clearActionError: (state) => {
+      state.actionError = null;
+    }
   },
+
   extraReducers: (builder) => {
-    // Fetch Pending Approvals
+    // Fetch Approvals
     builder
-      .addCase(fetchPendingApprovals.pending, (state) => {
-        state.isLoading = true;
+      .addCase(fetchApprovals.pending, (state) => {
+        state.isFetching = true;
         state.error = null;
       })
-      .addCase(fetchPendingApprovals.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.pendingApprovals = action.payload;
+      .addCase(fetchApprovals.fulfilled, (state, action) => {
+        state.isFetching = false;
+        state.approvals = action.payload.data || [];
+        state.pagination = action.payload.pagination || state.pagination;
       })
-      .addCase(fetchPendingApprovals.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
+      .addCase(fetchApprovals.rejected, (state, action) => {
+        state.isFetching = false;
+        state.error = action.payload?.message || 'Failed to fetch approvals';
       });
 
-    // Fetch Approval History
+    // Approve Request
     builder
-      .addCase(fetchApprovalHistory.pending, (state) => {
-        state.isFetchingHistory = true;
-        state.error = null;
+      .addCase(approveRequest.pending, (state) => {
+        state.isApproving = true;
+        state.actionError = null;
       })
-      .addCase(fetchApprovalHistory.fulfilled, (state, action) => {
-        state.isFetchingHistory = false;
-        state.approvalHistory = action.payload;
+      .addCase(approveRequest.fulfilled, (state, action) => {
+        state.isApproving = false;
+        // Remove approved request from list
+        const approvalId = action.payload.data?.approvalId;
+        state.approvals = state.approvals.filter(
+          (approval) => approval.approvalId !== approvalId
+        );
+        state.pagination.total = Math.max(0, state.pagination.total - 1);
       })
-      .addCase(fetchApprovalHistory.rejected, (state, action) => {
-        state.isFetchingHistory = false;
-        state.error = action.payload;
+      .addCase(approveRequest.rejected, (state, action) => {
+        state.isApproving = false;
+        state.actionError = action.payload?.message || 'Failed to approve request';
       });
 
-    // Approve User
+    // Reject Request
+    builder
+      .addCase(rejectRequest.pending, (state) => {
+        state.isRejecting = true;
+        state.actionError = null;
+      })
+      .addCase(rejectRequest.fulfilled, (state, action) => {
+        state.isRejecting = false;
+        // Remove rejected request from list
+        const approvalId = action.payload.data?.approvalId;
+        state.approvals = state.approvals.filter(
+          (approval) => approval.approvalId !== approvalId
+        );
+        state.pagination.total = Math.max(0, state.pagination.total - 1);
+      })
+      .addCase(rejectRequest.rejected, (state, action) => {
+        state.isRejecting = false;
+        state.actionError = action.payload?.message || 'Failed to reject request';
+      });
+
+    // Send Back Request
+    builder
+      .addCase(sendBackRequest.pending, (state) => {
+        state.isSendingBack = true;
+        state.actionError = null;
+      })
+      .addCase(sendBackRequest.fulfilled, (state, action) => {
+        state.isSendingBack = false;
+        // Remove sent back request from list
+        const approvalId = action.payload.data?.approvalId;
+        state.approvals = state.approvals.filter(
+          (approval) => approval.approvalId !== approvalId
+        );
+        state.pagination.total = Math.max(0, state.pagination.total - 1);
+      })
+      .addCase(sendBackRequest.rejected, (state, action) => {
+        state.isSendingBack = false;
+        state.actionError = action.payload?.message || 'Failed to send back request';
+      });
+
+    // Fetch Master Data
+    builder
+      .addCase(fetchApprovalMasterData.pending, (state) => {
+        state.isFetching = true;
+      })
+      .addCase(fetchApprovalMasterData.fulfilled, (state, action) => {
+        state.isFetching = false;
+        state.masterData = action.payload.data || state.masterData;
+      })
+      .addCase(fetchApprovalMasterData.rejected, (state, action) => {
+        state.isFetching = false;
+        state.error = action.payload?.message || 'Failed to fetch master data';
+      });
+
+    // Approve User (Transporter Admin User Approval)
     builder
       .addCase(approveUser.pending, (state) => {
         state.isApproving = true;
-        state.error = null;
-        state.successMessage = null;
+        state.actionError = null;
       })
-      .addCase(approveUser.fulfilled, (state, action) => {
+      .addCase(approveUser.fulfilled, (state) => {
         state.isApproving = false;
-        state.successMessage = "User approved successfully";
-        // Remove approved item from pending approvals
-        state.pendingApprovals = state.pendingApprovals.filter(
-          (approval) => approval.user_id !== action.payload.userId
-        );
       })
       .addCase(approveUser.rejected, (state, action) => {
         state.isApproving = false;
-        state.error = action.payload;
+        state.actionError = action.payload || 'Failed to approve user';
       });
 
-    // Reject User
+    // Reject User (Transporter Admin User Approval)
     builder
       .addCase(rejectUser.pending, (state) => {
         state.isRejecting = true;
-        state.error = null;
-        state.successMessage = null;
+        state.actionError = null;
       })
-      .addCase(rejectUser.fulfilled, (state, action) => {
+      .addCase(rejectUser.fulfilled, (state) => {
         state.isRejecting = false;
-        state.successMessage = "User rejected successfully";
-        // Remove rejected item from pending approvals
-        state.pendingApprovals = state.pendingApprovals.filter(
-          (approval) => approval.user_id !== action.payload.userId
-        );
       })
       .addCase(rejectUser.rejected, (state, action) => {
         state.isRejecting = false;
-        state.error = action.payload;
+        state.actionError = action.payload || 'Failed to reject user';
       });
-
-    // Fetch Approval Config
-    builder
-      .addCase(fetchApprovalConfig.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(fetchApprovalConfig.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.approvalConfig = action.payload;
-      })
-      .addCase(fetchApprovalConfig.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-      });
-  },
+  }
 });
 
-export const { clearError, clearSuccessMessage, clearApprovalHistory } =
-  approvalSlice.actions;
+// Export actions
+export const {
+  setFilters,
+  clearFilters,
+  clearError,
+  clearActionError
+} = approvalSlice.actions;
 
+// Export reducer
 export default approvalSlice.reducer;

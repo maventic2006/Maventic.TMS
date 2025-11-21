@@ -211,7 +211,7 @@ async function generateVehicleBulkUploadTemplate() {
       { header: 'Registration_Date', key: 'reg_date', width: 18 },
       { header: 'Registration_Upto', key: 'reg_upto', width: 18 },
       { header: 'Purchase_Date', key: 'purchase_date', width: 18 },
-      { header: 'Owner_Sr_Number', key: 'owner_sr', width: 18 },
+      { header: 'Owner_Sr_Number (Integer)', key: 'owner_sr', width: 22 },
       { header: 'State_Code', key: 'state_code', width: 12 },
       { header: 'RTO_Code', key: 'rto_code', width: 12 },
       { header: 'Sale_Amount', key: 'sale_amount', width: 15 },
@@ -225,7 +225,7 @@ async function generateVehicleBulkUploadTemplate() {
     };
     ownershipSheet.getRow(1).height = 20;
     
-    // Add sample data
+    // Add sample data (Owner_Sr_Number must be numeric: 1, 2, 3, etc.)
     ownershipSheet.addRow({
       ref_id: 'VR001',
       owner_name: 'ABC Transport Pvt Ltd',
@@ -235,7 +235,7 @@ async function generateVehicleBulkUploadTemplate() {
       reg_date: '2023-06-15',
       reg_upto: '2038-06-14',
       purchase_date: '2023-06-10',
-      owner_sr: 'OWN001',
+      owner_sr: 1,
       state_code: 'MH',
       rto_code: 'MH12',
       sale_amount: 2500000.00
@@ -250,7 +250,7 @@ async function generateVehicleBulkUploadTemplate() {
       reg_date: '2021-03-20',
       reg_upto: '2036-03-19',
       purchase_date: '2021-03-15',
-      owner_sr: 'OWN002',
+      owner_sr: 2,
       state_code: 'DL',
       rto_code: 'DL01',
       sale_amount: 1800000.00

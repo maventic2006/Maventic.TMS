@@ -40,9 +40,12 @@ const ThemeTable = ({
     const file = event.target.files[0];
     if (!file) return;
 
+    // Find column config to get specific accept types
+    const column = columns.find(col => col.key === columnKey);
+    
     // File validation
     const maxSize = 5 * 1024 * 1024; // 5MB
-    const allowedTypes = [
+    let allowedTypes = [
       "image/jpeg",
       "image/png",
       "image/gif",
@@ -51,6 +54,23 @@ const ThemeTable = ({
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
 
+    // If column specifies accept types, use those
+    if (column?.accept) {
+      allowedTypes = column.accept.split(',').map(type => {
+        // Convert file extension to MIME type
+        const mimeMap = {
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.png': 'image/png',
+          '.gif': 'image/gif',
+          '.pdf': 'application/pdf',
+          '.doc': 'application/msword',
+          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        };
+        return mimeMap[type] || type;
+      });
+    }
+
     if (file.size > maxSize) {
       alert("File size must be less than 5MB");
       event.target.value = "";
@@ -58,34 +78,31 @@ const ThemeTable = ({
     }
 
     if (!allowedTypes.includes(file.type)) {
-      alert("Only JPEG, PNG, GIF, PDF, DOC, and DOCX files are allowed");
+      alert(`Only ${allowedTypes.map(t => t.split('/')[1].toUpperCase()).join(', ')} files are allowed`);
       event.target.value = "";
       return;
     }
 
     try {
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onload = () => {
-        const updatedData = [...data];
-        updatedData[rowIndex] = {
-          ...updatedData[rowIndex],
-          fileName: file.name,
-          fileType: file.type,
-          fileData: reader.result.split(",")[1], // Remove data:type;base64, prefix
-        };
-        onDataChange(updatedData);
+      // Store file object for backend upload
+      const updatedData = [...data];
+      updatedData[rowIndex] = {
+        ...updatedData[rowIndex],
+        [columnKey]: file, // Store file object directly
+        [`${columnKey}_preview`]: URL.createObjectURL(file), // For preview
       };
-      reader.readAsDataURL(file);
+      onDataChange(updatedData);
     } catch (error) {
       alert("Error uploading file: " + error.message);
     }
   };
 
-  const removeFile = (rowIndex) => {
+  const removeFile = (rowIndex, columnKey = 'photo') => {
     const updatedData = [...data];
     updatedData[rowIndex] = {
       ...updatedData[rowIndex],
+      [columnKey]: null,
+      [`${columnKey}_preview`]: null,
       fileName: "",
       fileType: "",
       fileData: "",
@@ -139,6 +156,13 @@ const ThemeTable = ({
 
     // File upload column
     if (column.type === "file") {
+      const fileValue = row[column.key];
+      const isFileObject = fileValue instanceof File;
+      const previewUrl = row[`${column.key}_preview`];
+      const fileName = isFileObject ? fileValue.name : (row.fileName || (typeof fileValue === 'string' ? fileValue.split('/').pop() : ''));
+      const fileType = isFileObject ? fileValue.type : row.fileType;
+      const hasFile = isFileObject || fileName;
+
       return (
         <div className="flex items-center gap-2">
           <input
@@ -146,25 +170,39 @@ const ThemeTable = ({
             type="file"
             onChange={(e) => handleFileUpload(rowIndex, column.key, e)}
             className="hidden"
-            accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx"
+            accept={column.accept || ".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx"}
           />
-          {row.fileName ? (
+          {hasFile ? (
             <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg flex-1">
-              {getFileIcon(row.fileType)}
+              {/* Preview for images */}
+              {(fileType?.startsWith("image/") || previewUrl) && (
+                <img 
+                  src={previewUrl || (typeof fileValue === 'string' ? fileValue : '')} 
+                  alt="Preview" 
+                  className="w-10 h-10 object-cover rounded"
+                />
+              )}
+              {!fileType?.startsWith("image/") && !previewUrl && getFileIcon(fileType)}
               <span className="text-sm text-gray-700 truncate flex-1">
-                {row.fileName}
+                {fileName}
               </span>
+              {(previewUrl || (typeof fileValue === 'string' && fileValue.startsWith('http'))) && (
+                <button
+                  onClick={() => handlePreviewDocument({ 
+                    fileName, 
+                    fileType, 
+                    fileData: previewUrl || fileValue 
+                  })}
+                  className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                  title="Preview"
+                >
+                  <Eye className="w-3 h-3" />
+                </button>
+              )}
               <button
-                onClick={() => handlePreviewDocument(row)}
-                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                title="Preview Document"
-              >
-                <Eye className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => removeFile(rowIndex)}
+                onClick={() => removeFile(rowIndex, column.key)}
                 className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                title="Remove Document"
+                title="Remove"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -175,7 +213,9 @@ const ThemeTable = ({
               className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg hover:border-[#10B981] hover:bg-[#FFF4E6] transition-colors w-full"
             >
               <Upload className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-500">Upload File</span>
+              <span className="text-sm text-gray-500">
+                {column.accept?.includes('image') ? 'Upload Image' : 'Upload File'}
+              </span>
             </button>
           )}
         </div>

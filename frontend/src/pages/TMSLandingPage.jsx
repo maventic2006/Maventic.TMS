@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,7 +45,32 @@ const TMSLandingPage = () => {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated, isLoading } = useSelector((state) => state.auth);
+
+  // Authentication guard - redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      console.log("TMSLandingPage: User not authenticated, redirecting to login");
+      navigate("/login", { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect via useEffect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleLogout = async () => {
     try {
@@ -331,6 +356,12 @@ const TMSLandingPage = () => {
       } else if (item.title === "Consignor WH Maintenance") {
         console.log("Navigating to /warehouse");
         navigate("/warehouse");
+      } else if (item.title === "Consignor Maintenance") {
+        console.log("Navigating to /consignor");
+        navigate("/consignor");
+      } else if (item.title === "Super Admin Approval List") {
+        console.log("Navigating to /approvals/super-admin");
+        navigate("/approvals/super-admin");
       }
       // Add more navigation handlers for other menu items as needed
     } catch (error) {

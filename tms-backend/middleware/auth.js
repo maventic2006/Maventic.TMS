@@ -23,16 +23,27 @@ const authenticateToken = (req, res, next) => {
 
   // Try to get token from cookie first
   let token = req.cookies?.authToken;
+  let tokenSource = null;
 
   // If not in cookie, check Authorization header
   if (!token) {
     const authHeader = req.headers["authorization"];
     if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.substring(7); // Remove "Bearer " prefix
+      tokenSource = "Authorization header";
       console.log("✅ Token extracted from Authorization header");
     }
   } else {
+    tokenSource = "HTTP-only cookie";
     console.log("✅ Token found in cookie");
+    
+    // Debug: Show first/last few characters of token (NEVER log full token in production!)
+    if (process.env.NODE_ENV === 'development') {
+      const tokenPreview = token.length > 20 
+        ? `${token.substring(0, 10)}...${token.substring(token.length - 10)}` 
+        : token;
+      console.log(`🔍 Token preview: ${tokenPreview} (length: ${token.length})`);
+    }
   }
 
   // If no token found in either location, return 401
@@ -51,21 +62,51 @@ const authenticateToken = (req, res, next) => {
   }
 
   console.log("🔍 Verifying token...");
+  console.log(`🔐 Token source: ${tokenSource}`);
+  
   // Verify the token
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       console.log("❌ TOKEN VERIFICATION FAILED:", err.message);
+      console.log("❌ Error name:", err.name);
+      
+      // Provide specific error messages for different JWT errors
+      let errorDetails = err.message;
+      let errorCode = "INVALID_TOKEN";
+      
+      if (err.name === 'JsonWebTokenError') {
+        errorCode = "JWT_MALFORMED";
+        errorDetails = "Token format is invalid or corrupted. Please log in again.";
+        console.log("🔍 JWT Error Details:", {
+          name: err.name,
+          message: err.message,
+          hint: "Token might be corrupted in cookie storage"
+        });
+      } else if (err.name === 'TokenExpiredError') {
+        errorCode = "JWT_EXPIRED";
+        errorDetails = "Authentication token has expired. Please refresh your session.";
+        console.log("⏰ Token Expiration Details:", {
+          expiredAt: err.expiredAt,
+          hint: "Token was valid but has now expired"
+        });
+      } else if (err.name === 'NotBeforeError') {
+        errorCode = "JWT_NOT_ACTIVE";
+        errorDetails = "Token is not yet active.";
+      }
+      
       console.log("🔐 ===== AUTHENTICATION FAILED =====\n");
       return res.status(403).json({
         success: false,
         message: "Invalid or expired token",
         error: {
-          code: "INVALID_TOKEN",
-          details: err.message,
+          code: errorCode,
+          details: errorDetails,
         },
       });
     }
     console.log("✅ Token verified successfully for user:", user.user_id);
+    console.log("👤 User Type:", user.user_type_id);
+    console.log("🎭 User Role:", user.role);
     console.log("🔐 ===== AUTHENTICATION SUCCESS =====\n");
     req.user = user;
     next();

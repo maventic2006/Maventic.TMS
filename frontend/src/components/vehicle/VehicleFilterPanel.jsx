@@ -1,4 +1,9 @@
-﻿import React from "react";
+﻿import React, { useState, useEffect } from "react";
+import { X, Search } from "lucide-react";
+import { StatusSelect } from "../ui/Select";
+import ThemedSelect from "../ui/themed/ThemedSelect";
+import ThemedCheckbox from "../ui/themed/ThemedCheckbox";
+import { Button } from "../ui/Button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Filter } from "lucide-react";
 import {
@@ -8,10 +13,8 @@ import {
   FUEL_TYPES,
 } from "../../utils/vehicleConstants";
 import { getPageTheme, getComponentTheme } from "../../theme.config";
-import { StatusSelect } from "../ui/Select";
 
 const theme = getPageTheme("list");
-const buttonTheme = getComponentTheme("actionButton");
 const inputTheme = getComponentTheme("formInput");
 
 const VehicleFilterPanel = ({
@@ -265,6 +268,126 @@ const VehicleFilterPanel = ({
               />
             </div>
 
+            {/* Vehicle Condition Filter */}
+            <div>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
+                Condition
+              </label>
+              <StatusSelect
+                value={filters.vehicleCondition}
+                onChange={(value) => onFilterChange("vehicleCondition", value)}
+                options={[
+                  { value: "", label: "All Conditions" },
+                  { value: "EXCELLENT", label: "Excellent" },
+                  { value: "GOOD", label: "Good" },
+                  { value: "FAIR", label: "Fair" },
+                  { value: "POOR", label: "Poor" },
+                ]}
+                placeholder="All Conditions"
+                className="w-full"
+              />
+            </div>
+
+            {/* Registration State Filter */}
+            <div>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
+                Reg. State
+              </label>
+              <input
+                type="text"
+                value={filters.registrationState}
+                onChange={(e) =>
+                  onFilterChange("registrationState", e.target.value)
+                }
+                placeholder="Enter Registration State"
+                className="w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200 focus:outline-none focus:ring-2"
+                style={{
+                  border: `1px solid ${inputTheme.border.default}`,
+                  background: inputTheme.background,
+                  color: inputTheme.text,
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = inputTheme.border.focus;
+                  e.target.style.boxShadow = `0 0 0 3px ${inputTheme.border.focus}20`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = inputTheme.border.default;
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
+
+            {/* Towing Capacity Range Filters */}
+            <div>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
+                Towing Cap. Min
+              </label>
+              <input
+                type="number"
+                value={filters.towingCapacityMin}
+                onChange={(e) =>
+                  onFilterChange("towingCapacityMin", e.target.value)
+                }
+                placeholder="Min Capacity (kg)"
+                min="0"
+                className="w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200 focus:outline-none focus:ring-2"
+                style={{
+                  border: `1px solid ${inputTheme.border.default}`,
+                  background: inputTheme.background,
+                  color: inputTheme.text,
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = inputTheme.border.focus;
+                  e.target.style.boxShadow = `0 0 0 3px ${inputTheme.border.focus}20`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = inputTheme.border.default;
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
+
+            <div>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
+                Towing Cap. Max
+              </label>
+              <input
+                type="number"
+                value={filters.towingCapacityMax}
+                onChange={(e) =>
+                  onFilterChange("towingCapacityMax", e.target.value)
+                }
+                placeholder="Max Capacity (kg)"
+                min="0"
+                className="w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200 focus:outline-none focus:ring-2"
+                style={{
+                  border: `1px solid ${inputTheme.border.default}`,
+                  background: inputTheme.background,
+                  color: inputTheme.text,
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = inputTheme.border.focus;
+                  e.target.style.boxShadow = `0 0 0 3px ${inputTheme.border.focus}20`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = inputTheme.border.default;
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
+
             {/* Fuel Type Filter */}
             <div>
               <label
@@ -290,17 +413,20 @@ const VehicleFilterPanel = ({
               >
                 GPS Enabled
               </label>
-              <StatusSelect
-                value={filters.gpsEnabled}
-                onChange={(value) => onFilterChange("gpsEnabled", value)}
-                options={[
-                  { value: "", label: "All" },
-                  { value: "true", label: "Yes" },
-                  { value: "false", label: "No" },
-                ]}
-                placeholder="All"
-                className="w-full"
-              />
+              <div className="flex items-center space-x-2">
+                <ThemedCheckbox
+                  checked={filters.gpsEnabled === "true"}
+                  onCheckedChange={(checked) =>
+                    onFilterChange("gpsEnabled", checked ? "true" : "")
+                  }
+                />
+                <span
+                  className="text-sm"
+                  style={{ color: theme.colors.text.secondary }}
+                >
+                  Only GPS enabled vehicles
+                </span>
+              </div>
             </div>
 
             {/* Leasing Flag Filter */}
@@ -311,17 +437,20 @@ const VehicleFilterPanel = ({
               >
                 Leased
               </label>
-              <StatusSelect
-                value={filters.leasingFlag}
-                onChange={(value) => onFilterChange("leasingFlag", value)}
-                options={[
-                  { value: "", label: "All" },
-                  { value: "true", label: "Yes" },
-                  { value: "false", label: "No" },
-                ]}
-                placeholder="All"
-                className="w-full"
-              />
+              <div className="flex items-center space-x-2">
+                <ThemedCheckbox
+                  checked={filters.leasingFlag === "true"}
+                  onCheckedChange={(checked) =>
+                    onFilterChange("leasingFlag", checked ? "true" : "")
+                  }
+                />
+                <span
+                  className="text-sm"
+                  style={{ color: theme.colors.text.secondary }}
+                >
+                  Only leased vehicles
+                </span>
+              </div>
             </div>
           </div>
 
@@ -330,43 +459,22 @@ const VehicleFilterPanel = ({
             className="flex gap-4 mt-6 pt-6"
             style={{ borderTop: `1px solid ${theme.colors.card.border}` }}
           >
-            <button
+            <Button
+              variant="secondary"
               onClick={onClearFilters}
-              className="flex-1 px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              style={{
-                background: buttonTheme.secondary.background,
-                color: buttonTheme.secondary.text,
-                border: `1px solid ${buttonTheme.secondary.border}`,
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background =
-                  buttonTheme.secondary.hover.background;
-                e.target.style.borderColor = buttonTheme.secondary.hover.border;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = buttonTheme.secondary.background;
-                e.target.style.borderColor = buttonTheme.secondary.border;
-              }}
+              className="flex-1"
             >
-              Clear Filters
-            </button>
-            <button
+              <X className="h-4 w-4 mr-2" />
+              Clear All
+            </Button>
+            <Button
+              variant="default"
               onClick={onApplyFilters}
-              className="flex-1 px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              style={{
-                background: buttonTheme.primary.background,
-                color: buttonTheme.primary.text,
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background =
-                  buttonTheme.primary.hover.background;
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = buttonTheme.primary.background;
-              }}
+              className="flex-1"
             >
+              <Search className="h-4 w-4 mr-2" />
               Apply Filters
-            </button>
+            </Button>
           </div>
         </motion.div>
       )}
