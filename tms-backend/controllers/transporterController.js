@@ -2078,6 +2078,308 @@ const getCitiesByCountryAndState = async (req, res) => {
 };
 
 // Get all transporters with pagination and filters
+// const getTransporters = async (req, res) => {
+//   try {
+//     const {
+//       page = 1,
+//       limit = 25,
+//       search = "",
+//       transporterId = "",
+//       status = "",
+//       businessName = "",
+//       state = "",
+//       city = "",
+//       transportMode = "",
+//       vatGst = "",
+//       tan = "",
+//     } = req.query;
+
+//     // Convert page and limit to integers
+//     const pageNum = parseInt(page);
+//     const limitNum = parseInt(limit);
+//     const offset = (pageNum - 1) * limitNum;
+
+//     // Build base query - Get one row per transporter with primary address and first contact
+//     let query = knex("transporter_general_info as tgi")
+//       .leftJoin("tms_address as addr", function () {
+//         this.on("tgi.transporter_id", "=", "addr.user_reference_id")
+//           .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"))
+//           .andOn("addr.is_primary", "=", knex.raw("1")); // Get only primary address
+//       })
+//       .leftJoin(
+//         knex.raw(`(
+//           SELECT tc1.*
+//           FROM transporter_contact tc1
+//           INNER JOIN (
+//             SELECT transporter_id, MIN(tcontact_id) as min_contact_id, MIN(contact_unique_id) as min_unique_id
+//             FROM transporter_contact
+//             WHERE status = 'ACTIVE'
+//             GROUP BY transporter_id
+//           ) tc2 ON tc1.transporter_id = tc2.transporter_id
+//                AND tc1.tcontact_id = tc2.min_contact_id
+//                AND tc1.contact_unique_id = tc2.min_unique_id
+//         ) as tc`),
+//         "tgi.transporter_id",
+//         "tc.transporter_id"
+//       )
+//       .select(
+//         "tgi.transporter_id",
+//         "tgi.business_name",
+//         "tgi.trans_mode_road",
+//         "tgi.trans_mode_rail",
+//         "tgi.trans_mode_air",
+//         "tgi.trans_mode_sea",
+//         "tgi.active_flag",
+//         "tgi.from_date",
+//         "tgi.to_date",
+//         "tgi.avg_rating",
+//         "tgi.status",
+//         "tgi.created_by",
+//         "tgi.created_on",
+//         "tgi.updated_on",
+//         "addr.country",
+//         "addr.state",
+//         "addr.city",
+//         "addr.district",
+//         "addr.vat_number",
+//         "addr.tin_pan",
+//         "addr.tan",
+//         knex.raw(
+//           "CONCAT(COALESCE(addr.street_1, ''), ', ', COALESCE(addr.city, ''), ', ', COALESCE(addr.state, ''), ', ', COALESCE(addr.country, '')) as address"
+//         ),
+//         "tc.contact_person_name",
+//         "tc.phone_number",
+//         "tc.email_id"
+//       );
+
+//     // Apply filters
+//     if (search) {
+//       query = query.where(function () {
+//         this.where("tgi.business_name", "like", `%${search}%`)
+//           .orWhere("tgi.transporter_id", "like", `%${search}%`)
+//           .orWhere("addr.city", "like", `%${search}%`)
+//           .orWhere("addr.state", "like", `%${search}%`);
+//       });
+//     }
+
+//     if (transporterId) {
+//       query = query.where("tgi.transporter_id", "like", `%${transporterId}%`);
+//     }
+
+//     if (status) {
+//       query = query.where("tgi.status", status);
+//     }
+
+//     if (businessName) {
+//       query = query.where("tgi.business_name", "like", `%${businessName}%`);
+//     }
+
+//     if (state) {
+//       query = query.where("addr.state", "like", `%${state}%`);
+//     }
+
+//     if (city) {
+//       query = query.where("addr.city", "like", `%${city}%`);
+//     }
+
+//     if (vatGst) {
+//       query = query.where("addr.vat_number", "like", `%${vatGst}%`);
+//     }
+
+//     if (tan) {
+//       query = query.where("addr.tan", "like", `%${tan}%`);
+//     }
+
+//     if (transportMode) {
+//       const modes = transportMode.split(",");
+//       query = query.where(function () {
+//         modes.forEach((mode) => {
+//           switch (mode.toUpperCase()) {
+//             case "R":
+//             case "ROAD":
+//               this.orWhere("tgi.trans_mode_road", true);
+//               break;
+//             case "RL":
+//             case "RAIL":
+//               this.orWhere("tgi.trans_mode_rail", true);
+//               break;
+//             case "A":
+//             case "AIR":
+//               this.orWhere("tgi.trans_mode_air", true);
+//               break;
+//             case "S":
+//             case "SEA":
+//               this.orWhere("tgi.trans_mode_sea", true);
+//               break;
+//           }
+//         });
+//       });
+//     }
+
+//     // Get total count for pagination - count distinct transporters only
+//     let countQuery = knex("transporter_general_info as tgi");
+
+//     // For filters that need address or contact data, we join but count distinct transporter_id
+//     let needsAddressJoin = search || state || city || vatGst || tan;
+
+//     if (needsAddressJoin) {
+//       countQuery = countQuery.leftJoin("tms_address as addr", function () {
+//         this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
+//           "addr.user_type",
+//           "=",
+//           knex.raw("'TRANSPORTER'")
+//         );
+//       });
+//     }
+
+//     // Apply the same filters to count query
+//     if (search) {
+//       countQuery = countQuery.where(function () {
+//         this.where("tgi.business_name", "like", `%${search}%`)
+//           .orWhere("tgi.transporter_id", "like", `%${search}%`)
+//           .orWhere("addr.city", "like", `%${search}%`)
+//           .orWhere("addr.state", "like", `%${search}%`);
+//       });
+//     }
+
+//     if (transporterId) {
+//       countQuery = countQuery.where(
+//         "tgi.transporter_id",
+//         "like",
+//         `%${transporterId}%`
+//       );
+//     }
+
+//     if (businessName) {
+//       countQuery = countQuery.where(
+//         "tgi.business_name",
+//         "like",
+//         `%${businessName}%`
+//       );
+//     }
+
+//     if (status) {
+//       countQuery = countQuery.where("tgi.status", "like", `%${status}%`);
+//     }
+
+//     if (state) {
+//       countQuery = countQuery.where("addr.state", "like", `%${state}%`);
+//     }
+
+//     if (city) {
+//       countQuery = countQuery.where("addr.city", "like", `%${city}%`);
+//     }
+
+//     if (vatGst) {
+//       countQuery = countQuery.where("addr.vat_number", "like", `%${vatGst}%`);
+//     }
+
+//     if (tan) {
+//       countQuery = countQuery.where("addr.tan", "like", `%${tan}%`);
+//     }
+
+//     if (transportMode) {
+//       const modes = transportMode.split(",");
+//       countQuery = countQuery.where(function () {
+//         modes.forEach((mode) => {
+//           const upperMode = mode.trim().toUpperCase();
+//           switch (upperMode) {
+//             case "R":
+//             case "ROAD":
+//               this.orWhere("tgi.trans_mode_road", true);
+//               break;
+//             case "RL":
+//             case "RAIL":
+//               this.orWhere("tgi.trans_mode_rail", true);
+//               break;
+//             case "A":
+//             case "AIR":
+//               this.orWhere("tgi.trans_mode_air", true);
+//               break;
+//             case "S":
+//             case "SEA":
+//               this.orWhere("tgi.trans_mode_sea", true);
+//               break;
+//           }
+//         });
+//       });
+//     }
+
+//     const totalResult = await countQuery
+//       .countDistinct("tgi.transporter_id as count")
+//       .first();
+//     const total = parseInt(totalResult.count);
+
+//     // Apply pagination
+//     const transporters = await query
+//       .orderBy("tgi.transporter_id", "asc")
+//       .limit(limitNum)
+//       .offset(offset);
+
+//     // Transform transport modes to match frontend expected format
+//     const transformedTransporters = transporters.map((transporter) => {
+//       const transportModes = [];
+//       if (transporter.trans_mode_road) transportModes.push("R");
+//       if (transporter.trans_mode_rail) transportModes.push("RL");
+//       if (transporter.trans_mode_air) transportModes.push("A");
+//       if (transporter.trans_mode_sea) transportModes.push("S");
+
+//       return {
+//         id: transporter.transporter_id,
+//         businessName: transporter.business_name,
+//         transportMode: transportModes,
+//         status: transporter.status,
+//         avgRating: transporter.avg_rating,
+//         country: transporter.country,
+//         state: transporter.state,
+//         city: transporter.city,
+//         district: transporter.district,
+//         address: transporter.address,
+//         tinPan: transporter.tin_pan,
+//         tan: transporter.tan,
+//         vatGst: transporter.vat_number,
+//         contactPersonName: transporter.contact_person_name,
+//         mobileNumber: transporter.phone_number,
+//         emailId: transporter.email_id,
+//         createdBy: transporter.created_by,
+//         createdOn: transporter.created_on
+//           ? new Date(transporter.created_on).toISOString().split("T")[0]
+//           : null,
+//         updatedOn: transporter.updated_on
+//           ? new Date(transporter.updated_on).toISOString().split("T")[0]
+//           : null,
+//         activeFlag: transporter.active_flag,
+//         fromDate: transporter.from_date,
+//         toDate: transporter.to_date,
+//       };
+//     });
+
+//     res.json({
+//       success: true,
+//       data: transformedTransporters,
+//       pagination: {
+//         page: pageNum,
+//         limit: limitNum,
+//         total,
+//         pages: Math.ceil(total / limitNum),
+//       },
+//       timestamp: new Date().toISOString(),
+//     });
+//   } catch (error) {
+//     console.error("Error fetching transporters:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: {
+//         code: "FETCH_ERROR",
+//         message: "Failed to fetch transporters",
+//         details: error.message,
+//       },
+//       timestamp: new Date().toISOString(),
+//     });
+//   }
+// };
+
+// Get all transporters with pagination and filters
 const getTransporters = async (req, res) => {
   try {
     const {
@@ -2092,6 +2394,8 @@ const getTransporters = async (req, res) => {
       transportMode = "",
       vatGst = "",
       tan = "",
+      createdOnStart = "",
+      createdOnEnd = "",
     } = req.query;
 
     // Convert page and limit to integers
@@ -2099,12 +2403,12 @@ const getTransporters = async (req, res) => {
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Build base query - Get one row per transporter with primary address and first contact
+    // Base query
     let query = knex("transporter_general_info as tgi")
       .leftJoin("tms_address as addr", function () {
         this.on("tgi.transporter_id", "=", "addr.user_reference_id")
           .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"))
-          .andOn("addr.is_primary", "=", knex.raw("1")); // Get only primary address
+          .andOn("addr.is_primary", "=", knex.raw("1"));
       })
       .leftJoin(
         knex.raw(`(
@@ -2152,7 +2456,7 @@ const getTransporters = async (req, res) => {
         "tc.email_id"
       );
 
-    // Apply filters
+    // Search
     if (search) {
       query = query.where(function () {
         this.where("tgi.business_name", "like", `%${search}%`)
@@ -2162,33 +2466,16 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    if (transporterId) {
+    // All other existing filters...
+    if (transporterId)
       query = query.where("tgi.transporter_id", "like", `%${transporterId}%`);
-    }
-
-    if (status) {
-      query = query.where("tgi.status", status);
-    }
-
-    if (businessName) {
+    if (status) query = query.where("tgi.status", status);
+    if (businessName)
       query = query.where("tgi.business_name", "like", `%${businessName}%`);
-    }
-
-    if (state) {
-      query = query.where("addr.state", "like", `%${state}%`);
-    }
-
-    if (city) {
-      query = query.where("addr.city", "like", `%${city}%`);
-    }
-
-    if (vatGst) {
-      query = query.where("addr.vat_number", "like", `%${vatGst}%`);
-    }
-
-    if (tan) {
-      query = query.where("addr.tan", "like", `%${tan}%`);
-    }
+    if (state) query = query.where("addr.state", "like", `%${state}%`);
+    if (city) query = query.where("addr.city", "like", `%${city}%`);
+    if (vatGst) query = query.where("addr.vat_number", "like", `%${vatGst}%`);
+    if (tan) query = query.where("addr.tan", "like", `%${tan}%`);
 
     if (transportMode) {
       const modes = transportMode.split(",");
@@ -2216,13 +2503,18 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    // Get total count for pagination - count distinct transporters only
+    //Created On Date Range Filter
+    if (createdOnStart) {
+      query = query.where("tgi.created_on", ">=", createdOnStart);
+    }
+    if (createdOnEnd) {
+      query = query.where("tgi.created_on", "<=", createdOnEnd);
+    }
+
+    // Count query (with same date filters)
     let countQuery = knex("transporter_general_info as tgi");
 
-    // For filters that need address or contact data, we join but count distinct transporter_id
-    let needsAddressJoin = search || state || city || vatGst || tan;
-
-    if (needsAddressJoin) {
+    if (search || state || city || vatGst || tan) {
       countQuery = countQuery.leftJoin("tms_address as addr", function () {
         this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
           "addr.user_type",
@@ -2232,7 +2524,7 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    // Apply the same filters to count query
+    // Reapply filters
     if (search) {
       countQuery = countQuery.where(function () {
         this.where("tgi.business_name", "like", `%${search}%`)
@@ -2242,48 +2534,31 @@ const getTransporters = async (req, res) => {
       });
     }
 
-    if (transporterId) {
+    if (transporterId)
       countQuery = countQuery.where(
         "tgi.transporter_id",
         "like",
         `%${transporterId}%`
       );
-    }
-
-    if (businessName) {
+    if (businessName)
       countQuery = countQuery.where(
         "tgi.business_name",
         "like",
         `%${businessName}%`
       );
-    }
-
-    if (status) {
-      countQuery = countQuery.where("tgi.status", "like", `%${status}%`);
-    }
-
-    if (state) {
+    if (status) countQuery = countQuery.where("tgi.status", status);
+    if (state)
       countQuery = countQuery.where("addr.state", "like", `%${state}%`);
-    }
-
-    if (city) {
-      countQuery = countQuery.where("addr.city", "like", `%${city}%`);
-    }
-
-    if (vatGst) {
+    if (city) countQuery = countQuery.where("addr.city", "like", `%${city}%`);
+    if (vatGst)
       countQuery = countQuery.where("addr.vat_number", "like", `%${vatGst}%`);
-    }
-
-    if (tan) {
-      countQuery = countQuery.where("addr.tan", "like", `%${tan}%`);
-    }
+    if (tan) countQuery = countQuery.where("addr.tan", "like", `%${tan}%`);
 
     if (transportMode) {
       const modes = transportMode.split(",");
       countQuery = countQuery.where(function () {
         modes.forEach((mode) => {
-          const upperMode = mode.trim().toUpperCase();
-          switch (upperMode) {
+          switch (mode.toUpperCase()) {
             case "R":
             case "ROAD":
               this.orWhere("tgi.trans_mode_road", true);
@@ -2305,18 +2580,24 @@ const getTransporters = async (req, res) => {
       });
     }
 
+    // Date Filters for Count Query
+    if (createdOnStart) {
+      countQuery = countQuery.where("tgi.created_on", ">=", createdOnStart);
+    }
+    if (createdOnEnd) {
+      countQuery = countQuery.where("tgi.created_on", "<=", createdOnEnd);
+    }
+
     const totalResult = await countQuery
       .countDistinct("tgi.transporter_id as count")
       .first();
     const total = parseInt(totalResult.count);
 
-    // Apply pagination
     const transporters = await query
       .orderBy("tgi.transporter_id", "asc")
       .limit(limitNum)
       .offset(offset);
 
-    // Transform transport modes to match frontend expected format
     const transformedTransporters = transporters.map((transporter) => {
       const transportModes = [];
       if (transporter.trans_mode_road) transportModes.push("R");

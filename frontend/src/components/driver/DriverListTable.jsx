@@ -358,10 +358,16 @@ const DriverListTable = ({
                   Postal Code
                 </TableHead>
                 <TableHead className="text-white w-24 text-sm font-semibold h-14">
+                  Rating
+                </TableHead>
+                <TableHead className="text-white w-24 text-sm font-semibold h-14">
                   Status
                 </TableHead>
                 <TableHead className="text-white w-24 text-sm font-semibold h-14">
-                  Rating
+                  Created by
+                </TableHead>
+                <TableHead className="text-white w-24 text-sm font-semibold h-14">
+                  Created on
                 </TableHead>
                 <TableHead className="text-white w-32 text-sm font-semibold h-14">
                   Approver
@@ -430,9 +436,6 @@ const DriverListTable = ({
                       {displayValue(driver.postalCode)}
                     </span>
                   </TableCell>
-                  <TableCell className="px-4 py-3">
-                    <StatusPill status={driver.status} />
-                  </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 text-[#F59E0B] fill-[#F59E0B]" />
@@ -443,6 +446,9 @@ const DriverListTable = ({
                       </span>
                     </div>
                   </TableCell>
+                  <TableCell className="px-4 py-3">
+                    <StatusPill status={driver.status} />
+                  </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(driver.createdBy)}
@@ -451,6 +457,16 @@ const DriverListTable = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(driver.createdOn)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(driver.approver)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(driver.approved_on)}
                     </span>
                   </TableCell>
                 </TableRow>

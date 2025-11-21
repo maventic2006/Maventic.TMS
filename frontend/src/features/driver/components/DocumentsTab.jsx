@@ -1,7 +1,9 @@
-﻿import React, { useMemo } from "react";
-import { FileText, Plus, X, Calendar, Upload, File } from "lucide-react";
+﻿import React, { useMemo, useEffect } from "react";
+import { FileText, Plus, X, Calendar, Upload, File, Lock } from "lucide-react";
 import { CustomSelect } from "../../../components/ui/Select";
 import { Country, State } from "country-state-city";
+import { useSelector, useDispatch } from "react-redux";
+import { fetchMandatoryDocuments } from "../../../redux/slices/driverSlice";
 
 const DocumentsTab = ({
   formData,
@@ -10,7 +12,56 @@ const DocumentsTab = ({
   masterData,
   isLoading,
 }) => {
+  const dispatch = useDispatch();
+  const { mandatoryDocuments } = useSelector((state) => state.driver);
   const documents = formData?.documents || [];
+
+  // Fetch mandatory documents on mount
+  useEffect(() => {
+    if (mandatoryDocuments.length === 0) {
+      dispatch(fetchMandatoryDocuments());
+    }
+  }, [dispatch, mandatoryDocuments.length]);
+
+  // Pre-populate mandatory documents on first render or when mandatory docs are loaded
+  useEffect(() => {
+    // Only pre-populate if mandatory documents are loaded and not already present
+    if (mandatoryDocuments.length > 0) {
+      // Check if mandatory documents are already in the documents array
+      const hasMandatoryDocs = documents.some((doc) => doc.isMandatory);
+
+      // If no mandatory documents present, pre-fill them
+      if (!hasMandatoryDocs) {
+        const mandatoryDocs = mandatoryDocuments.map((mandDoc) => ({
+          documentType: mandDoc.documentTypeId,
+          documentNumber: "",
+          issuingCountry: "",
+          issuingState: "",
+          validFrom: "",
+          validTo: "",
+          status: true,
+          fileName: "",
+          fileType: "",
+          fileData: "",
+          isMandatory: mandDoc.isMandatory,
+          documentTypeName: mandDoc.documentTypeName,
+        }));
+
+        // If documents array is empty, just set mandatory docs
+        // Otherwise, prepend mandatory docs to existing documents
+        setFormData((prev) => ({
+          ...prev,
+          documents:
+            documents.length === 0
+              ? mandatoryDocs
+              : [
+                  ...mandatoryDocs,
+                  ...prev.documents.filter((doc) => !doc.isMandatory),
+                ],
+        }));
+      }
+    }
+  }, [mandatoryDocuments, setFormData]);
 
   // Get all countries
   const allCountries = useMemo(() => Country.getAllCountries(), []);
@@ -113,12 +164,21 @@ const DocumentsTab = ({
           fileName: "",
           fileType: "",
           fileData: "",
+          isMandatory: false, // New documents are not mandatory
         },
       ],
     }));
   };
 
   const removeDocument = (index) => {
+    const document = documents[index];
+
+    // Prevent removal of mandatory documents
+    if (document?.isMandatory) {
+      alert("This is a mandatory document and cannot be removed.");
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       documents: prev.documents.filter((_, i) => i !== index),
@@ -309,13 +369,22 @@ const DocumentsTab = ({
                         />
                       </td>
                       <td className="px-3">
-                        <button
-                          type="button"
-                          onClick={() => removeDocument(index)}
-                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        {document.isMandatory ? (
+                          <div
+                            className="flex items-center justify-center"
+                            title="Mandatory document - cannot be removed"
+                          >
+                            <Lock className="w-4 h-4 text-gray-400" />
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => removeDocument(index)}
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

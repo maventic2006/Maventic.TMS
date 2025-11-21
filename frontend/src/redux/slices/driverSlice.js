@@ -76,6 +76,31 @@ export const fetchMasterData = createAsyncThunk(
   }
 );
 
+export const fetchMandatoryDocuments = createAsyncThunk(
+  "driver/fetchMandatoryDocuments",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/driver/mandatory-documents");
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(
+          response.data.error || "Failed to fetch mandatory documents"
+        );
+      }
+    } catch (error) {
+      console.error("API Error fetching mandatory documents:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "NETWORK_ERROR",
+          message: "Failed to fetch mandatory documents",
+        }
+      );
+    }
+  }
+);
+
 export const fetchStatesByCountry = createAsyncThunk(
   "driver/fetchStatesByCountry",
   async (countryCode, { rejectWithValue }) => {
@@ -354,6 +379,9 @@ const initialState = {
   statesByCountry: {},
   citiesByCountryState: {},
 
+  // Mandatory documents from doc_type_configuration
+  mandatoryDocuments: [],
+
   // Driver data
   drivers: [],
   pagination: {
@@ -443,6 +471,20 @@ const driverSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchMasterData.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+
+      // Fetch Mandatory Documents
+      .addCase(fetchMandatoryDocuments.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(fetchMandatoryDocuments.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.mandatoryDocuments = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchMandatoryDocuments.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
       })

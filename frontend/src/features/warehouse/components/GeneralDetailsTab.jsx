@@ -20,6 +20,13 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
     speedLimit: 20,
     virtualYardIn: false,
     radiusVirtualYardIn: 0,
+    weighBridge: false,
+    gatepassSystem: false,
+    fuelAvailability: false,
+    stagingArea: false,
+    driverWaitingArea: false,
+    gateInChecklistAuth: false,
+    gateOutChecklistAuth: false,
   };
 
   const handleChange = (field, value) => {
@@ -262,6 +269,90 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
               </p>
             </div>
           )}
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Weigh Bridge
+            </label>
+            <Switch
+              checked={generalDetails.weighBridge || false}
+              onCheckedChange={(checked) =>
+                handleChange("weighBridge", checked)
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Gatepass System
+            </label>
+            <Switch
+              checked={generalDetails.gatepassSystem || false}
+              onCheckedChange={(checked) =>
+                handleChange("gatepassSystem", checked)
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Fuel Availability
+            </label>
+            <Switch
+              checked={generalDetails.fuelAvailability || false}
+              onCheckedChange={(checked) =>
+                handleChange("fuelAvailability", checked)
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Staging Area
+            </label>
+            <Switch
+              checked={generalDetails.stagingArea || false}
+              onCheckedChange={(checked) =>
+                handleChange("stagingArea", checked)
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Driver Waiting Area
+            </label>
+            <Switch
+              checked={generalDetails.driverWaitingArea || false}
+              onCheckedChange={(checked) =>
+                handleChange("driverWaitingArea", checked)
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Gate In Checklist Authorization
+            </label>
+            <Switch
+              checked={generalDetails.gateInChecklistAuth || false}
+              onCheckedChange={(checked) =>
+                handleChange("gateInChecklistAuth", checked)
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-[#0D1A33]">
+              Gate Out Checklist Authorization
+            </label>
+            <Switch
+              checked={generalDetails.gateOutChecklistAuth || false}
+              onCheckedChange={(checked) =>
+                handleChange("gateOutChecklistAuth", checked)
+              }
+            />
+          </div>
         </div>
       </div>
     </GlobalDropdownProvider>

@@ -54,13 +54,18 @@ const VehicleFilterPanel = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Registration Number Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Regn Number
               </label>
               <input
                 type="text"
                 value={filters.registrationNumber}
-                onChange={(e) => onFilterChange("registrationNumber", e.target.value)}
+                onChange={(e) =>
+                  onFilterChange("registrationNumber", e.target.value)
+                }
                 placeholder="Enter Registration No."
                 className="w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200 focus:outline-none focus:ring-2"
                 style={{
@@ -81,7 +86,10 @@ const VehicleFilterPanel = ({
 
             {/* Vehicle Type Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Vehicle Type
               </label>
               <StatusSelect
@@ -95,7 +103,10 @@ const VehicleFilterPanel = ({
 
             {/* Make/Brand Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Make
               </label>
               <input
@@ -122,7 +133,10 @@ const VehicleFilterPanel = ({
 
             {/* Model Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Model
               </label>
               <input
@@ -149,7 +163,10 @@ const VehicleFilterPanel = ({
 
             {/* Manufacturing Year From Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Year From
               </label>
               <input
@@ -178,7 +195,10 @@ const VehicleFilterPanel = ({
 
             {/* Manufacturing Year To Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Year To
               </label>
               <input
@@ -207,13 +227,19 @@ const VehicleFilterPanel = ({
 
             {/* Status Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Status
               </label>
               <StatusSelect
                 value={filters.status}
                 onChange={(value) => onFilterChange("status", value)}
-                options={[{ value: "", label: "All Statuses" }, ...VEHICLE_STATUS_OPTIONS]}
+                options={[
+                  { value: "", label: "All Statuses" },
+                  ...VEHICLE_STATUS_OPTIONS,
+                ]}
                 placeholder="All Statuses"
                 className="w-full"
               />
@@ -221,13 +247,19 @@ const VehicleFilterPanel = ({
 
             {/* Ownership Type Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Ownership
               </label>
               <StatusSelect
                 value={filters.ownership}
                 onChange={(value) => onFilterChange("ownership", value)}
-                options={[{ value: "", label: "All Types" }, ...OWNERSHIP_TYPES]}
+                options={[
+                  { value: "", label: "All Types" },
+                  ...OWNERSHIP_TYPES,
+                ]}
                 placeholder="All Types"
                 className="w-full"
               />
@@ -235,7 +267,10 @@ const VehicleFilterPanel = ({
 
             {/* Fuel Type Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Fuel Type
               </label>
               <StatusSelect
@@ -249,7 +284,10 @@ const VehicleFilterPanel = ({
 
             {/* GPS Enabled Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 GPS Enabled
               </label>
               <StatusSelect
@@ -258,7 +296,7 @@ const VehicleFilterPanel = ({
                 options={[
                   { value: "", label: "All" },
                   { value: "true", label: "Yes" },
-                  { value: "false", label: "No" }
+                  { value: "false", label: "No" },
                 ]}
                 placeholder="All"
                 className="w-full"
@@ -267,7 +305,10 @@ const VehicleFilterPanel = ({
 
             {/* Leasing Flag Filter */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
+              <label
+                className="block text-xs font-bold uppercase tracking-wider mb-2"
+                style={{ color: theme.colors.text.primary }}
+              >
                 Leased
               </label>
               <StatusSelect
@@ -276,7 +317,7 @@ const VehicleFilterPanel = ({
                 options={[
                   { value: "", label: "All" },
                   { value: "true", label: "Yes" },
-                  { value: "false", label: "No" }
+                  { value: "false", label: "No" },
                 ]}
                 placeholder="All"
                 className="w-full"
@@ -285,7 +326,10 @@ const VehicleFilterPanel = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4 mt-6 pt-6" style={{ borderTop: `1px solid ${theme.colors.card.border}` }}>
+          <div
+            className="flex gap-4 mt-6 pt-6"
+            style={{ borderTop: `1px solid ${theme.colors.card.border}` }}
+          >
             <button
               onClick={onClearFilters}
               className="flex-1 px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
@@ -295,7 +339,8 @@ const VehicleFilterPanel = ({
                 border: `1px solid ${buttonTheme.secondary.border}`,
               }}
               onMouseEnter={(e) => {
-                e.target.style.background = buttonTheme.secondary.hover.background;
+                e.target.style.background =
+                  buttonTheme.secondary.hover.background;
                 e.target.style.borderColor = buttonTheme.secondary.hover.border;
               }}
               onMouseLeave={(e) => {
@@ -313,7 +358,8 @@ const VehicleFilterPanel = ({
                 color: buttonTheme.primary.text,
               }}
               onMouseEnter={(e) => {
-                e.target.style.background = buttonTheme.primary.hover.background;
+                e.target.style.background =
+                  buttonTheme.primary.hover.background;
               }}
               onMouseLeave={(e) => {
                 e.target.style.background = buttonTheme.primary.background;

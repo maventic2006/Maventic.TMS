@@ -58,6 +58,8 @@ const WarehouseMaintenance = () => {
     warehouseId: "",
     warehouseName: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
     weighBridge: null,
     virtualYardIn: null,
     fuelAvailability: null,
@@ -67,6 +69,8 @@ const WarehouseMaintenance = () => {
     warehouseId: "",
     warehouseName: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
     weighBridge: null,
     virtualYardIn: null,
     fuelAvailability: null,
@@ -99,6 +103,12 @@ const WarehouseMaintenance = () => {
       if (appliedFilters.fuelAvailability !== null) {
         params.fuelAvailability = appliedFilters.fuelAvailability;
       }
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
+      }
 
       dispatch(fetchWarehouses(params));
     };
@@ -126,6 +136,8 @@ const WarehouseMaintenance = () => {
       warehouseId: "",
       warehouseName: "",
       status: "",
+      createdOnStart: "",
+      createdOnEnd: "",
       weighBridge: null,
       virtualYardIn: null,
       fuelAvailability: null,
@@ -183,6 +195,12 @@ const WarehouseMaintenance = () => {
       }
       if (appliedFilters.fuelAvailability !== null) {
         params.fuelAvailability = appliedFilters.fuelAvailability;
+      }
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
       }
 
       dispatch(fetchWarehouses(params));

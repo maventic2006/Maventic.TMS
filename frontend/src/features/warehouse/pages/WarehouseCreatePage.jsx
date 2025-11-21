@@ -63,8 +63,6 @@ const WarehouseCreatePage = () => {
       virtualYardIn: false,
       radiusVirtualYardIn: 0,
       speedLimit: 20,
-    },
-    facilities: {
       weighBridge: false,
       gatepassSystem: false,
       fuelAvailability: false,
@@ -105,10 +103,9 @@ const WarehouseCreatePage = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
     0: false, // General Details
-    1: false, // Facilities
-    2: false, // Address
-    3: false, // Documents
-    4: false, // Geofencing
+    1: false, // Address
+    2: false, // Documents
+    3: false, // Geofencing
   });
 
   const tabs = [

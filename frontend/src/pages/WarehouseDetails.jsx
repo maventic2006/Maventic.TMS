@@ -104,13 +104,14 @@ const WarehouseDetails = () => {
         vehicleCapacity: warehouseData.vehicle_capacity || 0,
         speedLimit: warehouseData.speed_limit || 20,
         virtualYardIn: warehouseData.virtual_yard_in || false,
-        radiusVirtualYardIn: warehouseData.radius_virtual_yard_in || 0,
-      },
-      facilities: {
-        weighBridge: warehouseData.weigh_bridge || false,
-        geoFencing: warehouseData.geo_fencing || false,
-        gatePass: warehouseData.gate_pass || false,
-        fuelFilling: warehouseData.fuel_filling || false,
+        radiusVirtualYardIn: warehouseData.radius_for_virtual_yard_in || 0,
+        weighBridge: warehouseData.weigh_bridge_availability || false,
+        gatepassSystem: warehouseData.gatepass_system_available || false,
+        fuelAvailability: warehouseData.fuel_availability || false,
+        stagingArea: warehouseData.staging_area_for_goods_organization || false,
+        driverWaitingArea: warehouseData.driver_waiting_area || false,
+        gateInChecklistAuth: warehouseData.gate_in_checklist_auth || false,
+        gateOutChecklistAuth: warehouseData.gate_out_checklist_auth || false,
       },
       address: {
         addressType: address.address_type_id || "",
@@ -144,10 +145,16 @@ const WarehouseDetails = () => {
       speed_limit: editData.generalDetails?.speedLimit || 20,
       virtual_yard_in: editData.generalDetails?.virtualYardIn || false,
       radius_virtual_yard_in: editData.generalDetails?.radiusVirtualYardIn || 0,
-      weigh_bridge: editData.facilities?.weighBridge || false,
-      geo_fencing: editData.facilities?.geoFencing || false,
-      gate_pass: editData.facilities?.gatePass || false,
-      fuel_filling: editData.facilities?.fuelFilling || false,
+      weigh_bridge: editData.generalDetails?.weighBridge || false,
+      geo_fencing: editData.generalDetails?.geoFencing || false,
+      gate_pass: editData.generalDetails?.gatepassSystem || false,
+      fuel_filling: editData.generalDetails?.fuelAvailability || false,
+      staging_area: editData.generalDetails?.stagingArea || false,
+      driver_waiting_area: editData.generalDetails?.driverWaitingArea || false,
+      gate_in_checklist_auth:
+        editData.generalDetails?.gateInChecklistAuth || false,
+      gate_out_checklist_auth:
+        editData.generalDetails?.gateOutChecklistAuth || false,
       consignor_id: currentWarehouse?.consignor_id || user?.consignor_id || "",
       address: editData.address
         ? {

@@ -473,14 +473,14 @@ const WarehouseListTable = ({
                 <TableHead className="text-white text-nowrap w-24 text-sm font-semibold h-14">
                   Created On
                 </TableHead>
+                <TableHead className="text-white text-nowrap w-20 text-sm font-semibold h-14">
+                  Status
+                </TableHead>
                 <TableHead className="text-white text-nowrap w-24 text-sm font-semibold h-14">
                   Approver
                 </TableHead>
                 <TableHead className="text-white text-nowrap w-24 text-sm font-semibold h-14">
                   Approved On
-                </TableHead>
-                <TableHead className="text-white text-nowrap w-20 text-sm font-semibold h-14">
-                  Status
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -569,11 +569,14 @@ const WarehouseListTable = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(
-                        warehouse.created_at
-                          ? new Date(warehouse.created_at).toLocaleDateString()
+                        warehouse.created_on
+                          ? warehouse.created_on.split("T")[0]
                           : null
                       )}
                     </span>
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
+                    <StatusPill status={warehouse.status} />
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
@@ -588,9 +591,6 @@ const WarehouseListTable = ({
                           : null
                       )}
                     </span>
-                  </TableCell>
-                  <TableCell className="px-4 py-3">
-                    <StatusPill status={warehouse.status} />
                   </TableCell>
                 </TableRow>
               ))}

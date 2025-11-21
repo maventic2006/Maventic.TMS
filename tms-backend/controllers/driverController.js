@@ -2,6 +2,8 @@ const knex = require("../config/database");
 const { Country, State, City } = require("country-state-city");
 const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
+const axios = require("axios");
+const https = require("https");
 
 // Helper function to generate unique IDs
 const generateDriverId = async () => {
@@ -672,39 +674,84 @@ const createDriver = async (req, res) => {
           console.log("🔍 Validating Driver License using external API...");
 
           try {
-            const apiResponse = await fetch(
-              "https://api.maventic.in/mapi/getDLDetails",
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  dlnumber: doc.documentNumber,
-                  dob: basicInfo.dateOfBirth,
-                }),
-                headers: { "Content-Type": "application/json" },
-              }
-            );
+            // Use axios to support GET request with body (non-standard but required by this API)
+            // Create HTTPS agent that bypasses SSL certificate verification for this specific API
+            const httpsAgent = new https.Agent({
+              rejectUnauthorized: false, // Disable SSL verification for this API only
+            });
 
-            const result = await apiResponse.json();
+            const apiResponse = await axios({
+              method: "GET",
+              url: "https://api.maventic.in/mapi/getDLDetails",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.DL_API_KEY || ""}`,
+              },
+              data: {
+                dlnumber: doc.documentNumber,
+                dob: basicInfo.dateOfBirth,
+              },
+              httpsAgent: httpsAgent, // Apply custom agent to bypass SSL verification
+            });
+
+            const result = apiResponse.data;
             console.log("📡 DL API Response:", result);
 
-            // Expected: API will return some 'valid' or 'status' field
-            if (!result || result.status !== "SUCCESS") {
+            // Check for API-level errors
+            // API returns: { error: "false", code: "200", message: "Success", data: {...} }
+            if (result.error === "true" || result.code !== "200") {
+              await trx.rollback();
+
+              // Determine user-friendly message based on response
+              let userMessage =
+                "Driver license number is invalid or could not be found";
+              if (
+                result.message &&
+                result.message.toLowerCase().includes("expired")
+              ) {
+                userMessage =
+                  "Driver license has expired. Please renew your license";
+              } else if (
+                result.message &&
+                result.message.toLowerCase().includes("not found")
+              ) {
+                userMessage =
+                  "Driver license number could not be found in the system";
+              } else if (
+                result.message &&
+                result.message.toLowerCase().includes("format")
+              ) {
+                userMessage = "Driver license number format is invalid";
+              }
+
+              return res.status(400).json({
+                success: false,
+                error: {
+                  code: "INVALID_DRIVER_LICENSE",
+                  message: userMessage,
+                  field: `documents[${i}].documentNumber`,
+                },
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            // Success check - verify both error flag and message
+            if (result.error !== "false" || result.message !== "Success") {
               await trx.rollback();
               return res.status(400).json({
                 success: false,
                 error: {
-                  code: "INVALID_DL",
+                  code: "INVALID_DRIVER_LICENSE",
                   message:
-                    result?.message ||
-                    "Entered Driver License number is invalid. Please check and try again.",
+                    result.message ||
+                    "Driver license number is invalid or could not be verified",
                   field: `documents[${i}].documentNumber`,
                 },
-                toastMessage:
-                  result?.message ||
-                  "Invalid Driver License number. Please verify before submitting.",
                 timestamp: new Date().toISOString(),
               });
             }
+
+            console.log("✅ Driver License validated successfully");
           } catch (err) {
             console.error("❌ DL API ERROR:", err);
             await trx.rollback();
@@ -712,10 +759,9 @@ const createDriver = async (req, res) => {
               success: false,
               error: {
                 code: "DL_API_ERROR",
-                message: "Unable to validate Driver License at the moment.",
+                message:
+                  "Unable to validate driver license. Please try again later",
               },
-              toastMessage:
-                "Driver License validation service unavailable. Try again later.",
               timestamp: new Date().toISOString(),
             });
           }
@@ -1657,6 +1703,150 @@ const updateDriver = async (req, res) => {
           });
         }
 
+        // ============================================
+        // 🔍 DRIVER LICENSE VALIDATION FOR UPDATE
+        // ============================================
+        if (doc.documentTypeName.toLowerCase() === "driver license") {
+          // Check if license number has changed (skip validation if unchanged)
+          let shouldValidate = true;
+
+          if (doc.documentId) {
+            // Existing document - check if number changed
+            const existingDoc = await trx("driver_documents")
+              .where("document_id", doc.documentId)
+              .where("driver_id", id)
+              .first();
+
+            if (
+              existingDoc &&
+              existingDoc.document_number === doc.documentNumber
+            ) {
+              shouldValidate = false; // License number unchanged, skip API validation
+              console.log(
+                "✓ Driver License number unchanged, skipping validation"
+              );
+            }
+          }
+
+          if (shouldValidate) {
+            console.log(
+              "🔍 Validating Driver License using external API (UPDATE)..."
+            );
+
+            try {
+              // Get driver's date of birth
+              const driverInfo = await trx("driver_basic_information")
+                .where("driver_id", id)
+                .first();
+
+              if (!driverInfo || !driverInfo.date_of_birth) {
+                await trx.rollback();
+                return res.status(400).json({
+                  success: false,
+                  error: {
+                    code: "VALIDATION_ERROR",
+                    message:
+                      "Driver date of birth is required for license validation",
+                    field: `documents[${i}].documentNumber`,
+                  },
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              // Use axios to support GET request with body (non-standard but required by this API)
+              // Create HTTPS agent that bypasses SSL certificate verification for this specific API
+              const httpsAgent = new https.Agent({
+                rejectUnauthorized: false, // Disable SSL verification for this API only
+              });
+
+              const apiResponse = await axios({
+                method: "GET",
+                url: "https://api.maventic.in/mapi/getDLDetails",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${process.env.DL_API_KEY || ""}`,
+                },
+                data: {
+                  dlnumber: doc.documentNumber,
+                  dob: driverInfo.date_of_birth,
+                },
+                httpsAgent: httpsAgent, // Apply custom agent to bypass SSL verification
+              });
+
+              const result = apiResponse.data;
+              console.log("📡 DL API Response (UPDATE):", result);
+
+              // Check for API-level errors
+              // API returns: { error: "false", code: "200", message: "Success", data: {...} }
+              if (result.error === "true" || result.code !== "200") {
+                await trx.rollback();
+
+                // Determine user-friendly message based on response
+                let userMessage =
+                  "Driver license number is invalid or could not be found";
+                if (
+                  result.message &&
+                  result.message.toLowerCase().includes("expired")
+                ) {
+                  userMessage =
+                    "Driver license has expired. Please renew your license";
+                } else if (
+                  result.message &&
+                  result.message.toLowerCase().includes("not found")
+                ) {
+                  userMessage =
+                    "Driver license number could not be found in the system";
+                } else if (
+                  result.message &&
+                  result.message.toLowerCase().includes("format")
+                ) {
+                  userMessage = "Driver license number format is invalid";
+                }
+
+                return res.status(400).json({
+                  success: false,
+                  error: {
+                    code: "INVALID_DRIVER_LICENSE",
+                    message: userMessage,
+                    field: `documents[${i}].documentNumber`,
+                  },
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              // Success check - verify both error flag and message
+              if (result.error !== "false" || result.message !== "Success") {
+                await trx.rollback();
+                return res.status(400).json({
+                  success: false,
+                  error: {
+                    code: "INVALID_DRIVER_LICENSE",
+                    message:
+                      result.message ||
+                      "Driver license number is invalid or could not be verified",
+                    field: `documents[${i}].documentNumber`,
+                  },
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              console.log("✅ Driver License validated successfully (UPDATE)");
+            } catch (err) {
+              console.error("❌ DL API ERROR (UPDATE):", err);
+              await trx.rollback();
+              return res.status(500).json({
+                success: false,
+                error: {
+                  code: "DL_API_ERROR",
+                  message:
+                    "Unable to validate driver license. Please try again later",
+                },
+                timestamp: new Date().toISOString(),
+              });
+            }
+          }
+        }
+
         // Check for duplicate document number (excluding the current document being updated)
         const duplicateCheck = await trx("driver_documents")
           .where("document_type_id", doc.documentTypeId)
@@ -2053,6 +2243,298 @@ const updateDriver = async (req, res) => {
 };
 
 // Get all drivers with pagination and filters
+// const getDrivers = async (req, res) => {
+//   try {
+//     const {
+//       page = 1,
+//       limit = 25,
+//       search = "",
+//       driverId = "",
+//       status = "",
+//       fullName = "",
+//       phoneNumber = "",
+//       emailId = "",
+//       gender = "",
+//       bloodGroup = "",
+//       licenseNumber = "",
+//       country = "",
+//       state = "",
+//       city = "",
+//       postalCode = "",
+//       avgRating = "",
+//       createdOnStart = "",
+//       createdOnEnd = "",
+//     } = req.query;
+
+//     // Convert page and limit to integers
+//     const pageNum = parseInt(page);
+//     const limitNum = parseInt(limit);
+//     const offset = (pageNum - 1) * limitNum;
+
+//     // Build base query with address and primary license
+//     let query = knex("driver_basic_information as dbi")
+//       .leftJoin("tms_address as addr", function () {
+//         this.on("dbi.driver_id", "=", "addr.user_reference_id")
+//           .andOn("addr.user_type", "=", knex.raw("'DRIVER'"))
+//           .andOn("addr.status", "=", knex.raw("'ACTIVE'"))
+//           .andOn("addr.is_primary", "=", knex.raw("true"));
+//       })
+//       .leftJoin(
+//         knex("driver_documents")
+//           .select(
+//             "driver_id",
+//             knex.raw(
+//               "GROUP_CONCAT(document_number SEPARATOR ', ') as license_numbers"
+//             )
+//           )
+//           .where("status", "ACTIVE")
+//           .groupBy("driver_id")
+//           .as("dd"),
+//         "dbi.driver_id",
+//         "dd.driver_id"
+//       )
+//       .select(
+//         "dbi.driver_id",
+//         "dbi.full_name",
+//         "dbi.date_of_birth",
+//         "dbi.gender",
+//         "dbi.blood_group",
+//         "dbi.phone_number",
+//         "dbi.email_id",
+//         "dbi.emergency_contact",
+//         "dbi.alternate_phone_number",
+//         "dbi.avg_rating",
+//         "dbi.status",
+//         "dbi.created_by",
+//         "dbi.created_on",
+//         "dbi.updated_on",
+//         "addr.country",
+//         "addr.state",
+//         "addr.city",
+//         "addr.district",
+//         "addr.postal_code",
+//         "dd.license_numbers"
+//       );
+
+//     // Count query for total records
+//     let countQuery = knex("driver_basic_information as dbi");
+
+//     // Apply filters
+//     if (search) {
+//       const searchPattern = `%${search}%`;
+//       query.where(function () {
+//         this.where("dbi.driver_id", "like", searchPattern)
+//           .orWhere("dbi.full_name", "like", searchPattern)
+//           .orWhere("dbi.phone_number", "like", searchPattern)
+//           .orWhere("dbi.email_id", "like", searchPattern);
+//       });
+//       countQuery.where(function () {
+//         this.where("dbi.driver_id", "like", searchPattern)
+//           .orWhere("dbi.full_name", "like", searchPattern)
+//           .orWhere("dbi.phone_number", "like", searchPattern)
+//           .orWhere("dbi.email_id", "like", searchPattern);
+//       });
+//     }
+
+//     if (driverId) {
+//       query.where("dbi.driver_id", "like", `%${driverId}%`);
+//       countQuery.where("dbi.driver_id", "like", `%${driverId}%`);
+//     }
+
+//     if (fullName) {
+//       query.where("dbi.full_name", "like", `%${fullName}%`);
+//       countQuery.where("dbi.full_name", "like", `%${fullName}%`);
+//     }
+
+//     if (phoneNumber) {
+//       query.where("dbi.phone_number", "like", `%${phoneNumber}%`);
+//       countQuery.where("dbi.phone_number", "like", `%${phoneNumber}%`);
+//     }
+
+//     if (emailId) {
+//       query.where("dbi.email_id", "like", `%${emailId}%`);
+//       countQuery.where("dbi.email_id", "like", `%${emailId}%`);
+//     }
+
+//     if (status) {
+//       query.where("dbi.status", status);
+//       countQuery.where("dbi.status", status);
+//     }
+
+//     if (gender) {
+//       query.where("dbi.gender", gender);
+//       countQuery.where("dbi.gender", gender);
+//     }
+
+//     if (bloodGroup) {
+//       query.where("dbi.blood_group", bloodGroup);
+//       countQuery.where("dbi.blood_group", bloodGroup);
+//     }
+
+//     // New filters for license number and address fields
+//     if (licenseNumber) {
+//       query.whereRaw(
+//         `dbi.driver_id IN (SELECT driver_id FROM driver_documents WHERE document_number LIKE ? AND status = 'ACTIVE')`,
+//         [`%${licenseNumber}%`]
+//       );
+//       countQuery.whereRaw(
+//         `dbi.driver_id IN (SELECT driver_id FROM driver_documents WHERE document_number LIKE ? AND status = 'ACTIVE')`,
+//         [`%${licenseNumber}%`]
+//       );
+//     }
+
+//     //Created On Date Range Filter
+//     if (createdOnStart) {
+//       query = query.where("dbi.created_on", ">=", createdOnStart);
+//     }
+//     if (createdOnEnd) {
+//       query = query.where("dbi.created_on", "<=", createdOnEnd);
+//     }
+
+//     if (country) {
+//       // Convert ISO code to country name if it's a code (2 characters)
+//       let countryValue = country;
+//       if (country.length === 2) {
+//         const countryObj = Country.getCountryByCode(country);
+//         countryValue = countryObj ? countryObj.name : country;
+//       }
+
+//       query.whereRaw(
+//         `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND country LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+//         [`%${countryValue}%`]
+//       );
+//       countQuery.whereRaw(
+//         `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND country LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+//         [`%${countryValue}%`]
+//       );
+//     }
+
+//     if (state) {
+//       // Convert ISO code to state name if we have country context
+//       let stateValue = state;
+//       if (country && state.length <= 3) {
+//         // Get country code for state lookup
+//         let countryCode = country;
+//         if (country.length !== 2) {
+//           // If country is a name, try to find its code
+//           const countryObj = Country.getAllCountries().find(
+//             (c) => c.name.toLowerCase() === country.toLowerCase()
+//           );
+//           countryCode = countryObj ? countryObj.isoCode : country;
+//         }
+
+//         // Get state name from ISO code
+//         const stateObj = State.getStateByCodeAndCountry(state, countryCode);
+//         stateValue = stateObj ? stateObj.name : state;
+//       }
+
+//       query.whereRaw(
+//         `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND state LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+//         [`%${stateValue}%`]
+//       );
+//       countQuery.whereRaw(
+//         `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND state LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+//         [`%${stateValue}%`]
+//       );
+//     }
+
+//     if (city) {
+//       query.whereRaw(
+//         `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND city LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+//         [`%${city}%`]
+//       );
+//       countQuery.whereRaw(
+//         `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND city LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+//         [`%${city}%`]
+//       );
+//     }
+
+//     if (postalCode) {
+//       query.whereRaw(
+//         `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND postal_code LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+//         [`%${postalCode}%`]
+//       );
+//       countQuery.whereRaw(
+//         `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND postal_code LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
+//         [`%${postalCode}%`]
+//       );
+//     }
+
+//     if (avgRating) {
+//       const rating = parseFloat(avgRating);
+//       if (!isNaN(rating)) {
+//         query.where("dbi.avg_rating", ">=", rating);
+//         countQuery.where("dbi.avg_rating", ">=", rating);
+//       }
+//     }
+
+//     // Date Filters for Count Query
+//     if (createdOnStart) {
+//       countQuery = countQuery.where("dbi.created_on", ">=", createdOnStart);
+//     }
+//     if (createdOnEnd) {
+//       countQuery = countQuery.where("dbi.created_on", "<=", createdOnEnd);
+//     }
+
+//     // Get total count
+//     const [{ count: total }] = await countQuery.count("* as count");
+
+//     // Get paginated results
+//     const drivers = await query
+//       .orderBy("dbi.driver_id", "asc")
+//       .limit(limitNum)
+//       .offset(offset);
+
+//     // Transform data to match frontend expected format
+//     const transformedDrivers = drivers.map((driver) => ({
+//       id: driver.driver_id,
+//       fullName: driver.full_name,
+//       dateOfBirth: formatDateForInput(driver.date_of_birth),
+//       gender: driver.gender,
+//       bloodGroup: driver.blood_group,
+//       phoneNumber: driver.phone_number,
+//       emailId: driver.email_id,
+//       emergencyContact: driver.emergency_contact,
+//       alternatePhoneNumber: driver.alternate_phone_number,
+//       avgRating: driver.avg_rating || 0,
+//       status: driver.status,
+//       licenseNumbers: driver.license_numbers || "N/A",
+//       country: driver.country,
+//       state: driver.state,
+//       city: driver.city,
+//       district: driver.district,
+//       postalCode: driver.postal_code,
+//       createdBy: driver.created_by,
+//       createdOn: formatDateForInput(driver.created_on),
+//       updatedOn: formatDateForInput(driver.updated_on),
+//     }));
+
+//     res.json({
+//       success: true,
+//       data: transformedDrivers,
+//       pagination: {
+//         page: pageNum,
+//         limit: limitNum,
+//         total,
+//         pages: Math.ceil(total / limitNum),
+//       },
+//       timestamp: new Date().toISOString(),
+//     });
+//   } catch (error) {
+//     console.error("Error fetching drivers:", error);
+//     res.status(500).json({
+//       success: false,
+//       error: {
+//         code: "FETCH_ERROR",
+//         message: "Failed to fetch drivers",
+//         details: error.message,
+//       },
+//       timestamp: new Date().toISOString(),
+//     });
+//   }
+// };
+
+// Get all drivers with pagination and filters
 const getDrivers = async (req, res) => {
   try {
     const {
@@ -2072,14 +2554,16 @@ const getDrivers = async (req, res) => {
       city = "",
       postalCode = "",
       avgRating = "",
+      createdOnStart = "",
+      createdOnEnd = "",
     } = req.query;
 
-    // Convert page and limit to integers
+    // Convert page and limit
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Build base query with address and primary license
+    // Base Query
     let query = knex("driver_basic_information as dbi")
       .leftJoin("tms_address as addr", function () {
         this.on("dbi.driver_id", "=", "addr.user_reference_id")
@@ -2124,26 +2608,28 @@ const getDrivers = async (req, res) => {
         "dd.license_numbers"
       );
 
-    // Count query for total records
+    // Count query
     let countQuery = knex("driver_basic_information as dbi");
 
-    // Apply filters
+    // ------- SEARCH FILTER -------
     if (search) {
       const searchPattern = `%${search}%`;
       query.where(function () {
-        this.where("dbi.driver_id", "like", searchPattern)
+        this.orWhere("dbi.driver_id", "like", searchPattern)
           .orWhere("dbi.full_name", "like", searchPattern)
           .orWhere("dbi.phone_number", "like", searchPattern)
           .orWhere("dbi.email_id", "like", searchPattern);
       });
+
       countQuery.where(function () {
-        this.where("dbi.driver_id", "like", searchPattern)
+        this.orWhere("dbi.driver_id", "like", searchPattern)
           .orWhere("dbi.full_name", "like", searchPattern)
           .orWhere("dbi.phone_number", "like", searchPattern)
           .orWhere("dbi.email_id", "like", searchPattern);
       });
     }
 
+    // ------- BASIC FILTERS -------
     if (driverId) {
       query.where("dbi.driver_id", "like", `%${driverId}%`);
       countQuery.where("dbi.driver_id", "like", `%${driverId}%`);
@@ -2179,87 +2665,121 @@ const getDrivers = async (req, res) => {
       countQuery.where("dbi.blood_group", bloodGroup);
     }
 
-    // New filters for license number and address fields
+    // ------- LICENSE NUMBER -------
     if (licenseNumber) {
-      query.whereRaw(
-        `dbi.driver_id IN (SELECT driver_id FROM driver_documents WHERE document_number LIKE ? AND status = 'ACTIVE')`,
-        [`%${licenseNumber}%`]
-      );
-      countQuery.whereRaw(
-        `dbi.driver_id IN (SELECT driver_id FROM driver_documents WHERE document_number LIKE ? AND status = 'ACTIVE')`,
-        [`%${licenseNumber}%`]
-      );
+      const rawCondition = `
+        dbi.driver_id IN (
+          SELECT driver_id 
+          FROM driver_documents 
+          WHERE document_number LIKE ? 
+            AND status = 'ACTIVE'
+        )
+      `;
+
+      query.whereRaw(rawCondition, [`%${licenseNumber}%`]);
+      countQuery.whereRaw(rawCondition, [`%${licenseNumber}%`]);
     }
 
+    // ------- CREATED ON DATE RANGE (NEW) -------
+    if (createdOnStart) {
+      query.where("dbi.created_on", ">=", createdOnStart);
+      countQuery.where("dbi.created_on", ">=", createdOnStart);
+    }
+
+    if (createdOnEnd) {
+      query.where("dbi.created_on", "<=", createdOnEnd);
+      countQuery.where("dbi.created_on", "<=", createdOnEnd);
+    }
+
+    // ------- ADDRESS FILTERS -------
     if (country) {
-      // Convert ISO code to country name if it's a code (2 characters)
       let countryValue = country;
+
       if (country.length === 2) {
-        const countryObj = Country.getCountryByCode(country);
-        countryValue = countryObj ? countryObj.name : country;
+        const obj = Country.getCountryByCode(country);
+        countryValue = obj ? obj.name : country;
       }
 
-      query.whereRaw(
-        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND country LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
-        [`%${countryValue}%`]
-      );
-      countQuery.whereRaw(
-        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND country LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
-        [`%${countryValue}%`]
-      );
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT user_reference_id 
+          FROM tms_address 
+          WHERE user_type = 'DRIVER' 
+            AND country LIKE ? 
+            AND status = 'ACTIVE' 
+            AND is_primary = true
+        )
+      `;
+
+      query.whereRaw(rawFilter, [`%${countryValue}%`]);
+      countQuery.whereRaw(rawFilter, [`%${countryValue}%`]);
     }
 
     if (state) {
-      // Convert ISO code to state name if we have country context
       let stateValue = state;
+
       if (country && state.length <= 3) {
-        // Get country code for state lookup
         let countryCode = country;
+
         if (country.length !== 2) {
-          // If country is a name, try to find its code
-          const countryObj = Country.getAllCountries().find(
+          const obj = Country.getAllCountries().find(
             (c) => c.name.toLowerCase() === country.toLowerCase()
           );
-          countryCode = countryObj ? countryObj.isoCode : country;
+          countryCode = obj ? obj.isoCode : country;
         }
 
-        // Get state name from ISO code
         const stateObj = State.getStateByCodeAndCountry(state, countryCode);
         stateValue = stateObj ? stateObj.name : state;
       }
 
-      query.whereRaw(
-        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND state LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
-        [`%${stateValue}%`]
-      );
-      countQuery.whereRaw(
-        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND state LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
-        [`%${stateValue}%`]
-      );
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT user_reference_id 
+          FROM tms_address 
+          WHERE user_type = 'DRIVER' 
+            AND state LIKE ? 
+            AND status = 'ACTIVE' 
+            AND is_primary = true
+        )
+      `;
+
+      query.whereRaw(rawFilter, [`%${stateValue}%`]);
+      countQuery.whereRaw(rawFilter, [`%${stateValue}%`]);
     }
 
     if (city) {
-      query.whereRaw(
-        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND city LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
-        [`%${city}%`]
-      );
-      countQuery.whereRaw(
-        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND city LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
-        [`%${city}%`]
-      );
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT user_reference_id 
+          FROM tms_address 
+          WHERE user_type = 'DRIVER' 
+            AND city LIKE ? 
+            AND status = 'ACTIVE' 
+            AND is_primary = true
+        )
+      `;
+
+      query.whereRaw(rawFilter, [`%${city}%`]);
+      countQuery.whereRaw(rawFilter, [`%${city}%`]);
     }
 
     if (postalCode) {
-      query.whereRaw(
-        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND postal_code LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
-        [`%${postalCode}%`]
-      );
-      countQuery.whereRaw(
-        `dbi.driver_id IN (SELECT user_reference_id FROM tms_address WHERE user_type = 'DRIVER' AND postal_code LIKE ? AND status = 'ACTIVE' AND is_primary = true)`,
-        [`%${postalCode}%`]
-      );
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT user_reference_id 
+          FROM tms_address 
+          WHERE user_type = 'DRIVER' 
+            AND postal_code LIKE ? 
+            AND status = 'ACTIVE' 
+            AND is_primary = true
+        )
+      `;
+
+      query.whereRaw(rawFilter, [`%${postalCode}%`]);
+      countQuery.whereRaw(rawFilter, [`%${postalCode}%`]);
     }
 
+    // ------- RATING FILTER -------
     if (avgRating) {
       const rating = parseFloat(avgRating);
       if (!isNaN(rating)) {
@@ -2268,16 +2788,15 @@ const getDrivers = async (req, res) => {
       }
     }
 
-    // Get total count
+    // ------- TOTAL COUNT -------
     const [{ count: total }] = await countQuery.count("* as count");
 
-    // Get paginated results
+    // ------- FETCH RESULTS -------
     const drivers = await query
       .orderBy("dbi.driver_id", "asc")
       .limit(limitNum)
       .offset(offset);
 
-    // Transform data to match frontend expected format
     const transformedDrivers = drivers.map((driver) => ({
       id: driver.driver_id,
       fullName: driver.full_name,
@@ -2720,6 +3239,48 @@ const getStatesByCountry = async (req, res) => {
   }
 };
 
+// Get mandatory documents for drivers from doc_type_configuration
+const getMandatoryDocuments = async (req, res) => {
+  try {
+    console.log("📋 Fetching mandatory documents for Driver...");
+
+    // Query doc_type_configuration for Driver user type
+    const mandatoryDocs = await knex("doc_type_configuration as dtc")
+      .join(
+        "document_name_master as dnm",
+        "dtc.doc_name_master_id",
+        "dnm.doc_name_master_id"
+      )
+      .where("dtc.user_type", "Driver")
+      .where("dtc.is_mandatory", 1)
+      .where("dtc.status", "ACTIVE")
+      .where("dnm.status", "ACTIVE")
+      .select(
+        "dnm.doc_name_master_id as documentTypeId",
+        "dnm.document_name as documentTypeName",
+        "dtc.is_mandatory as isMandatory"
+      );
+
+    console.log(`✅ Found ${mandatoryDocs.length} mandatory documents`);
+
+    res.json({
+      success: true,
+      data: mandatoryDocs,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error fetching mandatory documents:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch mandatory documents",
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 // Get cities by country and state
 const getCitiesByCountryAndState = async (req, res) => {
   try {
@@ -2755,6 +3316,7 @@ module.exports = {
   getDrivers,
   getDriverById,
   getMasterData,
+  getMandatoryDocuments,
   getStatesByCountry,
   getCitiesByCountryAndState,
 };

@@ -4,6 +4,7 @@ const {
   createDriver,
   updateDriver,
   getMasterData,
+  getMandatoryDocuments,
   getStatesByCountry,
   getCitiesByCountryAndState,
   getDrivers,
@@ -40,6 +41,12 @@ router.get(
   authenticateToken,
   checkProductOwnerAccess,
   getMasterData
+);
+router.get(
+  "/mandatory-documents",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getMandatoryDocuments
 );
 router.get(
   "/states/:countryCode",

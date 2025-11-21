@@ -136,9 +136,211 @@ const generateApprovalFlowId = async (trx = knex) => {
   );
 };
 
+// Helper: Format date to MySQL DATE format (YYYY-MM-DD)
+// Converts ISO date strings or Date objects to MySQL-compatible format
+const formatDateForMySQL = (dateValue) => {
+  if (!dateValue) return null;
+
+  // If it's already in YYYY-MM-DD format, return as-is
+  if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return dateValue;
+  }
+
+  // Convert to Date object and format
+  const date = new Date(dateValue);
+
+  // Check if date is valid
+  if (isNaN(date.getTime())) return null;
+
+  // Return YYYY-MM-DD format
+  return date.toISOString().split("T")[0];
+};
+
 // @desc    Get warehouse list with filters and pagination
 // @route   GET /api/warehouse
 // @access  Private (Consignor, Admin, Super Admin)
+// const getWarehouseList = async (req, res) => {
+//   try {
+//     console.log("📦 Warehouse List API called");
+//     console.log("Query params:", req.query);
+//     console.log("User:", req.user);
+
+//     // Validate query parameters
+//     const validation = validateWarehouseListQuery(req.query);
+//     if (!validation.isValid) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Validation failed",
+//         errors: validation.errors,
+//       });
+//     }
+
+//     // Extract query parameters
+//     const page = parseInt(req.query.page) || 1;
+//     const limit = parseInt(req.query.limit) || 25;
+//     const offset = (page - 1) * limit;
+
+//     // Filter by consignor ID only if user has consignor_id (not for product_owner/admin)
+//     const consignorId = req.user.consignor_id || null;
+
+//     // Build query with address join for city/state/country
+//     let query = knex("warehouse_basic_information as w")
+//       .leftJoin("tms_address as addr", function () {
+//         this.on("w.warehouse_id", "=", "addr.user_reference_id").andOn(
+//           "addr.user_type",
+//           "=",
+//           knex.raw("'WH'")
+//         );
+//       })
+//       .leftJoin(
+//         "warehouse_type_master as wtm",
+//         "w.warehouse_type",
+//         "wtm.warehouse_type_id"
+//       )
+//       .leftJoin(
+//         "material_types_master as mtm",
+//         "w.material_type_id",
+//         "mtm.material_types_id"
+//       )
+//       .select(
+//         "w.warehouse_id",
+//         "w.consignor_id",
+//         "w.warehouse_type",
+//         "wtm.warehouse_type as warehouse_type_name",
+//         "w.material_type_id",
+//         "mtm.material_types as material_type_name",
+//         "w.warehouse_name1",
+//         knex.raw("0 as geo_fencing"), // Field doesn't exist in table, default to 0
+//         "w.weigh_bridge_availability",
+//         "w.virtual_yard_in",
+//         "w.gatepass_system_available",
+//         "w.fuel_availability",
+//         knex.raw("COALESCE(addr.city, 'N/A') as city"),
+//         knex.raw("COALESCE(addr.state, 'N/A') as state"),
+//         knex.raw("COALESCE(addr.country, 'N/A') as country"),
+//         "w.region",
+//         "w.zone",
+//         "w.created_by",
+//         "w.created_at",
+//         knex.raw("'N/A' as approver"), // Field doesn't exist in table, default to N/A
+//         knex.raw("NULL as approved_on"), // Field doesn't exist in table, default to NULL
+//         "w.status"
+//       );
+
+//     // Filter by consignor ID (user's own warehouses)
+//     if (consignorId) {
+//       query = query.where("w.consignor_id", consignorId);
+//     }
+
+//     // Apply filters
+//     if (req.query.warehouseId) {
+//       query = query.where(
+//         "w.warehouse_id",
+//         "like",
+//         `%${req.query.warehouseId}%`
+//       );
+//     }
+//     if (req.query.warehouseName) {
+//       query = query.where(
+//         "w.warehouse_name1",
+//         "like",
+//         `%${req.query.warehouseName}%`
+//       );
+//     }
+//     if (req.query.status) {
+//       query = query.where("w.status", req.query.status);
+//     }
+//     if (req.query.weighBridge !== undefined) {
+//       query = query.where(
+//         "w.weigh_bridge_availability",
+//         req.query.weighBridge === "true"
+//       );
+//     }
+//     if (req.query.virtualYardIn !== undefined) {
+//       query = query.where(
+//         "w.virtual_yard_in",
+//         req.query.virtualYardIn === "true"
+//       );
+//     }
+//     if (req.query.fuelAvailability !== undefined) {
+//       query = query.where(
+//         "w.fuel_availability",
+//         req.query.fuelAvailability === "true"
+//       );
+//     }
+
+//     // Get total count (create separate query for counting)
+//     const countResult = await knex("warehouse_basic_information as w")
+//       .count("* as count")
+//       .where((builder) => {
+//         // Apply same filters as main query
+//         if (consignorId) {
+//           builder.where("w.consignor_id", consignorId);
+//         }
+//         if (req.query.warehouseId) {
+//           builder.where("w.warehouse_id", "like", `%${req.query.warehouseId}%`);
+//         }
+//         if (req.query.warehouseName) {
+//           builder.where(
+//             "w.warehouse_name1",
+//             "like",
+//             `%${req.query.warehouseName}%`
+//           );
+//         }
+//         if (req.query.status) {
+//           builder.where("w.status", req.query.status);
+//         }
+//         if (req.query.weighBridge !== undefined) {
+//           builder.where(
+//             "w.weigh_bridge_availability",
+//             req.query.weighBridge === "true"
+//           );
+//         }
+//         if (req.query.virtualYardIn !== undefined) {
+//           builder.where(
+//             "w.virtual_yard_in",
+//             req.query.virtualYardIn === "true"
+//           );
+//         }
+//         if (req.query.fuelAvailability !== undefined) {
+//           builder.where(
+//             "w.fuel_availability",
+//             req.query.fuelAvailability === "true"
+//           );
+//         }
+//       })
+//       .first();
+
+//     const total = parseInt(countResult.count);
+
+//     // Get paginated results
+//     const warehouses = await query
+//       .orderBy("w.warehouse_id", "asc")
+//       .limit(limit)
+//       .offset(offset);
+
+//     console.log(`✅ Found ${warehouses.length} warehouses`);
+
+//     res.json({
+//       success: true,
+//       warehouses,
+//       pagination: {
+//         page,
+//         limit,
+//         total,
+//         totalPages: Math.ceil(total / limit),
+//       },
+//     });
+//   } catch (error) {
+//     console.error("❌ Error fetching warehouses:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch warehouses",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const getWarehouseList = async (req, res) => {
   try {
     console.log("📦 Warehouse List API called");
@@ -155,15 +357,18 @@ const getWarehouseList = async (req, res) => {
       });
     }
 
-    // Extract query parameters
+    // Extract pagination params
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 25;
     const offset = (page - 1) * limit;
 
-    // Filter by consignor ID only if user has consignor_id (not for product_owner/admin)
+    // Extract date filters
+    const { createdOnStart = "", createdOnEnd = "" } = req.query;
+
+    // Filter by consignor ID (for non-admin users)
     const consignorId = req.user.consignor_id || null;
 
-    // Build query with address join for city/state/country
+    // MAIN QUERY
     let query = knex("warehouse_basic_information as w")
       .leftJoin("tms_address as addr", function () {
         this.on("w.warehouse_id", "=", "addr.user_reference_id").andOn(
@@ -190,7 +395,7 @@ const getWarehouseList = async (req, res) => {
         "w.material_type_id",
         "mtm.material_types as material_type_name",
         "w.warehouse_name1",
-        knex.raw("0 as geo_fencing"), // Field doesn't exist in table, default to 0
+        knex.raw("0 as geo_fencing"),
         "w.weigh_bridge_availability",
         "w.virtual_yard_in",
         "w.gatepass_system_available",
@@ -201,65 +406,71 @@ const getWarehouseList = async (req, res) => {
         "w.region",
         "w.zone",
         "w.created_by",
-        "w.created_at",
-        knex.raw("'N/A' as approver"), // Field doesn't exist in table, default to N/A
-        knex.raw("NULL as approved_on"), // Field doesn't exist in table, default to NULL
+
+        // Correct: expose as created_on
+        knex.raw("DATE(w.created_at) as created_on"),
+
+        knex.raw("'N/A' as approver"),
+        knex.raw("NULL as approved_on"),
         "w.status"
       );
 
-    // Filter by consignor ID (user's own warehouses)
+    // FILTER: Consignor
     if (consignorId) {
-      query = query.where("w.consignor_id", consignorId);
+      query.where("w.consignor_id", consignorId);
     }
 
-    // Apply filters
+    // FILTERS
     if (req.query.warehouseId) {
-      query = query.where(
-        "w.warehouse_id",
-        "like",
-        `%${req.query.warehouseId}%`
-      );
+      query.where("w.warehouse_id", "like", `%${req.query.warehouseId}%`);
     }
+
     if (req.query.warehouseName) {
-      query = query.where(
-        "w.warehouse_name1",
-        "like",
-        `%${req.query.warehouseName}%`
-      );
+      query.where("w.warehouse_name1", "like", `%${req.query.warehouseName}%`);
     }
+
     if (req.query.status) {
-      query = query.where("w.status", req.query.status);
+      query.where("w.status", req.query.status);
     }
+
     if (req.query.weighBridge !== undefined) {
-      query = query.where(
+      query.where(
         "w.weigh_bridge_availability",
         req.query.weighBridge === "true"
       );
     }
+
     if (req.query.virtualYardIn !== undefined) {
-      query = query.where(
-        "w.virtual_yard_in",
-        req.query.virtualYardIn === "true"
-      );
-    }
-    if (req.query.fuelAvailability !== undefined) {
-      query = query.where(
-        "w.fuel_availability",
-        req.query.fuelAvailability === "true"
-      );
+      query.where("w.virtual_yard_in", req.query.virtualYardIn === "true");
     }
 
-    // Get total count (create separate query for counting)
+    if (req.query.fuelAvailability !== undefined) {
+      query.where("w.fuel_availability", req.query.fuelAvailability === "true");
+    }
+
+    // -------------------------------
+    // DATE RANGE FILTERS (using created_at, exposing as created_on)
+    // -------------------------------
+    if (createdOnStart) {
+      query.whereRaw("DATE(w.created_at) >= ?", [createdOnStart]);
+    }
+
+    if (createdOnEnd) {
+      query.whereRaw("DATE(w.created_at) <= ?", [createdOnEnd]);
+    }
+
+    // COUNT QUERY
     const countResult = await knex("warehouse_basic_information as w")
       .count("* as count")
       .where((builder) => {
-        // Apply same filters as main query
         if (consignorId) {
           builder.where("w.consignor_id", consignorId);
         }
+
         if (req.query.warehouseId) {
           builder.where("w.warehouse_id", "like", `%${req.query.warehouseId}%`);
         }
+
         if (req.query.warehouseName) {
           builder.where(
             "w.warehouse_name1",
@@ -267,33 +478,46 @@ const getWarehouseList = async (req, res) => {
             `%${req.query.warehouseName}%`
           );
         }
+
         if (req.query.status) {
           builder.where("w.status", req.query.status);
         }
+
         if (req.query.weighBridge !== undefined) {
           builder.where(
             "w.weigh_bridge_availability",
             req.query.weighBridge === "true"
           );
         }
+
         if (req.query.virtualYardIn !== undefined) {
           builder.where(
             "w.virtual_yard_in",
             req.query.virtualYardIn === "true"
           );
         }
+
         if (req.query.fuelAvailability !== undefined) {
           builder.where(
             "w.fuel_availability",
             req.query.fuelAvailability === "true"
           );
         }
+
+        // DATE FILTERS FOR COUNT
+        if (createdOnStart) {
+          builder.whereRaw("DATE(w.created_at) >= ?", [createdOnStart]);
+        }
+
+        if (createdOnEnd) {
+          builder.whereRaw("DATE(w.created_at) <= ?", [createdOnEnd]);
+        }
       })
       .first();
 
     const total = parseInt(countResult.count);
 
-    // Get paginated results
+    // PAGINATION
     const warehouses = await query
       .orderBy("w.warehouse_id", "asc")
       .limit(limit)
@@ -964,8 +1188,8 @@ const createWarehouse = async (req, res) => {
             document_id: documentId,
             document_type_id: doc.documentType, // This is the documentTypeId from frontend
             document_number: doc.documentNumber,
-            valid_from: doc.validFrom || null,
-            valid_to: doc.validTo || null,
+            valid_from: formatDateForMySQL(doc.validFrom),
+            valid_to: formatDateForMySQL(doc.validTo),
             active: doc.status !== false,
             created_by: userId,
             created_at: knex.fn.now(),
@@ -983,8 +1207,8 @@ const createWarehouse = async (req, res) => {
               file_xstring_value: doc.fileData, // base64 encoded file data
               system_reference_id: documentUniqueId,
               is_verified: false,
-              valid_from: doc.validFrom,
-              valid_to: doc.validTo,
+              valid_from: formatDateForMySQL(doc.validFrom),
+              valid_to: formatDateForMySQL(doc.validTo),
               created_by: userId,
               updated_by: userId,
               created_at: knex.fn.now(),
@@ -1297,6 +1521,10 @@ const updateWarehouse = async (req, res) => {
       geo_fencing,
       gate_pass,
       fuel_filling,
+      staging_area,
+      driver_waiting_area,
+      gate_in_checklist_auth,
+      gate_out_checklist_auth,
       consignor_id,
       address,
       documents,
@@ -1348,6 +1576,22 @@ const updateWarehouse = async (req, res) => {
           fuel_filling !== undefined
             ? fuel_filling
             : existingWarehouse.fuel_availability,
+        staging_area_for_goods_organization:
+          staging_area !== undefined
+            ? staging_area
+            : existingWarehouse.staging_area_for_goods_organization,
+        driver_waiting_area:
+          driver_waiting_area !== undefined
+            ? driver_waiting_area
+            : existingWarehouse.driver_waiting_area,
+        gate_in_checklist_auth:
+          gate_in_checklist_auth !== undefined
+            ? gate_in_checklist_auth
+            : existingWarehouse.gate_in_checklist_auth,
+        gate_out_checklist_auth:
+          gate_out_checklist_auth !== undefined
+            ? gate_out_checklist_auth
+            : existingWarehouse.gate_out_checklist_auth,
         consignor_id: consignor_id || existingWarehouse.consignor_id,
         updated_by: userId,
         updated_at: knex.fn.now(),
@@ -1463,8 +1707,8 @@ const updateWarehouse = async (req, res) => {
               .update({
                 document_type_id: doc.documentType,
                 document_number: doc.documentNumber,
-                valid_from: doc.validFrom,
-                valid_to: doc.validTo,
+                valid_from: formatDateForMySQL(doc.validFrom),
+                valid_to: formatDateForMySQL(doc.validTo),
                 active: doc.status !== undefined ? doc.status : true,
                 updated_by: userId,
                 updated_at: knex.fn.now(),
@@ -1501,8 +1745,8 @@ const updateWarehouse = async (req, res) => {
               warehouse_id: id,
               document_type_id: doc.documentType,
               document_number: doc.documentNumber,
-              valid_from: doc.validFrom,
-              valid_to: doc.validTo,
+              valid_from: formatDateForMySQL(doc.validFrom),
+              valid_to: formatDateForMySQL(doc.validTo),
               active: doc.status !== undefined ? doc.status : true,
               document_id: documentId,
               status: "ACTIVE",

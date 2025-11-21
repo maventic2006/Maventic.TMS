@@ -63,6 +63,8 @@ const TransporterMaintenance = () => {
     tinPan: "",
     vatGst: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
     transportMode: [],
   });
 
@@ -72,6 +74,8 @@ const TransporterMaintenance = () => {
     tinPan: "",
     vatGst: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
     transportMode: [],
   });
 
@@ -101,6 +105,12 @@ const TransporterMaintenance = () => {
       }
       if (appliedFilters.transportMode.length > 0) {
         params.transportMode = appliedFilters.transportMode.join(",");
+      }
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
       }
 
       dispatch(fetchTransporters(params));
@@ -134,6 +144,8 @@ const TransporterMaintenance = () => {
       tinPan: "",
       vatGst: "",
       status: "",
+      createdOnStart: "",
+      createdOnEnd: "",
       transportMode: [],
     };
     setFilters(emptyFilters);
@@ -212,49 +224,51 @@ const TransporterMaintenance = () => {
       <div className="px-4 py-1 lg:px-6 lg:py-1">
         <div className="max-w-7xl mx-auto space-y-0">
           <TopActionBar
-          onCreateNew={handleCreateNew}
-          onLogout={handleLogout}
-          onBack={handleBack}
-          totalCount={pagination.total || 0}
-          showFilters={showFilters}
-          onToggleFilters={handleToggleFilters}
-          searchText={searchText}
-          onSearchChange={handleSearchChange}
-        />
+            onCreateNew={handleCreateNew}
+            onLogout={handleLogout}
+            onBack={handleBack}
+            totalCount={pagination.total || 0}
+            showFilters={showFilters}
+            onToggleFilters={handleToggleFilters}
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
+          />
 
-        <TransporterFilterPanel
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onApplyFilters={handleApplyFilters}
-          onClearFilters={handleClearFilters}
-          showFilters={showFilters}
-        />
+          <TransporterFilterPanel
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onApplyFilters={handleApplyFilters}
+            onClearFilters={handleClearFilters}
+            showFilters={showFilters}
+          />
 
-        <TransporterListTable
-          transporters={filteredTransporters}
-          loading={isFetching}
-          onTransporterClick={handleTransporterClick}
-          currentPage={pagination.page}
-          totalPages={pagination.pages}
-          totalItems={pagination.total}
-          itemsPerPage={pagination.limit}
-          onPageChange={handlePageChange}
-          filteredCount={filteredTransporters.length}
-          searchText={searchText}
-          onSearchChange={handleSearchChange}
-        />
+          <TransporterListTable
+            transporters={filteredTransporters}
+            loading={isFetching}
+            onTransporterClick={handleTransporterClick}
+            currentPage={pagination.page}
+            totalPages={pagination.pages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={handlePageChange}
+            filteredCount={filteredTransporters.length}
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
+          />
 
-        {error && (
-          <div
-            className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]"
-            style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
-          >
-            <p className="font-semibold text-sm">Error loading transporters:</p>
-            <p className="text-sm mt-1">
-              {error.message || "Something went wrong"}
-            </p>
-          </div>
-        )}
+          {error && (
+            <div
+              className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]"
+              style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+            >
+              <p className="font-semibold text-sm">
+                Error loading transporters:
+              </p>
+              <p className="text-sm mt-1">
+                {error.message || "Something went wrong"}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
