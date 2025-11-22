@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  Trash2,
 } from "lucide-react";
 import {
   Table,
@@ -83,6 +84,7 @@ const TransporterListTable = ({
   transporters,
   loading,
   onTransporterClick,
+  onDeleteDraft,
   // Pagination props
   currentPage,
   totalPages,
@@ -219,7 +221,21 @@ const TransporterListTable = ({
                     {transporter.id}
                   </span>
                 </div>
-                <StatusPill status={transporter.status} />
+                <div className="flex items-center gap-2">
+                  <StatusPill status={transporter.status} />
+                  {transporter.status === "SAVE_AS_DRAFT" && onDeleteDraft && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteDraft(transporter.id);
+                      }}
+                      className="inline-flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                      title="Delete Draft"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Business Name */}
@@ -415,6 +431,9 @@ const TransporterListTable = ({
                 <TableHead className="text-white w-24 text-sm font-semibold h-14">
                   Approved On
                 </TableHead>
+                <TableHead className="text-white w-20 text-sm font-semibold h-14 text-center">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -506,6 +525,21 @@ const TransporterListTable = ({
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(transporter.approvedOn)}
                     </span>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-center">
+                    {transporter.status === "SAVE_AS_DRAFT" &&
+                      onDeleteDraft && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteDraft(transporter.id);
+                          }}
+                          className="inline-flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                          title="Delete Draft"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                   </TableCell>
                 </TableRow>
               ))}

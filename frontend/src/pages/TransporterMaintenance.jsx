@@ -7,7 +7,11 @@ import TopActionBar from "../components/transporter/TopActionBar";
 import TransporterFilterPanel from "../components/transporter/TransporterFilterPanel";
 import TransporterListTable from "../components/transporter/TransporterListTable";
 import PaginationBar from "../components/transporter/PaginationBar";
-import { fetchTransporters } from "../redux/slices/transporterSlice";
+import {
+  fetchTransporters,
+  deleteTransporterDraft,
+} from "../redux/slices/transporterSlice";
+import { addToast, TOAST_TYPES } from "../redux/slices/uiSlice";
 
 // Fuzzy search utility function
 const fuzzySearch = (searchText, transporters) => {
@@ -214,6 +218,44 @@ const TransporterMaintenance = () => {
     [dispatch, pagination.limit, appliedFilters]
   );
 
+  const handleDeleteDraft = useCallback(
+    async (transporterId) => {
+      if (
+        window.confirm(
+          "Are you sure you want to delete this draft? This action cannot be undone."
+        )
+      ) {
+        try {
+          await dispatch(deleteTransporterDraft(transporterId)).unwrap();
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.SUCCESS,
+              message: "Draft deleted successfully",
+              duration: 3000,
+            })
+          );
+          // Refresh the list
+          dispatch(
+            fetchTransporters({
+              page: pagination.page,
+              limit: pagination.limit || 25,
+            })
+          );
+        } catch (error) {
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.ERROR,
+              message: "Failed to delete draft",
+              details: [error.message || "An error occurred"],
+              duration: 5000,
+            })
+          );
+        }
+      }
+    },
+    [dispatch, pagination.page, pagination.limit]
+  );
+
   const handleToggleFilters = useCallback(() => {
     setShowFilters(!showFilters);
   }, [showFilters]);
@@ -246,6 +288,7 @@ const TransporterMaintenance = () => {
             transporters={filteredTransporters}
             loading={isFetching}
             onTransporterClick={handleTransporterClick}
+            onDeleteDraft={handleDeleteDraft}
             currentPage={pagination.page}
             totalPages={pagination.pages}
             totalItems={pagination.total}

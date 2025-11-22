@@ -6,6 +6,8 @@ import { getPageTheme } from "../../theme.config";
 import {
   fetchTransporterById,
   updateTransporter,
+  updateTransporterDraft,
+  submitTransporterFromDraft,
   fetchMasterData,
   clearError,
 } from "../../redux/slices/transporterSlice";
@@ -31,6 +33,7 @@ import { getComponentTheme } from "../../utils/theme";
 import { validateFormSection } from "./validation";
 import { TOAST_TYPES } from "../../utils/constants";
 import EmptyState from "../../components/ui/EmptyState";
+import SubmitDraftModal from "../../components/ui/SubmitDraftModal";
 
 // Import tab components (we'll create view versions)
 import GeneralDetailsViewTab from "./components/GeneralDetailsViewTab";
@@ -53,8 +56,14 @@ const TransporterDetailsPage = () => {
   const dispatch = useDispatch();
 
   const { user, role } = useSelector((state) => state.auth);
-  const { selectedTransporter, isFetchingDetails, isUpdating, error } =
-    useSelector((state) => state.transporter);
+  const {
+    selectedTransporter,
+    isFetchingDetails,
+    isUpdating,
+    isUpdatingDraft,
+    isSubmittingDraft,
+    error,
+  } = useSelector((state) => state.transporter);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -67,6 +76,7 @@ const TransporterDetailsPage = () => {
     3: false, // Documents
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   const actionButtonTheme = getComponentTheme("actionButton");
   const tabButtonTheme = getComponentTheme("tabButton");
@@ -154,6 +164,17 @@ const TransporterDetailsPage = () => {
     }
   };
 
+  // Check if transporter is a draft
+  const isDraftTransporter =
+    selectedTransporter?.generalDetails?.status === "SAVE_AS_DRAFT";
+
+  // Check if current user is the creator of this transporter
+  const isCreator =
+    selectedTransporter?.generalDetails?.createdBy === user?.user_id;
+
+  // Determine if user can edit (creator-only for drafts, any product owner for non-drafts)
+  const canEdit = isDraftTransporter ? isCreator : true;
+
   // Track unsaved changes
   useEffect(() => {
     if (isEditMode && editFormData && selectedTransporter) {
@@ -231,6 +252,270 @@ const TransporterDetailsPage = () => {
   };
 
   const handleSaveChanges = async () => {
+    // If this is a draft transporter, show the submit modal
+    if (isDraftTransporter) {
+      setShowSubmitModal(true);
+      return;
+    }
+
+    // For non-draft transporters, proceed with normal update
+    await handleNormalUpdate();
+  };
+
+  // Handle update draft (minimal validation)
+  const handleUpdateDraft = async () => {
+    setShowSubmitModal(false);
+
+    try {
+      // Minimal validation - only business name required
+      if (
+        !editFormData?.generalDetails?.businessName ||
+        editFormData.generalDetails.businessName.trim().length < 2
+      ) {
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "Business name is required (minimum 2 characters)",
+          })
+        );
+        return;
+      }
+
+      // Clear any previous errors
+      setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+      });
+      dispatch(clearError());
+
+      // Call the update draft API
+      const result = await dispatch(
+        updateTransporterDraft({
+          transporterId: id,
+          transporterData: {
+            generalDetails: editFormData.generalDetails,
+            addresses: editFormData.addresses,
+            serviceableAreas: editFormData.serviceableAreas,
+            documents: editFormData.documents,
+          },
+        })
+      ).unwrap();
+
+      // Success - show toast notification
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Draft updated successfully!",
+        })
+      );
+
+      // Refresh the transporter data
+      await dispatch(fetchTransporterById(id));
+
+      // Switch to view mode
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
+    } catch (err) {
+      console.error("Error updating draft:", err);
+      dispatch(clearError());
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: err.message || "Failed to update draft. Please try again.",
+        })
+      );
+    }
+  };
+
+  // Handle submit for approval (full validation)
+  const handleSubmitForApproval = async () => {
+    setShowSubmitModal(false);
+
+    try {
+      // Clear previous errors
+      setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+      });
+
+      // Full validation - same as create transporter
+      const errors = validateAllSections(editFormData);
+
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+
+        // Update tab errors to show which tabs have issues
+        const newTabErrors = {
+          0:
+            errors.generalDetails &&
+            Object.keys(errors.generalDetails).length > 0,
+          1: errors.addresses && Object.keys(errors.addresses).length > 0,
+          2:
+            errors.serviceableAreas &&
+            Object.keys(errors.serviceableAreas).length > 0,
+          3: errors.documents && Object.keys(errors.documents).length > 0,
+        };
+        setTabErrors(newTabErrors);
+
+        // Find the first tab with errors and switch to it
+        if (newTabErrors[0]) {
+          setActiveTab(0);
+        } else if (newTabErrors[1]) {
+          setActiveTab(1);
+        } else if (newTabErrors[2]) {
+          setActiveTab(2);
+        } else if (newTabErrors[3]) {
+          setActiveTab(3);
+        }
+
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "Please fix all validation errors before submitting.",
+          })
+        );
+        return;
+      }
+
+      // Clear any previous errors
+      setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+      });
+      dispatch(clearError());
+
+      // Call the submit draft API
+      const result = await dispatch(
+        submitTransporterFromDraft({
+          transporterId: id,
+          transporterData: {
+            generalDetails: editFormData.generalDetails,
+            addresses: editFormData.addresses,
+            serviceableAreas: editFormData.serviceableAreas,
+            documents: editFormData.documents,
+          },
+        })
+      ).unwrap();
+
+      // Success - show toast notification
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message:
+            "Draft submitted for approval successfully! Status changed to PENDING.",
+        })
+      );
+
+      // Refresh the transporter data
+      await dispatch(fetchTransporterById(id));
+
+      // Switch to view mode
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
+    } catch (err) {
+      console.error("Error submitting draft:", err);
+
+      // IMPORTANT: Clear Redux error state immediately to prevent "Error Loading Data" page
+      dispatch(clearError());
+
+      // Check if it's a validation error from backend (400 Bad Request)
+      if (
+        err.code === "VALIDATION_ERROR" ||
+        err.message?.includes("required")
+      ) {
+        // Backend validation error - show inline errors and stay in edit mode
+
+        // Try to map backend error to tab and field
+        let tabWithError = null;
+        const backendErrors = {};
+
+        if (err.field) {
+          // Parse field path like "documents[0].documentNumber"
+          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+
+          if (fieldMatch) {
+            const [, section, index, field] = fieldMatch;
+
+            // Map section to tab index
+            const tabMapping = {
+              generalDetails: 0,
+              addresses: 1,
+              serviceableAreas: 2,
+              documents: 3,
+            };
+
+            tabWithError = tabMapping[section];
+
+            if (index !== undefined) {
+              // Array field error (e.g., documents[0].documentNumber)
+              if (!backendErrors[section]) backendErrors[section] = {};
+              if (!backendErrors[section][index])
+                backendErrors[section][index] = {};
+              if (field) {
+                backendErrors[section][index][field] = err.message;
+              }
+            } else if (field) {
+              // Object field error (e.g., generalDetails.businessName)
+              if (!backendErrors[section]) backendErrors[section] = {};
+              backendErrors[section][field] = err.message;
+            }
+          }
+        }
+
+        // Set validation errors
+        setValidationErrors(backendErrors);
+
+        // Update tab errors
+        const newTabErrors = {
+          0: tabWithError === 0,
+          1: tabWithError === 1,
+          2: tabWithError === 2,
+          3: tabWithError === 3,
+        };
+        setTabErrors(newTabErrors);
+
+        // Switch to tab with error
+        if (tabWithError !== null) {
+          setActiveTab(tabWithError);
+        }
+
+        // Show error toast
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message:
+              err.message || "Please fix validation errors before submitting.",
+          })
+        );
+
+        // STAY IN EDIT MODE - do not switch to view mode
+        return;
+      }
+
+      // Other errors (network, server, etc.) - show generic error toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: err.message || "Failed to submit draft. Please try again.",
+        })
+      );
+    }
+  };
+
+  // Handle normal update (for non-draft transporters)
+  const handleNormalUpdate = async () => {
     try {
       // Clear previous errors
       setValidationErrors({});
@@ -554,30 +839,32 @@ const TransporterDetailsPage = () => {
 
                 <button
                   onClick={handleSaveChanges}
-                  disabled={isUpdating}
+                  disabled={isUpdating || isUpdatingDraft || isSubmittingDraft}
                   className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
-                  {isUpdating ? (
+                  {isUpdating || isUpdatingDraft || isSubmittingDraft ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
+                      {isDraftTransporter ? "Processing..." : "Saving..."}
                     </>
                   ) : (
                     <>
                       <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                      Save Changes
+                      {isDraftTransporter ? "Submit Changes" : "Save Changes"}
                     </>
                   )}
                 </button>
               </>
             ) : (
-              <button
-                onClick={handleEditToggle}
-                className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
-              >
-                <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                Edit Details
-              </button>
+              canEdit && (
+                <button
+                  onClick={handleEditToggle}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
+                >
+                  <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  {isDraftTransporter ? "Edit Draft" : "Edit Details"}
+                </button>
+              )
             )}
           </div>
         </div>
@@ -699,6 +986,17 @@ const TransporterDetailsPage = () => {
           })}
         </div>
       </div>
+
+      {/* Submit Draft Modal */}
+      <SubmitDraftModal
+        isOpen={showSubmitModal}
+        onUpdateDraft={handleUpdateDraft}
+        onSubmitForApproval={handleSubmitForApproval}
+        onCancel={() => setShowSubmitModal(false)}
+        isLoading={isUpdatingDraft || isSubmittingDraft}
+        title="Submit Changes"
+        message="Would you like to update the draft or submit it for approval?"
+      />
     </div>
   );
 };

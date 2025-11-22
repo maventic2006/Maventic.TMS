@@ -9,6 +9,10 @@ const {
   getTransporters,
   getTransporterById,
   getDocumentFile,
+  saveTransporterAsDraft,
+  updateTransporterDraft,
+  deleteTransporterDraft,
+  submitTransporterFromDraft,
 } = require("../controllers/transporterController");
 const { authenticateToken } = require("../middleware/auth");
 
@@ -43,6 +47,33 @@ router.get(
   getTransporterById
 );
 router.post("/", authenticateToken, checkProductOwnerAccess, createTransporter);
+
+// Save as draft routes
+router.post(
+  "/save-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  saveTransporterAsDraft
+);
+router.put(
+  "/:id/update-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  updateTransporterDraft
+);
+router.put(
+  "/:id/submit-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  submitTransporterFromDraft
+);
+router.delete(
+  "/:id/delete-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  deleteTransporterDraft
+);
+
 router.put(
   "/:id",
   authenticateToken,

@@ -149,11 +149,11 @@ const GeneralDetailsTab = ({
                 : "border-[#E5E7EB] focus:border-[#3B82F6]"
             }`}
           />
-          {formData.generalDetails?.fromDate && (
+          {/* {formData.generalDetails?.fromDate && (
             <p className="text-xs text-gray-600">
               Display format: {formatDate(formData.generalDetails.fromDate)}
             </p>
-          )}
+          )} */}
           {errors.fromDate && (
             <p className="text-sm text-red-500 flex items-center gap-1">
               ⚠️ {errors.fromDate}
@@ -164,7 +164,7 @@ const GeneralDetailsTab = ({
         {/* Row 3 */}
         <div className="space-y-1">
           <label className="block text-xs font-medium text-[#0D1A33]">
-            To Date
+            To Date <span className="text-red-500">*</span>
           </label>
           <input
             type="date"
@@ -180,11 +180,11 @@ const GeneralDetailsTab = ({
                 : "border-[#E5E7EB] focus:border-[#3B82F6]"
             }`}
           />
-          {formData.generalDetails?.toDate && (
+          {/* {formData.generalDetails?.toDate && (
             <p className="text-xs text-gray-600">
               Display format: {formatDate(formData.generalDetails.toDate)}
             </p>
-          )}
+          )} */}
           {errors.toDate && (
             <p className="text-sm text-red-500 flex items-center gap-1">
               ⚠️ {errors.toDate}

@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Upload,
   AlertCircle,
+  FileDown,
 } from "lucide-react";
 
 import {
@@ -21,6 +22,8 @@ import {
   fetchMasterData,
   clearError,
   clearLastCreated,
+  saveTransporterAsDraft,
+  updateTransporterDraft,
 } from "../../redux/slices/transporterSlice";
 import { openModal } from "../../redux/slices/bulkUploadSlice";
 import BulkUploadModal from "./components/BulkUploadModal";
@@ -29,6 +32,11 @@ import { createTransporterSchema, validateFormSection } from "./validation";
 import { getComponentTheme } from "../../utils/theme";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../utils/constants";
 import { addToast } from "../../redux/slices/uiSlice";
+
+// Import draft management utilities
+import { useFormDirtyTracking } from "../../hooks/useFormDirtyTracking";
+import { useSaveAsDraft } from "../../hooks/useSaveAsDraft";
+import SaveAsDraftModal from "../../components/ui/SaveAsDraftModal";
 
 // Import tab components
 import GeneralDetailsTab from "./components/GeneralDetailsTab";
@@ -40,8 +48,14 @@ const CreateTransporterPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { isCreating, error, lastCreatedTransporter, masterData, isLoading } =
-    useSelector((state) => state.transporter);
+  const {
+    isCreating,
+    error,
+    lastCreatedTransporter,
+    masterData,
+    isLoading,
+    isSavingDraft,
+  } = useSelector((state) => state.transporter);
 
   const { user, role } = useSelector((state) => state.auth);
 
@@ -118,6 +132,118 @@ const CreateTransporterPage = () => {
     2: false, // Serviceable Area
     3: false, // Documents
   });
+
+  // ============================================
+  // DRAFT MANAGEMENT HOOKS
+  // ============================================
+
+  // Initial form data for dirty tracking
+  const initialFormData = {
+    transporterId: null,
+    generalDetails: {
+      businessName: "",
+      fromDate: "",
+      toDate: "",
+      avgRating: 0,
+      transMode: {
+        road: false,
+        rail: false,
+        air: false,
+        sea: false,
+      },
+      activeFlag: true,
+    },
+    addresses: [
+      {
+        vatNumber: "",
+        country: "",
+        state: "",
+        city: "",
+        district: "",
+        street1: "",
+        street2: "",
+        postalCode: "",
+        isPrimary: true,
+        contacts: [
+          {
+            name: "",
+            role: "",
+            phoneNumber: "",
+            alternatePhoneNumber: "",
+            email: "",
+            alternateEmail: "",
+            whatsappNumber: "",
+          },
+        ],
+      },
+    ],
+    serviceableAreas: [
+      {
+        country: "",
+        states: [],
+      },
+    ],
+    documents: [
+      {
+        documentType: "",
+        documentNumber: "",
+        referenceNumber: "",
+        country: "",
+        validFrom: "",
+        validTo: "",
+        status: true,
+        fileName: "",
+        fileType: "",
+        fileData: "",
+      },
+    ],
+  };
+
+  // Form dirty tracking - Pass INITIAL form data (empty baseline) to the hook
+  const { isDirty, setCurrentData, resetDirty } =
+    useFormDirtyTracking(initialFormData);
+
+  // Sync the dirty tracking hook's internal state with our formData whenever it changes
+  useEffect(() => {
+    setCurrentData(formData);
+  }, [formData, setCurrentData]);
+
+  // Save as draft hook
+  const {
+    showModal: showDraftModal,
+    setShowModal: setShowDraftModal,
+    handleSaveDraft,
+    handleDiscard,
+    handleCancel: handleCancelDraft,
+    isLoading: isDraftLoading,
+    showSaveAsDraftModal,
+  } = useSaveAsDraft(
+    "transporter",
+    formData,
+    isDirty,
+    null, // No recordId for create page
+    (data) => {
+      // Success callback
+      console.log("Draft saved successfully:", data);
+      resetDirty(formData);
+    },
+    (error) => {
+      // Error callback
+      console.error("Draft save failed:", error);
+    }
+  );
+
+  // Navigation blocking - Browser back/close/refresh
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   const tabs = [
     {
@@ -427,6 +553,54 @@ const CreateTransporterPage = () => {
     dispatch(createTransporter(formData));
   };
 
+  // Handle back button navigation with draft prompt
+  const handleBackClick = () => {
+    if (isDirty) {
+      showSaveAsDraftModal("/transporters");
+    } else {
+      navigate("/transporters");
+    }
+  };
+
+  // Handle manual save as draft button click
+  const handleSaveAsDraftClick = async () => {
+    if (!isDirty) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "No changes to save",
+          duration: 3000,
+        })
+      );
+      return;
+    }
+
+    try {
+      // Call the draft save function directly without navigation
+      const result = await dispatch(saveTransporterAsDraft(formData)).unwrap();
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Draft saved successfully",
+          duration: 3000,
+        })
+      );
+
+      // Reset dirty tracking after successful save
+      resetDirty(formData);
+    } catch (error) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "Failed to save draft",
+          details: [error.message || "An error occurred"],
+          duration: 5000,
+        })
+      );
+    }
+  };
+
   const handleBulkUpload = useCallback(() => {
     dispatch(openModal());
   }, [dispatch]);
@@ -440,7 +614,7 @@ const CreateTransporterPage = () => {
   return (
     <div className="bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
       <TMSHeader theme={theme} />
-      
+
       {/* Modern Header Bar with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
         {/* Background decoration */}
@@ -451,7 +625,7 @@ const CreateTransporterPage = () => {
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBackClick}
               className="group p-2 bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-all duration-300 hover:scale-105 border border-white/20"
             >
               <ArrowLeft className="w-5 h-5 text-white group-hover:text-white transition-colors" />
@@ -476,6 +650,24 @@ const CreateTransporterPage = () => {
             >
               <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
               Clear
+            </button>
+
+            <button
+              onClick={handleSaveAsDraftClick}
+              disabled={isCreating || isSavingDraft || !isDirty}
+              className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {isSavingDraft ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <FileDown className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  Save as Draft
+                </>
+              )}
             </button>
 
             <button
@@ -653,6 +845,16 @@ const CreateTransporterPage = () => {
       {/* Bulk Upload Modal and History */}
       <BulkUploadModal />
       <BulkUploadHistory />
+
+      {/* Save as Draft Modal */}
+      <SaveAsDraftModal
+        isOpen={showDraftModal}
+        onSaveDraft={handleSaveDraft}
+        onDiscard={handleDiscard}
+        onCancel={handleCancelDraft}
+        isLoading={isDraftLoading || isSavingDraft}
+        isUpdate={false}
+      />
     </div>
   );
 };

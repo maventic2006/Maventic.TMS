@@ -25,6 +25,7 @@ const TransporterFilterPanel = ({
     { value: "Active", label: "Active" },
     { value: "Approved", label: "Approved" },
     { value: "Pending", label: "Pending" },
+    { value: "SAVE_AS_DRAFT", label: "Draft" },
     { value: "Inactive", label: "Inactive" },
     { value: "Rejected", label: "Rejected" },
   ];

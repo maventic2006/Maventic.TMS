@@ -1,7 +1,20 @@
 ﻿import React from "react";
 import { motion } from "framer-motion";
-import { Truck, Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
+import {
+  Truck,
+  Loader2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "../ui/Table";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import VehicleStatusPill from "./VehicleStatusPill";
@@ -37,16 +50,19 @@ const VehicleListTable = ({
   const showNoResults = !loading && vehicles.length === 0;
 
   return (
-    <Card className="overflow-hidden rounded-xl border-0" style={{ 
-      boxShadow: theme.colors.card.shadow,
-      background: theme.colors.card.background 
-    }}>
+    <Card
+      className="overflow-hidden rounded-xl border-0"
+      style={{
+        boxShadow: theme.colors.card.shadow,
+        background: theme.colors.card.background,
+      }}
+    >
       {/* Header with search */}
-      <div 
-        className="px-6 py-2 border-b" 
-        style={{ 
+      <div
+        className="px-6 py-2 border-b"
+        style={{
           borderColor: theme.colors.header.border,
-          background: theme.colors.header.background 
+          background: theme.colors.header.background,
         }}
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -54,13 +70,22 @@ const VehicleListTable = ({
             {/* <h2 className="text-lg font-bold" style={{ color: theme.colors.text.primary }}>
               Vehicle List
             </h2> */}
-            <p className="text-sm mt-1" style={{ color: theme.colors.text.secondary }}>
-              <span className="font-semibold" style={{ color: theme.colors.pagination.active }}>{filteredCount}</span> vehicles found
+            <p
+              className="text-sm mt-1"
+              style={{ color: theme.colors.text.secondary }}
+            >
+              <span
+                className="font-semibold"
+                style={{ color: theme.colors.pagination.active }}
+              >
+                {filteredCount}
+              </span>{" "}
+              vehicles found
             </p>
           </div>
           <div className="relative w-full sm:w-auto">
-            <Search 
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none z-10" 
+            <Search
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 pointer-events-none z-10"
               style={{ color: theme.colors.search.icon }}
             />
             <input
@@ -74,8 +99,12 @@ const VehicleListTable = ({
                 background: theme.colors.search.background,
                 color: theme.colors.text.primary,
               }}
-              onFocus={(e) => e.target.style.borderColor = theme.colors.pagination.active}
-              onBlur={(e) => e.target.style.borderColor = theme.colors.search.border}
+              onFocus={(e) =>
+                (e.target.style.borderColor = theme.colors.pagination.active)
+              }
+              onBlur={(e) =>
+                (e.target.style.borderColor = theme.colors.search.border)
+              }
             />
           </div>
         </div>
@@ -86,7 +115,9 @@ const VehicleListTable = ({
         <div className="flex items-center justify-center py-16">
           <div className="flex flex-col items-center space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-[#1D4ED8]" />
-            <span className="text-sm font-semibold text-[#4A5568]">Loading vehicles...</span>
+            <span className="text-sm font-semibold text-[#4A5568]">
+              Loading vehicles...
+            </span>
           </div>
         </div>
       )}
@@ -95,9 +126,13 @@ const VehicleListTable = ({
       {showNoResults && (
         <div className="text-center py-16">
           <Truck className="h-20 w-20 text-[#E5E7EB] mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-[#0D1A33] mb-2">No Vehicles Found</h3>
+          <h3 className="text-lg font-bold text-[#0D1A33] mb-2">
+            No Vehicles Found
+          </h3>
           <p className="text-sm text-[#4A5568]">
-            {searchText ? `No results for "${searchText}"` : "Try adjusting your filters"}
+            {searchText
+              ? `No results for "${searchText}"`
+              : "Try adjusting your filters"}
           </p>
         </div>
       )}
@@ -116,7 +151,7 @@ const VehicleListTable = ({
                 border: `1px solid ${theme.colors.card.border}`,
                 background: theme.colors.card.background,
               }}
-              whileHover={{ 
+              whileHover={{
                 scale: 1.02,
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
               }}
@@ -131,7 +166,7 @@ const VehicleListTable = ({
                   >
                     {vehicle.vehicleId}
                   </span>
-                  <p 
+                  <p
                     className="text-sm mt-1 font-medium"
                     style={{ color: theme.colors.text.primary }}
                   >
@@ -142,38 +177,68 @@ const VehicleListTable = ({
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <span style={{ color: theme.colors.text.secondary }}>Type:</span>
-                  <span className="ml-2 font-semibold" style={{ color: theme.colors.text.primary }}>
+                  <span style={{ color: theme.colors.text.secondary }}>
+                    Type:
+                  </span>
+                  <span
+                    className="ml-2 font-semibold"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {vehicle.vehicleType}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: theme.colors.text.secondary }}>Make:</span>
-                  <span className="ml-2 font-semibold" style={{ color: theme.colors.text.primary }}>
+                  <span style={{ color: theme.colors.text.secondary }}>
+                    Make:
+                  </span>
+                  <span
+                    className="ml-2 font-semibold"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {vehicle.make}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: theme.colors.text.secondary }}>Model:</span>
-                  <span className="ml-2 font-semibold" style={{ color: theme.colors.text.primary }}>
+                  <span style={{ color: theme.colors.text.secondary }}>
+                    Model:
+                  </span>
+                  <span
+                    className="ml-2 font-semibold"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {vehicle.model}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: theme.colors.text.secondary }}>Year:</span>
-                  <span className="ml-2 font-semibold" style={{ color: theme.colors.text.primary }}>
+                  <span style={{ color: theme.colors.text.secondary }}>
+                    Year:
+                  </span>
+                  <span
+                    className="ml-2 font-semibold"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {vehicle.year}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: theme.colors.text.secondary }}>Fuel:</span>
-                  <span className="ml-2 font-semibold" style={{ color: theme.colors.text.primary }}>
+                  <span style={{ color: theme.colors.text.secondary }}>
+                    Fuel:
+                  </span>
+                  <span
+                    className="ml-2 font-semibold"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {vehicle.fuelType}
                   </span>
                 </div>
                 <div>
-                  <span style={{ color: theme.colors.text.secondary }}>Condition:</span>
-                  <span className="ml-2 font-semibold" style={{ color: theme.colors.text.primary }}>
+                  <span style={{ color: theme.colors.text.secondary }}>
+                    Condition:
+                  </span>
+                  <span
+                    className="ml-2 font-semibold"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {displayValue(vehicle.vehicleCondition)}
                   </span>
                 </div>
@@ -188,75 +253,101 @@ const VehicleListTable = ({
         <div className="hidden lg:block overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr style={{ 
-                background: theme.colors.table.header.background,
-                borderBottom: `1px solid ${theme.colors.table.header.border}`
-              }}>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+              <tr
+                style={{
+                  background: theme.colors.table.header.background,
+                  borderBottom: `1px solid ${theme.colors.table.header.border}`,
+                }}
+              >
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Vehicle ID
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Type
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Regn Number
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Make/Brand
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Model
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Year
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Fuel Type
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Condition
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Towing Cap. (kg)
                 </th>
-                <th 
-                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="text-center px-4 py-3 text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Fuel Cap. (L)
                 </th>
-                <th 
-                  className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider"
+                <th
+                  className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-nowrap"
+                  style={{ color: theme.colors.table.header.text }}
+                >
+                  Created by
+                </th>
+                <th
+                  className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-nowrap"
+                  style={{ color: theme.colors.table.header.text }}
+                >
+                  Created on
+                </th>
+                <th
+                  className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-nowrap"
                   style={{ color: theme.colors.table.header.text }}
                 >
                   Status
+                </th>
+                <th
+                  className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-nowrap"
+                  style={{ color: theme.colors.table.header.text }}
+                >
+                  Approver
+                </th>
+                <th
+                  className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-nowrap"
+                  style={{ color: theme.colors.table.header.text }}
+                >
+                  Approved on
                 </th>
               </tr>
             </thead>
@@ -268,17 +359,20 @@ const VehicleListTable = ({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03, duration: 0.2 }}
                   className="border-b transition-all duration-200 h-12"
-                  style={{ 
+                  style={{
                     borderColor: theme.colors.table.row.border,
                     background: theme.colors.table.row.background,
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = theme.colors.table.row.hover;
+                    e.currentTarget.style.background =
+                      theme.colors.table.row.hover;
                     e.currentTarget.style.transform = "translateX(2px)";
-                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)";
+                    e.currentTarget.style.boxShadow =
+                      "0 2px 8px rgba(0, 0, 0, 0.08)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = theme.colors.table.row.background;
+                    e.currentTarget.style.background =
+                      theme.colors.table.row.background;
                     e.currentTarget.style.transform = "translateX(0)";
                     e.currentTarget.style.boxShadow = "none";
                   }}
@@ -292,37 +386,88 @@ const VehicleListTable = ({
                       {vehicle.vehicleId}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
+                  <td
+                    className="px-4 py-2 text-sm text-center text-nowrap"
+                    style={{ color: theme.colors.text.secondary }}
+                  >
                     {vehicle.vehicleType}
                   </td>
-                  <td className="px-4 py-2 font-semibold text-sm text-center" style={{ color: theme.colors.text.primary }}>
+                  <td
+                    className="px-4 py-2 font-semibold text-sm text-center text-nowrap"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {vehicle.registrationNumber}
                   </td>
-                  <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
+                  <td
+                    className="px-4 py-2 text-sm text-center text-nowrap"
+                    style={{ color: theme.colors.text.secondary }}
+                  >
                     {vehicle.make}
                   </td>
-                  <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
+                  <td
+                    className="px-4 py-2 text-sm text-center text-nowrap"
+                    style={{ color: theme.colors.text.secondary }}
+                  >
                     {displayValue(vehicle.model)}
                   </td>
-                  <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
+                  <td
+                    className="px-4 py-2 text-sm text-center text-nowrap"
+                    style={{ color: theme.colors.text.secondary }}
+                  >
                     {displayValue(vehicle.year)}
                   </td>
-                  <td className="px-4 py-2 text-center">
-                    <span className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
+                  <td className="px-4 py-2 text-center text-nowrap">
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: theme.colors.text.secondary }}
+                    >
                       {displayValue(vehicle.fuelType)}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-sm text-center" style={{ color: theme.colors.text.secondary }}>
+                  <td
+                    className="px-4 py-2 text-sm text-center text-nowrap"
+                    style={{ color: theme.colors.text.secondary }}
+                  >
                     {displayValue(vehicle.vehicleCondition)}
                   </td>
-                  <td className="px-4 py-2 text-sm text-center font-semibold" style={{ color: theme.colors.text.primary }}>
+                  <td
+                    className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {displayValue(vehicle.towingCapacity)}
                   </td>
-                  <td className="px-4 py-2 text-sm text-center font-semibold" style={{ color: theme.colors.text.primary }}>
+                  <td
+                    className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
+                    style={{ color: theme.colors.text.primary }}
+                  >
                     {displayValue(vehicle.fuelCapacity)}
                   </td>
-                  <td className="px-4 py-2 text-center">
+                  <td
+                    className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
+                    style={{ color: theme.colors.text.primary }}
+                  >
+                    {displayValue(vehicle.createdBy)}
+                  </td>
+                  <td
+                    className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
+                    style={{ color: theme.colors.text.primary }}
+                  >
+                    {displayValue(vehicle.createdAt)}
+                  </td>
+                  <td className="px-4 py-2 text-center text-nowrap">
                     <VehicleStatusPill status={vehicle.status} />
+                  </td>
+                  <td
+                    className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
+                    style={{ color: theme.colors.text.primary }}
+                  >
+                    {displayValue(vehicle.approvedName)}
+                  </td>
+                  <td
+                    className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
+                    style={{ color: theme.colors.text.primary }}
+                  >
+                    {displayValue(vehicle.approvedBy)}
                   </td>
                 </motion.tr>
               ))}
