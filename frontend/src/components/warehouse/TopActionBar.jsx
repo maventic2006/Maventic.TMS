@@ -31,16 +31,8 @@ const TopActionBar = ({
             </Button>
             <div className="flex flex-col min-w-0 flex-1">
               <h1 className="text-2xl font-bold text-[#0D1A33] font-poppins truncate">
-                Consignor WH Maintenance
+                Consignor Warehouse Maintenance
               </h1>
-              {totalCount > 0 && (
-                <p className="text-xs sm:text-sm text-gray-600 font-medium">
-                  <span className="text-orange-600 font-bold">
-                    {totalCount}
-                  </span>{" "}
-                  warehouses
-                </p>
-              )}
             </div>
           </div>
 

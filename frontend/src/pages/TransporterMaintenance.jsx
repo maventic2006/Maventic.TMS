@@ -212,6 +212,12 @@ const TransporterMaintenance = () => {
       if (appliedFilters.transportMode.length > 0) {
         params.transportMode = appliedFilters.transportMode.join(",");
       }
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
+      }
 
       dispatch(fetchTransporters(params));
     },

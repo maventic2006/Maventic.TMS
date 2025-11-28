@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { User, Globe, Calendar, Upload, FileText, CheckCircle, X } from "lucide-react";
+import {
+  User,
+  Globe,
+  Calendar,
+  Upload,
+  FileText,
+  CheckCircle,
+  X,
+} from "lucide-react";
 import { getComponentTheme } from "../../../utils/theme";
+import { CustomSelect } from "@/components/ui/Select";
 
 const GeneralInfoTab = ({
   formData,
@@ -107,24 +116,29 @@ const GeneralInfoTab = ({
           <label className="block text-xs font-medium text-[#0D1A33]">
             Industry Type <span className="text-red-500">*</span>
           </label>
-          <select
+          <CustomSelect
+            key={`industry-${formData.general?.industry_type}`}
             value={formData.general?.industry_type || ""}
-            onChange={(e) => handleInputChange("industry_type", e.target.value)}
-            className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
-              errors.general?.industry_type
-                ? "border-red-500 focus:border-red-500"
-                : "border-[#E5E7EB] focus:border-[#3B82F6]"
+            onValueChange={(value) => handleInputChange("industry_type", value)}
+            options={[
+              { name: "Manufacturing", value: "Manufacturing" },
+              { name: "Retail", value: "Retail" },
+              { name: "Technology", value: "Technology" },
+              { name: "Healthcare", value: "Healthcare" },
+              { name: "Finance", value: "Finance" },
+              { name: "Logistics", value: "Logistics" },
+              { name: "Other", value: "Other" },
+            ]}
+            placeholder="Select Industry Type"
+            searchable
+            getOptionLabel={(option) => option.name}
+            getOptionValue={(option) => option.value}
+            className={`w-full text-sm ${
+              errors.general?.industry_type ? "border-red-500" : ""
             }`}
-          >
-            <option value="">Select Industry Type</option>
-            <option value="Manufacturing">Manufacturing</option>
-            <option value="Retail">Retail</option>
-            <option value="Technology">Technology</option>
-            <option value="Healthcare">Healthcare</option>
-            <option value="Finance">Finance</option>
-            <option value="Logistics">Logistics</option>
-            <option value="Other">Other</option>
-          </select>
+            error={errors.general?.industry_type}
+          />
+
           {errors.general?.industry_type && (
             <p className="text-sm text-red-500 flex items-center gap-1">
               ⚠️ {errors.general.industry_type}
@@ -137,18 +151,24 @@ const GeneralInfoTab = ({
           <label className="block text-xs font-medium text-[#0D1A33]">
             Currency Type
           </label>
-          <select
+          <CustomSelect
+            key={`currency-${formData.general?.currency_type}`}
             value={formData.general?.currency_type || ""}
-            onChange={(e) => handleInputChange("currency_type", e.target.value)}
-            className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
-          >
-            <option value="">Select Currency</option>
-            <option value="USD">USD - US Dollar</option>
-            <option value="EUR">EUR - Euro</option>
-            <option value="GBP">GBP - British Pound</option>
-            <option value="INR">INR - Indian Rupee</option>
-            <option value="CNY">CNY - Chinese Yuan</option>
-          </select>
+            onValueChange={(value) => handleInputChange("currency_type", value)}
+            options={[
+              { name: "USD - US Dollar", value: "USD" },
+              { name: "EUR - Euro", value: "EUR" },
+              { name: "GBP - British Pound", value: "GBP" },
+              { name: "INR - Indian Rupee", value: "INR" },
+              { name: "CNY - Chinese Yuan", value: "CNY" },
+            ]}
+            placeholder="Select Currency"
+            searchable
+            getOptionLabel={(option) => option.name}
+            getOptionValue={(option) => option.value}
+            className="w-full text-sm"
+            error={errors.general?.currency_type}
+          />
         </div>
 
         {/* Payment Term */}
@@ -156,22 +176,27 @@ const GeneralInfoTab = ({
           <label className="block text-xs font-medium text-[#0D1A33]">
             Payment Term <span className="text-red-500">*</span>
           </label>
-          <select
+          <CustomSelect
+            key={`payment-term-${formData.general?.payment_term}`}
             value={formData.general?.payment_term || ""}
-            onChange={(e) => handleInputChange("payment_term", e.target.value)}
-            className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
-              errors.general?.payment_term
-                ? "border-red-500 focus:border-red-500"
-                : "border-[#E5E7EB] focus:border-[#3B82F6]"
+            onValueChange={(value) => handleInputChange("payment_term", value)}
+            options={[
+              { name: "Net 30 Days", value: "NET_30" },
+              { name: "Net 60 Days", value: "NET_60" },
+              { name: "Net 90 Days", value: "NET_90" },
+              { name: "Immediate Payment", value: "IMMEDIATE" },
+              { name: "Advance Payment", value: "ADVANCE" },
+            ]}
+            placeholder="Select Payment Term"
+            searchable={false}
+            getOptionLabel={(option) => option.name}
+            getOptionValue={(option) => option.value}
+            className={`w-full text-sm ${
+              errors.general?.payment_term ? "border-red-500" : ""
             }`}
-          >
-            <option value="">Select Payment Term</option>
-            <option value="NET_30">Net 30 Days</option>
-            <option value="NET_60">Net 60 Days</option>
-            <option value="NET_90">Net 90 Days</option>
-            <option value="IMMEDIATE">Immediate Payment</option>
-            <option value="ADVANCE">Advance Payment</option>
-          </select>
+            error={errors.general?.payment_term}
+          />
+
           {errors.general?.payment_term && (
             <p className="text-sm text-red-500 flex items-center gap-1">
               ⚠️ {errors.general.payment_term}
@@ -241,7 +266,9 @@ const GeneralInfoTab = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm text-[#0D1A33]">{ndaFile.name}</span>
+                    <span className="text-sm text-[#0D1A33]">
+                      {ndaFile.name}
+                    </span>
                   </div>
                   <button
                     type="button"
@@ -257,7 +284,9 @@ const GeneralInfoTab = ({
                   <p className="text-sm text-gray-600 mb-1">
                     Click to upload or drag and drop
                   </p>
-                  <p className="text-xs text-gray-400">PDF, JPG, PNG (Max 5MB)</p>
+                  <p className="text-xs text-gray-400">
+                    PDF, JPG, PNG (Max 5MB)
+                  </p>
                   <input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
@@ -282,7 +311,9 @@ const GeneralInfoTab = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm text-[#0D1A33]">{msaFile.name}</span>
+                    <span className="text-sm text-[#0D1A33]">
+                      {msaFile.name}
+                    </span>
                   </div>
                   <button
                     type="button"
@@ -298,7 +329,9 @@ const GeneralInfoTab = ({
                   <p className="text-sm text-gray-600 mb-1">
                     Click to upload or drag and drop
                   </p>
-                  <p className="text-xs text-gray-400">PDF, JPG, PNG (Max 5MB)</p>
+                  <p className="text-xs text-gray-400">
+                    PDF, JPG, PNG (Max 5MB)
+                  </p>
                   <input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
@@ -356,7 +389,9 @@ const GeneralInfoTab = ({
             <input
               type="date"
               value={formData.general?.approved_date || ""}
-              onChange={(e) => handleInputChange("approved_date", e.target.value)}
+              onChange={(e) =>
+                handleInputChange("approved_date", e.target.value)
+              }
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
             />
           </div>
@@ -366,657 +401,29 @@ const GeneralInfoTab = ({
             <label className="block text-xs font-medium text-[#0D1A33]">
               Status
             </label>
-            <select
+
+            <CustomSelect
+              key={`status-${formData.general?.status}`}
               value={formData.general?.status || "ACTIVE"}
-              onChange={(e) => handleInputChange("status", e.target.value)}
-              className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
-            >
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-              <option value="PENDING">Pending</option>
-            </select>
+              onValueChange={(value) => handleInputChange("status", value)}
+              options={[
+                { name: "Active", value: "ACTIVE" },
+                { name: "Inactive", value: "INACTIVE" },
+                { name: "Pending", value: "PENDING" },
+              ]}
+              placeholder="Select Status"
+              searchable={false}
+              getOptionLabel={(option) => option.name}
+              getOptionValue={(option) => option.value}
+              className={`min-w-[200px] text-xs ${
+                errors.general?.status ? "border-red-500" : ""
+              }`}
+              error={errors.general?.status}
+            />
           </div>
         </div>
       </div>
     </div>
-    // <div style={{ padding: "24px" }}>
-    //   {/* Basic Information Section */}
-    //   <div
-    //     style={{
-    //       backgroundColor: theme.colors.card.background,
-    //       borderRadius: "12px",
-    //       padding: "24px",
-    //       marginBottom: "24px",
-    //       border: `1px solid ${theme.colors.card.border}`,
-    //     }}
-    //   >
-    //     <h3
-    //       style={{
-    //         fontSize: "18px",
-    //         fontWeight: "600",
-    //         color: theme.colors.text.primary,
-    //         marginBottom: "20px",
-    //       }}
-    //     >
-    //       Basic Information
-    //     </h3>
-
-    //     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-    //       {/* Customer Name */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Customer Name <span style={{ color: theme.colors.status.error }}>*</span>
-    //         </label>
-    //         <input
-    //           type="text"
-    //           value={data.customer_name || ""}
-    //           onChange={(e) => handleInputChange("customer_name", e.target.value)}
-    //           placeholder="Enter customer name"
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${
-    //               errors?.customer_name
-    //                 ? (theme.colors.input?.border?.error || theme.colors.status.error)
-    //                 : (theme.colors.input?.border?.default || theme.colors.card.border)
-    //             }`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //             transition: "border-color 0.2s",
-    //           }}
-    //         />
-    //         {errors?.customer_name && (
-    //           <span
-    //             style={{
-    //               display: "block",
-    //               fontSize: "12px",
-    //               color: theme.colors.status.error,
-    //               marginTop: "4px",
-    //             }}
-    //           >
-    //             {errors.customer_name}
-    //           </span>
-    //         )}
-    //       </div>
-
-    //       {/* Search Term */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Search Term <span style={{ color: theme.colors.status.error }}>*</span>
-    //         </label>
-    //         <input
-    //           type="text"
-    //           value={data.search_term || ""}
-    //           onChange={(e) => handleInputChange("search_term", e.target.value)}
-    //           placeholder="Enter search term"
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${
-    //               errors?.search_term
-    //                 ? (theme.colors.input?.border?.error || theme.colors.status.error)
-    //                 : (theme.colors.input?.border?.default || theme.colors.card.border)
-    //             }`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //           }}
-    //         />
-    //         {errors?.search_term && (
-    //           <span
-    //             style={{
-    //               display: "block",
-    //               fontSize: "12px",
-    //               color: theme.colors.status.error,
-    //               marginTop: "4px",
-    //             }}
-    //           >
-    //             {errors.search_term}
-    //           </span>
-    //         )}
-    //       </div>
-
-    //       {/* Industry Type */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Industry Type <span style={{ color: theme.colors.status.error }}>*</span>
-    //         </label>
-    //         <select
-    //           value={data.industry_type || ""}
-    //           onChange={(e) => handleInputChange("industry_type", e.target.value)}
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${
-    //               errors?.industry_type
-    //                 ? (theme.colors.input?.border?.error || theme.colors.status.error)
-    //                 : (theme.colors.input?.border?.default || theme.colors.card.border)
-    //             }`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //             backgroundColor: (theme.colors.input?.background || theme.colors.card.background),
-    //           }}
-    //         >
-    //           <option value="">Select Industry Type</option>
-    //           {masterData.industryTypes?.map((type) => (
-    //             <option key={type.value} value={type.value}>
-    //               {type.label}
-    //             </option>
-    //           ))}
-    //         </select>
-    //         {errors?.industry_type && (
-    //           <span
-    //             style={{
-    //               display: "block",
-    //               fontSize: "12px",
-    //               color: theme.colors.status.error,
-    //               marginTop: "4px",
-    //             }}
-    //           >
-    //             {errors.industry_type}
-    //           </span>
-    //         )}
-    //       </div>
-
-    //       {/* Currency Type */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Currency Type
-    //         </label>
-    //         <select
-    //           value={data.currency_type || ""}
-    //           onChange={(e) => handleInputChange("currency_type", e.target.value)}
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${(theme.colors.input?.border?.default || theme.colors.card.border)}`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //             backgroundColor: (theme.colors.input?.background || theme.colors.card.background),
-    //           }}
-    //         >
-    //           <option value="">Select Currency Type</option>
-    //           {masterData.currencyTypes?.map((currency) => (
-    //             <option key={currency.value} value={currency.value}>
-    //               {currency.label}
-    //             </option>
-    //           ))}
-    //         </select>
-    //       </div>
-
-    //       {/* Payment Term */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Payment Term <span style={{ color: theme.colors.status.error }}>*</span>
-    //         </label>
-    //         <select
-    //           value={data.payment_term || ""}
-    //           onChange={(e) => handleInputChange("payment_term", e.target.value)}
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${
-    //               errors?.payment_term
-    //                 ? (theme.colors.input?.border?.error || theme.colors.status.error)
-    //                 : (theme.colors.input?.border?.default || theme.colors.card.border)
-    //             }`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //             backgroundColor: (theme.colors.input?.background || theme.colors.card.background),
-    //           }}
-    //         >
-    //           <option value="">Select Payment Term</option>
-    //           {masterData.paymentTerms?.map((term) => (
-    //             <option key={term.value} value={term.value}>
-    //               {term.label}
-    //             </option>
-    //           ))}
-    //         </select>
-    //         {errors?.payment_term && (
-    //           <span
-    //             style={{
-    //               display: "block",
-    //               fontSize: "12px",
-    //               color: theme.colors.status.error,
-    //               marginTop: "4px",
-    //             }}
-    //           >
-    //             {errors.payment_term}
-    //           </span>
-    //         )}
-    //       </div>
-
-    //       {/* Website URL */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           <Globe size={16} style={{ display: "inline", marginRight: "6px" }} />
-    //           Website URL
-    //         </label>
-    //         <input
-    //           type="url"
-    //           value={data.website_url || ""}
-    //           onChange={(e) => handleInputChange("website_url", e.target.value)}
-    //           placeholder="https://example.com"
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${
-    //               errors?.website_url
-    //                 ? (theme.colors.input?.border?.error || theme.colors.status.error)
-    //                 : (theme.colors.input?.border?.default || theme.colors.card.border)
-    //             }`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //           }}
-    //         />
-    //         {errors?.website_url && (
-    //           <span
-    //             style={{
-    //               display: "block",
-    //               fontSize: "12px",
-    //               color: theme.colors.status.error,
-    //               marginTop: "4px",
-    //             }}
-    //           >
-    //             {errors.website_url}
-    //           </span>
-    //         )}
-    //       </div>
-    //     </div>
-
-    //     {/* Remark - Full Width */}
-    //     <div style={{ marginTop: "20px" }}>
-    //       <label
-    //         style={{
-    //           display: "block",
-    //           fontSize: "14px",
-    //           fontWeight: "500",
-    //           color: theme.colors.text.primary,
-    //           marginBottom: "8px",
-    //         }}
-    //       >
-    //         Remark
-    //       </label>
-    //       <textarea
-    //         value={data.remark || ""}
-    //         onChange={(e) => handleInputChange("remark", e.target.value)}
-    //         placeholder="Enter any additional remarks"
-    //         rows={3}
-    //         style={{
-    //           width: "100%",
-    //           padding: "10px 12px",
-    //           fontSize: "14px",
-    //           border: `1px solid ${(theme.colors.input?.border?.default || theme.colors.card.border)}`,
-    //           borderRadius: "8px",
-    //           outline: "none",
-    //           resize: "vertical",
-    //         }}
-    //       />
-    //     </div>
-    //   </div>
-
-    //   {/* Document Upload Section */}
-    //   <div
-    //     style={{
-    //       backgroundColor: theme.colors.card.background,
-    //       borderRadius: "12px",
-    //       padding: "24px",
-    //       marginBottom: "24px",
-    //       border: `1px solid ${theme.colors.card.border}`,
-    //     }}
-    //   >
-    //     <h3
-    //       style={{
-    //         fontSize: "18px",
-    //         fontWeight: "600",
-    //         color: theme.colors.text.primary,
-    //         marginBottom: "20px",
-    //       }}
-    //     >
-    //       <FileText size={20} style={{ display: "inline", marginRight: "8px" }} />
-    //       Document Upload
-    //     </h3>
-
-    //     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-    //       {/* NDA Upload */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Upload NDA
-    //         </label>
-    //         <div
-    //           style={{
-    //             border: `2px dashed ${(theme.colors.input?.border?.default || theme.colors.card.border)}`,
-    //             borderRadius: "8px",
-    //             padding: "20px",
-    //             textAlign: "center",
-    //             cursor: "pointer",
-    //             transition: "border-color 0.2s",
-    //           }}
-    //           onDragOver={(e) => e.preventDefault()}
-    //         >
-    //           {ndaFile ? (
-    //             <div
-    //               style={{
-    //                 display: "flex",
-    //                 alignItems: "center",
-    //                 justifyContent: "space-between",
-    //               }}
-    //             >
-    //               <div style={{ display: "flex", alignItems: "center" }}>
-    //                 <CheckCircle size={20} style={{ color: theme.colors.status.success, marginRight: "8px" }} />
-    //                 <span style={{ fontSize: "14px", color: theme.colors.text.primary }}>
-    //                   {ndaFile.name}
-    //                 </span>
-    //               </div>
-    //               <button
-    //                 type="button"
-    //                 onClick={() => handleRemoveFile("nda")}
-    //                 style={{
-    //                   background: "transparent",
-    //                   border: "none",
-    //                   cursor: "pointer",
-    //                   padding: "4px",
-    //                 }}
-    //               >
-    //                 <X size={18} style={{ color: theme.colors.status.error }} />
-    //               </button>
-    //             </div>
-    //           ) : (
-    //             <label style={{ cursor: "pointer" }}>
-    //               <Upload size={24} style={{ color: theme.colors.text.secondary, marginBottom: "8px" }} />
-    //               <p style={{ fontSize: "14px", color: theme.colors.text.secondary, marginBottom: "4px" }}>
-    //                 Click to upload or drag and drop
-    //               </p>
-    //               <p style={{ fontSize: "12px", color: theme.colors.text.disabled }}>
-    //                 PDF, JPG, PNG (Max 5MB)
-    //               </p>
-    //               <input
-    //                 type="file"
-    //                 accept=".pdf,.jpg,.jpeg,.png"
-    //                 onChange={(e) => handleFileUpload("nda", e)}
-    //                 style={{ display: "none" }}
-    //               />
-    //             </label>
-    //           )}
-    //         </div>
-    //       </div>
-
-    //       {/* MSA Upload */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Upload MSA
-    //         </label>
-    //         <div
-    //           style={{
-    //             border: `2px dashed ${(theme.colors.input?.border?.default || theme.colors.card.border)}`,
-    //             borderRadius: "8px",
-    //             padding: "20px",
-    //             textAlign: "center",
-    //             cursor: "pointer",
-    //             transition: "border-color 0.2s",
-    //           }}
-    //           onDragOver={(e) => e.preventDefault()}
-    //         >
-    //           {msaFile ? (
-    //             <div
-    //               style={{
-    //                 display: "flex",
-    //                 alignItems: "center",
-    //                 justifyContent: "space-between",
-    //               }}
-    //             >
-    //               <div style={{ display: "flex", alignItems: "center" }}>
-    //                 <CheckCircle size={20} style={{ color: theme.colors.status.success, marginRight: "8px" }} />
-    //                 <span style={{ fontSize: "14px", color: theme.colors.text.primary }}>
-    //                   {msaFile.name}
-    //                 </span>
-    //               </div>
-    //               <button
-    //                 type="button"
-    //                 onClick={() => handleRemoveFile("msa")}
-    //                 style={{
-    //                   background: "transparent",
-    //                   border: "none",
-    //                   cursor: "pointer",
-    //                   padding: "4px",
-    //                 }}
-    //               >
-    //                 <X size={18} style={{ color: theme.colors.status.error }} />
-    //               </button>
-    //             </div>
-    //           ) : (
-    //             <label style={{ cursor: "pointer" }}>
-    //               <Upload size={24} style={{ color: theme.colors.text.secondary, marginBottom: "8px" }} />
-    //               <p style={{ fontSize: "14px", color: theme.colors.text.secondary, marginBottom: "4px" }}>
-    //                 Click to upload or drag and drop
-    //               </p>
-    //               <p style={{ fontSize: "12px", color: theme.colors.text.disabled }}>
-    //                 PDF, JPG, PNG (Max 5MB)
-    //               </p>
-    //               <input
-    //                 type="file"
-    //                 accept=".pdf,.jpg,.jpeg,.png"
-    //                 onChange={(e) => handleFileUpload("msa", e)}
-    //                 style={{ display: "none" }}
-    //               />
-    //             </label>
-    //           )}
-    //         </div>
-    //       </div>
-    //     </div>
-    //   </div>
-
-    //   {/* Additional Information Section */}
-    //   <div
-    //     style={{
-    //       backgroundColor: theme.colors.card.background,
-    //       borderRadius: "12px",
-    //       padding: "24px",
-    //       border: `1px solid ${theme.colors.card.border}`,
-    //     }}
-    //   >
-    //     <h3
-    //       style={{
-    //         fontSize: "18px",
-    //         fontWeight: "600",
-    //         color: theme.colors.text.primary,
-    //         marginBottom: "20px",
-    //       }}
-    //     >
-    //       Additional Information
-    //     </h3>
-
-    //     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-    //       {/* Name on PO */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Name on Purchase Order
-    //         </label>
-    //         <input
-    //           type="text"
-    //           value={data.name_on_po || ""}
-    //           onChange={(e) => handleInputChange("name_on_po", e.target.value)}
-    //           placeholder="Enter name to appear on PO"
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${(theme.colors.input?.border?.default || theme.colors.card.border)}`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //           }}
-    //         />
-    //       </div>
-
-    //       {/* Approved By */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Approved By
-    //         </label>
-    //         <input
-    //           type="text"
-    //           value={data.approved_by || ""}
-    //           onChange={(e) => handleInputChange("approved_by", e.target.value)}
-    //           placeholder="Enter approver name"
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${(theme.colors.input?.border?.default || theme.colors.card.border)}`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //           }}
-    //         />
-    //       </div>
-
-    //       {/* Approved Date */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           <Calendar size={16} style={{ display: "inline", marginRight: "6px" }} />
-    //           Approved Date
-    //         </label>
-    //         <input
-    //           type="date"
-    //           value={data.approved_date || ""}
-    //           onChange={(e) => handleInputChange("approved_date", e.target.value)}
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${(theme.colors.input?.border?.default || theme.colors.card.border)}`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //           }}
-    //         />
-    //       </div>
-
-    //       {/* Status */}
-    //       <div>
-    //         <label
-    //           style={{
-    //             display: "block",
-    //             fontSize: "14px",
-    //             fontWeight: "500",
-    //             color: theme.colors.text.primary,
-    //             marginBottom: "8px",
-    //           }}
-    //         >
-    //           Status
-    //         </label>
-    //         <select
-    //           value={data.status || "ACTIVE"}
-    //           onChange={(e) => handleInputChange("status", e.target.value)}
-    //           style={{
-    //             width: "100%",
-    //             padding: "10px 12px",
-    //             fontSize: "14px",
-    //             border: `1px solid ${(theme.colors.input?.border?.default || theme.colors.card.border)}`,
-    //             borderRadius: "8px",
-    //             outline: "none",
-    //             backgroundColor: (theme.colors.input?.background || theme.colors.card.background),
-    //           }}
-    //         >
-    //           <option value="ACTIVE">Active</option>
-    //           <option value="INACTIVE">Inactive</option>
-    //           <option value="PENDING">Pending</option>
-    //         </select>
-    //       </div>
-    //     </div>
-    //   </div>
-    // </div>
   );
 };
 

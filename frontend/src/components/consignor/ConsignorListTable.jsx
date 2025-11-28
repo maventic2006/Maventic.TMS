@@ -12,6 +12,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 
 const ConsignorListTable = ({
@@ -25,6 +26,7 @@ const ConsignorListTable = ({
   filteredCount,
   searchText,
   onSearchChange,
+  onDeleteDraft,
 }) => {
   const navigate = useNavigate();
 
@@ -36,9 +38,7 @@ const ConsignorListTable = ({
       value === "" ||
       value === "N/A"
     ) {
-      return (
-        <span className="text-gray-400 text-sm font-normal italic">N/A</span>
-      );
+      return "N/A";
     }
     return value;
   };
@@ -172,173 +172,209 @@ const ConsignorListTable = ({
       {/* Table */}
       {!loading && !showNoResults && (
         <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          {/* Table Header */}
-          <thead>
-            <tr className="bg-[#0D1A33] hover:bg-[#0D1A33]/90 transition-all duration-300">
-              <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[60px]">
-                S.No
-              </th>
-              <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[120px]">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4" />
-                  Customer ID
-                  <svg
-                    className="ml-1 h-4 w-4 opacity-70"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                  </svg>
-                </div>
-              </th>
-              <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[200px]">
-                <div className="flex items-center gap-2">
-                  Customer Name
-                  <svg
-                    className="ml-1 h-4 w-4 opacity-70"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                  </svg>
-                </div>
-              </th>
-              <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[150px]">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="w-4 h-4" />
-                  Industry Type
-                </div>
-              </th>
-              <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[120px]">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Currency
-                </div>
-              </th>
-              <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[130px]">
-                Payment Term
-              </th>
-              <th className="px-4 py-3.5 text-center text-sm font-semibold text-white h-14 min-w-[100px]">
-                <div className="flex items-center justify-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  NDA
-                </div>
-              </th>
-              <th className="px-4 py-3.5 text-center text-sm font-semibold text-white h-14 min-w-[100px]">
-                <div className="flex items-center justify-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  MSA
-                </div>
-              </th>
-              <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[140px]">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Created Date
-                </div>
-              </th>
-              <th className="px-4 py-3.5 text-center text-sm font-semibold text-white h-14 min-w-[100px]">
-                Status
-              </th>
-            </tr>
-          </thead>
-
-          {/* Table Body */}
-          <tbody>
-            {consignors.map((consignor, index) => (
-              <tr
-                key={consignor.customer_id}
-                className="border-b border-[#E5E7EB] hover:bg-[#F5F7FA] transition-all duration-300 group h-14"
-              >
-                {/* Serial Number */}
-                <td className="px-4 py-3 text-sm text-[#4A5568] whitespace-nowrap">
-                  {startIndex + index + 1}
-                </td>
-
-                {/* Customer ID - Clickable */}
-                <td
-                  className="px-4 py-3 whitespace-nowrap cursor-pointer"
-                  onClick={(e) => handleRowClick(consignor.customer_id, e)}
-                >
-                  <span className="text-[#1D4ED8] font-bold text-sm hover:text-[#0F172A] hover:underline transition-all duration-200">
-                    {displayValue(consignor.customer_id)}
-                  </span>
-                </td>
-
-                {/* Customer Name */}
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <span className="text-sm font-semibold text-[#0D1A33]">
-                    {displayValue(consignor.customer_name)}
-                  </span>
-                </td>
-
-                {/* Industry Type */}
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <span className="text-sm text-[#4A5568]">
-                    {displayValue(consignor.industry_type)}
-                  </span>
-                </td>
-
-                {/* Currency Type */}
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <span className="text-sm text-[#4A5568]">
-                    {displayValue(consignor.currency_type)}
-                  </span>
-                </td>
-
-                {/* Payment Term */}
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                    {displayValue(consignor.payment_term)}
-                  </span>
-                </td>
-
-                {/* NDA Status */}
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex items-center justify-center gap-2">
-                    {getDocumentStatusIcon(consignor.nda_expiry_date)}
-                    <span className="text-xs text-[#4A5568]">
-                      {consignor.upload_nda ? formatDate(consignor.nda_expiry_date) : "N/A"}
-                    </span>
+          <table className="w-full border-collapse">
+            {/* Table Header */}
+            <thead>
+              <tr className="bg-[#0D1A33] hover:bg-[#0D1A33]/90 transition-all duration-300">
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[60px]">
+                  S.No
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[120px] text-nowrap">
+                  <div className="flex items-center gap-2">
+                    Customer ID
+                    <svg
+                      className="ml-1 h-4 w-4 opacity-70"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
                   </div>
-                </td>
-
-                {/* MSA Status */}
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex items-center justify-center gap-2">
-                    {getDocumentStatusIcon(consignor.msa_expiry_date)}
-                    <span className="text-xs text-[#4A5568]">
-                      {consignor.upload_msa ? formatDate(consignor.msa_expiry_date) : "N/A"}
-                    </span>
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[200px] text-nowrap">
+                  <div className="flex items-center gap-2">
+                    Customer Name
+                    <svg
+                      className="ml-1 h-4 w-4 opacity-70"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
                   </div>
-                </td>
-
-                {/* Created Date */}
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <span className="text-sm text-[#4A5568]">
-                    {formatDate(consignor.created_at)}
-                  </span>
-                </td>
-
-                {/* Status */}
-                <td className="px-4 py-3 text-center whitespace-nowrap">
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                      consignor.status === "ACTIVE"
-                        ? "bg-green-100 text-green-700"
-                        : consignor.status === "PENDING"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {consignor.status || "UNKNOWN"}
-                  </span>
-                </td>
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[150px] text-nowrap">
+                  <div className="flex items-center gap-2">Industry Type</div>
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[120px] text-nowrap">
+                  <div className="flex items-center gap-2">Currency</div>
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[130px] text-nowrap">
+                  Payment Term
+                </th>
+                <th className="px-4 py-3.5 text-center text-sm font-semibold text-white h-14 min-w-[100px] text-nowrap">
+                  <div className="flex items-center justify-center gap-2">
+                    NDA
+                  </div>
+                </th>
+                <th className="px-4 py-3.5 text-center text-sm font-semibold text-white h-14 min-w-[100px] text-nowrap">
+                  <div className="flex items-center justify-center gap-2">
+                    MSA
+                  </div>
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[140px] text-nowrap">
+                  <div className="flex items-center gap-2">Created By</div>
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[140px] text-nowrap">
+                  <div className="flex items-center gap-2">Created On</div>
+                </th>
+                <th className="px-4 py-3.5 text-center text-sm font-semibold text-white h-14 min-w-[100px] text-nowrap">
+                  Status
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[140px] text-nowrap">
+                  <div className="flex items-center gap-2">Approver</div>
+                </th>
+                <th className="px-4 py-3.5 text-left text-sm font-semibold text-white h-14 min-w-[140px] text-nowrap">
+                  <div className="flex items-center gap-2">Approved On</div>
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+
+            {/* Table Body */}
+            <tbody>
+              {consignors.map((consignor, index) => (
+                <tr
+                  key={consignor.customer_id}
+                  className="border-b border-[#E5E7EB] hover:bg-[#F5F7FA] transition-all duration-300 group h-14"
+                >
+                  {/* Serial Number */}
+                  <td className="px-4 py-3 text-sm text-[#4A5568] whitespace-nowrap">
+                    {startIndex + index + 1}
+                  </td>
+
+                  {/* Customer ID - Clickable */}
+                  <td
+                    className="px-4 py-3 whitespace-nowrap cursor-pointer"
+                    onClick={(e) => handleRowClick(consignor.customer_id, e)}
+                  >
+                    <span className="text-[#1D4ED8] font-bold text-sm hover:text-[#0F172A] hover:underline transition-all duration-200">
+                      {displayValue(consignor.customer_id)}
+                    </span>
+                  </td>
+
+                  {/* Customer Name */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm font-semibold text-[#0D1A33]">
+                      {displayValue(consignor.customer_name)}
+                    </span>
+                  </td>
+
+                  {/* Industry Type */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(consignor.industry_type)}
+                    </span>
+                  </td>
+
+                  {/* Currency Type */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(consignor.currency_type)}
+                    </span>
+                  </td>
+
+                  {/* Payment Term */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                      {displayValue(consignor.payment_term)}
+                    </span>
+                  </td>
+
+                  {/* NDA Status */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-2">
+                      {getDocumentStatusIcon(consignor.nda_expiry_date)}
+                      <span className="text-xs text-[#4A5568]">
+                        {consignor.upload_nda
+                          ? formatDate(consignor.nda_expiry_date)
+                          : "N/A"}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* MSA Status */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-2">
+                      {getDocumentStatusIcon(consignor.msa_expiry_date)}
+                      <span className="text-xs text-[#4A5568]">
+                        {consignor.upload_msa
+                          ? formatDate(consignor.msa_expiry_date)
+                          : "N/A"}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {formatDate(consignor.created_by)}
+                    </span>
+                  </td>
+                  {/* Created Date */}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {formatDate(consignor.created_at)}
+                    </span>
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-2">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                          consignor.status === "ACTIVE"
+                            ? "bg-green-100 text-green-700"
+                            : consignor.status === "PENDING"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : consignor.status === "SAVE_AS_DRAFT"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {consignor.status === "SAVE_AS_DRAFT"
+                          ? "Draft"
+                          : consignor.status || "UNKNOWN"}
+                      </span>
+                      {consignor.status === "SAVE_AS_DRAFT" &&
+                        onDeleteDraft && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteDraft(consignor.customer_id);
+                            }}
+                            className="inline-flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                            title="Delete Draft"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                    </div>
+                  </td>
+
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(consignor.approver)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-[#4A5568]">
+                      {displayValue(consignor.approved_on)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Pagination Section */}

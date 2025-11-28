@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle, XCircle, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Clock, FileText } from "lucide-react";
 
 const StatusPill = ({ status }) => {
   const getStatusStyles = (status) => {
@@ -13,6 +13,9 @@ const StatusPill = ({ status }) => {
       case "pending":
         // Pending: Yellow/Amber theme
         return "bg-[#FEF3C7] text-[#F97316]";
+      case "save_as_draft": // ✅ Add draft status (matching transporter pattern)
+        // Draft: Blue theme
+        return "bg-blue-100 text-blue-700";
       case "inactive":
         // Inactive: Gray theme
         return "bg-[#E5E7EB] text-[#6B7280]";
@@ -33,12 +36,22 @@ const StatusPill = ({ status }) => {
         return <CheckCircle className="h-3 w-3" />;
       case "pending":
         return <Clock className="h-3 w-3" />;
+      case "save_as_draft": // ✅ Add draft icon
+        return <FileText className="h-3 w-3" />;
       case "inactive":
       case "rejected":
         return <XCircle className="h-3 w-3" />;
       default:
         return null;
     }
+  };
+
+  // ✅ Display text mapping (SAVE_AS_DRAFT → "Draft")
+  const getStatusText = (status) => {
+    if (status === "SAVE_AS_DRAFT" || status === "save_as_draft") {
+      return "Draft";
+    }
+    return status || "Unknown";
   };
 
   const icon = getStatusIcon(status);
@@ -50,7 +63,7 @@ const StatusPill = ({ status }) => {
       )}`}
     >
       {icon}
-      <span className="capitalize">{status || "Unknown"}</span>
+      <span className="capitalize">{getStatusText(status)}</span>
     </span>
   );
 };

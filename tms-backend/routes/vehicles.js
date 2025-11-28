@@ -1,7 +1,7 @@
-﻿const express = require('express');
+﻿const express = require("express");
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
-const vehicleController = require('../controllers/vehicleController');
+const { authenticateToken } = require("../middleware/auth");
+const vehicleController = require("../controllers/vehicleController");
 
 /**
  * Vehicle Routes
@@ -18,7 +18,7 @@ const vehicleController = require('../controllers/vehicleController');
  * @desc    Get master data for dropdowns
  * @access  Private
  */
-router.get('/master-data', authenticateToken, vehicleController.getMasterData);
+router.get("/master-data", authenticateToken, vehicleController.getMasterData);
 
 /**
  * @route   GET /api/vehicle
@@ -33,7 +33,7 @@ router.get('/master-data', authenticateToken, vehicleController.getMasterData);
  * @query   {string} sortBy - Sort field (default: created_at)
  * @query   {string} sortOrder - Sort order (default: desc)
  */
-router.get('/', authenticateToken, vehicleController.getAllVehicles);
+router.get("/", authenticateToken, vehicleController.getAllVehicles);
 
 /**
  * @route   GET /api/vehicle/:id
@@ -41,7 +41,7 @@ router.get('/', authenticateToken, vehicleController.getAllVehicles);
  * @access  Private
  * @param   {string} id - Vehicle ID
  */
-router.get('/:id', authenticateToken, vehicleController.getVehicleById);
+router.get("/:id", authenticateToken, vehicleController.getVehicleById);
 
 /**
  * @route   POST /api/vehicle
@@ -55,7 +55,77 @@ router.get('/:id', authenticateToken, vehicleController.getVehicleById);
  * @body    {object} serviceFrequency - Service frequency settings
  * @body    {array} documents - Vehicle documents
  */
-router.post('/', authenticateToken, vehicleController.createVehicle);
+router.post("/", authenticateToken, vehicleController.createVehicle);
+
+// ============================================================================
+// DRAFT WORKFLOW ROUTES
+// ============================================================================
+
+/**
+ * @route   POST /api/vehicle/save-draft
+ * @desc    Save vehicle as draft (minimal validation)
+ * @access  Private
+ * @body    {object} basicInformation - Vehicle basic info (partial)
+ * @body    {object} specifications - Vehicle specifications (partial)
+ * @body    {object} capacityDetails - Capacity and dimensions (partial)
+ * @body    {object} ownershipDetails - Ownership information (partial)
+ * @body    {object} maintenanceHistory - Maintenance records (partial)
+ * @body    {array} documents - Vehicle documents (partial)
+ */
+router.post(
+  "/save-draft",
+  authenticateToken,
+  vehicleController.saveVehicleAsDraft
+);
+
+/**
+ * @route   PUT /api/vehicle/:id/update-draft
+ * @desc    Update vehicle draft (no validation, creator only)
+ * @access  Private
+ * @param   {string} id - Vehicle ID
+ * @body    {object} basicInformation - Vehicle basic info
+ * @body    {object} specifications - Vehicle specifications
+ * @body    {object} capacityDetails - Capacity and dimensions
+ * @body    {object} ownershipDetails - Ownership information
+ * @body    {object} maintenanceHistory - Maintenance records
+ * @body    {array} documents - Vehicle documents
+ */
+router.put(
+  "/:id/update-draft",
+  authenticateToken,
+  vehicleController.updateVehicleDraft
+);
+
+/**
+ * @route   PUT /api/vehicle/:id/submit-draft
+ * @desc    Submit vehicle draft for approval (full validation, DRAFT -> PENDING)
+ * @access  Private
+ * @param   {string} id - Vehicle ID
+ * @body    {object} basicInformation - Vehicle basic info (required)
+ * @body    {object} specifications - Vehicle specifications (required)
+ * @body    {object} capacityDetails - Capacity and dimensions
+ * @body    {object} ownershipDetails - Ownership information
+ * @body    {object} maintenanceHistory - Maintenance records
+ * @body    {object} serviceFrequency - Service frequency settings
+ * @body    {array} documents - Vehicle documents
+ */
+router.put(
+  "/:id/submit-draft",
+  authenticateToken,
+  vehicleController.submitVehicleFromDraft
+);
+
+/**
+ * @route   DELETE /api/vehicle/:id/delete-draft
+ * @desc    Delete vehicle draft (hard delete, creator only)
+ * @access  Private
+ * @param   {string} id - Vehicle ID
+ */
+router.delete(
+  "/:id/delete-draft",
+  authenticateToken,
+  vehicleController.deleteVehicleDraft
+);
 
 /**
  * @route   PUT /api/vehicle/:id
@@ -70,7 +140,7 @@ router.post('/', authenticateToken, vehicleController.createVehicle);
  * @body    {object} serviceFrequency - Service frequency settings
  * @body    {array} documents - Vehicle documents
  */
-router.put('/:id', authenticateToken, vehicleController.updateVehicle);
+router.put("/:id", authenticateToken, vehicleController.updateVehicle);
 
 /**
  * @route   DELETE /api/vehicle/:id
@@ -78,6 +148,6 @@ router.put('/:id', authenticateToken, vehicleController.updateVehicle);
  * @access  Private
  * @param   {string} id - Vehicle ID
  */
-router.delete('/:id', authenticateToken, vehicleController.deleteVehicle);
+router.delete("/:id", authenticateToken, vehicleController.deleteVehicle);
 
 module.exports = router;

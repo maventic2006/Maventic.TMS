@@ -18,11 +18,16 @@ import {
   createConsignor,
   fetchConsignorMasterData,
   clearError,
+  saveConsignorAsDraft,
+  updateConsignorDraft,
 } from "../../../redux/slices/consignorSlice";
 import { createConsignorSchema } from "../validation";
 import { getComponentTheme } from "../../../utils/theme";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../../utils/constants";
 import { addToast } from "../../../redux/slices/uiSlice";
+import { useFormDirtyTracking } from "../../../hooks/useFormDirtyTracking";
+import { useSaveAsDraft } from "../../../hooks/useSaveAsDraft";
+import SaveAsDraftModal from "../../../components/ui/SaveAsDraftModal";
 
 // Import tab components
 import GeneralInfoTab from "../components/GeneralInfoTab";
@@ -30,12 +35,48 @@ import ContactTab from "../components/ContactTab";
 import OrganizationTab from "../components/OrganizationTab";
 import DocumentsTab from "../components/DocumentsTab";
 
+// Initial form data constant for dirty tracking
+const getInitialFormData = () => ({
+  consignorId: null,
+  general: {
+    customer_name: "",
+    search_term: "",
+    industry_type: "",
+    currency_type: "",
+    payment_term: "",
+    website_url: "",
+    remark: "",
+    name_on_po: "",
+    approved_by: "",
+    approved_date: "",
+    upload_nda: null,
+    nda_validity: "",
+    upload_msa: null,
+    msa_validity: "",
+    address_id: "",
+    status: "ACTIVE",
+  },
+  contacts: [],
+  organization: {
+    company_code: "",
+    business_area: "",
+    status: "ACTIVE",
+  },
+  documents: [],
+});
+
 const ConsignorCreatePage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { isCreating, error, lastCreatedId, masterData, isLoading } =
-    useSelector((state) => state.consignor);
+  const {
+    isCreating,
+    isSavingDraft,
+    error,
+    lastCreatedId,
+    masterData,
+    isLoading,
+  } = useSelector((state) => state.consignor);
 
   const { user, role } = useSelector((state) => state.auth);
 
@@ -44,34 +85,7 @@ const ConsignorCreatePage = () => {
   const theme = getPageTheme("general");
 
   const [activeTab, setActiveTab] = useState(0);
-  const [formData, setFormData] = useState({
-    consignorId: null,
-    general: {
-      customer_name: "",
-      search_term: "",
-      industry_type: "",
-      currency_type: "",
-      payment_term: "",
-      website_url: "",
-      remark: "",
-      name_on_po: "",
-      approved_by: "",
-      approved_date: "",
-      upload_nda: null,
-      nda_validity: "",
-      upload_msa: null,
-      msa_validity: "",
-      address_id: "",
-      status: "ACTIVE",
-    },
-    contacts: [],
-    organization: {
-      company_code: "",
-      business_area: "",
-      status: "ACTIVE",
-    },
-    documents: [],
-  });
+  const [formData, setFormData] = useState(() => getInitialFormData());
 
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
@@ -108,14 +122,89 @@ const ConsignorCreatePage = () => {
     },
   ];
 
+  // Dirty tracking hook for unsaved changes
+  const initialFormData = getInitialFormData();
+  const { isDirty, currentData, setCurrentData, resetDirty } =
+    useFormDirtyTracking(initialFormData);
+
+  // Sync formData with dirty tracking
+  useEffect(() => {
+    setCurrentData(formData);
+  }, [formData, setCurrentData]);
+
+  // Save as draft hook integration
+  const {
+    showModal: showDraftModal,
+    handleSaveDraft,
+    handleDiscard,
+    handleCancel: handleCancelDraft,
+    isLoading: isDraftLoading,
+    showSaveAsDraftModal,
+  } = useSaveAsDraft(
+    "consignor",
+    formData,
+    isDirty,
+    null, // No recordId for create page
+    (data) => {
+      console.log("✅ Draft saved successfully:", data);
+      resetDirty(formData);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Consignor draft saved successfully!",
+          duration: 3000,
+        })
+      );
+      // Navigate to consignor list page after successful save
+      setTimeout(() => {
+        navigate("/consignor");
+      }, 1000);
+    },
+    (error) => {
+      console.error("❌ Error saving draft:", error);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: error?.message || "Failed to save draft",
+          duration: 5000,
+        })
+      );
+    }
+  );
+
+  // Browser navigation blocking (refresh/close)
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  // React Router navigation blocking
+  // const blocker = useBlocker(
+  //   ({ currentLocation, nextLocation }) =>
+  //     isDirty && currentLocation.pathname !== nextLocation.pathname
+  // );
+
+  // useEffect(() => {
+  //   if (blocker.state === "blocked") {
+  //     showSaveAsDraftModal(blocker.location.pathname);
+  //   }
+  // }, [blocker.state, blocker.location, showSaveAsDraftModal]);
+
   // Load master data on component mount
   useEffect(() => {
     // Check if masterData is empty or if documentTypes array is empty
-    const needsFetch = !masterData || 
-                       Object.keys(masterData).length === 0 || 
-                       !masterData.documentTypes || 
-                       masterData.documentTypes.length === 0;
-    
+    const needsFetch =
+      !masterData ||
+      Object.keys(masterData).length === 0 ||
+      !masterData.documentTypes ||
+      masterData.documentTypes.length === 0;
+
     if (needsFetch) {
       console.log("🔄 Attempting to fetch consignor master data...");
       console.log("🔄 Current masterData:", masterData);
@@ -186,9 +275,7 @@ const ConsignorCreatePage = () => {
         addToast({
           type: TOAST_TYPES.SUCCESS,
           message: "Consignor created successfully!",
-          details: [
-            `Consignor ID: ${lastCreatedId}`,
-          ],
+          details: [`Consignor ID: ${lastCreatedId}`],
           duration: 3000,
         })
       );
@@ -207,34 +294,9 @@ const ConsignorCreatePage = () => {
         "Are you sure you want to clear all data? This action cannot be undone."
       )
     ) {
-      setFormData({
-        consignorId: null,
-        general: {
-          customer_name: "",
-          search_term: "",
-          industry_type: "",
-          currency_type: "",
-          payment_term: "",
-          website_url: "",
-          remark: "",
-          name_on_po: "",
-          approved_by: "",
-          approved_date: "",
-          upload_nda: null,
-          nda_validity: "",
-          upload_msa: null,
-          msa_validity: "",
-          address_id: "",
-          status: "ACTIVE",
-        },
-        contacts: [],
-        organization: {
-          company_code: "",
-          business_area: "",
-          status: "ACTIVE",
-        },
-        documents: [],
-      });
+      const clearedData = getInitialFormData();
+      setFormData(clearedData);
+      resetDirty(clearedData);
       setValidationErrors({});
       setActiveTab(0);
     }
@@ -251,12 +313,14 @@ const ConsignorCreatePage = () => {
     });
 
     // Prepare data for validation (remove File objects temporarily)
-    const validationData = JSON.parse(JSON.stringify(formData, (key, value) => {
-      if (value instanceof File) {
-        return value.name; // Replace File with filename for validation
-      }
-      return value;
-    }));
+    const validationData = JSON.parse(
+      JSON.stringify(formData, (key, value) => {
+        if (value instanceof File) {
+          return value.name; // Replace File with filename for validation
+        }
+        return value;
+      })
+    );
 
     // Validate entire form
     const validation = createConsignorSchema.safeParse(validationData);
@@ -344,24 +408,24 @@ const ConsignorCreatePage = () => {
     // Extract file objects from contacts and documents
     const files = {};
     const cleanFormData = { ...formData };
-    
+
     // Process contacts to extract photo files
     if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
       cleanFormData.contacts = cleanFormData.contacts.map((contact, index) => {
         const cleanContact = { ...contact };
-        
+
         // Extract photo file if it exists
         if (cleanContact.photo instanceof File) {
           files[`contact_${index}_photo`] = cleanContact.photo;
           cleanContact.photo = null; // ✅ Set to null instead of filename string
-        } else if (typeof cleanContact.photo === 'string') {
+        } else if (typeof cleanContact.photo === "string") {
           // If photo is already a filename string (from state), remove it
           cleanContact.photo = null;
         }
-        
+
         // Remove preview URL (not needed for backend)
         delete cleanContact.photo_preview;
-        
+
         return cleanContact;
       });
     }
@@ -370,7 +434,7 @@ const ConsignorCreatePage = () => {
     if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
       cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
         const cleanDoc = { ...doc };
-        
+
         // Map frontend field names to backend field names
         const mappedDoc = {
           document_type_id: cleanDoc.documentType || cleanDoc.document_type_id,
@@ -378,9 +442,9 @@ const ConsignorCreatePage = () => {
           valid_from: cleanDoc.validFrom || cleanDoc.valid_from,
           valid_to: cleanDoc.validTo || cleanDoc.valid_to,
           country: cleanDoc.country,
-          status: cleanDoc.status !== undefined ? cleanDoc.status : true
+          status: cleanDoc.status !== undefined ? cleanDoc.status : true,
         };
-        
+
         // Extract document file if it exists
         if (cleanDoc.fileUpload instanceof File) {
           const fileKey = `document_${index}_file`;
@@ -391,7 +455,7 @@ const ConsignorCreatePage = () => {
           // If no file uploaded, set fileKey to null
           mappedDoc.fileKey = null;
         }
-        
+
         return mappedDoc;
       });
     }
@@ -400,17 +464,17 @@ const ConsignorCreatePage = () => {
     if (cleanFormData.general) {
       // Handle NDA upload
       if (cleanFormData.general.upload_nda instanceof File) {
-        files['general_nda'] = cleanFormData.general.upload_nda;
+        files["general_nda"] = cleanFormData.general.upload_nda;
         cleanFormData.general.upload_nda = null; // ✅ Set to null, not filename
-      } else if (typeof cleanFormData.general.upload_nda === 'string') {
+      } else if (typeof cleanFormData.general.upload_nda === "string") {
         cleanFormData.general.upload_nda = null; // Remove filename string
       }
-      
+
       // Handle MSA upload
       if (cleanFormData.general.upload_msa instanceof File) {
-        files['general_msa'] = cleanFormData.general.upload_msa;
+        files["general_msa"] = cleanFormData.general.upload_msa;
         cleanFormData.general.upload_msa = null; // ✅ Set to null, not filename
-      } else if (typeof cleanFormData.general.upload_msa === 'string') {
+      } else if (typeof cleanFormData.general.upload_msa === "string") {
         cleanFormData.general.upload_msa = null; // Remove filename string
       }
     }
@@ -418,11 +482,11 @@ const ConsignorCreatePage = () => {
     // Submit valid data with files
     try {
       const formDataPayload = new FormData();
-      formDataPayload.append('payload', JSON.stringify(cleanFormData));
-      
+      formDataPayload.append("payload", JSON.stringify(cleanFormData));
+
       // Append all photo and document files
-      console.log('\n🔍 ===== FRONTEND FILE DEBUG =====');
-      console.log('Total files to upload:', Object.keys(files).length);
+      console.log("\n🔍 ===== FRONTEND FILE DEBUG =====");
+      console.log("Total files to upload:", Object.keys(files).length);
       Object.entries(files).forEach(([key, file]) => {
         console.log(`  Appending file: ${key}`);
         console.log(`    - name: ${file.name}`);
@@ -430,52 +494,107 @@ const ConsignorCreatePage = () => {
         console.log(`    - size: ${file.size} bytes`);
         formDataPayload.append(key, file);
       });
-      
+
       // Log FormData contents
-      console.log('\n📦 FormData contents:');
+      console.log("\n📦 FormData contents:");
       for (let [key, value] of formDataPayload.entries()) {
         if (value instanceof File) {
           console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
         } else {
-          console.log(`  ${key}: ${typeof value === 'string' && value.length > 100 ? value.substring(0, 100) + '...' : value}`);
+          console.log(
+            `  ${key}: ${
+              typeof value === "string" && value.length > 100
+                ? value.substring(0, 100) + "..."
+                : value
+            }`
+          );
         }
       }
-      console.log('===========================\n');
+      console.log("===========================\n");
 
       // Get API URL
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
       // Use fetch with credentials to send HTTP-only cookie
       // NOTE: Token is in HTTP-only cookie (authToken), NOT in localStorage
       const response = await fetch(`${apiUrl}/api/consignors`, {
-        method: 'POST',
-        credentials: 'include',  // ✅ CRITICAL: Send HTTP-only cookie with request
-        body: formDataPayload
+        method: "POST",
+        credentials: "include", // ✅ CRITICAL: Send HTTP-only cookie with request
+        body: formDataPayload,
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error?.message || 'Failed to create consignor');
+        throw new Error(error.error?.message || "Failed to create consignor");
       }
 
       const result = await response.json();
-      
+
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: 'Consignor created successfully',
+          message: "Consignor created successfully",
           duration: 3000,
         })
       );
 
       // Navigate to list page
-      navigate('/consignor');
+      navigate("/consignor");
     } catch (error) {
       dispatch(
         addToast({
           type: TOAST_TYPES.ERROR,
-          message: error.message || 'Failed to create consignor',
+          message: error.message || "Failed to create consignor",
           duration: 5000,
+        })
+      );
+    }
+  };
+
+  // Back button handler with dirty check
+  const handleBackClick = () => {
+    if (isDirty) {
+      showSaveAsDraftModal("/consignor");
+    } else {
+      navigate("/consignor");
+    }
+  };
+
+  // Manual save as draft button handler
+  const handleSaveAsDraftClick = async () => {
+    if (!isDirty) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "No changes to save",
+        })
+      );
+      return;
+    }
+
+    try {
+      const result = await dispatch(
+        saveConsignorAsDraft({ consignorData: formData })
+      ).unwrap();
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Consignor draft saved successfully!",
+        })
+      );
+
+      resetDirty(formData);
+
+      // Navigate to consignor list page after 1 second
+      setTimeout(() => {
+        navigate("/consignor");
+      }, 1000);
+    } catch (error) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: error?.message || "Failed to save draft",
         })
       );
     }
@@ -486,7 +605,7 @@ const ConsignorCreatePage = () => {
   return (
     <div className="bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
       <TMSHeader theme={theme} />
-      
+
       {/* Modern Header Bar with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
         {/* Background decoration */}
@@ -497,7 +616,7 @@ const ConsignorCreatePage = () => {
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBackClick}
               className="group p-2 bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-all duration-300 hover:scale-105 border border-white/20"
             >
               <ArrowLeft className="w-5 h-5 text-white group-hover:text-white transition-colors" />
@@ -508,7 +627,8 @@ const ConsignorCreatePage = () => {
                 Create New Consignor
               </h1>
               <p className="text-blue-100/80 text-xs font-medium">
-                Complete all sections to create a comprehensive consignor profile
+                Complete all sections to create a comprehensive consignor
+                profile
               </p>
             </div>
           </div>
@@ -516,7 +636,7 @@ const ConsignorCreatePage = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={handleClear}
-              disabled={isCreating}
+              disabled={isCreating || isSavingDraft}
               className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
@@ -524,8 +644,26 @@ const ConsignorCreatePage = () => {
             </button>
 
             <button
+              onClick={handleSaveAsDraftClick}
+              disabled={isCreating || isSavingDraft || !isDirty}
+              className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {isSavingDraft ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  Save as Draft
+                </>
+              )}
+            </button>
+
+            <button
               onClick={handleSubmit}
-              disabled={isCreating}
+              disabled={isCreating || isSavingDraft}
               className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isCreating ? (
@@ -629,6 +767,16 @@ const ConsignorCreatePage = () => {
           })}
         </div>
       </div>
+
+      {/* Save as Draft Modal */}
+      <SaveAsDraftModal
+        isOpen={showDraftModal}
+        onSaveDraft={handleSaveDraft}
+        onDiscard={handleDiscard}
+        onCancel={handleCancelDraft}
+        isLoading={isDraftLoading || isSavingDraft}
+        isUpdate={false}
+      />
     </div>
   );
 };

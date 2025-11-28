@@ -9,6 +9,10 @@ const {
   getCitiesByCountryAndState,
   getDrivers,
   getDriverById,
+  saveDriverAsDraft,
+  updateDriverDraft,
+  deleteDriverDraft,
+  submitDriverFromDraft,
 } = require("../controllers/driverController");
 const { authenticateToken } = require("../middleware/auth");
 
@@ -67,6 +71,33 @@ router.get("/:id", authenticateToken, checkProductOwnerAccess, getDriverById);
 
 // Mutation routes
 router.post("/", authenticateToken, checkProductOwnerAccess, createDriver);
+
+// Save as draft routes
+router.post(
+  "/save-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  saveDriverAsDraft
+);
+router.put(
+  "/:id/update-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  updateDriverDraft
+);
+router.put(
+  "/:id/submit-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  submitDriverFromDraft
+);
+router.delete(
+  "/:id/delete-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  deleteDriverDraft
+);
+
 router.put("/:id", authenticateToken, checkProductOwnerAccess, updateDriver);
 
 module.exports = router;

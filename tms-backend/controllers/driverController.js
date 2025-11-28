@@ -4,6 +4,7 @@ const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
 const axios = require("axios");
 const https = require("https");
+const bcrypt = require("bcrypt");
 
 // Helper function to generate unique IDs
 const generateDriverId = async () => {
@@ -2867,6 +2868,7 @@ const getDriverById = async (req, res) => {
     }
 
     // Get addresses for this driver with address type name
+    // Include both ACTIVE and draft statuses (SAVE_AS_DRAFT and DRAFT)
     const addresses = await knex("tms_address as ta")
       .leftJoin(
         "address_type_master as atm",
@@ -2875,19 +2877,24 @@ const getDriverById = async (req, res) => {
       )
       .where("ta.user_reference_id", id)
       .where("ta.user_type", "DRIVER")
-      .where("ta.status", "ACTIVE")
+      .whereIn("ta.status", ["ACTIVE", "SAVE_AS_DRAFT", "DRAFT"])
       .select("ta.*", "atm.address as addressTypeName");
 
     // Get documents for this driver with file upload information
+    // Include both ACTIVE and draft statuses (SAVE_AS_DRAFT and DRAFT)
     const documents = await knex("driver_documents as dd")
       .leftJoin(
         "document_name_master as dnm",
         "dd.document_type_id",
         "dnm.doc_name_master_id"
       )
-      .leftJoin("document_upload as du", "dd.document_id", "du.document_id")
+      .leftJoin(
+        "document_upload as du",
+        "dd.document_unique_id",
+        "du.system_reference_id"
+      )
       .where("dd.driver_id", id)
-      .where("dd.status", "ACTIVE")
+      .whereIn("dd.status", ["ACTIVE", "SAVE_AS_DRAFT", "DRAFT"])
       .select(
         "dd.*",
         "dnm.document_name as documentTypeName",
@@ -2898,13 +2905,15 @@ const getDriverById = async (req, res) => {
       );
 
     // Get history information
+    // Include both ACTIVE and draft statuses (SAVE_AS_DRAFT and DRAFT)
     const history = await knex("driver_history_information")
       .where("driver_id", id)
-      .where("status", "ACTIVE")
+      .whereIn("status", ["ACTIVE", "SAVE_AS_DRAFT", "DRAFT"])
       .orderBy("from_date", "desc")
       .select("*");
 
     // Get accident/violation records with violation type name
+    // Include both ACTIVE and draft statuses (SAVE_AS_DRAFT and DRAFT)
     const accidents = await knex("driver_accident_violation as dav")
       .leftJoin(
         "violation_type_master as vtm",
@@ -2912,7 +2921,7 @@ const getDriverById = async (req, res) => {
         "vtm.violation_type_id"
       )
       .where("dav.driver_id", id)
-      .where("dav.status", "ACTIVE")
+      .whereIn("dav.status", ["ACTIVE", "SAVE_AS_DRAFT", "DRAFT"])
       .orderBy("dav.date", "desc")
       .select("dav.*", "vtm.violation_type as violationTypeName");
 
@@ -3310,6 +3319,1485 @@ const getCitiesByCountryAndState = async (req, res) => {
   }
 };
 
+// ========================================
+// SAVE AS DRAFT CONTROLLER
+// ========================================
+// const saveDriverAsDraft = async (req, res) => {
+//   try {
+//     const {
+//       basicInfo,
+//       addresses,
+//       documents,
+//       employmentHistory,
+//       accidentsViolations,
+//     } = req.body;
+//     const userId = req.user?.user_id; // Get from JWT token
+
+//     const currentTimestamp = new Date();
+
+//     console.log("📝 Starting save driver as draft - User:", userId);
+
+//     // Minimal validation - only full name and date of birth required
+//     if (!basicInfo?.fullName || basicInfo.fullName.trim().length < 2) {
+//       return res.status(400).json({
+//         success: false,
+//         error: {
+//           code: "VALIDATION_ERROR",
+//           message: "Full name is required (minimum 2 characters)",
+//           field: "fullName",
+//         },
+//       });
+//     }
+
+//     if (!basicInfo?.dateOfBirth) {
+//       return res.status(400).json({
+//         success: false,
+//         error: {
+//           code: "VALIDATION_ERROR",
+//           message: "Date of birth is required",
+//           field: "dateOfBirth",
+//         },
+//       });
+//     }
+
+//     const trx = await knex.transaction();
+
+//     try {
+//       // Generate driver ID
+//       const driverId = await generateDriverId();
+
+//       console.log("🆔 Generated Driver ID:", driverId);
+
+//       // Insert into driver_basic_information with SAVE_AS_DRAFT status
+//       await trx("driver_basic_information").insert({
+//         driver_id: driverId,
+//         full_name: basicInfo.fullName,
+//         date_of_birth: basicInfo.dateOfBirth,
+//         gender: basicInfo.gender || null,
+//         blood_group: basicInfo.bloodGroup || null,
+//         phone_number: basicInfo.phoneNumber || null,
+//         email_id: basicInfo.emailId || null,
+//         whats_app_number: basicInfo.whatsAppNumber || null,
+//         alternate_phone_number: basicInfo.alternatePhoneNumber || null,
+//         driver_license_number: basicInfo.driverLicenseNumber || null,
+//         license_type: basicInfo.licenseType || null,
+//         license_expiry_date: basicInfo.licenseExpiryDate || null,
+//         license_issuing_authority: basicInfo.licenseIssuingAuthority || null,
+//         aadhar_number: basicInfo.aadharNumber || null,
+//         pan_number: basicInfo.panNumber || null,
+//         passport_number: basicInfo.passportNumber || null,
+//         status: "SAVE_AS_DRAFT", // Draft status
+//         created_by: userId,
+//         updated_by: userId,
+//         created_at: knex.fn.now(),
+//         updated_at: knex.fn.now(),
+//         created_on: knex.fn.now(),
+//         updated_on: knex.fn.now(),
+//       });
+
+//       // Save partial address data if provided
+//       if (addresses && addresses.length > 0) {
+//         for (const address of addresses) {
+//           if (address.country || address.state || address.city) {
+//             const addressId = await generateAddressId(trx);
+
+//             await trx("tms_address").insert({
+//               address_id: addressId,
+//               user_reference_id: driverId,
+//               user_type: "DRIVER",
+//               country: address.country || null,
+//               state: address.state || null,
+//               city: address.city || null,
+//               district: address.district || null,
+//               street_1: address.street1 || null,
+//               street_2: address.street2 || null,
+//               postal_code: address.postalCode || null,
+//               is_primary: address.isPrimary || false,
+//               address_type_id: address.addressTypeId || "AT001",
+//               status: "ACTIVE",
+//               created_by: userId,
+//               updated_by: userId,
+//               created_at: currentTimestamp,
+//               updated_at: currentTimestamp,
+//               created_on: currentTimestamp,
+//               updated_on: currentTimestamp,
+//             });
+//           }
+//         }
+//       }
+
+//       // Save partial documents if provided
+//       if (documents && documents.length > 0) {
+//         for (const doc of documents) {
+//           if (doc.documentNumber || doc.documentType) {
+//             const docId = await generateDocumentId(trx);
+//             const documentUniqueId = `${driverId}_${docId}`;
+
+//             await trx("driver_documents").insert({
+//               document_unique_id: documentUniqueId,
+//               document_id: docId,
+//               driver_id: driverId,
+//               document_type_id: doc.documentType || null,
+//               document_number: doc.documentNumber || null,
+//               issue_date: doc.issueDate || null,
+//               expiry_date: doc.expiryDate || null,
+//               issuing_authority: doc.issuingAuthority || null,
+//               status: doc.status !== undefined ? doc.status : "ACTIVE",
+//               created_by: userId,
+//               updated_by: userId,
+//               created_at: currentTimestamp,
+//               updated_at: currentTimestamp,
+//               created_on: currentTimestamp,
+//               updated_on: currentTimestamp,
+//             });
+
+//             // Handle file upload if provided
+//             if (doc.fileName && doc.fileData) {
+//               const uploadId = await generateDocumentUploadId(trx);
+
+//               await trx("document_upload").insert({
+//                 document_id: uploadId,
+//                 file_name: doc.fileName,
+//                 file_type: doc.fileType || "application/pdf",
+//                 file_xstring_value: doc.fileData,
+//                 system_reference_id: documentUniqueId,
+//                 status: "ACTIVE",
+//                 created_by: userId,
+//                 updated_by: userId,
+//                 created_at: currentTimestamp,
+//                 updated_at: currentTimestamp,
+//                 created_on: currentTimestamp,
+//                 updated_on: currentTimestamp,
+//               });
+//             }
+//           }
+//         }
+//       }
+
+//       // Save partial employment history if provided
+//       if (employmentHistory && employmentHistory.length > 0) {
+//         for (const history of employmentHistory) {
+//           if (history.employerName || history.fromDate) {
+//             const historyId = await generateHistoryId(trx);
+
+//             await trx("driver_history_information").insert({
+//               history_id: historyId,
+//               driver_id: driverId,
+//               employer_name: history.employerName || null,
+//               from_date: history.fromDate || null,
+//               to_date: history.toDate || null,
+//               position: history.position || null,
+//               vehicle_type: history.vehicleType || null,
+//               reason_for_leaving: history.reasonForLeaving || null,
+//               status: "ACTIVE",
+//               created_by: userId,
+//               updated_by: userId,
+//               created_at: currentTimestamp,
+//               updated_at: currentTimestamp,
+//               created_on: currentTimestamp,
+//               updated_on: currentTimestamp,
+//             });
+//           }
+//         }
+//       }
+
+//       // Save partial accidents/violations if provided
+//       if (accidentsViolations && accidentsViolations.length > 0) {
+//         for (const incident of accidentsViolations) {
+//           if (incident.incidentDate || incident.violationType) {
+//             const accidentId = await generateAccidentId(trx);
+
+//             await trx("driver_accident_violation").insert({
+//               accident_id: accidentId,
+//               driver_id: driverId,
+//               incident_date: incident.incidentDate || null,
+//               violation_type: incident.violationType || null,
+//               description: incident.description || null,
+//               severity: incident.severity || null,
+//               penalty_amount: incident.penaltyAmount || null,
+//               status: "ACTIVE",
+//               created_by: userId,
+//               updated_by: userId,
+//               created_at: currentTimestamp,
+//               updated_at: currentTimestamp,
+//               created_on: currentTimestamp,
+//               updated_on: currentTimestamp,
+//             });
+//           }
+//         }
+//       }
+
+//       await trx.commit();
+
+//       console.log("✅ Driver draft saved successfully:", driverId);
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "Driver saved as draft successfully",
+//         data: {
+//           driverId,
+//           status: "SAVE_AS_DRAFT",
+//         },
+//       });
+//     } catch (error) {
+//       await trx.rollback();
+//       throw error;
+//     }
+//   } catch (error) {
+//     console.error("❌ Save driver as draft error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       error: {
+//         code: "SAVE_DRAFT_ERROR",
+//         message: "Failed to save driver as draft",
+//         details: error.message,
+//       },
+//     });
+//   }
+// };
+
+// SAVE AS DRAFT CONTROLLER
+// const saveDriverAsDraft = async (req, res) => {
+//   const trx = await knex.transaction();
+
+//   try {
+//     const { basicInfo, addresses, documents } = req.body;
+
+//     const timestamp = new Date();
+//     const user = req.user?.user_id || "SYSTEM";
+
+//     // ===========================================================
+//     // 1️⃣ Generate driver_id
+//     // ===========================================================
+//     const driverId = await generateDriverId(trx);
+
+//     // ===========================================================
+//     // 2️⃣ INSERT DRIVER BASIC INFO  (driver_basic_information)
+//     // ===========================================================
+//     await trx("driver_basic_information").insert({
+//       driver_id: driverId,
+//       full_name: basicInfo?.fullName || null,
+//       date_of_birth: basicInfo?.dateOfBirth || null,
+//       gender: basicInfo?.gender || null,
+//       blood_group: basicInfo?.bloodGroup || null,
+//       phone_number: basicInfo?.phoneNumber || null,
+//       email_id: basicInfo?.emailId || null,
+//       emergency_contact: basicInfo?.emergencyContact || null,
+//       alternate_phone_number: basicInfo?.alternatePhoneNumber || null,
+
+//       created_at: timestamp,
+//       created_on: timestamp,
+//       created_by: user,
+
+//       updated_at: timestamp,
+//       updated_on: timestamp,
+//       updated_by: user,
+
+//       status: "DRAFT",
+//     });
+
+//     // ===========================================================
+//     // 3️⃣ INSERT ADDRESSES  (tms_address)
+//     // ===========================================================
+//     if (addresses && addresses.length > 0) {
+//       for (const addr of addresses) {
+//         const addressId = await generateAddressId(trx);
+
+//         await trx("tms_address").insert({
+//           address_id: addressId,
+//           user_reference_id: driverId,
+//           user_type: "DRIVER",
+
+//           country: addr.country || null,
+//           state: addr.state || null,
+//           city: addr.city || null,
+//           district: addr.district || null,
+//           street_1: addr.street1 || null,
+//           street_2: addr.street2 || null,
+//           postal_code: addr.postalCode || null,
+
+//           address_type_id: addr.addressTypeId || null,
+//           is_primary: addr.isPrimary || false,
+
+//           created_at: timestamp,
+//           created_on: timestamp,
+//           created_by: user,
+
+//           updated_at: timestamp,
+//           updated_on: timestamp,
+//           updated_by: user,
+
+//           status: "ACTIVE",
+//         });
+//       }
+//     }
+
+//     // ===========================================================
+//     // 4️⃣ INSERT DOCUMENTS  (driver_documents)
+//     // ===========================================================
+//     if (documents && documents.length > 0) {
+//       for (const doc of documents) {
+//         // Skip empty docs (same as update flow)
+//         if (!doc.documentNumber || doc.documentNumber.trim() === "") {
+//           continue;
+//         }
+
+//         const documentId = await generateDocumentId(trx);
+
+//         await trx("driver_documents").insert({
+//           document_id: documentId,
+//           driver_id: driverId,
+
+//           document_type_id: doc.documentType || null,
+//           document_number: doc.documentNumber || null,
+//           document_file: doc.documentFile || null, // xstring or base64
+
+//           // issue_date: doc.issueDate || null,
+//           // expiry_date: doc.expiryDate || null,
+
+//           created_at: timestamp,
+//           created_on: timestamp,
+//           created_by: user,
+
+//           updated_at: timestamp,
+//           updated_on: timestamp,
+//           updated_by: user,
+
+//           status: "ACTIVE",
+//         });
+//       }
+//     }
+
+//     await trx.commit();
+//     return res.status(201).json({
+//       success: true,
+//       message: "Driver saved as draft successfully",
+//       driver_id: driverId,
+//       timestamp: new Date().toISOString(),
+//     });
+//   } catch (err) {
+//     console.error("❌ SAVE DRAFT ERROR:", err);
+//     await trx.rollback();
+//     return res.status(500).json({
+//       success: false,
+//       error: {
+//         code: "INTERNAL_SERVER_ERROR",
+//         message: "Failed to save driver draft",
+//       },
+//       timestamp: new Date().toISOString(),
+//     });
+//   }
+// };
+
+const saveDriverAsDraft = async (req, res) => {
+  const trx = await knex.transaction();
+
+  try {
+    const { basicInfo, addresses, documents } = req.body;
+
+    const timestamp = new Date();
+    const user = req.user?.user_id || "SYSTEM";
+
+    // ===========================================================
+    // 1️⃣ Generate driver_id
+    // ===========================================================
+    const driverId = await generateDriverId(trx);
+
+    // ===========================================================
+    // 1.1️⃣ Generate user_id for user_master
+    // ===========================================================
+    const userMasterId = `UM${driverId.replace("DR", "")}`; // Example: DR001 → UM001
+
+    // TEMP PASSWORD for DRAFT drivers
+    const tempPassword = await bcrypt.hash("TempDriver@123", 10);
+
+    // ===========================================================
+    // 2️⃣ INSERT USER MASTER FOR DRIVER
+    // ===========================================================
+    await trx("user_master").insert({
+      user_id: userMasterId,
+      user_type_id: "UT004", // ⚡ CHANGE if your driver user_type_id differs
+      user_full_name: basicInfo?.fullName || "Draft Driver",
+      email_id: basicInfo?.emailId || null,
+      mobile_number: basicInfo?.phoneNumber || null,
+
+      from_date: knex.raw("CURDATE()"),
+      to_date: null,
+
+      password: tempPassword,
+      password_type: "initial",
+
+      status: "DRAFT", // Same pattern as transporter
+      is_active: false,
+
+      created_by: user,
+      updated_by: user,
+      created_by_user_id: user,
+      created_at: timestamp,
+      updated_at: timestamp,
+      created_on: timestamp,
+      updated_on: timestamp,
+    });
+
+    // ===========================================================
+    // 3️⃣ INSERT DRIVER BASIC INFO  (driver_basic_information)
+    // ===========================================================
+    await trx("driver_basic_information").insert({
+      driver_id: driverId,
+      full_name: basicInfo?.fullName || null,
+      date_of_birth: basicInfo?.dateOfBirth || null,
+      gender: basicInfo?.gender || null,
+      blood_group: basicInfo?.bloodGroup || null,
+      phone_number: basicInfo?.phoneNumber || null,
+      email_id: basicInfo?.emailId || null,
+      emergency_contact: basicInfo?.emergencyContact || null,
+      alternate_phone_number: basicInfo?.alternatePhoneNumber || null,
+
+      status: "DRAFT",
+
+      created_at: timestamp,
+      created_on: timestamp,
+      created_by: user,
+      updated_at: timestamp,
+      updated_on: timestamp,
+      updated_by: user,
+    });
+
+    // ===========================================================
+    // 4️⃣ INSERT ADDRESSES  (tms_address)
+    // ===========================================================
+    if (addresses && addresses.length > 0) {
+      for (const addr of addresses) {
+        const addressId = await generateAddressId(trx);
+
+        await trx("tms_address").insert({
+          address_id: addressId,
+          user_reference_id: driverId,
+          user_type: "DRIVER",
+
+          country: addr.country || null,
+          state: addr.state || null,
+          city: addr.city || null,
+          district: addr.district || null,
+          street_1: addr.street1 || null,
+          street_2: addr.street2 || null,
+          postal_code: addr.postalCode || null,
+
+          address_type_id: addr.addressTypeId || null,
+          is_primary: addr.isPrimary || false,
+
+          status: "ACTIVE",
+
+          created_at: timestamp,
+          created_on: timestamp,
+          created_by: user,
+          updated_at: timestamp,
+          updated_on: timestamp,
+          updated_by: user,
+        });
+      }
+    }
+
+    // ===========================================================
+    // 5️⃣ INSERT DOCUMENTS  (driver_documents)
+    // ===========================================================
+    if (documents && documents.length > 0) {
+      for (const doc of documents) {
+        if (!doc.documentNumber?.trim()) continue;
+
+        const documentId = await generateDocumentId(trx);
+
+        await trx("driver_documents").insert({
+          document_id: documentId,
+          driver_id: driverId,
+
+          document_type_id: doc.documentType || null,
+          document_number: doc.documentNumber || null,
+          document_file: doc.documentFile || null,
+
+          status: "ACTIVE",
+
+          created_at: timestamp,
+          created_on: timestamp,
+          created_by: user,
+          updated_at: timestamp,
+          updated_on: timestamp,
+          updated_by: user,
+        });
+      }
+    }
+
+    await trx.commit();
+    return res.status(201).json({
+      success: true,
+      message: "Driver saved as draft successfully",
+      driver_id: driverId,
+      user_master_id: userMasterId,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("❌ SAVE DRAFT ERROR:", err);
+    await trx.rollback();
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to save driver draft",
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+// ========================================
+// UPDATE DRAFT CONTROLLER
+// ========================================
+// Update Driver Draft Controller (fixed table/field names)
+// Update Driver Draft Controller (schema-corrected)
+const updateDriverDraft = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      basicInfo,
+      addresses,
+      documents,
+      employmentHistory,
+      accidentsViolations,
+    } = req.body;
+    const userId = req.user?.user_id;
+
+    const currentTimestamp = new Date();
+
+    console.log("📝 Updating driver draft:", id, "User:", userId);
+
+    // Verify driver exists
+    const existing = await knex("driver_basic_information")
+      .where("driver_id", id)
+      .first();
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Driver not found",
+        },
+      });
+    }
+
+    // Accept both "SAVE_AS_DRAFT" and "DRAFT" statuses for backward compatibility
+    if (existing.status !== "SAVE_AS_DRAFT" && existing.status !== "DRAFT") {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_STATUS",
+          message:
+            "Can only update drafts. Use regular update endpoint for active drivers",
+        },
+      });
+    }
+
+    if (existing.created_by !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "You can only update your own drafts",
+        },
+      });
+    }
+
+    // Minimal validation
+    if (!basicInfo?.fullName || basicInfo.fullName.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Full name is required (minimum 2 characters)",
+          field: "fullName",
+        },
+      });
+    }
+
+    if (!basicInfo?.dateOfBirth) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Date of birth is required",
+          field: "dateOfBirth",
+        },
+      });
+    }
+
+    const trx = await knex.transaction();
+
+    try {
+      // ---------------------------
+      // Update driver_basic_information
+      // NOTE: only keep columns that actually exist in the table per create/update controllers
+      // ---------------------------
+      await trx("driver_basic_information")
+        .where("driver_id", id)
+        .update({
+          full_name: basicInfo.fullName,
+          date_of_birth: basicInfo.dateOfBirth,
+          gender: basicInfo.gender || null,
+          blood_group: basicInfo.bloodGroup || null,
+          phone_number: basicInfo.phoneNumber || null,
+          email_id: basicInfo.emailId || null,
+          emergency_contact: basicInfo.emergencyContact || null,
+          alternate_phone_number: basicInfo.alternatePhoneNumber || null,
+          // avg_rating is not updated here (it's managed elsewhere)
+          updated_by: userId,
+          updated_at: knex.fn.now(),
+          updated_on: knex.fn.now(),
+        });
+
+      // ---------------------------
+      // Delete existing related data and re-insert (addresses, documents, history, accidents)
+      // Canonical document_unique_id format: `${driverId}-${documentId}`
+      // ---------------------------
+      await trx("tms_address").where("user_reference_id", id).del();
+
+      // Delete document_upload entries referencing this driver's document_unique_id pattern
+      await trx("document_upload")
+        .whereIn("system_reference_id", function () {
+          this.select("document_unique_id")
+            .from("driver_documents")
+            .where("document_unique_id", "like", `${id}-%`);
+        })
+        .del();
+
+      // Delete driver_documents for this driver
+      await trx("driver_documents")
+        .where("document_unique_id", "like", `${id}-%`)
+        .del();
+
+      // Delete history entries
+      await trx("driver_history_information").where("driver_id", id).del();
+
+      // Delete accidents/violations
+      await trx("driver_accident_violation").where("driver_id", id).del();
+
+      // ---------------------------
+      // Re-insert addresses (tms_address)
+      // ---------------------------
+      if (addresses && addresses.length > 0) {
+        for (const address of addresses) {
+          // Only insert if some meaningful address data present
+          if (address.country || address.state || address.city) {
+            const addressId = await generateAddressId(trx);
+
+            await trx("tms_address").insert({
+              address_id: addressId,
+              user_reference_id: id,
+              user_type: "DRIVER",
+              country: address.country || null,
+              state: address.state || null,
+              city: address.city || null,
+              district: address.district || null,
+              street_1: address.street1 || null,
+              street_2: address.street2 || null,
+              postal_code: address.postalCode || null,
+              is_primary: address.isPrimary || false,
+              address_type_id: address.addressTypeId || "AT001",
+              status: "DRAFT",
+              created_by: userId,
+              updated_by: userId,
+              created_at: currentTimestamp,
+              updated_at: currentTimestamp,
+              created_on: currentTimestamp,
+              updated_on: currentTimestamp,
+            });
+          }
+        }
+      }
+
+      // ---------------------------
+      // Re-insert documents (driver_documents + document_upload)
+      // ---------------------------
+      if (documents && documents.length > 0) {
+        for (const doc of documents) {
+          // Only insert if any meaningful doc data present
+          if (doc.documentNumber || doc.documentType) {
+            const docId = await generateDocumentId(trx);
+            const documentUniqueId = `${id}-${docId}`;
+
+            await trx("driver_documents").insert({
+              document_unique_id: documentUniqueId,
+              document_id: docId,
+              driver_id: id,
+              document_type_id: doc.documentType || null,
+              document_number: doc.documentNumber || null,
+              issuing_country: doc.issuingCountry || null,
+              issuing_state: doc.issuingState || null,
+              valid_from: doc.validFrom || null,
+              valid_to: doc.validTo || null,
+              active_flag: doc.status !== false,
+              remarks: doc.remarks || null,
+              created_by: userId,
+              updated_by: userId,
+              created_at: currentTimestamp,
+              updated_at: currentTimestamp,
+              created_on: currentTimestamp,
+              updated_on: currentTimestamp,
+              status: "DRAFT",
+            });
+
+            // If file data provided, insert into document_upload
+            if (doc.fileData) {
+              const docUploadId = await generateDocumentUploadId(trx);
+
+              await trx("document_upload").insert({
+                document_id: docUploadId,
+                file_name: doc.fileName || null,
+                file_type: doc.fileType || "application/pdf",
+                file_xstring_value: doc.fileData,
+                system_reference_id: documentUniqueId,
+                is_verified: false,
+                valid_from: doc.validFrom || null,
+                valid_to: doc.validTo || null,
+                created_at: currentTimestamp,
+                created_on: currentTimestamp,
+                created_by: userId,
+                updated_at: currentTimestamp,
+                updated_on: currentTimestamp,
+                updated_by: userId,
+                status: "DRAFT",
+              });
+            }
+          }
+        }
+      }
+
+      // ---------------------------
+      // Re-insert history (driver_history_information)
+      // ---------------------------
+      if (employmentHistory && employmentHistory.length > 0) {
+        for (const history of employmentHistory) {
+          // Only insert if meaningful data present
+          if (history.employerName || history.fromDate) {
+            const historyId = await generateHistoryId(trx);
+
+            await trx("driver_history_information").insert({
+              driver_history_id: historyId,
+              driver_id: id,
+              employer: history.employerName || null,
+              employment_status: history.employmentStatus || null,
+              from_date: history.fromDate || null,
+              to_date: history.toDate || null,
+              job_title: history.jobTitle || null,
+              created_at: currentTimestamp,
+              created_on: currentTimestamp,
+              created_by: userId,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: userId,
+              status: "DRAFT",
+            });
+          }
+        }
+      }
+
+      // ---------------------------
+      // Re-insert accidents/violations (driver_accident_violation)
+      // ---------------------------
+      if (accidentsViolations && accidentsViolations.length > 0) {
+        for (const incident of accidentsViolations) {
+          // Only insert if meaningful data present
+          if (incident.incidentDate || incident.violationType) {
+            const accidentId = await generateAccidentId(trx);
+
+            await trx("driver_accident_violation").insert({
+              driver_violation_id: accidentId,
+              driver_id: id,
+              type: incident.violationType || null,
+              date: incident.incidentDate || null,
+              vehicle_regn_number:
+                incident.vehicleRegnNumber ||
+                incident.vehicleRegistrationNumber ||
+                null,
+              description: incident.description || null,
+              created_at: currentTimestamp,
+              created_on: currentTimestamp,
+              created_by: userId,
+              updated_at: currentTimestamp,
+              updated_on: currentTimestamp,
+              updated_by: userId,
+              status: "DRAFT",
+            });
+          }
+        }
+      }
+
+      await trx.commit();
+
+      console.log("✅ Driver draft updated successfully:", id);
+
+      return res.status(200).json({
+        success: true,
+        message: "Driver draft updated successfully",
+        data: {
+          driver_id: id,
+          status: "DRAFT",
+        },
+      });
+    } catch (error) {
+      await trx.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error("❌ Update driver draft error:", error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_DRAFT_ERROR",
+        message: "Failed to update driver draft",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// SUBMIT DRAFT FOR APPROVAL CONTROLLER
+// ========================================
+const submitDriverFromDraft = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      basicInfo,
+      addresses,
+      documents,
+      employmentHistory,
+      accidentsViolations,
+    } = req.body;
+    const userId = req.user?.user_id;
+
+    const currentTimestamp = new Date();
+
+    console.log(
+      "📤 Submitting driver draft for approval:",
+      id,
+      "User:",
+      userId
+    );
+
+    // Verify it's a draft and belongs to the user
+    const existing = await knex("driver_basic_information")
+      .where("driver_id", id)
+      .first();
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Driver not found",
+        },
+      });
+    }
+
+    // Accept both "SAVE_AS_DRAFT" and "DRAFT" statuses for backward compatibility
+    if (existing.status !== "SAVE_AS_DRAFT" && existing.status !== "DRAFT") {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_STATUS",
+          message:
+            "Can only submit drafts for approval. This driver is already submitted.",
+        },
+      });
+    }
+
+    if (existing.created_by !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "You can only submit your own drafts",
+        },
+      });
+    }
+
+    // ========================================
+    // COMPREHENSIVE VALIDATION - Same as createDriver
+    // ========================================
+
+    // Validate basic info - full name
+    if (!basicInfo?.fullName || basicInfo.fullName.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Full name is required (minimum 2 characters)",
+          field: "basicInfo.fullName",
+        },
+      });
+    }
+
+    // Validate date of birth with age check
+    const dobValidation = validateDateOfBirth(basicInfo.dateOfBirth);
+    if (!dobValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: dobValidation.message,
+          field: "basicInfo.dateOfBirth",
+        },
+      });
+    }
+
+    // Validate phone number
+    if (!basicInfo.phoneNumber || !validatePhoneNumber(basicInfo.phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Valid phone number is required",
+          field: "basicInfo.phoneNumber",
+        },
+      });
+    }
+
+    // Check for duplicate phone number (exclude current driver)
+    const existingPhoneCheck = await knex("driver_basic_information")
+      .where("phone_number", basicInfo.phoneNumber)
+      .whereNot("driver_id", id)
+      .first();
+
+    if (existingPhoneCheck) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_PHONE",
+          message: "Phone number already exists for another driver",
+          field: "basicInfo.phoneNumber",
+        },
+      });
+    }
+
+    // Validate email if provided
+    if (basicInfo.emailId && !validateEmail(basicInfo.emailId)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid email format",
+          field: "basicInfo.emailId",
+        },
+      });
+    }
+
+    // Check for duplicate email (exclude current driver)
+    if (basicInfo.emailId) {
+      const existingEmailCheck = await knex("driver_basic_information")
+        .where("email_id", basicInfo.emailId)
+        .whereNot("driver_id", id)
+        .first();
+
+      if (existingEmailCheck) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "DUPLICATE_EMAIL",
+            message: "Email already exists for another driver",
+            field: "basicInfo.emailId",
+          },
+        });
+      }
+    }
+
+    // Validate alternate phone number if provided
+    if (
+      basicInfo.alternatePhoneNumber &&
+      !validatePhoneNumber(basicInfo.alternatePhoneNumber)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid alternate phone number",
+          field: "basicInfo.alternatePhoneNumber",
+        },
+      });
+    }
+
+    // Validate emergency contact
+    if (!basicInfo.emergencyContact) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Emergency contact is required",
+          field: "basicInfo.emergencyContact",
+        },
+      });
+    }
+
+    if (!validatePhoneNumber(basicInfo.emergencyContact)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid emergency contact number",
+          field: "basicInfo.emergencyContact",
+        },
+      });
+    }
+
+    // Validate at least one address
+    if (!addresses || addresses.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "At least one address is required",
+          field: "addresses",
+        },
+      });
+    }
+
+    // Validate each address
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
+
+      if (!address.addressTypeId) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Address type is required",
+            field: `addresses[${i}].addressTypeId`,
+          },
+        });
+      }
+
+      if (!address.country) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Country is required",
+            field: `addresses[${i}].country`,
+          },
+        });
+      }
+
+      if (!address.state) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "State is required",
+            field: `addresses[${i}].state`,
+          },
+        });
+      }
+
+      if (!address.city) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "City is required",
+            field: `addresses[${i}].city`,
+          },
+        });
+      }
+
+      if (!address.postalCode || address.postalCode.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Postal code is required",
+            field: `addresses[${i}].postalCode`,
+          },
+        });
+      }
+
+      if (!validatePostalCode(address.postalCode)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Invalid postal code format",
+            field: `addresses[${i}].postalCode`,
+          },
+        });
+      }
+    }
+
+    // Validate documents if provided
+    if (documents && documents.length > 0) {
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
+
+        // Skip empty documents
+        if (!doc.documentNumber || doc.documentNumber.trim() === "") {
+          continue;
+        }
+
+        if (!doc.documentType) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document ${i + 1}: Document type is required`,
+              field: `documents[${i}].documentType`,
+            },
+          });
+        }
+
+        // Validate document exists in master and resolve ID
+        const docNameInfo = await knex("document_name_master")
+          .where(function () {
+            this.where("doc_name_master_id", doc.documentType).orWhere(
+              "document_name",
+              doc.documentType
+            );
+          })
+          .where("status", "ACTIVE")
+          .first();
+
+        if (!docNameInfo) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document ${i + 1}: Invalid document type "${
+                doc.documentType
+              }"`,
+              field: `documents[${i}].documentType`,
+            },
+          });
+        }
+
+        // Store resolved document type ID and name
+        doc.documentTypeId = docNameInfo.doc_name_master_id;
+        doc.documentTypeName = docNameInfo.document_name;
+
+        // Validate document format
+        const docValidation = validateDocumentNumber(
+          doc.documentNumber,
+          doc.documentTypeName
+        );
+        if (!docValidation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Document ${i + 1}: ${docValidation.message}`,
+              field: `documents[${i}].documentNumber`,
+            },
+          });
+        }
+
+        // Check for duplicate document numbers (exclude current driver's documents)
+        const duplicateDoc = await knex("driver_documents")
+          .where("document_type_id", doc.documentTypeId)
+          .where("document_number", doc.documentNumber)
+          .whereNot("driver_id", id)
+          .first();
+
+        if (duplicateDoc) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "DUPLICATE_DOCUMENT",
+              message: `Document ${i + 1}: This ${
+                doc.documentTypeName
+              } number already exists`,
+              field: `documents[${i}].documentNumber`,
+            },
+          });
+        }
+      }
+    }
+
+    const trx = await knex.transaction();
+
+    try {
+      // Update general info to PENDING status
+      await trx("driver_basic_information")
+        .where("driver_id", id)
+        .update({
+          full_name: basicInfo.fullName,
+          date_of_birth: basicInfo.dateOfBirth,
+          gender: basicInfo.gender || null,
+          blood_group: basicInfo.bloodGroup || null,
+          phone_number: basicInfo.phoneNumber || null,
+          email_id: basicInfo.emailId || null,
+          emergency_contact: basicInfo.emergencyContact || null,
+          alternate_phone_number: basicInfo.alternatePhoneNumber || null,
+          status: "PENDING", // Change status to PENDING
+          updated_by: userId,
+          updated_at: knex.fn.now(),
+          updated_on: knex.fn.now(),
+        });
+
+      // Delete existing related data and re-insert with complete data
+      await trx("tms_address").where("user_reference_id", id).del();
+      await trx("document_upload")
+        .whereIn("system_reference_id", function () {
+          this.select("document_unique_id")
+            .from("driver_documents")
+            .where("document_unique_id", "like", `${id}_%`);
+        })
+        .del();
+      await trx("driver_documents")
+        .where("document_unique_id", "like", `${id}_%`)
+        .del();
+      await trx("driver_history_information").where("driver_id", id).del();
+      await trx("driver_accident_violation").where("driver_id", id).del();
+
+      // Re-insert complete data
+      for (const address of addresses) {
+        const addressId = await generateAddressId(trx);
+
+        await trx("tms_address").insert({
+          address_id: addressId,
+          user_reference_id: id,
+          user_type: "DRIVER",
+          country: address.country,
+          state: address.state,
+          city: address.city,
+          district: address.district || null,
+          street_1: address.street1 || null,
+          street_2: address.street2 || null,
+          postal_code: address.postalCode || null,
+          is_primary: address.isPrimary || false,
+          address_type_id: address.addressTypeId || "AT001",
+          status: "ACTIVE",
+          created_by: userId,
+          updated_by: userId,
+          created_at: currentTimestamp,
+          updated_at: currentTimestamp,
+          created_on: currentTimestamp,
+          updated_on: currentTimestamp,
+        });
+      }
+
+      // Re-insert documents if provided
+      if (documents && documents.length > 0) {
+        for (const doc of documents) {
+          const docId = await generateDocumentId(trx);
+          const documentUniqueId = `${id}_${docId}`;
+
+          await trx("driver_documents").insert({
+            document_unique_id: documentUniqueId,
+            document_id: docId,
+            driver_id: id,
+            document_type_id: doc.documentTypeId || doc.documentType, // Use resolved ID
+            document_number: doc.documentNumber,
+            issuing_country: doc.issuingCountry || null,
+            issuing_state: doc.issuingState || null,
+            valid_from: doc.validFrom || null,
+            valid_to: doc.validTo || null,
+            active_flag: doc.status !== false,
+            remarks: doc.remarks || null,
+            status: "ACTIVE",
+            created_by: userId,
+            updated_by: userId,
+            created_at: currentTimestamp,
+            updated_at: currentTimestamp,
+            created_on: currentTimestamp,
+            updated_on: currentTimestamp,
+          });
+
+          if (doc.fileData) {
+            const uploadId = await generateDocumentUploadId(trx);
+            await trx("document_upload").insert({
+              document_id: uploadId,
+              file_xstring_value: doc.fileData,
+              file_name: doc.fileName || "document",
+              file_type: doc.fileType || "application/pdf",
+              system_reference_id: documentUniqueId,
+              status: "ACTIVE",
+              created_by: userId,
+              updated_by: userId,
+              created_at: currentTimestamp,
+              updated_at: currentTimestamp,
+              created_on: currentTimestamp,
+              updated_on: currentTimestamp,
+            });
+          }
+        }
+      }
+
+      // Re-insert employment history if provided
+      if (employmentHistory && employmentHistory.length > 0) {
+        for (const history of employmentHistory) {
+          const historyId = await generateHistoryId(trx);
+
+          await trx("driver_history_information").insert({
+            driver_history_id: historyId,
+            driver_id: id,
+            employer: history.employer || history.employerName || null,
+            employment_status: history.employmentStatus || null,
+            from_date: history.fromDate,
+            to_date: history.toDate || null,
+            job_title: history.jobTitle || history.position || null,
+            status: "ACTIVE",
+            created_by: userId,
+            updated_by: userId,
+            created_at: currentTimestamp,
+            updated_at: currentTimestamp,
+            created_on: currentTimestamp,
+            updated_on: currentTimestamp,
+          });
+        }
+      }
+
+      // Re-insert accidents/violations if provided
+      if (accidentsViolations && accidentsViolations.length > 0) {
+        for (const incident of accidentsViolations) {
+          const accidentId = await generateAccidentId(trx);
+
+          await trx("driver_accident_violation").insert({
+            driver_violation_id: accidentId,
+            driver_id: id,
+            type: incident.type || incident.violationType || null,
+            date: incident.date || incident.incidentDate || null,
+            vehicle_regn_number: incident.vehicleRegistrationNumber || null,
+            description: incident.description || null,
+            status: "ACTIVE",
+            created_by: userId,
+            updated_by: userId,
+            created_at: currentTimestamp,
+            updated_at: currentTimestamp,
+            created_on: currentTimestamp,
+            updated_on: currentTimestamp,
+          });
+        }
+      }
+
+      await trx.commit();
+
+      console.log("✅ Driver draft submitted for approval successfully:", id);
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Driver draft submitted for approval successfully. Status changed to PENDING.",
+        data: {
+          driverId: id,
+          status: "PENDING",
+        },
+      });
+    } catch (error) {
+      await trx.rollback();
+      console.error("❌ Submit driver draft transaction error:", error);
+      throw error;
+    }
+  } catch (error) {
+    console.error("❌ Submit driver draft error:", error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "SUBMIT_DRAFT_ERROR",
+        message: "Failed to submit driver draft for approval",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// DELETE DRAFT CONTROLLER
+// ========================================
+const deleteDriverDraft = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.user_id;
+
+    console.log("🗑️ Deleting driver draft:", id, "User:", userId);
+
+    // Verify it's a draft and belongs to the user
+    const existing = await knex("driver_basic_information")
+      .where("driver_id", id)
+      .first();
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message: "Driver not found",
+        },
+      });
+    }
+
+    // Accept both "SAVE_AS_DRAFT" and "DRAFT" statuses for backward compatibility
+    if (existing.status !== "SAVE_AS_DRAFT" && existing.status !== "DRAFT") {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_STATUS",
+          message: "Can only delete drafts",
+        },
+      });
+    }
+
+    if (existing.created_by !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "You can only delete your own drafts",
+        },
+      });
+    }
+
+    const trx = await knex.transaction();
+
+    try {
+      // Delete all related data
+      await trx("tms_address").where("user_reference_id", id).del();
+      await trx("document_upload")
+        .whereIn("system_reference_id", function () {
+          this.select("document_unique_id")
+            .from("driver_documents")
+            .where("document_unique_id", "like", `${id}_%`);
+        })
+        .del();
+      await trx("driver_documents")
+        .where("document_unique_id", "like", `${id}_%`)
+        .del();
+      await trx("driver_history_information").where("driver_id", id).del();
+      await trx("driver_accident_violation").where("driver_id", id).del();
+
+      // Delete driver record
+      await trx("driver_basic_information").where("driver_id", id).del();
+
+      await trx.commit();
+
+      console.log("✅ Driver draft deleted successfully:", id);
+
+      return res.status(200).json({
+        success: true,
+        message: "Driver draft deleted successfully",
+      });
+    } catch (error) {
+      await trx.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error("❌ Delete driver draft error:", error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_DRAFT_ERROR",
+        message: "Failed to delete driver draft",
+        details: error.message,
+      },
+    });
+  }
+};
+
 module.exports = {
   createDriver,
   updateDriver,
@@ -3319,4 +4807,8 @@ module.exports = {
   getMandatoryDocuments,
   getStatesByCountry,
   getCitiesByCountryAndState,
+  saveDriverAsDraft,
+  updateDriverDraft,
+  deleteDriverDraft,
+  submitDriverFromDraft,
 };

@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { Plus, ArrowLeft, Filter, Truck, Upload } from "lucide-react";
 import { getPageTheme, getComponentTheme } from "../../theme.config";
+import { Button } from "../ui/Button";
 
 const theme = getPageTheme("list");
 const buttonTheme = getComponentTheme("actionButton");
@@ -44,12 +45,18 @@ const TopActionBar = ({
           }}
           title="Back to Portal"
         >
-          <ArrowLeft className="h-5 w-5" style={{ color: theme.colors.text.primary}} />
+          <ArrowLeft
+            className="h-5 w-5"
+            style={{ color: theme.colors.text.primary }}
+          />
         </motion.button>
         <div>
           <div className="flex items-center gap-3">
             {/* <Truck className="h-7 w-7" style={{ color: theme.colors.pagination.active }} /> */}
-            <h1 className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
+            <h1
+              className="text-2xl font-bold"
+              style={{ color: theme.colors.text.primary }}
+            >
               Vehicle Maintenance
             </h1>
           </div>
@@ -77,52 +84,93 @@ const TopActionBar = ({
           </p>
         </div> */}
 
+        {/* Bulk Upload Button */}
+        {onBulkUpload && (
+          // <motion.button
+          //   whileHover={{ scale: 1.02 }}
+          //   whileTap={{ scale: 0.98 }}
+          //   onClick={onBulkUpload}
+          //   className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm"
+          //   style={{
+          //     background: "#3B82F6",
+          //     color: "#FFFFFF",
+          //     border: "1px solid #2563EB",
+          //   }}
+          //   onMouseEnter={(e) => {
+          //     e.currentTarget.style.background = "#2563EB";
+          //     e.currentTarget.style.boxShadow =
+          //       "0 4px 12px rgba(59, 130, 246, 0.3)";
+          //   }}
+          //   onMouseLeave={(e) => {
+          //     e.currentTarget.style.background = "#3B82F6";
+          //     e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
+          //   }}
+          //   title="Bulk Upload Vehicles"
+          // >
+          //   <Upload className="h-4 w-4" />
+          //   <span className="hidden sm:inline">Bulk Upload</span>
+          //   <span className="sm:hidden">Upload</span>
+          // </motion.button>
+
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onBulkUpload}
+            className="bg-[#10B981] hover:bg-[#059669] text-white font-semibold rounded-lg transition-all duration-200 py-2.5 px-5"
+          >
+            <Upload className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Bulk Upload</span>
+          </Button>
+        )}
+
         {/* Filter Toggle Button */}
-        <motion.button
+        {/* <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={onToggleFilters}
           className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200"
           style={{
-            background: showFilters ? buttonTheme.primary.background : buttonTheme.secondary.background,
-            color: showFilters ? buttonTheme.primary.text : buttonTheme.secondary.text,
-            border: `1px solid ${showFilters ? buttonTheme.primary.border : buttonTheme.secondary.border}`,
+            background: showFilters
+              ? buttonTheme.primary.background
+              : buttonTheme.secondary.background,
+            color: showFilters
+              ? buttonTheme.primary.text
+              : buttonTheme.secondary.text,
+            border: `1px solid ${
+              showFilters
+                ? buttonTheme.primary.border
+                : buttonTheme.secondary.border
+            }`,
           }}
         >
           <Filter className="h-4 w-4" />
-          <span className="hidden sm:inline">{showFilters ? "Hide Filters" : "Show Filters"}</span>
+          <span className="hidden sm:inline">
+            {showFilters ? "Hide" : "Show"}
+          </span>
         </motion.button>
+         */}
 
-        {/* Bulk Upload Button */}
-        {onBulkUpload && (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onBulkUpload}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm"
-            style={{
-              background: "#3B82F6",
-              color: "#FFFFFF",
-              border: "1px solid #2563EB",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#2563EB";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.3)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#3B82F6";
-              e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
-            }}
-            title="Bulk Upload Vehicles"
-          >
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Bulk Upload</span>
-            <span className="sm:hidden">Upload</span>
-          </motion.button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onToggleFilters}
+          className={`transition-colors duration-200 rounded-lg py-2.5 px-5 font-medium ${
+            showFilters
+              ? "bg-[#1D4ED8]/10 border-[#1D4ED8] text-[#1D4ED8]"
+              : "border-[#E5E7EB] text-[#4A5568] hover:bg-gray-50"
+          }`}
+        >
+          <Filter className="h-4 w-4 sm:mr-2" />
+          <span className="hidden md:inline">
+            {showFilters ? "Hide" : "Filters"}
+          </span>
+          <span className="hidden sm:inline md:hidden">
+            {showFilters ? "Hide" : "Show"}
+          </span>
+        </Button>
 
         {/* Create Vehicle Button */}
-        <motion.button
+        {/* <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={onCreateNew}
@@ -134,7 +182,8 @@ const TopActionBar = ({
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = buttonTheme.primary.hover;
-            e.currentTarget.style.boxShadow = "0 4px 12px rgba(16, 185, 129, 0.3)";
+            e.currentTarget.style.boxShadow =
+              "0 4px 12px rgba(16, 185, 129, 0.3)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = buttonTheme.primary.background;
@@ -142,9 +191,18 @@ const TopActionBar = ({
           }}
         >
           <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Create Vehicle</span>
-          <span className="sm:hidden">New</span>
-        </motion.button>
+          <span className="hidden sm:inline">Create New</span>
+        </motion.button> */}
+
+        <Button
+          variant="default"
+          size="sm"
+          onClick={onCreateNew}
+          className="bg-[#10B981] hover:bg-[#059669] text-white font-semibold rounded-lg transition-all duration-200 py-2.5 px-5"
+        >
+          <Plus className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Create New</span>
+        </Button>
       </div>
     </motion.div>
   );

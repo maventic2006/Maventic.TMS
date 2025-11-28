@@ -365,6 +365,129 @@ export const downloadDriverErrorReport = createAsyncThunk(
   }
 );
 
+// ============================================
+// DRAFT MANAGEMENT ASYNC THUNKS
+// ============================================
+
+/**
+ * Save driver as draft
+ * Creates a new draft record with minimal validation
+ */
+export const saveDriverAsDraft = createAsyncThunk(
+  "driver/saveAsDraft",
+  async (driverData, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/driver/save-draft", driverData);
+
+      if (response.data.success) {
+        // Backend returns driver_id directly in response.data, not in response.data.data
+        return {
+          driver_id: response.data.driver_id,
+          message: response.data.message,
+        };
+      } else {
+        return rejectWithValue(response.data.error || "Failed to save draft");
+      }
+    } catch (error) {
+      console.error("Error saving draft:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "SAVE_DRAFT_ERROR",
+          message: "Failed to save driver as draft",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Update existing driver draft
+ * Only allows updating drafts created by current user
+ */
+export const updateDriverDraft = createAsyncThunk(
+  "driver/updateDraft",
+  async ({ driverId, driverData }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(
+        `/driver/${driverId}/update-draft`,
+        driverData
+      );
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(response.data.error || "Failed to update draft");
+      }
+    } catch (error) {
+      console.error("Error updating draft:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "UPDATE_DRAFT_ERROR",
+          message: "Failed to update draft",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Delete driver draft
+ * Only allows deleting drafts created by current user
+ */
+export const deleteDriverDraft = createAsyncThunk(
+  "driver/deleteDraft",
+  async (driverId, { rejectWithValue }) => {
+    try {
+      const response = await api.delete(`/driver/${driverId}/delete-draft`);
+
+      if (response.data.success) {
+        return { driverId };
+      } else {
+        return rejectWithValue(response.data.error || "Failed to delete draft");
+      }
+    } catch (error) {
+      console.error("Error deleting draft:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "DELETE_DRAFT_ERROR",
+          message: "Failed to delete draft",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Submit driver from draft to PENDING status
+ * Performs full validation and changes status from SAVE_AS_DRAFT to PENDING
+ * Only allows submitting drafts created by current user
+ */
+export const submitDriverFromDraft = createAsyncThunk(
+  "driver/submitFromDraft",
+  async ({ driverId, driverData }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(
+        `/driver/${driverId}/submit-draft`,
+        driverData
+      );
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(response.data.error || "Failed to submit draft");
+      }
+    } catch (error) {
+      console.error("Error submitting draft:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "SUBMIT_DRAFT_ERROR",
+          message: "Failed to submit draft for approval",
+        }
+      );
+    }
+  }
+);
+
 const initialState = {
   // Master data
   masterData: {
@@ -402,6 +525,14 @@ const initialState = {
 
   // Success state
   lastCreated: null,
+
+  // Draft management state
+  isSavingDraft: false,
+  isUpdatingDraft: false,
+  isDeletingDraft: false,
+  isSubmittingDraft: false,
+  draftError: null,
+  lastDraftAction: null,
 
   // Bulk upload state
   bulkUpload: {
@@ -587,6 +718,81 @@ const driverSlice = createSlice({
       .addCase(downloadDriverErrorReport.rejected, (state, action) => {
         state.bulkUpload.isDownloadingError = false;
         state.bulkUpload.errors = action.payload;
+      })
+
+      // Save Driver as Draft
+      .addCase(saveDriverAsDraft.pending, (state) => {
+        state.isSavingDraft = true;
+        state.draftError = null;
+      })
+      .addCase(saveDriverAsDraft.fulfilled, (state, action) => {
+        state.isSavingDraft = false;
+        state.lastDraftAction = { type: "save", data: action.payload };
+        state.draftError = null;
+      })
+      .addCase(saveDriverAsDraft.rejected, (state, action) => {
+        state.isSavingDraft = false;
+        state.draftError = action.payload;
+      })
+
+      // Update Driver Draft
+      .addCase(updateDriverDraft.pending, (state) => {
+        state.isUpdatingDraft = true;
+        state.draftError = null;
+      })
+      .addCase(updateDriverDraft.fulfilled, (state, action) => {
+        state.isUpdatingDraft = false;
+        state.lastDraftAction = { type: "update", data: action.payload };
+        state.draftError = null;
+      })
+      .addCase(updateDriverDraft.rejected, (state, action) => {
+        state.isUpdatingDraft = false;
+        state.draftError = action.payload;
+      })
+
+      // Delete Driver Draft
+      .addCase(deleteDriverDraft.pending, (state) => {
+        state.isDeletingDraft = true;
+        state.draftError = null;
+      })
+      .addCase(deleteDriverDraft.fulfilled, (state, action) => {
+        state.isDeletingDraft = false;
+        // Remove the deleted draft from the drivers list
+        state.drivers = state.drivers.filter(
+          (driver) => driver.driverId !== action.payload.driverId
+        );
+        state.lastDraftAction = { type: "delete", data: action.payload };
+        state.draftError = null;
+      })
+      .addCase(deleteDriverDraft.rejected, (state, action) => {
+        state.isDeletingDraft = false;
+        state.draftError = action.payload;
+      })
+
+      // Submit Driver Draft for Approval
+      .addCase(submitDriverFromDraft.pending, (state) => {
+        state.isSubmittingDraft = true;
+        state.draftError = null;
+      })
+      .addCase(submitDriverFromDraft.fulfilled, (state, action) => {
+        state.isSubmittingDraft = false;
+        // Update the driver in the list if present
+        const index = state.drivers.findIndex(
+          (driver) => driver.driverId === action.payload.driverId
+        );
+        if (index !== -1) {
+          state.drivers[index].status = "PENDING";
+        }
+        // Update selectedDriver if it's the same one
+        if (state.selectedDriver?.driverId === action.payload.driverId) {
+          state.selectedDriver.status = "PENDING";
+        }
+        state.lastDraftAction = { type: "submit", data: action.payload };
+        state.draftError = null;
+      })
+      .addCase(submitDriverFromDraft.rejected, (state, action) => {
+        state.isSubmittingDraft = false;
+        state.draftError = action.payload;
       });
   },
 });

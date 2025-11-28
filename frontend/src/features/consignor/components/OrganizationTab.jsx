@@ -1,18 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Building2, Briefcase, Info, X, ChevronDown } from "lucide-react";
 import { State } from "country-state-city";
+import { CustomSelect } from "@/components/ui/Select";
 
-const OrganizationTab = ({
-  formData,
-  setFormData,
-  errors = {},
-}) => {
+const OrganizationTab = ({ formData, setFormData, errors = {} }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef(null);
 
   // Get all Indian states
-  const allStates = State.getStatesOfCountry("IN").map(state => state.name);
+  const allStates = State.getStatesOfCountry("IN").map((state) => state.name);
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -45,7 +42,7 @@ const OrganizationTab = ({
       // Remove state
       handleInputChange(
         "business_area",
-        currentStates.filter(s => s !== stateName)
+        currentStates.filter((s) => s !== stateName)
       );
     } else {
       // Add state
@@ -57,11 +54,11 @@ const OrganizationTab = ({
     const currentStates = formData.organization?.business_area || [];
     handleInputChange(
       "business_area",
-      currentStates.filter(s => s !== stateName)
+      currentStates.filter((s) => s !== stateName)
     );
   };
 
-  const filteredStates = allStates.filter(state =>
+  const filteredStates = allStates.filter((state) =>
     state.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -87,7 +84,9 @@ const OrganizationTab = ({
           <input
             type="text"
             value={formData.organization?.company_code || ""}
-            onChange={(e) => handleInputChange("company_code", e.target.value.toUpperCase())}
+            onChange={(e) =>
+              handleInputChange("company_code", e.target.value.toUpperCase())
+            }
             className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors uppercase ${
               errors.organization?.company_code
                 ? "border-red-500 focus:border-red-500"
@@ -111,7 +110,7 @@ const OrganizationTab = ({
             <Briefcase className="inline w-3 h-3 mr-1" />
             Business Area (States) <span className="text-red-500">*</span>
           </label>
-          
+
           <div className="relative" ref={dropdownRef}>
             {/* Selected States Display */}
             <div
@@ -217,14 +216,21 @@ const OrganizationTab = ({
           <label className="block text-xs font-medium text-[#0D1A33]">
             Status
           </label>
-          <select
+          <CustomSelect
+            key={`org-status-${formData.organization?.status}`}
             value={formData.organization?.status || "ACTIVE"}
-            onChange={(e) => handleInputChange("status", e.target.value)}
-            className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
-          >
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
+            onValueChange={(value) => handleInputChange("status", value)}
+            options={[
+              { name: "Active", value: "ACTIVE" },
+              { name: "Inactive", value: "INACTIVE" },
+            ]}
+            placeholder="Select Status"
+            searchable={false}
+            getOptionLabel={(option) => option.name}
+            getOptionValue={(option) => option.value}
+            className="w-full text-sm"
+            error={errors.organization?.status}
+          />
         </div>
       </div>
 
@@ -238,7 +244,10 @@ const OrganizationTab = ({
             </p>
             <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
               <li>Company Code must be unique across all consignors</li>
-              <li>Business Area allows selection of multiple states where the consignor operates</li>
+              <li>
+                Business Area allows selection of multiple states where the
+                consignor operates
+              </li>
               <li>Select all applicable states for comprehensive coverage</li>
               <li>Use consistent naming conventions for better reporting</li>
             </ul>

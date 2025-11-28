@@ -11,7 +11,10 @@ import {
   fetchConsignors,
   setFilters as setReduxFilters,
   clearFilters,
+  deleteConsignorDraft,
 } from "../redux/slices/consignorSlice";
+import { addToast } from "../redux/slices/uiSlice";
+import { TOAST_TYPES } from "../utils/constants";
 
 const ConsignorMaintenance = () => {
   const navigate = useNavigate();
@@ -19,9 +22,8 @@ const ConsignorMaintenance = () => {
   const theme = getPageTheme("list");
 
   // Redux state
-  const { consignors, pagination, filters, isFetching, error, masterData } = useSelector(
-    (state) => state.consignor
-  );
+  const { consignors, pagination, filters, isFetching, error, masterData } =
+    useSelector((state) => state.consignor);
 
   // Local state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -32,12 +34,16 @@ const ConsignorMaintenance = () => {
     customerName: "",
     industryType: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
   });
   const [appliedFilters, setAppliedFilters] = useState({
     customerId: "",
     customerName: "",
     industryType: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
   });
 
   // Fetch consignors on component mount
@@ -49,7 +55,7 @@ const ConsignorMaintenance = () => {
   useEffect(() => {
     // Build filter object with mapped parameter names
     const filterParams = {};
-    
+
     // Map frontend field names to backend parameter names
     if (appliedFilters.customerId) {
       filterParams.customer_id = appliedFilters.customerId;
@@ -63,22 +69,27 @@ const ConsignorMaintenance = () => {
     if (appliedFilters.status) {
       filterParams.status = appliedFilters.status;
     }
+    if (appliedFilters.createdOnStart) {
+      filterParams.createdOnStart = appliedFilters.createdOnStart;
+    }
+    if (appliedFilters.createdOnEnd) {
+      filterParams.createdOnEnd = appliedFilters.createdOnEnd;
+    }
 
     // Redux thunk expects { page, limit, filters }
-    dispatch(fetchConsignors({
-      page: pagination.page,
-      limit: pagination.limit || 25,
-      filters: filterParams
-    }));
+    dispatch(
+      fetchConsignors({
+        page: pagination.page,
+        limit: pagination.limit || 25,
+        filters: filterParams,
+      })
+    );
   }, [dispatch, appliedFilters, pagination.page, pagination.limit]);
 
   // Handle filter changes (only updates local state, not applied)
-  const handleFilterChange = useCallback(
-    (newFilters) => {
-      setLocalFilters(newFilters);
-    },
-    []
-  );
+  const handleFilterChange = useCallback((newFilters) => {
+    setLocalFilters(newFilters);
+  }, []);
 
   // Handle apply filters - this actually triggers the API call
   const handleApplyFilters = useCallback(() => {
@@ -95,6 +106,8 @@ const ConsignorMaintenance = () => {
       customerName: "",
       industryType: "",
       status: "",
+      createdOnStart: "",
+      createdOnEnd: "",
     };
     setLocalFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
@@ -106,16 +119,27 @@ const ConsignorMaintenance = () => {
     (page) => {
       // Build filter object with mapped parameter names
       const filterParams = {};
-      if (appliedFilters.customerId) filterParams.customer_id = appliedFilters.customerId;
-      if (appliedFilters.customerName) filterParams.search = appliedFilters.customerName;
-      if (appliedFilters.industryType) filterParams.industry_type = appliedFilters.industryType;
+      if (appliedFilters.customerId)
+        filterParams.customer_id = appliedFilters.customerId;
+      if (appliedFilters.customerName)
+        filterParams.search = appliedFilters.customerName;
+      if (appliedFilters.industryType)
+        filterParams.industry_type = appliedFilters.industryType;
       if (appliedFilters.status) filterParams.status = appliedFilters.status;
-      
-      dispatch(fetchConsignors({ 
-        page, 
-        limit: pagination.limit || 25,
-        filters: filterParams
-      }));
+      if (appliedFilters.createdOnStart) {
+        filterParams.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        filterParams.createdOnEnd = appliedFilters.createdOnEnd;
+      }
+
+      dispatch(
+        fetchConsignors({
+          page,
+          limit: pagination.limit || 25,
+          filters: filterParams,
+        })
+      );
     },
     [dispatch, appliedFilters, pagination.limit]
   );
@@ -126,16 +150,25 @@ const ConsignorMaintenance = () => {
     try {
       // Build filter object with mapped parameter names
       const filterParams = {};
-      if (appliedFilters.customerId) filterParams.customer_id = appliedFilters.customerId;
-      if (appliedFilters.customerName) filterParams.search = appliedFilters.customerName;
-      if (appliedFilters.industryType) filterParams.industry_type = appliedFilters.industryType;
+      if (appliedFilters.customerId)
+        filterParams.customer_id = appliedFilters.customerId;
+      if (appliedFilters.customerName)
+        filterParams.search = appliedFilters.customerName;
+      if (appliedFilters.industryType)
+        filterParams.industry_type = appliedFilters.industryType;
       if (appliedFilters.status) filterParams.status = appliedFilters.status;
-      
+      if (appliedFilters.createdOnStart) {
+        filterParams.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        filterParams.createdOnEnd = appliedFilters.createdOnEnd;
+      }
+
       await dispatch(
         fetchConsignors({
           page: pagination.page,
           limit: pagination.limit || 25,
-          filters: filterParams
+          filters: filterParams,
         })
       ).unwrap();
     } catch (error) {
@@ -160,6 +193,62 @@ const ConsignorMaintenance = () => {
     setShowFilters((prev) => !prev);
   }, []);
 
+  // Handle delete draft
+  const handleDeleteDraft = useCallback(
+    async (customerId) => {
+      if (
+        window.confirm(
+          "Are you sure you want to delete this draft? This action cannot be undone."
+        )
+      ) {
+        try {
+          await dispatch(deleteConsignorDraft(customerId)).unwrap();
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.SUCCESS,
+              message: "Draft deleted successfully",
+              duration: 3000,
+            })
+          );
+          // Refresh the list
+          const filterParams = {};
+          if (appliedFilters.customerId)
+            filterParams.customer_id = appliedFilters.customerId;
+          if (appliedFilters.customerName)
+            filterParams.search = appliedFilters.customerName;
+          if (appliedFilters.industryType)
+            filterParams.industry_type = appliedFilters.industryType;
+          if (appliedFilters.status)
+            filterParams.status = appliedFilters.status;
+          if (appliedFilters.createdOnStart) {
+            filterParams.createdOnStart = appliedFilters.createdOnStart;
+          }
+          if (appliedFilters.createdOnEnd) {
+            filterParams.createdOnEnd = appliedFilters.createdOnEnd;
+          }
+
+          dispatch(
+            fetchConsignors({
+              page: pagination.page,
+              limit: pagination.limit || 25,
+              filters: filterParams,
+            })
+          );
+        } catch (error) {
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.ERROR,
+              message: "Failed to delete draft",
+              details: [error.message || "An error occurred"],
+              duration: 5000,
+            })
+          );
+        }
+      }
+    },
+    [dispatch, pagination.page, pagination.limit, appliedFilters]
+  );
+
   // Handle fuzzy search - client-side filtering on visible table fields only
   const handleSearchChange = useCallback((value) => {
     setSearchText(value);
@@ -181,7 +270,7 @@ const ConsignorMaintenance = () => {
       // 4. Currency
       // 5. Payment Term
       // 6. Status
-      
+
       const searchableFields = [
         consignor.customer_id,
         consignor.customer_name,
@@ -207,72 +296,67 @@ const ConsignorMaintenance = () => {
     >
       {/* Header */}
       <TMSHeader />
+      <div className="px-4 py-1 lg:px-6 lg:py-1">
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto space-y-0">
+          {/* Top Action Bar */}
+          <TopActionBar
+            onCreateNew={handleCreateNew}
+            totalCount={pagination.total}
+            onBack={handleBack}
+            showFilters={showFilters}
+            onToggleFilters={handleToggleFilters}
+          />
 
-      {/* Main Content */}
-      <div
-        style={{
-          maxWidth: "1600px",
-          margin: "0 auto",
-          padding: "24px",
-        }}
-      >
-        {/* Top Action Bar */}
-        <TopActionBar 
-          onCreateNew={handleCreateNew}
-          totalCount={pagination.total}
-          onBack={handleBack}
-          showFilters={showFilters}
-          onToggleFilters={handleToggleFilters}
-        />
+          {/* Filter Panel */}
+          <ConsignorFilterPanel
+            filters={localFilters}
+            onFilterChange={handleFilterChange}
+            onApplyFilters={handleApplyFilters}
+            onClearFilters={handleClearFilters}
+            showFilters={showFilters}
+          />
 
-        {/* Filter Panel */}
-        <ConsignorFilterPanel
-          filters={localFilters}
-          onFilterChange={handleFilterChange}
-          onApplyFilters={handleApplyFilters}
-          onClearFilters={handleClearFilters}
-          showFilters={showFilters}
-        />
-
-        {/* Error Message */}
-        {error && (
-          <div
-            style={{
-              marginTop: "20px",
-              padding: "16px",
-              backgroundColor: theme.colors.status.error + "20",
-              borderRadius: "12px",
-              border: `1px solid ${theme.colors.status.error}`,
-            }}
-          >
-            <p
+          {/* Error Message */}
+          {error && (
+            <div
               style={{
-                fontSize: "14px",
-                color: theme.colors.status.error,
-                margin: 0,
+                marginTop: "20px",
+                padding: "16px",
+                backgroundColor: theme.colors.status.error + "20",
+                borderRadius: "12px",
+                border: `1px solid ${theme.colors.status.error}`,
               }}
             >
-              <strong>Error:</strong> {error}
-            </p>
-          </div>
-        )}
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: theme.colors.status.error,
+                  margin: 0,
+                }}
+              >
+                <strong>Error:</strong> {error}
+              </p>
+            </div>
+          )}
 
-        {/* Consignor List Table */}
-        <ConsignorListTable
-          consignors={filteredConsignors}
-          loading={isFetching}
-          currentPage={pagination.page}
-          totalPages={pagination.pages}
-          totalItems={pagination.total}
-          itemsPerPage={pagination.limit || 25}
-          onPageChange={handlePageChange}
-          filteredCount={filteredConsignors.length}
-          searchText={searchText}
-          onSearchChange={handleSearchChange}
-        />
+          {/* Consignor List Table */}
+          <ConsignorListTable
+            consignors={filteredConsignors}
+            loading={isFetching}
+            currentPage={pagination.page}
+            totalPages={pagination.pages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit || 25}
+            onPageChange={handlePageChange}
+            filteredCount={filteredConsignors.length}
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
+            onDeleteDraft={handleDeleteDraft}
+          />
 
-        {/* Pagination Bar */}
-        {/* {!isFetching && consignors.length > 0 && (
+          {/* Pagination Bar */}
+          {/* {!isFetching && consignors.length > 0 && (
           <div style={{ marginTop: "24px" }}>
             <PaginationBar
               currentPage={pagination.page}
@@ -284,8 +368,8 @@ const ConsignorMaintenance = () => {
           </div>
         )} */}
 
-        {/* Summary Card */}
-        {/* {!isFetching && consignors.length > 0 && (
+          {/* Summary Card */}
+          {/* {!isFetching && consignors.length > 0 && (
           <div
             style={{
               marginTop: "24px",
@@ -384,6 +468,7 @@ const ConsignorMaintenance = () => {
             </div>
           </div>
         )} */}
+        </div>
       </div>
     </div>
   );

@@ -8,6 +8,8 @@ import {
   updateConsignor,
   fetchConsignorMasterData,
   clearError,
+  updateConsignorDraft,
+  submitConsignorFromDraft,
 } from "../../../redux/slices/consignorSlice";
 import { addToast } from "../../../redux/slices/uiSlice";
 import {
@@ -53,8 +55,9 @@ const ConsignorDetailsPage = () => {
   const dispatch = useDispatch();
 
   const { user, role } = useSelector((state) => state.auth);
-  const { currentConsignor, isFetching, isUpdating, error } =
-    useSelector((state) => state.consignor);
+  const { currentConsignor, isFetching, isUpdating, error } = useSelector(
+    (state) => state.consignor
+  );
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -126,13 +129,13 @@ const ConsignorDetailsPage = () => {
   // Set edit form data when consignor data is loaded
   useEffect(() => {
     if (currentConsignor && !editFormData) {
-      console.log('📋 ===== CONSIGNOR DETAILS PAGE DEBUG =====');
-      console.log('currentConsignor from Redux:', currentConsignor);
-      console.log('Has customer_id?', currentConsignor.customer_id);
-      console.log('Has customer_name?', currentConsignor.customer_name);
-      console.log('Has contacts?', currentConsignor.contacts);
-      console.log('Has organization?', currentConsignor.organization);
-      console.log('==========================================');
+      console.log("📋 ===== CONSIGNOR DETAILS PAGE DEBUG =====");
+      console.log("currentConsignor from Redux:", currentConsignor);
+      console.log("Has customer_id?", currentConsignor.customer_id);
+      console.log("Has customer_name?", currentConsignor.customer_name);
+      console.log("Has contacts?", currentConsignor.contacts);
+      console.log("Has organization?", currentConsignor.organization);
+      console.log("==========================================");
       setEditFormData(currentConsignor);
     }
   }, [currentConsignor, editFormData]);
@@ -204,7 +207,10 @@ const ConsignorDetailsPage = () => {
     }
 
     // Validate organization
-    const organizationValidation = validateTab("organization", formData.organization);
+    const organizationValidation = validateTab(
+      "organization",
+      formData.organization
+    );
     if (!organizationValidation.isValid) {
       errors.organization = organizationValidation.errors;
     }
@@ -240,13 +246,9 @@ const ConsignorDetailsPage = () => {
 
         // Update tab errors to show which tabs have issues
         const newTabErrors = {
-          0:
-            errors.general &&
-            Object.keys(errors.general).length > 0,
+          0: errors.general && Object.keys(errors.general).length > 0,
           1: errors.contacts && Object.keys(errors.contacts).length > 0,
-          2:
-            errors.organization &&
-            Object.keys(errors.organization).length > 0,
+          2: errors.organization && Object.keys(errors.organization).length > 0,
           3: errors.documents && Object.keys(errors.documents).length > 0,
           4: false, // Warehouse List - no validation for now
         };
@@ -285,14 +287,15 @@ const ConsignorDetailsPage = () => {
 
       // Prepare data for backend API (needs nested structure)
       // Extract general fields from flattened editFormData
-      const { contacts, organization, documents, ...generalFields } = editFormData;
-      
+      const { contacts, organization, documents, ...generalFields } =
+        editFormData;
+
       // Call the update API
       const result = await dispatch(
         updateConsignor({
           customerId: id,
           data: {
-            general: generalFields,  // All fields except contacts, organization, documents
+            general: generalFields, // All fields except contacts, organization, documents
             contacts,
             organization,
             documents,
@@ -407,6 +410,127 @@ const ConsignorDetailsPage = () => {
     }
   };
 
+  // Handle update draft (for SAVE_AS_DRAFT status only)
+  const handleUpdateDraft = async () => {
+    try {
+      // Prepare data for backend API (needs nested structure)
+      const { contacts, organization, documents, ...generalFields } =
+        editFormData;
+
+      await dispatch(
+        updateConsignorDraft({
+          customerId: id,
+          consignorData: {
+            general: generalFields,
+            contacts,
+            organization,
+            documents,
+          },
+        })
+      ).unwrap();
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Draft updated successfully!",
+        })
+      );
+
+      // Refresh the consignor data
+      await dispatch(fetchConsignorById(id));
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+    } catch (err) {
+      console.error("Error updating draft:", err);
+      dispatch(clearError());
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: err.message || "Failed to update draft. Please try again.",
+        })
+      );
+    }
+  };
+
+  // Handle submit draft for approval (SAVE_AS_DRAFT → PENDING)
+  const handleSubmitForApproval = async () => {
+    try {
+      // Prepare data for backend API (needs nested structure)
+      const { contacts, organization, documents, ...generalFields } =
+        editFormData;
+
+      await dispatch(
+        submitConsignorFromDraft({
+          customerId: id,
+          consignorData: {
+            general: generalFields,
+            contacts,
+            organization,
+            documents,
+          },
+        })
+      ).unwrap();
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message:
+            "Consignor submitted for approval successfully! Status changed to PENDING.",
+        })
+      );
+
+      // Refresh the consignor data
+      await dispatch(fetchConsignorById(id));
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+    } catch (err) {
+      console.error("Error submitting for approval:", err);
+      dispatch(clearError());
+
+      // Handle validation errors
+      if (err.code === "VALIDATION_ERROR" && err.field) {
+        const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+        if (fieldMatch) {
+          const [, section] = fieldMatch;
+          const tabMapping = {
+            general: 0,
+            contacts: 1,
+            organization: 2,
+            documents: 3,
+          };
+          const tabWithError = tabMapping[section];
+          if (tabWithError !== null) {
+            setActiveTab(tabWithError);
+          }
+        }
+
+        // Build user-friendly error message with expected format
+        let errorMessage = err.message;
+        if (err.expectedFormat) {
+          errorMessage = `${err.message} (Expected format: ${err.expectedFormat})`;
+        }
+
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: errorMessage,
+          })
+        );
+        return;
+      }
+
+      // Other errors (network, server, etc.)
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message:
+            err.message ||
+            "Failed to submit for approval. Please check all required fields.",
+        })
+      );
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "active":
@@ -415,6 +539,9 @@ const ConsignorDetailsPage = () => {
         return "bg-red-100 text-red-800";
       case "pending":
         return "bg-yellow-100 text-yellow-800";
+      case "save_as_draft":
+      case "draft":
+        return "bg-blue-100 text-blue-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -477,7 +604,7 @@ const ConsignorDetailsPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
       <TMSHeader theme={theme} />
-      
+
       {/* Modern Header Bar with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
         {/* Background decoration */}
@@ -515,17 +642,13 @@ const ConsignorDetailsPage = () => {
                 {currentConsignor.created_by && (
                   <div className="flex items-center gap-2">
                     <User className="w-3 h-3" />
-                    <span>
-                      Created by: {currentConsignor.created_by}
-                    </span>
+                    <span>Created by: {currentConsignor.created_by}</span>
                   </div>
                 )}
                 {currentConsignor.created_date && (
                   <div className="flex items-center gap-2">
                     <Calendar className="w-3 h-3" />
-                    <span>
-                      Created: {currentConsignor.created_date}
-                    </span>
+                    <span>Created: {currentConsignor.created_date}</span>
                   </div>
                 )}
               </div>
@@ -536,8 +659,14 @@ const ConsignorDetailsPage = () => {
             {/* Approval Action Bar - Inline in Header */}
             {currentConsignor.userApprovalStatus && (
               <>
-                {console.log("🎯 ConsignorDetailsPage - Passing userApprovalStatus:", currentConsignor.userApprovalStatus)}
-                {console.log("🎯 ConsignorDetailsPage - Current user from Redux:", user)}
+                {console.log(
+                  "🎯 ConsignorDetailsPage - Passing userApprovalStatus:",
+                  currentConsignor.userApprovalStatus
+                )}
+                {console.log(
+                  "🎯 ConsignorDetailsPage - Current user from Redux:",
+                  user
+                )}
                 <ConsignorApprovalActionBar
                   userApprovalStatus={currentConsignor.userApprovalStatus}
                   consignorId={id}
@@ -556,23 +685,67 @@ const ConsignorDetailsPage = () => {
                   Cancel
                 </button>
 
-                <button
-                  onClick={handleSaveChanges}
-                  disabled={isUpdating}
-                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                >
-                  {isUpdating ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                      Save Changes
-                    </>
-                  )}
-                </button>
+                {/* Show different save buttons based on status */}
+                {currentConsignor.status === "SAVE_AS_DRAFT" ? (
+                  <>
+                    {/* Update Draft button */}
+                    <button
+                      onClick={handleUpdateDraft}
+                      disabled={isUpdating}
+                      className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white rounded-xl font-medium text-sm hover:from-[#2563EB] hover:to-[#3B82F6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {isUpdating ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                          Update Draft
+                        </>
+                      )}
+                    </button>
+
+                    {/* Submit for Approval button */}
+                    <button
+                      onClick={handleSubmitForApproval}
+                      disabled={isUpdating}
+                      className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {isUpdating ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                          Submit for Approval
+                        </>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  /* Regular Save Changes button for ACTIVE/PENDING status */
+                  <button
+                    onClick={handleSaveChanges}
+                    disabled={isUpdating}
+                    className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
+                    {isUpdating ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                        Save Changes
+                      </>
+                    )}
+                  </button>
+                )}
               </>
             ) : (
               <button
@@ -676,12 +849,14 @@ const ConsignorDetailsPage = () => {
                     <div className="p-4">
                       <TabComponent
                         // For edit mode, pass formData. For view mode, pass consignor
-                        {...(isEditMode ? {
-                          formData: editFormData,
-                          setFormData: setEditFormData
-                        } : {
-                          consignor: currentConsignor
-                        })}
+                        {...(isEditMode
+                          ? {
+                              formData: editFormData,
+                              setFormData: setEditFormData,
+                            }
+                          : {
+                              consignor: currentConsignor,
+                            })}
                         errors={
                           isEditMode
                             ? tab.id === 0

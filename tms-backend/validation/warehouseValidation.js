@@ -25,6 +25,7 @@ const validateWarehouseListQuery = (query) => {
     "PENDING",
     "APPROVED",
     "REJECTED",
+    "SAVE_AS_DRAFT", // ✅ Added draft status support
   ];
   if (query.status && !validStatuses.includes(query.status.toUpperCase())) {
     errors.push({ field: "status", message: "Invalid status value" });
@@ -39,18 +40,22 @@ const validateWarehouseListQuery = (query) => {
 const validateWarehouseCreate = (data) => {
   const errors = [];
 
-  if (!data.consignorId || data.consignorId.trim() === "") {
+  // ✅ Support both camelCase and snake_case field names
+  const consignorId = data.consignorId || data.consignor_id;
+  const warehouseName1 = data.warehouseName1 || data.warehouse_name1;
+
+  if (!consignorId || consignorId.trim() === "") {
     errors.push({ field: "consignorId", message: "Consignor ID is required" });
   }
 
-  if (!data.warehouseName1 || data.warehouseName1.trim() === "") {
+  if (!warehouseName1 || warehouseName1.trim() === "") {
     errors.push({
       field: "warehouseName1",
       message: "Warehouse name is required",
     });
   }
 
-  if (data.warehouseName1 && data.warehouseName1.length > 100) {
+  if (warehouseName1 && warehouseName1.length > 100) {
     errors.push({
       field: "warehouseName1",
       message: "Warehouse name cannot exceed 100 characters",

@@ -16,6 +16,7 @@ const WarehouseFilterPanel = ({
 }) => {
   const statusOptions = [
     { value: "", label: "All Status" },
+    { value: "SAVE_AS_DRAFT", label: "Draft" }, // ✅ Add draft status
     { value: "ACTIVE", label: "Active" },
     { value: "INACTIVE", label: "Inactive" },
     { value: "PENDING", label: "Pending" },

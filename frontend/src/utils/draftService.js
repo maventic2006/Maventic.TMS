@@ -55,7 +55,7 @@ export const saveDraft = async (module, data) => {
  */
 export const updateDraft = async (module, id, data) => {
   try {
-    const response = await api.put(`/${module}/update-draft/${id}`, data);
+    const response = await api.put(`/${module}/${id}/update-draft`, data);
     return {
       success: true,
       data: response.data,
@@ -103,7 +103,7 @@ export const updateDraft = async (module, id, data) => {
  */
 export const deleteDraft = async (module, id) => {
   try {
-    const response = await api.delete(`/${module}/delete-draft/${id}`);
+    const response = await api.delete(`/${module}/${id}/delete-draft`);
     return {
       success: true,
       data: response.data,

@@ -77,7 +77,8 @@ const DriverFilterPanel = ({
     { value: "", label: "All Status" },
     { value: "ACTIVE", label: "Active" },
     { value: "INACTIVE", label: "Inactive" },
-    { value: "SUSPENDED", label: "Suspended" },
+    { value: "DRAFT", label: "Draft" },
+    { value: "PENDING", label: "Pending" },
   ];
 
   const genderOptions = [

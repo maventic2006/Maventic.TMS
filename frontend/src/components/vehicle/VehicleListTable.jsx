@@ -6,6 +6,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import {
   Table,
@@ -30,6 +31,7 @@ const VehicleListTable = ({
   vehicles,
   loading,
   onVehicleClick,
+  onDeleteDraft,
   // Pagination props
   currentPage,
   totalPages,
@@ -173,7 +175,21 @@ const VehicleListTable = ({
                     {vehicle.registrationNumber}
                   </p>
                 </div>
-                <VehicleStatusPill status={vehicle.status} />
+                <div className="flex items-center gap-2">
+                  <VehicleStatusPill status={vehicle.status} />
+                  {vehicle.status === "SAVE_AS_DRAFT" && onDeleteDraft && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteDraft(vehicle.vehicleId);
+                      }}
+                      title="Delete Draft"
+                      className="p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-200 hover:scale-110"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
@@ -349,6 +365,12 @@ const VehicleListTable = ({
                 >
                   Approved on
                 </th>
+                <th
+                  className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-nowrap"
+                  style={{ color: theme.colors.table.header.text }}
+                >
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -468,6 +490,20 @@ const VehicleListTable = ({
                     style={{ color: theme.colors.text.primary }}
                   >
                     {displayValue(vehicle.approvedBy)}
+                  </td>
+                  <td className="px-4 py-2 text-center text-nowrap">
+                    {vehicle.status === "SAVE_AS_DRAFT" && onDeleteDraft && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteDraft(vehicle.vehicleId);
+                        }}
+                        title="Delete Draft"
+                        className="p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-200 hover:scale-110"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </td>
                 </motion.tr>
               ))}

@@ -3,7 +3,7 @@ import { Globe, Plus, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { Country, State } from "country-state-city";
 import { getComponentTheme } from "../../../utils/theme";
-import { CustomSelect } from "../../../components/ui/Select";
+import { CustomSelect, MultiSelect } from "../../../components/ui/Select";
 
 const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
   const dispatch = useDispatch();
@@ -199,7 +199,7 @@ const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
                         {area.country ? (
                           <div className="space-y-2">
                             {/* State Dropdown */}
-                            <CustomSelect
+                            {/* <CustomSelect
                               key={`state-${index}-${area.states?.length}`}
                               value=""
                               onValueChange={(value) => {
@@ -233,6 +233,32 @@ const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
                                 (state) =>
                                   !(area.states || []).includes(state.name)
                               )}
+                              placeholder="Select states to add"
+                              searchable
+                              getOptionLabel={(option) => option.name}
+                              getOptionValue={(option) => option.name}
+                              className="min-w-[400px] text-sm"
+                            /> */}
+
+                            <MultiSelect
+                              key={`state-${index}-${area.states?.length}`}
+                              value={area.states || []}
+                              onValueChange={(selectedValues) => {
+                                const validStates = getStatesForCountry(
+                                  area.country
+                                ).map((s) => s.name);
+
+                                const filtered = selectedValues.filter((v) =>
+                                  validStates.includes(v)
+                                );
+
+                                updateServiceableArea(
+                                  index,
+                                  "states",
+                                  filtered
+                                );
+                              }}
+                              options={getStatesForCountry(area.country)}
                               placeholder="Select states to add"
                               searchable
                               getOptionLabel={(option) => option.name}

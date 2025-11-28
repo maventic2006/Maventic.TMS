@@ -132,16 +132,24 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                   <thead>
                     <tr className="text-left text-xs font-medium text-gray-600 border-b border-gray-200">
                       <th className="pb-3 w-12"></th>
-                      <th className="pb-3 pl-4 min-w-[200px]">Ownership Name</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">
+                        Ownership Name
+                      </th>
                       <th className="pb-3 pl-4 min-w-[150px]">Valid From</th>
                       <th className="pb-3 pl-4 min-w-[150px]">Valid To</th>
-                      <th className="pb-3 pl-4 min-w-[200px]">Registration Number</th>
-                      <th className="pb-3 pl-4 min-w-[150px]">Registration Date</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">
+                        Registration Number
+                      </th>
+                      <th className="pb-3 pl-4 min-w-[150px]">
+                        Registration Date
+                      </th>
                       <th className="pb-3 pl-4 min-w-[150px]">Purchase Date</th>
                       <th className="pb-3 pl-4 min-w-[150px]">RTO Code</th>
                       <th className="pb-3 pl-4 min-w-[150px]">Sale Amount</th>
                       <th className="pb-3 pl-4 min-w-[200px]">Country</th>
-                      <th className="pb-3 pl-4 min-w-[200px]">Contact Number</th>
+                      <th className="pb-3 pl-4 min-w-[200px]">
+                        Contact Number
+                      </th>
                       <th className="pb-3 w-12"></th>
                     </tr>
                   </thead>
@@ -172,7 +180,11 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="text"
                               value={ownership.ownershipName || ""}
                               onChange={(e) =>
-                                updateOwnership(index, "ownershipName", e.target.value)
+                                updateOwnership(
+                                  index,
+                                  "ownershipName",
+                                  e.target.value
+                                )
                               }
                               placeholder="Enter ownership name"
                               className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
@@ -187,7 +199,11 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="date"
                               value={ownership.validFrom || ""}
                               onChange={(e) =>
-                                updateOwnership(index, "validFrom", e.target.value)
+                                updateOwnership(
+                                  index,
+                                  "validFrom",
+                                  e.target.value
+                                )
                               }
                               className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors?.ownershipDetails?.[index]?.validFrom
@@ -201,7 +217,11 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="date"
                               value={ownership.validTo || ""}
                               onChange={(e) =>
-                                updateOwnership(index, "validTo", e.target.value)
+                                updateOwnership(
+                                  index,
+                                  "validTo",
+                                  e.target.value
+                                )
                               }
                               className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors?.ownershipDetails?.[index]?.validTo
@@ -215,11 +235,16 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="text"
                               value={ownership.registrationNumber || ""}
                               onChange={(e) =>
-                                updateOwnership(index, "registrationNumber", e.target.value.toUpperCase())
+                                updateOwnership(
+                                  index,
+                                  "registrationNumber",
+                                  e.target.value.toUpperCase()
+                                )
                               }
                               placeholder="MH12AB1234"
                               className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.ownershipDetails?.[index]?.registrationNumber
+                                errors?.ownershipDetails?.[index]
+                                  ?.registrationNumber
                                   ? "border-red-500"
                                   : "border-gray-300"
                               }`}
@@ -230,10 +255,15 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="date"
                               value={ownership.registrationDate || ""}
                               onChange={(e) =>
-                                updateOwnership(index, "registrationDate", e.target.value)
+                                updateOwnership(
+                                  index,
+                                  "registrationDate",
+                                  e.target.value
+                                )
                               }
                               className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
-                                errors?.ownershipDetails?.[index]?.registrationDate
+                                errors?.ownershipDetails?.[index]
+                                  ?.registrationDate
                                   ? "border-red-500"
                                   : "border-gray-300"
                               }`}
@@ -244,7 +274,11 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="date"
                               value={ownership.purchaseDate || ""}
                               onChange={(e) =>
-                                updateOwnership(index, "purchaseDate", e.target.value)
+                                updateOwnership(
+                                  index,
+                                  "purchaseDate",
+                                  e.target.value
+                                )
                               }
                               className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors?.ownershipDetails?.[index]?.purchaseDate
@@ -258,7 +292,11 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="text"
                               value={ownership.rtoCode || ""}
                               onChange={(e) =>
-                                updateOwnership(index, "rtoCode", e.target.value.toUpperCase())
+                                updateOwnership(
+                                  index,
+                                  "rtoCode",
+                                  e.target.value.toUpperCase()
+                                )
                               }
                               placeholder="MH12"
                               className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
@@ -273,7 +311,11 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="number"
                               value={ownership.saleAmount || 0}
                               onChange={(e) =>
-                                updateOwnership(index, "saleAmount", parseFloat(e.target.value) || 0)
+                                updateOwnership(
+                                  index,
+                                  "saleAmount",
+                                  parseFloat(e.target.value) || 0
+                                )
                               }
                               placeholder="2500000"
                               className={`min-w-[150px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
@@ -308,8 +350,13 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
                               type="tel"
                               value={ownership.contactNumber || ""}
                               onChange={(e) =>
-                                updateOwnership(index, "contactNumber", e.target.value)
+                                updateOwnership(
+                                  index,
+                                  "contactNumber",
+                                  e.target.value
+                                )
                               }
+                              maxLength={10}
                               placeholder="Contact number"
                               className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors?.ownershipDetails?.[index]?.contactNumber
@@ -336,7 +383,9 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
             ) : (
               <div className="text-center py-12 text-gray-500">
                 <FileUser className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-medium">No ownership records added yet</p>
+                <p className="text-lg font-medium">
+                  No ownership records added yet
+                </p>
                 <p className="text-sm">Click "Add" to get started</p>
               </div>
             )}
@@ -348,7 +397,10 @@ const OwnershipDetailsTab = ({ formData, setFormData, errors }) => {
           <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
           <div className="text-xs text-blue-800">
             <p className="font-semibold mb-1">Ownership Information</p>
-            <p>Provide accurate ownership and registration details for legal compliance. Use the table above to add multiple ownership records.</p>
+            <p>
+              Provide accurate ownership and registration details for legal
+              compliance. Use the table above to add multiple ownership records.
+            </p>
           </div>
         </div>
       </div>

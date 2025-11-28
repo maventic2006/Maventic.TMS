@@ -2078,308 +2078,6 @@ const getCitiesByCountryAndState = async (req, res) => {
 };
 
 // Get all transporters with pagination and filters
-// const getTransporters = async (req, res) => {
-//   try {
-//     const {
-//       page = 1,
-//       limit = 25,
-//       search = "",
-//       transporterId = "",
-//       status = "",
-//       businessName = "",
-//       state = "",
-//       city = "",
-//       transportMode = "",
-//       vatGst = "",
-//       tan = "",
-//     } = req.query;
-
-//     // Convert page and limit to integers
-//     const pageNum = parseInt(page);
-//     const limitNum = parseInt(limit);
-//     const offset = (pageNum - 1) * limitNum;
-
-//     // Build base query - Get one row per transporter with primary address and first contact
-//     let query = knex("transporter_general_info as tgi")
-//       .leftJoin("tms_address as addr", function () {
-//         this.on("tgi.transporter_id", "=", "addr.user_reference_id")
-//           .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"))
-//           .andOn("addr.is_primary", "=", knex.raw("1")); // Get only primary address
-//       })
-//       .leftJoin(
-//         knex.raw(`(
-//           SELECT tc1.*
-//           FROM transporter_contact tc1
-//           INNER JOIN (
-//             SELECT transporter_id, MIN(tcontact_id) as min_contact_id, MIN(contact_unique_id) as min_unique_id
-//             FROM transporter_contact
-//             WHERE status = 'ACTIVE'
-//             GROUP BY transporter_id
-//           ) tc2 ON tc1.transporter_id = tc2.transporter_id
-//                AND tc1.tcontact_id = tc2.min_contact_id
-//                AND tc1.contact_unique_id = tc2.min_unique_id
-//         ) as tc`),
-//         "tgi.transporter_id",
-//         "tc.transporter_id"
-//       )
-//       .select(
-//         "tgi.transporter_id",
-//         "tgi.business_name",
-//         "tgi.trans_mode_road",
-//         "tgi.trans_mode_rail",
-//         "tgi.trans_mode_air",
-//         "tgi.trans_mode_sea",
-//         "tgi.active_flag",
-//         "tgi.from_date",
-//         "tgi.to_date",
-//         "tgi.avg_rating",
-//         "tgi.status",
-//         "tgi.created_by",
-//         "tgi.created_on",
-//         "tgi.updated_on",
-//         "addr.country",
-//         "addr.state",
-//         "addr.city",
-//         "addr.district",
-//         "addr.vat_number",
-//         "addr.tin_pan",
-//         "addr.tan",
-//         knex.raw(
-//           "CONCAT(COALESCE(addr.street_1, ''), ', ', COALESCE(addr.city, ''), ', ', COALESCE(addr.state, ''), ', ', COALESCE(addr.country, '')) as address"
-//         ),
-//         "tc.contact_person_name",
-//         "tc.phone_number",
-//         "tc.email_id"
-//       );
-
-//     // Apply filters
-//     if (search) {
-//       query = query.where(function () {
-//         this.where("tgi.business_name", "like", `%${search}%`)
-//           .orWhere("tgi.transporter_id", "like", `%${search}%`)
-//           .orWhere("addr.city", "like", `%${search}%`)
-//           .orWhere("addr.state", "like", `%${search}%`);
-//       });
-//     }
-
-//     if (transporterId) {
-//       query = query.where("tgi.transporter_id", "like", `%${transporterId}%`);
-//     }
-
-//     if (status) {
-//       query = query.where("tgi.status", status);
-//     }
-
-//     if (businessName) {
-//       query = query.where("tgi.business_name", "like", `%${businessName}%`);
-//     }
-
-//     if (state) {
-//       query = query.where("addr.state", "like", `%${state}%`);
-//     }
-
-//     if (city) {
-//       query = query.where("addr.city", "like", `%${city}%`);
-//     }
-
-//     if (vatGst) {
-//       query = query.where("addr.vat_number", "like", `%${vatGst}%`);
-//     }
-
-//     if (tan) {
-//       query = query.where("addr.tan", "like", `%${tan}%`);
-//     }
-
-//     if (transportMode) {
-//       const modes = transportMode.split(",");
-//       query = query.where(function () {
-//         modes.forEach((mode) => {
-//           switch (mode.toUpperCase()) {
-//             case "R":
-//             case "ROAD":
-//               this.orWhere("tgi.trans_mode_road", true);
-//               break;
-//             case "RL":
-//             case "RAIL":
-//               this.orWhere("tgi.trans_mode_rail", true);
-//               break;
-//             case "A":
-//             case "AIR":
-//               this.orWhere("tgi.trans_mode_air", true);
-//               break;
-//             case "S":
-//             case "SEA":
-//               this.orWhere("tgi.trans_mode_sea", true);
-//               break;
-//           }
-//         });
-//       });
-//     }
-
-//     // Get total count for pagination - count distinct transporters only
-//     let countQuery = knex("transporter_general_info as tgi");
-
-//     // For filters that need address or contact data, we join but count distinct transporter_id
-//     let needsAddressJoin = search || state || city || vatGst || tan;
-
-//     if (needsAddressJoin) {
-//       countQuery = countQuery.leftJoin("tms_address as addr", function () {
-//         this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
-//           "addr.user_type",
-//           "=",
-//           knex.raw("'TRANSPORTER'")
-//         );
-//       });
-//     }
-
-//     // Apply the same filters to count query
-//     if (search) {
-//       countQuery = countQuery.where(function () {
-//         this.where("tgi.business_name", "like", `%${search}%`)
-//           .orWhere("tgi.transporter_id", "like", `%${search}%`)
-//           .orWhere("addr.city", "like", `%${search}%`)
-//           .orWhere("addr.state", "like", `%${search}%`);
-//       });
-//     }
-
-//     if (transporterId) {
-//       countQuery = countQuery.where(
-//         "tgi.transporter_id",
-//         "like",
-//         `%${transporterId}%`
-//       );
-//     }
-
-//     if (businessName) {
-//       countQuery = countQuery.where(
-//         "tgi.business_name",
-//         "like",
-//         `%${businessName}%`
-//       );
-//     }
-
-//     if (status) {
-//       countQuery = countQuery.where("tgi.status", "like", `%${status}%`);
-//     }
-
-//     if (state) {
-//       countQuery = countQuery.where("addr.state", "like", `%${state}%`);
-//     }
-
-//     if (city) {
-//       countQuery = countQuery.where("addr.city", "like", `%${city}%`);
-//     }
-
-//     if (vatGst) {
-//       countQuery = countQuery.where("addr.vat_number", "like", `%${vatGst}%`);
-//     }
-
-//     if (tan) {
-//       countQuery = countQuery.where("addr.tan", "like", `%${tan}%`);
-//     }
-
-//     if (transportMode) {
-//       const modes = transportMode.split(",");
-//       countQuery = countQuery.where(function () {
-//         modes.forEach((mode) => {
-//           const upperMode = mode.trim().toUpperCase();
-//           switch (upperMode) {
-//             case "R":
-//             case "ROAD":
-//               this.orWhere("tgi.trans_mode_road", true);
-//               break;
-//             case "RL":
-//             case "RAIL":
-//               this.orWhere("tgi.trans_mode_rail", true);
-//               break;
-//             case "A":
-//             case "AIR":
-//               this.orWhere("tgi.trans_mode_air", true);
-//               break;
-//             case "S":
-//             case "SEA":
-//               this.orWhere("tgi.trans_mode_sea", true);
-//               break;
-//           }
-//         });
-//       });
-//     }
-
-//     const totalResult = await countQuery
-//       .countDistinct("tgi.transporter_id as count")
-//       .first();
-//     const total = parseInt(totalResult.count);
-
-//     // Apply pagination
-//     const transporters = await query
-//       .orderBy("tgi.transporter_id", "asc")
-//       .limit(limitNum)
-//       .offset(offset);
-
-//     // Transform transport modes to match frontend expected format
-//     const transformedTransporters = transporters.map((transporter) => {
-//       const transportModes = [];
-//       if (transporter.trans_mode_road) transportModes.push("R");
-//       if (transporter.trans_mode_rail) transportModes.push("RL");
-//       if (transporter.trans_mode_air) transportModes.push("A");
-//       if (transporter.trans_mode_sea) transportModes.push("S");
-
-//       return {
-//         id: transporter.transporter_id,
-//         businessName: transporter.business_name,
-//         transportMode: transportModes,
-//         status: transporter.status,
-//         avgRating: transporter.avg_rating,
-//         country: transporter.country,
-//         state: transporter.state,
-//         city: transporter.city,
-//         district: transporter.district,
-//         address: transporter.address,
-//         tinPan: transporter.tin_pan,
-//         tan: transporter.tan,
-//         vatGst: transporter.vat_number,
-//         contactPersonName: transporter.contact_person_name,
-//         mobileNumber: transporter.phone_number,
-//         emailId: transporter.email_id,
-//         createdBy: transporter.created_by,
-//         createdOn: transporter.created_on
-//           ? new Date(transporter.created_on).toISOString().split("T")[0]
-//           : null,
-//         updatedOn: transporter.updated_on
-//           ? new Date(transporter.updated_on).toISOString().split("T")[0]
-//           : null,
-//         activeFlag: transporter.active_flag,
-//         fromDate: transporter.from_date,
-//         toDate: transporter.to_date,
-//       };
-//     });
-
-//     res.json({
-//       success: true,
-//       data: transformedTransporters,
-//       pagination: {
-//         page: pageNum,
-//         limit: limitNum,
-//         total,
-//         pages: Math.ceil(total / limitNum),
-//       },
-//       timestamp: new Date().toISOString(),
-//     });
-//   } catch (error) {
-//     console.error("Error fetching transporters:", error);
-//     res.status(500).json({
-//       success: false,
-//       error: {
-//         code: "FETCH_ERROR",
-//         message: "Failed to fetch transporters",
-//         details: error.message,
-//       },
-//       timestamp: new Date().toISOString(),
-//     });
-//   }
-// };
-
-// Get all transporters with pagination and filters
 const getTransporters = async (req, res) => {
   try {
     const {
@@ -3769,7 +3467,13 @@ const submitTransporterFromDraft = async (req, res) => {
       });
     }
 
-    // FULL VALIDATION - Same as createTransporter
+    // ========================================
+    // COMPREHENSIVE VALIDATION - Same as createTransporter
+    // ========================================
+
+    console.log("🔍 Starting submit-draft validation - VALIDATION PHASE");
+
+    // Validate general details - business name
     if (
       !generalDetails?.businessName ||
       generalDetails.businessName.trim().length < 2
@@ -3778,25 +3482,38 @@ const submitTransporterFromDraft = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "Business name is required (minimum 2 characters)",
+          message: ERROR_MESSAGES.BUSINESS_NAME_TOO_SHORT,
           field: "generalDetails.businessName",
         },
       });
     }
 
-    // Validate at least one transport mode
-    const hasTransportMode =
-      generalDetails.transMode?.road ||
-      generalDetails.transMode?.rail ||
-      generalDetails.transMode?.air ||
-      generalDetails.transMode?.sea;
-
-    if (!hasTransportMode) {
+    // Validate from date
+    if (!generalDetails.fromDate) {
       return res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "At least one transport mode must be selected",
+          message: ERROR_MESSAGES.FROM_DATE_REQUIRED,
+          field: "generalDetails.fromDate",
+        },
+      });
+    }
+
+    // Validate transport modes - at least one must be selected
+    const transportModes = [
+      generalDetails.transMode?.road,
+      generalDetails.transMode?.rail,
+      generalDetails.transMode?.air,
+      generalDetails.transMode?.sea,
+    ];
+
+    if (!transportModes.some((mode) => mode)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: ERROR_MESSAGES.TRANSPORT_MODE_REQUIRED,
           field: "generalDetails.transMode",
         },
       });
@@ -3808,13 +3525,113 @@ const submitTransporterFromDraft = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "At least one address is required",
+          message: ERROR_MESSAGES.ADDRESS_REQUIRED,
           field: "addresses",
         },
       });
     }
 
-    // Validate primary address
+    // Validate each address comprehensively
+    for (let i = 0; i < addresses.length; i++) {
+      const address = addresses[i];
+
+      // Validate VAT number
+      if (
+        !address.vatNumber ||
+        !validateVATNumber(address.vatNumber, address.country)
+      ) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.VAT_NUMBER_INVALID,
+            field: `addresses[${i}].vatNumber`,
+          },
+        });
+      }
+
+      // Validate country, state, city
+      if (!address.country || !address.state || !address.city) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.COUNTRY_STATE_CITY_REQUIRED,
+            field: `addresses[${i}]`,
+          },
+        });
+      }
+
+      // Validate contacts for each address
+      if (!address.contacts || address.contacts.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.CONTACT_REQUIRED,
+            field: `addresses[${i}].contacts`,
+          },
+        });
+      }
+
+      // Validate each contact
+      for (let j = 0; j < address.contacts.length; j++) {
+        const contact = address.contacts[j];
+
+        // Validate contact name
+        if (!contact.name || contact.name.trim().length < 2) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: ERROR_MESSAGES.CONTACT_NAME_REQUIRED,
+              field: `addresses[${i}].contacts[${j}].name`,
+            },
+          });
+        }
+
+        // Validate phone number
+        if (!contact.phoneNumber || !validatePhoneNumber(contact.phoneNumber)) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: ERROR_MESSAGES.PHONE_NUMBER_INVALID,
+              field: `addresses[${i}].contacts[${j}].phoneNumber`,
+            },
+          });
+        }
+
+        // Validate alternate phone if provided
+        if (
+          contact.alternatePhoneNumber &&
+          !validatePhoneNumber(contact.alternatePhoneNumber)
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: ERROR_MESSAGES.ALTERNATE_PHONE_INVALID,
+              field: `addresses[${i}].contacts[${j}].alternatePhoneNumber`,
+            },
+          });
+        }
+
+        // Validate email
+        if (!contact.email || !validateEmail(contact.email)) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: ERROR_MESSAGES.EMAIL_INVALID,
+              field: `addresses[${i}].contacts[${j}].email`,
+            },
+          });
+        }
+      }
+    }
+
+    // Validate primary address exists
     const primaryAddress = addresses.find((addr) => addr.isPrimary);
     if (!primaryAddress) {
       return res.status(400).json({
@@ -3833,11 +3650,271 @@ const submitTransporterFromDraft = async (req, res) => {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "At least one serviceable area is required",
+          message: ERROR_MESSAGES.SERVICEABLE_AREA_REQUIRED,
           field: "serviceableAreas",
         },
       });
     }
+
+    // Check for duplicate countries in serviceable areas
+    const countries = serviceableAreas.map((area) => area.country);
+    const uniqueCountries = [...new Set(countries)];
+    if (countries.length !== uniqueCountries.length) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: ERROR_MESSAGES.SERVICEABLE_AREA_DUPLICATE,
+          field: "serviceableAreas",
+        },
+      });
+    }
+
+    // Validate each serviceable area
+    for (let i = 0; i < serviceableAreas.length; i++) {
+      const area = serviceableAreas[i];
+
+      if (!area.country) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Country is required for serviceable area ${i + 1}`,
+            field: `serviceableAreas[${i}].country`,
+          },
+        });
+      }
+
+      if (!area.states || area.states.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `At least one state must be selected for serviceable area ${
+              i + 1
+            }`,
+            field: `serviceableAreas[${i}].states`,
+          },
+        });
+      }
+
+      // Validate that states belong to the specified country
+      const country = Country.getAllCountries().find(
+        (c) => c.name === area.country
+      );
+      if (!country) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Invalid country: ${area.country}`,
+            field: `serviceableAreas[${i}].country`,
+          },
+        });
+      }
+
+      const validStates = State.getStatesOfCountry(country.isoCode);
+      const validStateNames = validStates.map((s) => s.name);
+
+      for (const stateName of area.states) {
+        if (!validStateNames.includes(stateName)) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `State "${stateName}" does not belong to country "${area.country}". Please select valid states for this country.`,
+              field: `serviceableAreas[${i}].states`,
+            },
+          });
+        }
+      }
+    }
+
+    // Validate documents
+    if (!documents || documents.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: ERROR_MESSAGES.DOCUMENT_REQUIRED,
+          field: "documents",
+        },
+      });
+    }
+
+    // Validate each document
+    for (let i = 0; i < documents.length; i++) {
+      const doc = documents[i];
+
+      if (!doc.documentType) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.DOCUMENT_TYPE_REQUIRED,
+            field: `documents[${i}].documentType`,
+          },
+        });
+      }
+
+      if (!doc.documentNumber) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.DOCUMENT_NUMBER_REQUIRED,
+            field: `documents[${i}].documentNumber`,
+          },
+        });
+      }
+
+      // Validate document number format based on document type
+      const docTypeInfo = await knex("document_name_master")
+        .where(function () {
+          this.where("doc_name_master_id", doc.documentType).orWhere(
+            "document_name",
+            doc.documentType
+          );
+        })
+        .first();
+
+      if (docTypeInfo) {
+        doc.documentTypeId = docTypeInfo.doc_name_master_id;
+
+        const validation = validateDocumentNumber(
+          doc.documentNumber,
+          docTypeInfo.document_name
+        );
+
+        if (!validation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: validation.message,
+              field: `documents[${i}].documentNumber`,
+              expectedFormat: validation.format,
+            },
+          });
+        }
+
+        doc.documentNumber = doc.documentNumber.trim().toUpperCase();
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Invalid document type: ${doc.documentType}`,
+            field: `documents[${i}].documentType`,
+          },
+        });
+      }
+
+      if (!doc.country) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.DOCUMENT_COUNTRY_REQUIRED,
+            field: `documents[${i}].country`,
+          },
+        });
+      }
+
+      if (!doc.validFrom) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.DOCUMENT_VALID_FROM_REQUIRED,
+            field: `documents[${i}].validFrom`,
+          },
+        });
+      }
+
+      if (!doc.validTo) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.DOCUMENT_VALID_TO_REQUIRED,
+            field: `documents[${i}].validTo`,
+          },
+        });
+      }
+
+      // Validate date range
+      const validFrom = new Date(doc.validFrom);
+      const validTo = new Date(doc.validTo);
+
+      if (validTo <= validFrom) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: ERROR_MESSAGES.DOCUMENT_DATE_INVALID,
+            field: `documents[${i}].validTo`,
+          },
+        });
+      }
+    }
+
+    // Check for duplicate VAT numbers (exclude current transporter's addresses)
+    const vatNumbers = addresses.map((addr) => addr.vatNumber);
+    const existingVATCheck = await knex("tms_address")
+      .whereIn("vat_number", vatNumbers)
+      .whereNot("user_reference_id", id)
+      .andWhere("status", "ACTIVE");
+
+    if (existingVATCheck.length > 0) {
+      const duplicateVAT = existingVATCheck[0].vat_number;
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: `VAT number ${duplicateVAT} already exists. Please use a unique VAT number`,
+          field: "vatNumber",
+          value: duplicateVAT,
+        },
+      });
+    }
+
+    // Check for duplicate document numbers (exclude current transporter's documents)
+    for (let i = 0; i < documents.length; i++) {
+      const doc = documents[i];
+      const documentTypeId = doc.documentTypeId || doc.documentType;
+
+      const existingDoc = await knex("transporter_documents")
+        .where("document_number", doc.documentNumber)
+        .andWhere("document_type_id", documentTypeId)
+        .whereNot("document_unique_id", "like", `${id}_%`)
+        .andWhere("status", "ACTIVE")
+        .first();
+
+      if (existingDoc) {
+        const docTypeInfo = await knex("document_name_master")
+          .where("doc_name_master_id", documentTypeId)
+          .first();
+
+        const docTypeName = docTypeInfo
+          ? docTypeInfo.document_name
+          : "this document type";
+
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Document number ${doc.documentNumber} already exists for ${docTypeName}. Please use a unique document number`,
+            field: `documents[${i}].documentNumber`,
+            value: doc.documentNumber,
+          },
+        });
+      }
+    }
+
+    console.log(
+      "✅ ALL VALIDATIONS PASSED - Starting submit-draft transaction"
+    );
 
     const trx = await knex.transaction();
 

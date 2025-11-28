@@ -11,6 +11,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
 
   // Safe navigation - ensure formData has the expected structure
   const generalDetails = formData?.generalDetails || {
+    consignorId: user?.consignor_id,
     warehouseName: "",
     warehouseName2: "",
     warehouseType: "",

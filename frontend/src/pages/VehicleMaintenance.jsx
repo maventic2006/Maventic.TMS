@@ -7,8 +7,12 @@ import VehicleFilterPanel from "../components/vehicle/VehicleFilterPanel";
 import VehicleListTable from "../components/vehicle/VehicleListTable";
 import VehicleBulkUploadModal from "../features/vehicle/components/VehicleBulkUploadModal";
 import VehicleBulkUploadHistory from "../features/vehicle/components/VehicleBulkUploadHistory";
-import { fetchVehicles } from "../redux/slices/vehicleSlice";
+import {
+  fetchVehicles,
+  deleteVehicleDraft,
+} from "../redux/slices/vehicleSlice";
 import { openVehicleBulkUploadModal } from "../redux/slices/vehicleBulkUploadSlice";
+import { addToast, TOAST_TYPES } from "../redux/slices/uiSlice";
 import { getPageTheme } from "../theme.config";
 
 // Enhanced fuzzy search utility with better field handling
@@ -24,7 +28,7 @@ const fuzzySearch = (searchText, vehicles) => {
   const searchLower = searchText.toLowerCase().trim();
 
   return vehicles.filter((vehicle) => {
-    if (!vehicle || typeof vehicle !== 'object') {
+    if (!vehicle || typeof vehicle !== "object") {
       return false;
     }
 
@@ -44,7 +48,7 @@ const fuzzySearch = (searchText, vehicles) => {
       vehicle.vehicleCondition,
       vehicle.engineNumber,
       vehicle.chassisNumber, // Maps to vin from backend
-      vehicle.gpsDeviceId,   // Maps to gpsIMEI from backend
+      vehicle.gpsDeviceId, // Maps to gpsIMEI from backend
     ];
 
     return searchableFields.some((field) => {
@@ -66,7 +70,9 @@ const VehicleMaintenance = () => {
   const dispatch = useDispatch();
 
   // Redux state
-  const { vehicles, pagination, isFetching, error } = useSelector((state) => state.vehicle);
+  const { vehicles, pagination, isFetching, error } = useSelector(
+    (state) => state.vehicle
+  );
 
   // Local state
   const [searchText, setSearchText] = useState("");
@@ -92,6 +98,8 @@ const VehicleMaintenance = () => {
     bodyType: "",
     towingCapacityMin: "",
     towingCapacityMax: "",
+    createdOnStart: "",
+    createdOnEnd: "",
   });
 
   const [appliedFilters, setAppliedFilters] = useState({
@@ -113,6 +121,8 @@ const VehicleMaintenance = () => {
     bodyType: "",
     towingCapacityMin: "",
     towingCapacityMax: "",
+    createdOnStart: "",
+    createdOnEnd: "",
   });
 
   // Initial load
@@ -182,7 +192,12 @@ const VehicleMaintenance = () => {
       if (appliedFilters.towingCapacityMax) {
         params.towingCapacityMax = appliedFilters.towingCapacityMax;
       }
-
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
+      }
       dispatch(fetchVehicles(params));
     };
 
@@ -217,6 +232,8 @@ const VehicleMaintenance = () => {
       bodyType: "",
       towingCapacityMin: "",
       towingCapacityMax: "",
+      createdOnStart: "",
+      createdOnEnd: "",
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
@@ -297,11 +314,11 @@ const VehicleMaintenance = () => {
   const filteredVehicles = useMemo(() => {
     // Ensure we have valid vehicles array
     const vehicleArray = Array.isArray(vehicles) ? vehicles : [];
-    
+
     if (!searchText || searchText.trim() === "") {
       return vehicleArray;
     }
-    
+
     return fuzzySearch(searchText, vehicleArray);
   }, [searchText, vehicles]);
 
@@ -328,12 +345,53 @@ const VehicleMaintenance = () => {
     dispatch(openVehicleBulkUploadModal());
   }, [dispatch]);
 
+  const handleDeleteDraft = useCallback(
+    async (vehicleId) => {
+      if (
+        window.confirm(
+          "Are you sure you want to delete this draft? This action cannot be undone."
+        )
+      ) {
+        try {
+          await dispatch(deleteVehicleDraft(vehicleId)).unwrap();
+
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.SUCCESS,
+              message: "Draft deleted successfully",
+              duration: 3000,
+            })
+          );
+
+          // Refresh the vehicle list to remove the deleted item
+          dispatch(
+            fetchVehicles({
+              page: pagination.page,
+              limit: pagination.limit || 25,
+              ...appliedFilters,
+            })
+          );
+        } catch (error) {
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.ERROR,
+              message: "Failed to delete draft",
+              details: [error.message || "An error occurred"],
+              duration: 5000,
+            })
+          );
+        }
+      }
+    },
+    [dispatch, pagination.page, pagination.limit, appliedFilters]
+  );
+
   const theme = getPageTheme("list");
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <TMSHeader theme={theme} />
-      
+
       <div className="max-w-7xl mx-auto px-2 lg:px-6 space-y-4">
         <TopActionBar
           onCreateNew={handleCreateNew}
@@ -356,6 +414,7 @@ const VehicleMaintenance = () => {
           vehicles={filteredVehicles}
           loading={isFetching}
           onVehicleClick={handleVehicleClick}
+          onDeleteDraft={handleDeleteDraft}
           // Pagination props (matching TransporterListTable)
           currentPage={pagination.page}
           totalPages={pagination.pages}
@@ -375,7 +434,9 @@ const VehicleMaintenance = () => {
             style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
           >
             <p className="font-semibold text-sm">Error loading vehicles:</p>
-            <p className="text-sm mt-1">{error.message || "Something went wrong"}</p>
+            <p className="text-sm mt-1">
+              {error.message || "Something went wrong"}
+            </p>
           </div>
         )}
       </div>

@@ -13,36 +13,85 @@ import { ChevronDown, Check, Search, X } from "lucide-react";
 const GlobalDropdownContext = createContext();
 
 // Global dropdown provider to manage which dropdown is open
+// const GlobalDropdownProvider = ({ children }) => {
+//   const [openDropdownId, setOpenDropdownId] = useState(null);
+
+//   const openDropdown = (id) => {
+//     setOpenDropdownId(id);
+//   };
+
+//   const closeDropdown = () => {
+//     setOpenDropdownId(null);
+//   };
+
+//   const isDropdownOpen = (id) => {
+//     return openDropdownId === id;
+//   };
+
+//   useEffect(() => {
+//     const handleClickOutside = (event) => {
+//       // Close dropdown if clicked outside any dropdown
+//       const isInsideDropdown = event.target.closest(
+//         "[data-dropdown-container]"
+//       );
+//       if (!isInsideDropdown) {
+//         closeDropdown();
+//       }
+//     };
+
+//     document.addEventListener("mousedown", handleClickOutside);
+//     return () => {
+//       document.removeEventListener("mousedown", handleClickOutside);
+//     };
+//   }, []);
+
+//   return (
+//     <GlobalDropdownContext.Provider
+//       value={{ openDropdown, closeDropdown, isDropdownOpen }}
+//     >
+//       {children}
+//     </GlobalDropdownContext.Provider>
+//   );
+// };
+
 const GlobalDropdownProvider = ({ children }) => {
   const [openDropdownId, setOpenDropdownId] = useState(null);
 
-  const openDropdown = (id) => {
-    setOpenDropdownId(id);
-  };
+  const openDropdown = (id) => setOpenDropdownId(id);
+  const closeDropdown = () => setOpenDropdownId(null);
+  const isDropdownOpen = (id) => openDropdownId === id;
 
-  const closeDropdown = () => {
-    setOpenDropdownId(null);
-  };
+  // useEffect(() => {
+  //   const handleClickOutside = (event) => {
+  //     const insideDropdown = event.target.closest("[data-dropdown-container]");
+  //     const insideTrigger = event.target.closest("[data-dropdown-trigger]");
 
-  const isDropdownOpen = (id) => {
-    return openDropdownId === id;
-  };
+  //     // If NOT inside trigger AND NOT inside dropdown → close it
+  //     if (!insideDropdown && !insideTrigger) {
+  //       closeDropdown();
+  //     }
+  //   };
+
+  //   document.addEventListener("mousedown", handleClickOutside);
+  //   return () => document.removeEventListener("mousedown", handleClickOutside);
+  // }, []);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Close dropdown if clicked outside any dropdown
-      const isInsideDropdown = event.target.closest(
-        "[data-dropdown-container]"
-      );
-      if (!isInsideDropdown) {
-        closeDropdown();
-      }
+    const handleClick = (e) => {
+      const isTrigger = e.target.closest("[data-dropdown-trigger]");
+      const isContainer = e.target.closest("[data-dropdown-container]");
+
+      // Do NOT close if click is inside portal container
+      if (isContainer) return;
+
+      // Do NOT close if clicking on trigger (toggle handles this)
+      if (isTrigger) return;
+
+      closeDropdown();
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
   }, []);
 
   return (
@@ -158,6 +207,78 @@ const SelectValue = ({ placeholder, ...props }) => {
 SelectValue.displayName = "SelectValue";
 
 // Portal component for dropdown content
+// const DropdownPortal = ({ isOpen, triggerRef, children, className }) => {
+//   const [position, setPosition] = useState({});
+//   const contentRef = useRef(null);
+
+//   useEffect(() => {
+//     if (isOpen && triggerRef.current && contentRef.current) {
+//       const triggerRect = triggerRef.current.getBoundingClientRect();
+//       const contentRect = contentRef.current.getBoundingClientRect();
+//       const viewportHeight = window.innerHeight;
+//       const viewportWidth = window.innerWidth;
+//       const scrollY = window.scrollY;
+//       const scrollX = window.scrollX;
+
+//       const spaceBelow = viewportHeight - triggerRect.bottom;
+//       const spaceAbove = triggerRect.top;
+//       const maxHeight = 240; // max-h-60 = 240px
+
+//       let top, left, width;
+
+//       // Position horizontally
+//       left = triggerRect.left + scrollX;
+//       width = triggerRect.width;
+
+//       // Ensure dropdown doesn't go outside viewport horizontally
+//       if (left + width > viewportWidth) {
+//         left = viewportWidth - width - 16; // 16px padding from edge
+//       }
+//       if (left < 16) {
+//         left = 16;
+//         width = Math.min(width, viewportWidth - 32);
+//       }
+
+//       // Position vertically
+//       if (spaceBelow >= maxHeight || spaceBelow > spaceAbove) {
+//         // Open downward
+//         top = triggerRect.bottom + scrollY + 4;
+//       } else {
+//         // Open upward
+//         top = triggerRect.top + scrollY - maxHeight - 4;
+//       }
+
+//       setPosition({
+//         position: "absolute",
+//         top: `${top}px`,
+//         left: `${left}px`,
+//         width: `${width}px`,
+//         zIndex: 99999,
+//       });
+//     }
+//   }, [isOpen, triggerRef]);
+
+//   if (!isOpen) return null;
+
+//   return createPortal(
+//     <div
+//       ref={contentRef}
+//       data-dropdown-container
+//       className={clsx(
+//         "max-h-72 overflow-y-auto overflow-x-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-lg py-2 text-sm shadow-2xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-300",
+//         className
+//       )}
+//       style={position}
+//     >
+//       {/* Modern glassmorphism background overlay */}
+//       <div className="absolute inset-0 bg-gradient-to-br from-white/90 via-white/70 to-white/90 backdrop-blur-lg rounded-2xl"></div>
+
+//       <div className="relative p-2 space-y-1">{children}</div>
+//     </div>,
+//     document.body
+//   );
+// };
+
 const DropdownPortal = ({ isOpen, triggerRef, children, className }) => {
   const [position, setPosition] = useState({});
   const contentRef = useRef(null);
@@ -165,37 +286,31 @@ const DropdownPortal = ({ isOpen, triggerRef, children, className }) => {
   useEffect(() => {
     if (isOpen && triggerRef.current && contentRef.current) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
-      const contentRect = contentRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
       const viewportWidth = window.innerWidth;
       const scrollY = window.scrollY;
       const scrollX = window.scrollX;
 
+      const maxHeight = 240;
       const spaceBelow = viewportHeight - triggerRect.bottom;
       const spaceAbove = triggerRect.top;
-      const maxHeight = 240; // max-h-60 = 240px
 
       let top, left, width;
 
-      // Position horizontally
       left = triggerRect.left + scrollX;
       width = triggerRect.width;
 
-      // Ensure dropdown doesn't go outside viewport horizontally
       if (left + width > viewportWidth) {
-        left = viewportWidth - width - 16; // 16px padding from edge
+        left = viewportWidth - width - 16;
       }
       if (left < 16) {
         left = 16;
         width = Math.min(width, viewportWidth - 32);
       }
 
-      // Position vertically
       if (spaceBelow >= maxHeight || spaceBelow > spaceAbove) {
-        // Open downward
         top = triggerRect.bottom + scrollY + 4;
       } else {
-        // Open upward
         top = triggerRect.top + scrollY - maxHeight - 4;
       }
 
@@ -214,14 +329,13 @@ const DropdownPortal = ({ isOpen, triggerRef, children, className }) => {
   return createPortal(
     <div
       ref={contentRef}
-      data-dropdown-container
+      data-dropdown-container="true"
       className={clsx(
         "max-h-72 overflow-y-auto overflow-x-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-lg py-2 text-sm shadow-2xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-300",
         className
       )}
       style={position}
     >
-      {/* Modern glassmorphism background overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/90 via-white/70 to-white/90 backdrop-blur-lg rounded-2xl"></div>
 
       <div className="relative p-2 space-y-1">{children}</div>
@@ -409,7 +523,7 @@ const StatusSelect = ({
 const CustomSelect = ({
   value,
   onChange,
-  onValueChange, // Support both onChange and onValueChange
+  onValueChange,
   options = [],
   placeholder = "Select an option",
   className,
@@ -418,12 +532,13 @@ const CustomSelect = ({
   searchable = false,
   clearable = false,
   required = false,
-  getOptionLabel, // Function to get label from option object
-  getOptionValue, // Function to get value from option object
+  getOptionLabel,
+  getOptionValue,
 }) => {
   const globalDropdownContext = useContext(GlobalDropdownContext);
   const dropdownId = useRef(Math.random().toString(36).substr(2, 9)).current;
   const triggerRef = useRef(null);
+  const searchInputRef = useRef(null); // 🔥 NEW REF
   const [searchTerm, setSearchTerm] = useState("");
 
   const isOpen = globalDropdownContext?.isDropdownOpen(dropdownId) || false;
@@ -440,7 +555,15 @@ const CustomSelect = ({
     }
   };
 
-  // Helper functions to extract label and value from options
+  // 🔥 AUTO-FOCUS SEARCH FIELD WHEN DROPDOWN OPENS
+  useEffect(() => {
+    if (isOpen && searchable) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 10);
+    }
+  }, [isOpen, searchable]);
+
   const extractLabel = (option) => {
     if (!option) return "";
     if (getOptionLabel) return getOptionLabel(option);
@@ -462,44 +585,23 @@ const CustomSelect = ({
 
   const filteredOptions =
     searchable && searchTerm
-      ? options.filter((option) => {
-          const label = extractLabel(option);
-          return label.toLowerCase().includes(searchTerm.toLowerCase());
-        })
+      ? options.filter((option) =>
+          extractLabel(option).toLowerCase().includes(searchTerm.toLowerCase())
+        )
       : options;
 
-  // Debug logging
-  useEffect(() => {
-    if (value) {
-      const selectedOpt = options.find(
-        (option) => extractValue(option) === value
-      );
-      if (!selectedOpt && options.length > 0) {
-        console.log("⚠️ Value not found in options:", value);
-      }
-    }
-  }, [value, options]);
-
   const handleSelect = (optionValue) => {
-    console.log("✅ Selected:", optionValue);
+    if (onValueChange) onValueChange(optionValue);
+    else if (onChange) onChange(optionValue);
 
-    // Support both onChange and onValueChange props
-    if (onValueChange) {
-      onValueChange(optionValue);
-    } else if (onChange) {
-      onChange(optionValue);
-    }
     globalDropdownContext?.closeDropdown();
     setSearchTerm("");
   };
 
   const handleClear = (e) => {
     e.stopPropagation();
-    if (onValueChange) {
-      onValueChange("");
-    } else if (onChange) {
-      onChange("");
-    }
+    if (onValueChange) onValueChange("");
+    else if (onChange) onChange("");
   };
 
   const getDisplayValue = () => {
@@ -561,6 +663,7 @@ const CustomSelect = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
+                ref={searchInputRef} // 🔥 AUTO-FOCUS TARGET
                 type="text"
                 placeholder="Search options..."
                 value={searchTerm}
@@ -615,6 +718,187 @@ const CustomSelect = ({
   );
 };
 
+const MultiSelect = ({
+  value = [],
+  onValueChange,
+  options = [],
+  placeholder = "Select options",
+  className,
+  error,
+  disabled,
+  searchable = false,
+  getOptionLabel,
+  getOptionValue,
+}) => {
+  const globalDropdownContext = useContext(GlobalDropdownContext);
+  const dropdownId = useRef(Math.random().toString(36).substr(2, 9)).current;
+
+  const triggerRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const isOpen = globalDropdownContext?.isDropdownOpen(dropdownId) || false;
+
+  const setIsOpen = (open) => {
+    if (!globalDropdownContext) return;
+    if (open && !disabled) {
+      globalDropdownContext.openDropdown(dropdownId);
+      setSearchTerm("");
+    } else {
+      globalDropdownContext.closeDropdown();
+      setSearchTerm("");
+    }
+  };
+
+  // Autofocus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchable) {
+      setTimeout(() => searchInputRef.current?.focus(), 10);
+    }
+  }, [isOpen, searchable]);
+
+  const extractLabel = (option) => {
+    if (!option) return "";
+    if (getOptionLabel) return getOptionLabel(option);
+    return option?.label || option?.name || option?.toString();
+  };
+
+  const extractValue = (option) => {
+    if (!option) return "";
+    if (getOptionValue) return getOptionValue(option);
+    return option?.value || option?.id || option?.name || option.toString();
+  };
+
+  const filteredOptions =
+    searchable && searchTerm
+      ? options.filter((option) =>
+          extractLabel(option).toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : options;
+
+  // MULTI SELECT LOGIC — does NOT close dropdown
+  const toggleSelection = (selectedValue) => {
+    let updated = [];
+
+    if (value.includes(selectedValue)) {
+      updated = value.filter((v) => v !== selectedValue);
+    } else {
+      updated = [...value, selectedValue];
+    }
+
+    onValueChange(updated); // send full array back
+  };
+
+  const getDisplayLabel = () => {
+    if (!value || value.length === 0) return placeholder;
+    return `${value.length} selected`;
+  };
+
+  return (
+    <div className="relative w-full">
+      {/* TRIGGER BUTTON */}
+      <button
+        ref={triggerRef}
+        data-dropdown-trigger
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={clsx(
+          "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-xs",
+          "transition-all duration-200 focus:outline-none focus:ring-2",
+          disabled
+            ? "bg-gray-50 text-gray-500 cursor-not-allowed border-gray-200"
+            : error
+            ? "border-red-300 bg-white"
+            : isOpen
+            ? "border-blue-400 bg-white"
+            : "border-gray-200/80 bg-white/90 hover:border-gray-300",
+          className
+        )}
+      >
+        <span
+          className={clsx(
+            "truncate flex-1",
+            value.length ? "text-gray-900" : "text-gray-500"
+          )}
+        >
+          {getDisplayLabel()}
+        </span>
+
+        <ChevronDown
+          className={clsx(
+            "h-4 w-4 text-gray-400 transition-transform duration-200",
+            isOpen && "rotate-180"
+          )}
+        />
+      </button>
+
+      {/* DROPDOWN PORTAL */}
+      <DropdownPortal isOpen={isOpen} triggerRef={triggerRef}>
+        {searchable && (
+          <div className="p-2 border-b border-gray-100">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* OPTIONS LIST */}
+        <div className="max-h-48 overflow-y-auto">
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-4 text-sm text-gray-500 text-center">
+              No options found
+            </div>
+          ) : (
+            filteredOptions.map((option, index) => {
+              const optionValue = extractValue(option);
+              const optionLabel = extractLabel(option);
+              const isSelected = value.includes(optionValue);
+
+              return (
+                <div
+                  className="w-full px-3 py-2.5 flex items-center gap-3 text-sm cursor-pointer hover:bg-blue-50"
+                  onMouseDown={(e) => {
+                    // prevents the item selection click from bubbling and closing
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleSelection(optionValue);
+                  }}
+                >
+                  {/* CHECKBOX */}
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    readOnly
+                    className="h-4 w-4"
+                  />
+
+                  <span className="truncate flex-1">{optionLabel}</span>
+
+                  {isSelected && <Check className="h-4 w-4 text-blue-600" />}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </DropdownPortal>
+    </div>
+  );
+};
+
 export {
   Select,
   SelectTrigger,
@@ -624,4 +908,5 @@ export {
   StatusSelect,
   CustomSelect,
   GlobalDropdownProvider,
+  MultiSelect,
 };
