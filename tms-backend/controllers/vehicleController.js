@@ -1,5 +1,5 @@
 const db = require("../config/database");
-const axios = require('axios');
+const axios = require("axios");
 
 /**
  * Vehicle Controller
@@ -119,11 +119,11 @@ const generateVehicleId = async () => {
 //     const result = await db('vehicle_ownership_details')
 //       .max('vehicle_ownership_id as max_id')
 //       .first();
-    
+
 //     if (!result.max_id) {
 //       return 'OWN0001';
 //     }
-    
+
 //     const numPart = parseInt(result.max_id.substring(3)) + 1;
 //     return 'OWN' + numPart.toString().padStart(4, '0');
 //   } catch (error) {
@@ -528,61 +528,68 @@ const validateForeignKeys = async (vehicleData) => {
 
   // Validate fuel_type_id
   if (vehicleData.fuel_type_id) {
-    const fuelType = await db('fuel_type_master')
-      .where('fuel_type_id', vehicleData.fuel_type_id)
-      .where('status', 'ACTIVE')
+    const fuelType = await db("fuel_type_master")
+      .where("fuel_type_id", vehicleData.fuel_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!fuelType) {
       // Log available fuel types for debugging when validation fails
-      const availableFuelTypes = await db('fuel_type_master').where('status', 'ACTIVE').select('fuel_type_id', 'fuel_type');
+      const availableFuelTypes = await db("fuel_type_master")
+        .where("status", "ACTIVE")
+        .select("fuel_type_id", "fuel_type");
       console.log("❌ Invalid fuel_type_id:", vehicleData.fuel_type_id);
-      console.log("✅ Valid fuel types:", availableFuelTypes.map(ft => `${ft.fuel_type_id}:${ft.fuel_type}`).join(', '));
-      
+      console.log(
+        "✅ Valid fuel types:",
+        availableFuelTypes
+          .map((ft) => `${ft.fuel_type_id}:${ft.fuel_type}`)
+          .join(", ")
+      );
+
       errors.push({
-        field: 'specifications.fuelType',
-        message: `Invalid fuel type ID: ${vehicleData.fuel_type_id}. Please select a valid fuel type.`
+        field: "specifications.fuelType",
+        message: `Invalid fuel type ID: ${vehicleData.fuel_type_id}. Please select a valid fuel type.`,
       });
     }
   }
 
   // Validate vehicle_type_id
   if (vehicleData.vehicle_type_id) {
-    const vehicleType = await db('vehicle_type_master')
-      .where('vehicle_type_id', vehicleData.vehicle_type_id)
-      .where('status', 'ACTIVE')
+    const vehicleType = await db("vehicle_type_master")
+      .where("vehicle_type_id", vehicleData.vehicle_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!vehicleType) {
       errors.push({
-        field: 'basicInformation.vehicleType',
-        message: `Invalid vehicle type ID: ${vehicleData.vehicle_type_id}. Please select a valid vehicle type.`
+        field: "basicInformation.vehicleType",
+        message: `Invalid vehicle type ID: ${vehicleData.vehicle_type_id}. Please select a valid vehicle type.`,
       });
     }
   }
 
   // Validate usage_type_id
   if (vehicleData.usage_type_id) {
-    const usageType = await db('usage_type_master')
-      .where('usage_type_id', vehicleData.usage_type_id)
-      .where('status', 'ACTIVE')
+    const usageType = await db("usage_type_master")
+      .where("usage_type_id", vehicleData.usage_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!usageType) {
       errors.push({
-        field: 'basicInformation.usageType',
-        message: `Invalid usage type ID: ${vehicleData.usage_type_id}. Please select a valid usage type.`
+        field: "basicInformation.usageType",
+        message: `Invalid usage type ID: ${vehicleData.usage_type_id}. Please select a valid usage type.`,
       });
     }
   }
 
   // Validate engine_type_id
   if (vehicleData.engine_type_id) {
-    const engineType = await db('engine_type_master')
-      .where('engine_type_id', vehicleData.engine_type_id)
-      .where('status', 'ACTIVE')
+    const engineType = await db("engine_type_master")
+      .where("engine_type_id", vehicleData.engine_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!engineType) {
       errors.push({
-        field: 'specifications.engineType',
-        message: `Invalid engine type ID: ${vehicleData.engine_type_id}. Please select a valid engine type.`
+        field: "specifications.engineType",
+        message: `Invalid engine type ID: ${vehicleData.engine_type_id}. Please select a valid engine type.`,
       });
     }
   }
@@ -623,14 +630,14 @@ const createVehicle = async (req, res) => {
       ...validateBasicInformation(vehicleData),
       ...validateSpecifications(vehicleData),
     ];
-    
+
     // Validate foreign key references
     const foreignKeyErrors = await validateForeignKeys(vehicleData);
     validationErrors.push(...foreignKeyErrors);
-    
+
     if (validationErrors.length > 0) {
       await trx.rollback();
-      console.log('❌ Validation errors found:', validationErrors);
+      console.log("❌ Validation errors found:", validationErrors);
       return res.status(400).json({
         success: false,
         message: "Validation errors",
@@ -1346,28 +1353,34 @@ const getVehicleById = async (req, res) => {
 
     let userApprovalStatus = null;
     let approvalHistory = [];
-    
+
     try {
       // Find Vehicle Owner user associated with this vehicle
       // Vehicle Owner users have names like "Vehicle Owner - VEH0062"
-      const associatedUser = await db('user_master')
-        .where('user_type_id', 'UT005') // Vehicle Owner user type
-        .where('user_full_name', 'like', `%${id}%`) // Match vehicle ID in name
+      const associatedUser = await db("user_master")
+        .where("user_type_id", "UT005") // Vehicle Owner user type
+        .where("user_full_name", "like", `%${id}%`) // Match vehicle ID in name
         .first();
 
       if (associatedUser) {
-        console.log(`✅ Found associated Vehicle Owner user: ${associatedUser.user_id} for vehicle ${id}`);
-        
+        console.log(
+          `✅ Found associated Vehicle Owner user: ${associatedUser.user_id} for vehicle ${id}`
+        );
+
         // Get approval flow for this user
-        const approvalFlows = await db('approval_flow_trans as aft')
-          .leftJoin('approval_type_master as atm', 'aft.approval_type_id', 'atm.approval_type_id')
-          .where('aft.user_id_reference_id', associatedUser.user_id)
-          .select(
-            'aft.*',
-            'atm.approval_type as approval_category',
-            'atm.approval_name'
+        const approvalFlows = await db("approval_flow_trans as aft")
+          .leftJoin(
+            "approval_type_master as atm",
+            "aft.approval_type_id",
+            "atm.approval_type_id"
           )
-          .orderBy('aft.created_at', 'desc');
+          .where("aft.user_id_reference_id", associatedUser.user_id)
+          .select(
+            "aft.*",
+            "atm.approval_type as approval_category",
+            "atm.approval_name"
+          )
+          .orderBy("aft.created_at", "desc");
 
         userApprovalStatus = {
           approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id || null,
@@ -1376,7 +1389,8 @@ const getVehicleById = async (req, res) => {
           userMobile: associatedUser.mobile_number,
           userStatus: associatedUser.status,
           isActive: associatedUser.is_active,
-          currentApprovalStatus: approvalFlows[0]?.s_status || associatedUser.status,
+          currentApprovalStatus:
+            approvalFlows[0]?.s_status || associatedUser.status,
           pendingWith: approvalFlows[0]?.pending_with_name || null,
           pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
           createdByUserId: approvalFlows[0]?.created_by_user_id || null,
@@ -1384,13 +1398,19 @@ const getVehicleById = async (req, res) => {
         };
 
         approvalHistory = approvalFlows;
-        
-        console.log(`✅ Found approval status for vehicle ${id}:`, userApprovalStatus);
+
+        console.log(
+          `✅ Found approval status for vehicle ${id}:`,
+          userApprovalStatus
+        );
       } else {
         console.log(`⚠️  No Vehicle Owner user found for vehicle ${id}`);
       }
     } catch (approvalError) {
-      console.error('❌ Error fetching vehicle approval status:', approvalError.message);
+      console.error(
+        "❌ Error fetching vehicle approval status:",
+        approvalError.message
+      );
     }
 
     // Format response
@@ -1971,7 +1991,6 @@ const deleteVehicle = async (req, res) => {
  * Get master data for vehicle dropdowns
  * @route GET /api/vehicle/master-data
  */
-
 
 const getMasterData = async (req, res) => {
   try {
@@ -3267,7 +3286,7 @@ const lookupVehicleByRC = async (req, res) => {
     if (!registrationNumber || registrationNumber.length < 8) {
       return res.status(400).json({
         success: false,
-        message: 'Valid registration number is required (minimum 8 characters)'
+        message: "Valid registration number is required (minimum 8 characters)",
       });
     }
 
@@ -3275,89 +3294,94 @@ const lookupVehicleByRC = async (req, res) => {
     const cleanRegNumber = registrationNumber.trim().toUpperCase();
 
     // Call actual RC API
-    const axios = require('axios');
+    const axios = require("axios");
     const apiUrl = `https://api.maventic.in/mapi/getVehicleDetailsByVehicleNumber`;
 
     try {
       const response = await axios.get(apiUrl, {
         timeout: 30000, // 30 second timeout
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          Authorization: `Bearer ${process.env.VEHICLE_API_KEY}`
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${process.env.VEHICLE_API_KEY}`,
         },
         data: {
-          vehiclenumber: cleanRegNumber
+          vehiclenumber: cleanRegNumber,
         },
         // Add SSL configuration to handle certificate issues
-        httpsAgent: new (require('https')).Agent({
-          rejectUnauthorized: false
-        })
+        httpsAgent: new (require("https").Agent)({
+          rejectUnauthorized: false,
+        }),
       });
 
-      console.log('RC API Response:', response.data);
+      console.log("RC API Response:", response.data);
       // Check if response has data
-      if (response.data && response.data.response && response.data.response.length > 0) {
+      if (
+        response.data &&
+        response.data.response &&
+        response.data.response.length > 0
+      ) {
         const rcResponse = response.data.response[0];
-        
-        if (rcResponse.responseStatus === 'SUCCESS' && rcResponse.jsonResponse?.VehicleDetails) {
+
+        if (
+          rcResponse.responseStatus === "SUCCESS" &&
+          rcResponse.jsonResponse?.VehicleDetails
+        ) {
           // Return successful response
           res.json({
             success: true,
-            message: 'Vehicle details fetched successfully',
-            response: response.data.response
+            message: "Vehicle details fetched successfully",
+            response: response.data.response,
           });
         } else {
           // Vehicle not found
           return res.status(404).json({
             success: false,
-            message: 'Registration number not found in RC database'
+            message: "Registration number not found in RC database",
           });
         }
       } else {
         // No data found
         return res.status(404).json({
           success: false,
-          message: 'Registration number not found in RC database'
+          message: "Registration number not found in RC database",
         });
       }
     } catch (apiError) {
-      console.error('RC API Error:', apiError.message);
-      
+      console.error("RC API Error:", apiError.message);
+
       // Handle different types of API errors
-      if (apiError.code === 'ECONNABORTED') {
+      if (apiError.code === "ECONNABORTED") {
         return res.status(408).json({
           success: false,
-          message: 'Request timeout - RC API is taking too long to respond'
+          message: "Request timeout - RC API is taking too long to respond",
         });
       } else if (apiError.response?.status === 404) {
         return res.status(404).json({
           success: false,
-          message: 'Registration number not found in RC database'
+          message: "Registration number not found in RC database",
         });
       } else if (apiError.response?.status >= 500) {
         return res.status(502).json({
           success: false,
-          message: 'Server error occurred while fetching vehicle details'
+          message: "Server error occurred while fetching vehicle details",
         });
       } else {
         return res.status(502).json({
           success: false,
-          message: 'Error occurred in server while fetching vehicle details'
+          message: "Error occurred in server while fetching vehicle details",
         });
       }
     }
-
   } catch (error) {
-    console.error('Error in RC lookup:', error);
+    console.error("Error in RC lookup:", error);
     res.status(500).json({
       success: false,
-      message: 'Error occurred in server while processing request',
-      error: error.message
+      message: "Error occurred in server while processing request",
+      error: error.message,
     });
   }
 };
-
 
 module.exports = {
   createVehicle,
@@ -3365,5 +3389,10 @@ module.exports = {
   getVehicleById,
   updateVehicle,
   deleteVehicle,
-  getMasterData
+  getMasterData,
+  saveVehicleAsDraft,
+  updateVehicleDraft,
+  submitVehicleFromDraft,
+  deleteVehicleDraft,
+  lookupVehicleByRC,
 };

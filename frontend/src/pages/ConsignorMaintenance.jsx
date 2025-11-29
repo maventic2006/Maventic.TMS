@@ -36,7 +36,6 @@ const ConsignorMaintenance = () => {
     status: "",
     createdOnStart: "",
     createdOnEnd: "",
-    status: "",
   });
   const [appliedFilters, setAppliedFilters] = useState({
     customerId: "",
@@ -45,7 +44,6 @@ const ConsignorMaintenance = () => {
     status: "",
     createdOnStart: "",
     createdOnEnd: "",
-    status: "",
   });
 
   // Fetch consignors on component mount

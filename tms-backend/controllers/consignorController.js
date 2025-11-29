@@ -867,6 +867,89 @@ const updateConsignorDraft = async (req, res) => {
         }
       }
 
+      // Update documents if provided (metadata updates only, no file uploads in draft mode)
+      const documentsData = payload.documents || [];
+      if (
+        documentsData &&
+        Array.isArray(documentsData) &&
+        documentsData.length > 0
+      ) {
+        console.log(
+          `📄 Processing ${documentsData.length} document metadata updates...`
+        );
+
+        // Helper to generate unique document ID
+        const generateDocumentId = async () => {
+          let attempts = 0;
+          const maxAttempts = 10;
+
+          // Get all existing document IDs to find the max numeric value
+          const existingIds = await trx("consignor_documents").select(
+            "document_unique_id"
+          );
+
+          let maxNumericId = 0;
+          existingIds.forEach((row) => {
+            const match = row.document_unique_id?.match(/^CDOC(\d+)$/);
+            if (match) {
+              const numericPart = parseInt(match[1], 10);
+              if (numericPart > maxNumericId) {
+                maxNumericId = numericPart;
+              }
+            }
+          });
+
+          while (attempts < maxAttempts) {
+            const nextId = maxNumericId + 1 + attempts;
+            const newId = `CDOC${nextId.toString().padStart(5, "0")}`;
+
+            const exists = await trx("consignor_documents")
+              .where({ document_unique_id: newId })
+              .first();
+
+            if (!exists) {
+              return newId;
+            }
+            attempts++;
+          }
+
+          throw new Error("Failed to generate unique document ID");
+        };
+
+        // Delete existing documents for this consignor
+        await trx("consignor_documents").where({ customer_id: id }).del();
+
+        // Re-insert documents with updated metadata
+        for (const doc of documentsData) {
+          // Only process if document has required fields
+          if (doc.documentType && doc.documentNumber && doc.validFrom) {
+            const documentUniqueId = await generateDocumentId();
+
+            await trx("consignor_documents").insert({
+              document_unique_id: documentUniqueId,
+              document_id: doc.documentId || null, // Preserve existing document upload ID if present
+              customer_id: id,
+              document_type_id: doc.documentType, // Frontend sends "documentType"
+              document_number: doc.documentNumber,
+              valid_from: doc.validFrom,
+              valid_to: doc.validTo || null,
+              status:
+                doc.status === true || doc.status === "ACTIVE"
+                  ? "ACTIVE"
+                  : "DRAFT",
+              created_by: req.user.user_id,
+              created_at: new Date(),
+              updated_by: req.user.user_id,
+              updated_at: new Date(),
+            });
+
+            console.log(
+              `  ✅ Document saved: ${documentUniqueId} (${doc.documentType} - ${doc.documentNumber})`
+            );
+          }
+        }
+      }
+
       return { customerId: id };
     });
 
