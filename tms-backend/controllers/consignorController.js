@@ -418,7 +418,7 @@ const getConsignorWarehouses = async (req, res) => {
 /**
  * POST /api/consignors/save-draft
  * Save consignor as draft with minimal validation (business_name only)
- * Status: DRAFT
+ * Status: SAVE_AS_DRAFT
  */
 const saveConsignorAsDraft = async (req, res) => {
   const db = require("../config/database");
@@ -605,7 +605,7 @@ const saveConsignorAsDraft = async (req, res) => {
               country_code: contact.country_code || null,
               linkedin_link: contact.linkedin_link || null,
               contact_photo: null, // File uploads handled separately
-              status: "DRAFT", // ✅ FIX: Changed from "SAVE_AS_DRAFT" (15 chars) to "DRAFT" (5 chars) to fit varchar(10) constraint
+              status: "Active", // ✅ FIX: Changed from "SAVE_AS_DRAFT" (15 chars) to "DRAFT" (5 chars) to fit varchar(10) constraint
               created_by: req.user.user_id,
               created_at: new Date(),
               updated_by: req.user.user_id,
@@ -620,11 +620,16 @@ const saveConsignorAsDraft = async (req, res) => {
         const org = payload.organization;
         // Only insert if BOTH company_code AND business_area are provided (both are required in schema)
         if (org.company_code && org.business_area) {
+          // Convert business_area array to JSON string for database storage
+          const businessAreaJson = Array.isArray(org.business_area)
+            ? JSON.stringify(org.business_area)
+            : org.business_area;
+
           await trx("consignor_organization").insert({
             customer_id: customerId,
             company_code: org.company_code,
-            business_area: org.business_area,
-            status: "DRAFT", // ✅ FIX: Changed from "SAVE_AS_DRAFT" (15 chars) to "DRAFT" (5 chars) to fit varchar(10) constraint
+            business_area: businessAreaJson,
+            status: "Active", // ✅ FIX: Changed from "SAVE_AS_DRAFT" (15 chars) to "DRAFT" (5 chars) to fit varchar(10) constraint
             created_by: req.user.user_id,
             created_at: new Date(),
             updated_by: req.user.user_id,
@@ -691,7 +696,7 @@ const updateConsignorDraft = async (req, res) => {
         throw { type: "NOT_FOUND", message: "Consignor not found" };
       }
 
-      if (existing.status !== "DRAFT") {
+      if (existing.status !== "SAVE_AS_DRAFT") {
         return res.status(400).json({
           success: false,
           error: {
@@ -717,17 +722,17 @@ const updateConsignorDraft = async (req, res) => {
       const updateFields = {};
 
       if (generalData.customer_name !== undefined)
-        updateFields.business_name = generalData.customer_name;
+        updateFields.customer_name = generalData.customer_name;
       if (generalData.search_term !== undefined)
-        updateFields.company_abbrevation = generalData.search_term;
+        updateFields.search_term = generalData.search_term;
       if (generalData.industry_type !== undefined)
         updateFields.industry_type = generalData.industry_type;
       if (generalData.currency_type !== undefined)
-        updateFields.currency = generalData.currency_type;
+        updateFields.currency_type = generalData.currency_type;
       if (generalData.payment_term !== undefined)
         updateFields.payment_term = generalData.payment_term;
       if (generalData.website_url !== undefined)
-        updateFields.website = generalData.website_url;
+        updateFields.website_url = generalData.website_url;
       if (generalData.remark !== undefined)
         updateFields.remark = generalData.remark;
       if (generalData.name_on_po !== undefined)
@@ -800,11 +805,19 @@ const updateConsignorDraft = async (req, res) => {
                 contact.contact_number ||
                 contact.phone_number ||
                 contact.phone ||
+                contact.number ||
                 null,
-              contact_email: contact.contact_email || contact.email || null,
-              status: "DRAFT",
+              email_id: contact.email_id || contact.email || null,
+              contact_role: contact.contact_role || contact.role || null,
+              contact_team: contact.contact_team || contact.team || null,
+              country_code: contact.country_code || null,
+              linkedin_link: contact.linkedin_link || null,
+              contact_photo: null,
+              status: "Active",
               created_by: req.user.user_id,
               created_at: new Date(),
+              updated_by: req.user.user_id,
+              updated_at: new Date(),
             });
           }
         }
@@ -819,8 +832,14 @@ const updateConsignorDraft = async (req, res) => {
         const orgUpdateFields = {};
         if (organizationData.company_code !== undefined)
           orgUpdateFields.company_code = organizationData.company_code;
-        if (organizationData.business_area !== undefined)
-          orgUpdateFields.business_area = organizationData.business_area;
+        if (organizationData.business_area !== undefined) {
+          // Convert business_area array to JSON string for database storage
+          orgUpdateFields.business_area = Array.isArray(
+            organizationData.business_area
+          )
+            ? JSON.stringify(organizationData.business_area)
+            : organizationData.business_area;
+        }
         orgUpdateFields.updated_by = req.user.user_id;
         orgUpdateFields.updated_at = new Date();
 
@@ -830,14 +849,20 @@ const updateConsignorDraft = async (req, res) => {
             .where({ customer_id: id })
             .update(orgUpdateFields);
         } else if (organizationData.company_code) {
-          // Insert new
+          // Insert new - ensure business_area is JSON string
+          const businessAreaJson = Array.isArray(organizationData.business_area)
+            ? JSON.stringify(organizationData.business_area)
+            : organizationData.business_area || null;
+
           await trx("consignor_organization").insert({
             customer_id: id,
             company_code: organizationData.company_code,
-            business_area: organizationData.business_area || null,
-            status: "DRAFT",
+            business_area: businessAreaJson,
+            status: "Active",
             created_by: req.user.user_id,
             created_at: new Date(),
+            updated_by: req.user.user_id,
+            updated_at: new Date(),
           });
         }
       }
@@ -902,7 +927,7 @@ const submitConsignorFromDraft = async (req, res) => {
       return notFoundResponse(res, "Consignor", id);
     }
 
-    if (existing.status !== "DRAFT") {
+    if (existing.status !== "SAVE_AS_DRAFT") {
       return res.status(400).json({
         success: false,
         error: {
@@ -945,7 +970,7 @@ const submitConsignorFromDraft = async (req, res) => {
       req.user.user_id
     );
 
-    // Change status from DRAFT to PENDING
+    // Change status from SAVE_AS_DRAFT to PENDING
     await db("consignor_basic_information").where({ customer_id: id }).update({
       status: "PENDING",
       updated_by: req.user.user_id,
@@ -953,7 +978,11 @@ const submitConsignorFromDraft = async (req, res) => {
     });
 
     // Update child records status to ACTIVE (using correct table name: contact)
-    await db("contact").where({ customer_id: id }).update({ status: "ACTIVE" });
+    await db("contact").where({ customer_id: id }).update({
+      status: "ACTIVE",
+      updated_by: req.user.user_id,
+      updated_at: new Date(),
+    });
 
     // Update organization status if exists
     const orgExists = await db("consignor_organization")
@@ -961,9 +990,11 @@ const submitConsignorFromDraft = async (req, res) => {
       .first();
 
     if (orgExists) {
-      await db("consignor_organization")
-        .where({ customer_id: id })
-        .update({ status: "ACTIVE" });
+      await db("consignor_organization").where({ customer_id: id }).update({
+        status: "ACTIVE",
+        updated_by: req.user.user_id,
+        updated_at: new Date(),
+      });
     }
 
     console.log("✅ Consignor draft submitted successfully");
@@ -1011,7 +1042,7 @@ const deleteConsignorDraft = async (req, res) => {
         throw { type: "NOT_FOUND", message: "Consignor not found" };
       }
 
-      if (existing.status !== "DRAFT") {
+      if (existing.status !== "SAVE_AS_DRAFT") {
         return res.status(400).json({
           success: false,
           error: {

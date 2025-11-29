@@ -187,15 +187,18 @@ const VehicleDetailsPage = () => {
     return currentVehicle; // currentVehicle is already transformed by the Redux thunk
   }, [currentVehicle]);
 
-  // Populate formData when entering edit mode OR when loading a draft vehicle OR when vehicle data changes
+  // Populate formData when vehicle data is available (for both draft and non-draft vehicles)
+  // This ensures data is ready before entering edit mode
   useEffect(() => {
-    if (transformedVehicle && (isEditMode || isDraftVehicle)) {
+    if (transformedVehicle) {
       console.log(
         "🔍 Populating formData from transformedVehicle:",
         transformedVehicle
       );
       console.log(
-        "🔍 Draft status check:",
+        "🔍 Vehicle status:",
+        transformedVehicle.status,
+        "Draft status check:",
         isDraftVehicle,
         "Edit mode:",
         isEditMode

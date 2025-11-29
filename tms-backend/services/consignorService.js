@@ -432,23 +432,23 @@ const getConsignorWarehouses = async (customerId, filters = {}) => {
         "cwm.customer_id",
         "cwm.status as mapping_status",
         "cwm.created_at as mapped_at",
-        "wbi.warehouse_name",
+        "cwm.is_active",
+        "cwm.valid_from",
+        "cwm.valid_to",
+        "wbi.warehouse_name1 as warehouse_name",
         "wbi.warehouse_type",
-        "wbi.contact_person",
-        "wbi.contact_number",
-        "wbi.email_id",
-        "wbi.city",
-        "wbi.state",
-        "wbi.country",
+        "wbi.warehouse_id as warehouse_code",
         "wbi.status as warehouse_status"
       );
 
     // Apply filters
     if (search) {
       query = query.where(function () {
-        this.where("wbi.warehouse_name", "like", `%${search}%`)
-          .orWhere("wbi.warehouse_id", "like", `%${search}%`)
-          .orWhere("wbi.city", "like", `%${search}%`);
+        this.where("wbi.warehouse_name1", "like", `%${search}%`).orWhere(
+          "wbi.warehouse_id",
+          "like",
+          `%${search}%`
+        );
       });
     }
 
@@ -460,8 +460,8 @@ const getConsignorWarehouses = async (customerId, filters = {}) => {
       query = query.where("wbi.warehouse_type", warehouse_type);
     }
 
-    // Get total count
-    const countQuery = query.clone().count("* as total").first();
+    // Get total count - clear select before counting to avoid GROUP BY issues
+    const countQuery = query.clone().clearSelect().count("* as total").first();
     const { total } = await countQuery;
 
     // Apply pagination
@@ -570,6 +570,7 @@ const getConsignorById = async (customerId) => {
         "cd.document_number",
         "cd.valid_from",
         "cd.valid_to",
+        "cd.status", // Add status field
         "du.document_id",
         "du.file_name", // Keep file name
         "du.file_type" // Keep file type
@@ -653,6 +654,7 @@ const getConsignorById = async (customerId) => {
         upload_nda: consignor.upload_nda, // NDA document ID
         upload_msa: consignor.upload_msa, // MSA document ID
         status: consignor.status,
+        userApprovalStatus: userApprovalStatus, // Add user approval status to general section
       },
       // Map database column names to frontend field names
       contacts: contacts.map((c) => ({
@@ -676,18 +678,20 @@ const getConsignorById = async (customerId) => {
           }
         : null,
       documents: documents.map((d) => ({
-        document_unique_id: d.document_unique_id,
-        document_type_id: d.document_type_id,
-        document_type: d.document_type, // Document name from master table
-        document_number: d.document_number,
-        valid_from: d.valid_from,
-        valid_to: d.valid_to,
-        document_id: d.document_id, // Document upload ID for download
-        file_name: d.file_name, // Original file name
-        file_type: d.file_type, // MIME type
-        status: "ACTIVE", // Add status for frontend
+        documentUniqueId: d.document_unique_id, // Keep unique ID for reference
+        documentType: d.document_type_id, // Frontend expects "documentType" with ID
+        documentTypeName: d.document_type, // Document name from master table
+        documentNumber: d.document_number,
+        referenceNumber: "", // Not stored in database, return empty
+        country: "", // Not stored in database, return empty
+        validFrom: d.valid_from,
+        validTo: d.valid_to,
+        documentId: d.document_id, // Document upload ID for download
+        fileName: d.file_name || "", // Original file name
+        fileType: d.file_type || "", // MIME type
+        fileData: "", // Not returned for security (use download endpoint)
+        status: d.status === "ACTIVE", // Convert to boolean for frontend
       })),
-      userApprovalStatus, // Add approval status to response
     };
   } catch (error) {
     console.error("Get consignor by ID error:", error);
@@ -1232,9 +1236,11 @@ const updateConsignor = async (customerId, payload, files, userId) => {
     // 2. Update contacts if provided with photo upload handling
     if (contacts) {
       // Soft delete existing contacts
-      await trx("contact")
-        .where("customer_id", customerId)
-        .update({ status: "INACTIVE", updated_at: knex.fn.now() });
+      await trx("contact").where("customer_id", customerId).update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
 
       // Insert new contacts with frontend field mapping and photo uploads
       if (contacts.length > 0) {

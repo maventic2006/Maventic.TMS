@@ -10,6 +10,7 @@ import {
   Flag,
 } from "lucide-react";
 import VehicleStatusPill from "../../../components/vehicle/VehicleStatusPill";
+import { formatDate } from "../../../utils/helpers";
 
 const InfoField = ({ label, value }) => (
   <div className="space-y-1">
@@ -78,17 +79,20 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
           />
           <InfoField
             label="Registration Date"
-            value={vehicle.registrationDate}
+            value={formatDate(vehicle.registrationDate)}
           />
           <InfoField label="RC Book Number" value={vehicle.rcBookNumber} />
-          <InfoField label="RC Expiry Date" value={vehicle.rcExpiryDate} />
+          <InfoField
+            label="RC Expiry Date"
+            value={formatDate(vehicle.rcExpiryDate)}
+          />
           <InfoField
             label="Insurance Policy No."
             value={vehicle.insurancePolicyNumber}
           />
           <InfoField
             label="Insurance Expiry"
-            value={vehicle.insuranceExpiryDate}
+            value={formatDate(vehicle.insuranceExpiryDate)}
           />
         </div>
       </div>
@@ -126,11 +130,11 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
           <InfoField label="Average KM/Day" value={vehicle.averageKmPerDay} />
           <InfoField
             label="Last Service Date"
-            value={vehicle.lastServiceDate}
+            value={formatDate(vehicle.lastServiceDate)}
           />
           <InfoField
             label="Next Service Due (km)"
-            value={vehicle.nextServiceDue}
+            value={formatDate(vehicle.nextServiceDue)}
           />
           <InfoField label="Current Driver" value={vehicle.currentDriver} />
           <InfoField label="Current Location" value={vehicle.currentLocation} />
@@ -169,20 +173,12 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
           <InfoField
             label="Created Date"
-            value={
-              vehicle.createdAt
-                ? new Date(vehicle.createdAt).toLocaleDateString()
-                : "N/A"
-            }
+            value={formatDate(vehicle.createdAt)}
           />
           <InfoField label="Created By" value={vehicle.createdBy} />
           <InfoField
             label="Last Updated"
-            value={
-              vehicle.updatedAt
-                ? new Date(vehicle.updatedAt).toLocaleDateString()
-                : "N/A"
-            }
+            value={formatDate(vehicle.updatedAt)}
           />
           <InfoField label="Updated By" value={vehicle.updatedBy} />
           <InfoField label="Status" value={vehicle.status} />

@@ -1573,12 +1573,16 @@ const updateVehicle = async (req, res) => {
           .where("vehicle_id_code", id)
           .update({
             ownership_name: ownershipDetails.ownershipName,
-            valid_from: ownershipDetails.validFrom,
-            valid_to: ownershipDetails.validTo,
+            valid_from: formatDateForMySQL(ownershipDetails.validFrom),
+            valid_to: formatDateForMySQL(ownershipDetails.validTo),
             registration_number: ownershipDetails.registrationNumber,
-            registration_date: ownershipDetails.registrationDate,
-            registration_upto: ownershipDetails.registrationUpto,
-            purchase_date: ownershipDetails.purchaseDate,
+            registration_date: formatDateForMySQL(
+              ownershipDetails.registrationDate
+            ),
+            registration_upto: formatDateForMySQL(
+              ownershipDetails.registrationUpto
+            ),
+            purchase_date: formatDateForMySQL(ownershipDetails.purchaseDate),
             owner_sr_number: ownershipDetails.ownerSrNumber,
             state_code: ownershipDetails.stateCode,
             rto_code: ownershipDetails.rtoCode,
@@ -1594,12 +1598,16 @@ const updateVehicle = async (req, res) => {
           vehicle_ownership_id: ownershipId,
           vehicle_id_code: id,
           ownership_name: ownershipDetails.ownershipName,
-          valid_from: ownershipDetails.validFrom,
-          valid_to: ownershipDetails.validTo,
+          valid_from: formatDateForMySQL(ownershipDetails.validFrom),
+          valid_to: formatDateForMySQL(ownershipDetails.validTo),
           registration_number: ownershipDetails.registrationNumber,
-          registration_date: ownershipDetails.registrationDate,
-          registration_upto: ownershipDetails.registrationUpto,
-          purchase_date: ownershipDetails.purchaseDate,
+          registration_date: formatDateForMySQL(
+            ownershipDetails.registrationDate
+          ),
+          registration_upto: formatDateForMySQL(
+            ownershipDetails.registrationUpto
+          ),
+          purchase_date: formatDateForMySQL(ownershipDetails.purchaseDate),
           owner_sr_number: ownershipDetails.ownerSrNumber,
           state_code: ownershipDetails.stateCode,
           rto_code: ownershipDetails.rtoCode,
@@ -1625,9 +1633,11 @@ const updateVehicle = async (req, res) => {
         await trx("vehicle_maintenance_service_history")
           .where("vehicle_id_code", id)
           .update({
-            service_date: maintenanceHistory.serviceDate,
+            service_date: formatDateForMySQL(maintenanceHistory.serviceDate),
             service_remark: maintenanceHistory.serviceRemark,
-            upcoming_service_date: maintenanceHistory.upcomingServiceDate,
+            upcoming_service_date: formatDateForMySQL(
+              maintenanceHistory.upcomingServiceDate
+            ),
             type_of_service: maintenanceHistory.typeOfService,
             service_expense: maintenanceHistory.serviceExpense || 0,
             updated_by: req.user?.user_id || "SYSTEM",
@@ -1638,9 +1648,11 @@ const updateVehicle = async (req, res) => {
         await trx("vehicle_maintenance_service_history").insert({
           vehicle_maintenance_id: maintenanceId,
           vehicle_id_code: id,
-          service_date: maintenanceHistory.serviceDate,
+          service_date: formatDateForMySQL(maintenanceHistory.serviceDate),
           service_remark: maintenanceHistory.serviceRemark,
-          upcoming_service_date: maintenanceHistory.upcomingServiceDate,
+          upcoming_service_date: formatDateForMySQL(
+            maintenanceHistory.upcomingServiceDate
+          ),
           type_of_service: maintenanceHistory.typeOfService,
           service_expense: maintenanceHistory.serviceExpense || 0,
           created_by: req.user?.user_id || "SYSTEM",
@@ -1661,8 +1673,8 @@ const updateVehicle = async (req, res) => {
             .update({
               document_type_id: doc.documentType,
               reference_number: doc.referenceNumber,
-              valid_from: doc.validFrom,
-              valid_to: doc.validTo,
+              valid_from: formatDateForMySQL(doc.validFrom),
+              valid_to: formatDateForMySQL(doc.validTo),
               remarks: doc.remarks,
               updated_by: req.user?.user_id || "SYSTEM",
               updated_at: db.fn.now(),
@@ -1696,8 +1708,8 @@ const updateVehicle = async (req, res) => {
                 file_xstring_value: doc.fileData,
                 system_reference_id: doc.documentId,
                 is_verified: false,
-                valid_from: doc.validFrom,
-                valid_to: doc.validTo,
+                valid_from: formatDateForMySQL(doc.validFrom),
+                valid_to: formatDateForMySQL(doc.validTo),
                 created_by: req.user?.user_id || "SYSTEM",
                 updated_by: req.user?.user_id || "SYSTEM",
                 created_at: new Date(),
@@ -1721,8 +1733,8 @@ const updateVehicle = async (req, res) => {
             document_provider: doc.documentProvider,
             coverage_type_id: doc.coverageType,
             premium_amount: doc.premiumAmount || 0,
-            valid_from: doc.validFrom,
-            valid_to: doc.validTo,
+            valid_from: formatDateForMySQL(doc.validFrom),
+            valid_to: formatDateForMySQL(doc.validTo),
             remarks: doc.remarks,
             created_by: req.user?.user_id || "SYSTEM",
             updated_by: req.user?.user_id || "SYSTEM",
@@ -1740,8 +1752,8 @@ const updateVehicle = async (req, res) => {
               file_xstring_value: doc.fileData,
               system_reference_id: documentId,
               is_verified: false,
-              valid_from: doc.validFrom,
-              valid_to: doc.validTo,
+              valid_from: formatDateForMySQL(doc.validFrom),
+              valid_to: formatDateForMySQL(doc.validTo),
               created_by: req.user?.user_id || "SYSTEM",
               updated_by: req.user?.user_id || "SYSTEM",
               created_at: new Date(),
@@ -2307,8 +2319,8 @@ const saveVehicleAsDraft = async (req, res) => {
             document_provider: doc.documentProvider || null,
             coverage_type_id: doc.coverageType || null,
             premium_amount: doc.premiumAmount || 0,
-            valid_from: doc.validFrom || null,
-            valid_to: doc.validTo || null,
+            valid_from: formatDateForMySQL(doc.validFrom) || null,
+            valid_to: formatDateForMySQL(doc.validTo) || null,
             remarks: doc.remarks || null,
             created_by: userId,
             updated_by: userId,
@@ -2325,8 +2337,8 @@ const saveVehicleAsDraft = async (req, res) => {
               file_xstring_value: doc.fileData,
               system_reference_id: documentId,
               is_verified: false,
-              valid_from: doc.validFrom || null,
-              valid_to: doc.validTo || null,
+              valid_from: formatDateForMySQL(doc.validFrom) || null,
+              valid_to: formatDateForMySQL(doc.validTo) || null,
               created_by: userId,
               updated_by: userId,
               created_at: new Date(),
@@ -2507,12 +2519,16 @@ const updateVehicleDraft = async (req, res) => {
           .where("vehicle_id_code", id)
           .update({
             ownership_name: ownershipDetails.ownershipName || null,
-            valid_from: ownershipDetails.validFrom || null,
-            valid_to: ownershipDetails.validTo || null,
+            valid_from: formatDateForMySQL(ownershipDetails.validFrom),
+            valid_to: formatDateForMySQL(ownershipDetails.validTo),
             registration_number: ownershipDetails.registrationNumber || null,
-            registration_date: ownershipDetails.registrationDate || null,
-            registration_upto: ownershipDetails.registrationUpto || null,
-            purchase_date: ownershipDetails.purchaseDate || null,
+            registration_date: formatDateForMySQL(
+              ownershipDetails.registrationDate
+            ),
+            registration_upto: formatDateForMySQL(
+              ownershipDetails.registrationUpto
+            ),
+            purchase_date: formatDateForMySQL(ownershipDetails.purchaseDate),
             owner_sr_number: ownershipDetails.ownerSrNumber || null,
             state_code: ownershipDetails.stateCode || null,
             rto_code: ownershipDetails.rtoCode || null,
@@ -2530,12 +2546,16 @@ const updateVehicleDraft = async (req, res) => {
           vehicle_ownership_id: ownershipId,
           vehicle_id_code: id,
           ownership_name: ownershipDetails.ownershipName || null,
-          valid_from: ownershipDetails.validFrom || null,
-          valid_to: ownershipDetails.validTo || null,
+          valid_from: formatDateForMySQL(ownershipDetails.validFrom),
+          valid_to: formatDateForMySQL(ownershipDetails.validTo),
           registration_number: ownershipDetails.registrationNumber || null,
-          registration_date: ownershipDetails.registrationDate || null,
-          registration_upto: ownershipDetails.registrationUpto || null,
-          purchase_date: ownershipDetails.purchaseDate || null,
+          registration_date: formatDateForMySQL(
+            ownershipDetails.registrationDate
+          ),
+          registration_upto: formatDateForMySQL(
+            ownershipDetails.registrationUpto
+          ),
+          purchase_date: formatDateForMySQL(ownershipDetails.purchaseDate),
           owner_sr_number: ownershipDetails.ownerSrNumber || null,
           state_code: ownershipDetails.stateCode || null,
           rto_code: ownershipDetails.rtoCode || null,
@@ -2562,10 +2582,11 @@ const updateVehicleDraft = async (req, res) => {
         await trx("vehicle_maintenance_service_history")
           .where("vehicle_id_code", id)
           .update({
-            service_date: maintenanceHistory.serviceDate || null,
+            service_date: formatDateForMySQL(maintenanceHistory.serviceDate),
             service_remark: maintenanceHistory.serviceRemark || null,
-            upcoming_service_date:
-              maintenanceHistory.upcomingServiceDate || null,
+            upcoming_service_date: formatDateForMySQL(
+              maintenanceHistory.upcomingServiceDate
+            ),
             type_of_service: maintenanceHistory.typeOfService || null,
             service_expense: maintenanceHistory.serviceExpense || 0,
             updated_by: userId,
@@ -2578,9 +2599,11 @@ const updateVehicleDraft = async (req, res) => {
         await trx("vehicle_maintenance_service_history").insert({
           vehicle_maintenance_id: maintenanceId,
           vehicle_id_code: id,
-          service_date: maintenanceHistory.serviceDate || null,
+          service_date: formatDateForMySQL(maintenanceHistory.serviceDate),
           service_remark: maintenanceHistory.serviceRemark || null,
-          upcoming_service_date: maintenanceHistory.upcomingServiceDate || null,
+          upcoming_service_date: formatDateForMySQL(
+            maintenanceHistory.upcomingServiceDate
+          ),
           type_of_service: maintenanceHistory.typeOfService || null,
           service_expense: maintenanceHistory.serviceExpense || 0,
           created_by: userId,
@@ -2619,8 +2642,8 @@ const updateVehicleDraft = async (req, res) => {
             document_provider: doc.documentProvider || null,
             coverage_type_id: doc.coverageType || null,
             premium_amount: doc.premiumAmount || 0,
-            valid_from: doc.validFrom || null,
-            valid_to: doc.validTo || null,
+            valid_from: formatDateForMySQL(doc.validFrom) || null,
+            valid_to: formatDateForMySQL(doc.validTo) || null,
             remarks: doc.remarks || null,
             created_by: userId,
             updated_by: userId,
@@ -2637,8 +2660,8 @@ const updateVehicleDraft = async (req, res) => {
               file_xstring_value: doc.fileData,
               system_reference_id: documentId,
               is_verified: false,
-              valid_from: doc.validFrom || null,
-              valid_to: doc.validTo || null,
+              valid_from: formatDateForMySQL(doc.validFrom) || null,
+              valid_to: formatDateForMySQL(doc.validTo) || null,
               created_by: userId,
               updated_by: userId,
               created_at: new Date(),
@@ -2877,12 +2900,16 @@ const submitVehicleFromDraft = async (req, res) => {
         vehicle_ownership_id: ownershipId,
         vehicle_id_code: id,
         ownership_name: ownershipDetails.ownershipName,
-        valid_from: ownershipDetails.validFrom,
-        valid_to: ownershipDetails.validTo,
+        valid_from: formatDateForMySQL(ownershipDetails.validFrom),
+        valid_to: formatDateForMySQL(ownershipDetails.validTo),
         registration_number: ownershipDetails.registrationNumber,
-        registration_date: ownershipDetails.registrationDate,
-        registration_upto: ownershipDetails.registrationUpto,
-        purchase_date: ownershipDetails.purchaseDate,
+        registration_date: formatDateForMySQL(
+          ownershipDetails.registrationDate
+        ),
+        registration_upto: formatDateForMySQL(
+          ownershipDetails.registrationUpto
+        ),
+        purchase_date: formatDateForMySQL(ownershipDetails.purchaseDate),
         owner_sr_number: ownershipDetails.ownerSrNumber,
         state_code: ownershipDetails.stateCode,
         rto_code: ownershipDetails.rtoCode,
@@ -2902,9 +2929,11 @@ const submitVehicleFromDraft = async (req, res) => {
       await trx("vehicle_maintenance_service_history").insert({
         vehicle_maintenance_id: maintenanceId,
         vehicle_id_code: id,
-        service_date: maintenanceHistory.serviceDate,
+        service_date: formatDateForMySQL(maintenanceHistory.serviceDate),
         service_remark: maintenanceHistory.serviceRemark,
-        upcoming_service_date: maintenanceHistory.upcomingServiceDate,
+        upcoming_service_date: formatDateForMySQL(
+          maintenanceHistory.upcomingServiceDate
+        ),
         type_of_service: maintenanceHistory.typeOfService,
         service_expense: maintenanceHistory.serviceExpense || 0,
         created_by: userId,
@@ -2944,8 +2973,8 @@ const submitVehicleFromDraft = async (req, res) => {
           document_provider: doc.documentProvider,
           coverage_type_id: doc.coverageType,
           premium_amount: doc.premiumAmount || 0,
-          valid_from: doc.validFrom,
-          valid_to: doc.validTo,
+          valid_from: formatDateForMySQL(doc.validFrom),
+          valid_to: formatDateForMySQL(doc.validTo),
           remarks: doc.remarks,
           created_by: userId,
           updated_by: userId,
@@ -2962,8 +2991,8 @@ const submitVehicleFromDraft = async (req, res) => {
             file_xstring_value: doc.fileData,
             system_reference_id: documentId,
             is_verified: false,
-            valid_from: doc.validFrom,
-            valid_to: doc.validTo,
+            valid_from: formatDateForMySQL(doc.validFrom),
+            valid_to: formatDateForMySQL(doc.validTo),
             created_by: userId,
             updated_by: userId,
             created_at: new Date(),

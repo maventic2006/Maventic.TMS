@@ -127,18 +127,35 @@ const ConsignorDetailsPage = () => {
   }, [dispatch]);
 
   // Set edit form data when consignor data is loaded
+  // Transform flattened currentConsignor into nested structure for edit components
   useEffect(() => {
-    if (currentConsignor && !editFormData) {
+    if (currentConsignor) {
       console.log("📋 ===== CONSIGNOR DETAILS PAGE DEBUG =====");
       console.log("currentConsignor from Redux:", currentConsignor);
-      console.log("Has customer_id?", currentConsignor.customer_id);
-      console.log("Has customer_name?", currentConsignor.customer_name);
-      console.log("Has contacts?", currentConsignor.contacts);
-      console.log("Has organization?", currentConsignor.organization);
+
+      // Transform currentConsignor data into nested structure expected by edit components
+      // Extract contacts, organization, documents from currentConsignor
+      const { contacts, organization, documents, ...generalFields } =
+        currentConsignor;
+
+      // Create nested formData structure
+      const transformedData = {
+        general: generalFields,
+        contacts: contacts || [],
+        organization: organization || {
+          company_code: "",
+          business_area: "",
+          status: "ACTIVE",
+        },
+        documents: documents || [],
+      };
+
+      console.log("📋 Transformed data for edit mode:", transformedData);
       console.log("==========================================");
-      setEditFormData(currentConsignor);
+
+      setEditFormData(transformedData);
     }
-  }, [currentConsignor, editFormData]);
+  }, [currentConsignor]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -286,16 +303,15 @@ const ConsignorDetailsPage = () => {
       dispatch(clearError());
 
       // Prepare data for backend API (needs nested structure)
-      // Extract general fields from flattened editFormData
-      const { contacts, organization, documents, ...generalFields } =
-        editFormData;
+      // Extract general fields from editFormData
+      const { general, contacts, organization, documents } = editFormData;
 
       // Call the update API
       const result = await dispatch(
         updateConsignor({
           customerId: id,
           data: {
-            general: generalFields, // All fields except contacts, organization, documents
+            general,
             contacts,
             organization,
             documents,
@@ -414,14 +430,13 @@ const ConsignorDetailsPage = () => {
   const handleUpdateDraft = async () => {
     try {
       // Prepare data for backend API (needs nested structure)
-      const { contacts, organization, documents, ...generalFields } =
-        editFormData;
+      const { general, contacts, organization, documents } = editFormData;
 
       await dispatch(
         updateConsignorDraft({
           customerId: id,
           consignorData: {
-            general: generalFields,
+            general,
             contacts,
             organization,
             documents,
@@ -456,14 +471,13 @@ const ConsignorDetailsPage = () => {
   const handleSubmitForApproval = async () => {
     try {
       // Prepare data for backend API (needs nested structure)
-      const { contacts, organization, documents, ...generalFields } =
-        editFormData;
+      const { general, contacts, organization, documents } = editFormData;
 
       await dispatch(
         submitConsignorFromDraft({
           customerId: id,
           consignorData: {
-            general: generalFields,
+            general,
             contacts,
             organization,
             documents,
@@ -631,7 +645,9 @@ const ConsignorDetailsPage = () => {
                     currentConsignor.status
                   )}`}
                 >
-                  {currentConsignor.status || "UNKNOWN"}
+                  {currentConsignor.status === "SAVE_AS_DRAFT"
+                    ? "DRAFT"
+                    : currentConsignor.status || "UNKNOWN"}
                 </span>
               </div>
               <div className="flex items-center gap-4 text-blue-100/80 text-xs">
@@ -753,7 +769,10 @@ const ConsignorDetailsPage = () => {
                 className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
               >
                 <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                Edit Details
+                {currentConsignor.status === "SAVE_AS_DRAFT" ||
+                currentConsignor.status === "DRAFT"
+                  ? "Edit Draft"
+                  : "Edit Details"}
               </button>
             )}
           </div>

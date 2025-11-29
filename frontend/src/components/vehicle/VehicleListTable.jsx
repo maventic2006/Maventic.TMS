@@ -20,6 +20,7 @@ import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import VehicleStatusPill from "./VehicleStatusPill";
 import { getPageTheme } from "../../theme.config";
+import { formatDate } from "../../utils/helpers";
 
 const theme = getPageTheme("list");
 
@@ -474,7 +475,7 @@ const VehicleListTable = ({
                     className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
                     style={{ color: theme.colors.text.primary }}
                   >
-                    {displayValue(vehicle.createdAt)}
+                    {formatDate(vehicle.createdAt)}
                   </td>
                   <td className="px-4 py-2 text-center text-nowrap">
                     <VehicleStatusPill status={vehicle.status} />

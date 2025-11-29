@@ -1,11 +1,26 @@
 ﻿import React, { useState } from "react";
-import { Wrench, Calendar, DollarSign, MapPin, Plus, X, FileText, User, Hash, Edit, Trash2 } from "lucide-react";
+import {
+  Wrench,
+  Calendar,
+  DollarSign,
+  MapPin,
+  Plus,
+  X,
+  FileText,
+  User,
+  Hash,
+  Edit,
+  Trash2,
+} from "lucide-react";
 import { CustomSelect } from "../../../components/ui/Select";
 import CollapsibleSection from "../../../components/ui/CollapsibleSection";
+import { formatDate } from "../../../utils/helpers";
 
 const InfoField = ({ label, value }) => (
   <div className="space-y-1">
-    <p className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide">{label}</p>
+    <p className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide">
+      {label}
+    </p>
     <p className="text-sm font-medium text-[#0D1A33]">{value || "N/A"}</p>
   </div>
 );
@@ -28,7 +43,9 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
   if (isEditMode) {
     return (
       <div className="text-center py-12">
-        <p className="text-[#4A5568]">Edit mode for Maintenance History coming soon...</p>
+        <p className="text-[#4A5568]">
+          Edit mode for Maintenance History coming soon...
+        </p>
       </div>
     );
   }
@@ -60,8 +77,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[#E5E7EB]">
         <div>
-          <h3 className="text-lg font-bold text-[#0D1A33]">Maintenance & Service History</h3>
-          <p className="text-sm text-[#4A5568] mt-1">Complete service records and maintenance tracking</p>
+          <h3 className="text-lg font-bold text-[#0D1A33]">
+            Maintenance & Service History
+          </h3>
+          <p className="text-sm text-[#4A5568] mt-1">
+            Complete service records and maintenance tracking
+          </p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
@@ -76,19 +97,21 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
       {maintenanceHistory.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-lg border border-[#E5E7EB]">
           <Wrench className="h-16 w-16 text-[#E5E7EB] mx-auto mb-4" />
-          <p className="text-[#4A5568] font-medium">No maintenance records found</p>
-          <p className="text-sm text-[#4A5568] mt-2">Click "Add Service Record" to add the first entry</p>
+          <p className="text-[#4A5568] font-medium">
+            No maintenance records found
+          </p>
+          <p className="text-sm text-[#4A5568] mt-2">
+            Click "Add Service Record" to add the first entry
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
           {maintenanceHistory.map((record, index) => {
-            const formattedServiceDate = record.serviceDate 
-              ? new Date(record.serviceDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
-              : 'N/A';
-            const formattedUpcomingDate = record.upcomingServiceDate
-              ? new Date(record.upcomingServiceDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })
-              : 'N/A';
-            
+            const formattedServiceDate = formatDate(record.serviceDate);
+            const formattedUpcomingDate = formatDate(
+              record.upcomingServiceDate
+            );
+
             return (
               <CollapsibleSection
                 key={index}
@@ -104,7 +127,8 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-800">
-                          {record.typeOfService || `Service Record ${index + 1}`}
+                          {record.typeOfService ||
+                            `Service Record ${index + 1}`}
                         </h3>
                         <p className="text-sm text-gray-600 flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5" />
@@ -113,9 +137,14 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                       </div>
                     </div>
                     <div className="text-right mr-8">
-                      <p className="text-xs text-gray-600 uppercase tracking-wide">Cost</p>
+                      <p className="text-xs text-gray-600 uppercase tracking-wide">
+                        Cost
+                      </p>
                       <p className="text-lg font-bold text-gray-800">
-                        ₹ {record.serviceExpense ? parseFloat(record.serviceExpense).toLocaleString() : "0"}
+                        ₹{" "}
+                        {record.serviceExpense
+                          ? parseFloat(record.serviceExpense).toLocaleString()
+                          : "0"}
                       </p>
                     </div>
                   </div>
@@ -124,21 +153,31 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                 {/* Service Details Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-600">Maintenance ID</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Maintenance ID
+                    </label>
                     <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                      <p className="text-gray-800">{record.vehicleMaintenanceId || "N/A"}</p>
+                      <p className="text-gray-800">
+                        {record.vehicleMaintenanceId || "N/A"}
+                      </p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-600">Service Type</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Service Type
+                    </label>
                     <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                      <p className="text-gray-800 font-semibold">{record.typeOfService || "N/A"}</p>
+                      <p className="text-gray-800 font-semibold">
+                        {record.typeOfService || "N/A"}
+                      </p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-600">Service Date</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Service Date
+                    </label>
                     <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-500" />
                       <p className="text-gray-800">{formattedServiceDate}</p>
@@ -146,7 +185,9 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-600">Next Service Due</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Next Service Due
+                    </label>
                     <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-500" />
                       <p className="text-gray-800">{formattedUpcomingDate}</p>
@@ -154,11 +195,16 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-600">Service Expense</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Service Expense
+                    </label>
                     <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-gray-500" />
                       <p className="text-gray-800 font-semibold">
-                        ₹ {record.serviceExpense ? parseFloat(record.serviceExpense).toLocaleString() : "0"}
+                        ₹{" "}
+                        {record.serviceExpense
+                          ? parseFloat(record.serviceExpense).toLocaleString()
+                          : "0"}
                       </p>
                     </div>
                   </div>
@@ -167,7 +213,9 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                 {/* Service Remark */}
                 {record.serviceRemark && (
                   <div className="mt-4 pt-4 border-t border-gray-200/50">
-                    <label className="text-sm font-medium text-gray-600 block mb-2">Service Remarks</label>
+                    <label className="text-sm font-medium text-gray-600 block mb-2">
+                      Service Remarks
+                    </label>
                     <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
                       <p className="text-gray-800">{record.serviceRemark}</p>
                     </div>
@@ -190,8 +238,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <Wrench className="h-5 w-5 text-[#6366F1]" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#0D1A33]">Add Service Record</h3>
-                  <p className="text-sm text-[#4A5568]">Fill in the service details below</p>
+                  <h3 className="text-lg font-bold text-[#0D1A33]">
+                    Add Service Record
+                  </h3>
+                  <p className="text-sm text-[#4A5568]">
+                    Fill in the service details below
+                  </p>
                 </div>
               </div>
               <button
@@ -211,11 +263,22 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   </label>
                   <CustomSelect
                     value={newService.serviceType}
-                    onChange={(value) => setNewService({ ...newService, serviceType: value })}
+                    onChange={(value) =>
+                      setNewService({ ...newService, serviceType: value })
+                    }
                     options={[
-                      { value: "Routine Maintenance", label: "Routine Maintenance" },
-                      { value: "Preventive Maintenance", label: "Preventive Maintenance" },
-                      { value: "Corrective Maintenance", label: "Corrective Maintenance" },
+                      {
+                        value: "Routine Maintenance",
+                        label: "Routine Maintenance",
+                      },
+                      {
+                        value: "Preventive Maintenance",
+                        label: "Preventive Maintenance",
+                      },
+                      {
+                        value: "Corrective Maintenance",
+                        label: "Corrective Maintenance",
+                      },
                       { value: "Emergency Repair", label: "Emergency Repair" },
                     ]}
                     placeholder="Select Service Type"
@@ -230,7 +293,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="date"
                     value={newService.serviceDate}
-                    onChange={(e) => setNewService({ ...newService, serviceDate: e.target.value })}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        serviceDate: e.target.value,
+                      })
+                    }
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
                 </div>
@@ -242,7 +310,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="number"
                     value={newService.odometerReading}
-                    onChange={(e) => setNewService({ ...newService, odometerReading: e.target.value })}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        odometerReading: e.target.value,
+                      })
+                    }
                     placeholder="Enter odometer reading"
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
@@ -255,7 +328,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="text"
                     value={newService.serviceCenter}
-                    onChange={(e) => setNewService({ ...newService, serviceCenter: e.target.value })}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        serviceCenter: e.target.value,
+                      })
+                    }
                     placeholder="Enter service center name"
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
@@ -268,7 +346,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="text"
                     value={newService.technician}
-                    onChange={(e) => setNewService({ ...newService, technician: e.target.value })}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        technician: e.target.value,
+                      })
+                    }
                     placeholder="Enter technician name"
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
@@ -281,7 +364,9 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="number"
                     value={newService.cost}
-                    onChange={(e) => setNewService({ ...newService, cost: e.target.value })}
+                    onChange={(e) =>
+                      setNewService({ ...newService, cost: e.target.value })
+                    }
                     placeholder="Enter service cost"
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
@@ -294,7 +379,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="text"
                     value={newService.invoiceNumber}
-                    onChange={(e) => setNewService({ ...newService, invoiceNumber: e.target.value })}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        invoiceNumber: e.target.value,
+                      })
+                    }
                     placeholder="Enter invoice number"
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
@@ -307,7 +397,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="number"
                     value={newService.nextServiceDue}
-                    onChange={(e) => setNewService({ ...newService, nextServiceDue: e.target.value })}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        nextServiceDue: e.target.value,
+                      })
+                    }
                     placeholder="Enter next service due"
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
@@ -320,7 +415,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <textarea
                   value={newService.description}
-                  onChange={(e) => setNewService({ ...newService, description: e.target.value })}
+                  onChange={(e) =>
+                    setNewService({
+                      ...newService,
+                      description: e.target.value,
+                    })
+                  }
                   placeholder="Describe the service performed..."
                   rows={3}
                   className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
@@ -333,7 +433,12 @@ const MaintenanceViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <textarea
                   value={newService.partsReplaced}
-                  onChange={(e) => setNewService({ ...newService, partsReplaced: e.target.value })}
+                  onChange={(e) =>
+                    setNewService({
+                      ...newService,
+                      partsReplaced: e.target.value,
+                    })
+                  }
                   placeholder="List all parts that were replaced..."
                   rows={3}
                   className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"

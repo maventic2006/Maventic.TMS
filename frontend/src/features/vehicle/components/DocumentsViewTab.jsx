@@ -1,10 +1,26 @@
 ﻿import React, { useState } from "react";
-import { FileText, Calendar, Building, CheckCircle, XCircle, Upload, Plus, Download, Eye, Trash2, AlertTriangle, X } from "lucide-react";
+import {
+  FileText,
+  Calendar,
+  Building,
+  CheckCircle,
+  XCircle,
+  Upload,
+  Plus,
+  Download,
+  Eye,
+  Trash2,
+  AlertTriangle,
+  X,
+} from "lucide-react";
 import { CustomSelect } from "../../../components/ui/Select";
+import { formatDate } from "../../../utils/helpers";
 
 const InfoField = ({ label, value }) => (
   <div className="space-y-1">
-    <p className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide">{label}</p>
+    <p className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide">
+      {label}
+    </p>
     <p className="text-sm font-medium text-[#0D1A33]">{value || "N/A"}</p>
   </div>
 );
@@ -41,7 +57,9 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
     if (!expiryDate) return false;
     const today = new Date();
     const expiry = new Date(expiryDate);
-    const daysUntilExpiry = Math.floor((expiry - today) / (1000 * 60 * 60 * 24));
+    const daysUntilExpiry = Math.floor(
+      (expiry - today) / (1000 * 60 * 60 * 24)
+    );
     return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
   };
 
@@ -88,12 +106,16 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
       }
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: doc.fileType });
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = doc.fileName || `${doc.documentType}_${doc.documentNumber}.${doc.fileType.split('/')[1]}`;
+      link.download =
+        doc.fileName ||
+        `${doc.documentType}_${doc.documentNumber}.${
+          doc.fileType.split("/")[1]
+        }`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -107,16 +129,24 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
 
   // Mock statistics
   const totalDocs = documents.length;
-  const expiredDocs = documents.filter(doc => isExpired(doc.expiryDate)).length;
-  const expiringSoonDocs = documents.filter(doc => isExpiringSoon(doc.expiryDate)).length;
+  const expiredDocs = documents.filter((doc) =>
+    isExpired(doc.expiryDate)
+  ).length;
+  const expiringSoonDocs = documents.filter((doc) =>
+    isExpiringSoon(doc.expiryDate)
+  ).length;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[#E5E7EB]">
         <div>
-          <h3 className="text-lg font-bold text-[#0D1A33]">Vehicle Documents</h3>
-          <p className="text-sm text-[#4A5568] mt-1">Manage all vehicle related documents and certificates</p>
+          <h3 className="text-lg font-bold text-[#0D1A33]">
+            Vehicle Documents
+          </h3>
+          <p className="text-sm text-[#4A5568] mt-1">
+            Manage all vehicle related documents and certificates
+          </p>
         </div>
         <button
           onClick={() => setShowUploadModal(true)}
@@ -130,16 +160,24 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
       {/* Document Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-[#DBEAFE] rounded-lg p-4 border border-[#1D4ED8]">
-          <p className="text-xs font-semibold text-[#1D4ED8] uppercase tracking-wide mb-1">Total Documents</p>
+          <p className="text-xs font-semibold text-[#1D4ED8] uppercase tracking-wide mb-1">
+            Total Documents
+          </p>
           <p className="text-2xl font-bold text-[#1D4ED8]">{totalDocs}</p>
         </div>
         <div className="bg-[#FEF3C7] rounded-lg p-4 border border-[#F59E0B]">
-          <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wide mb-1">Expiring Soon</p>
-          <p className="text-2xl font-bold text-[#F59E0B]">{expiringSoonDocs}</p>
+          <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wide mb-1">
+            Expiring Soon
+          </p>
+          <p className="text-2xl font-bold text-[#F59E0B]">
+            {expiringSoonDocs}
+          </p>
           <p className="text-xs text-[#F59E0B] mt-1">Within 30 days</p>
         </div>
         <div className="bg-[#FEE2E2] rounded-lg p-4 border border-[#EF4444]">
-          <p className="text-xs font-semibold text-[#EF4444] uppercase tracking-wide mb-1">Expired</p>
+          <p className="text-xs font-semibold text-[#EF4444] uppercase tracking-wide mb-1">
+            Expired
+          </p>
           <p className="text-2xl font-bold text-[#EF4444]">{expiredDocs}</p>
           <p className="text-xs text-[#EF4444] mt-1">Requires renewal</p>
         </div>
@@ -150,16 +188,21 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
         <div className="text-center py-16 bg-white rounded-lg border border-[#E5E7EB]">
           <FileText className="h-16 w-16 text-[#E5E7EB] mx-auto mb-4" />
           <p className="text-[#4A5568] font-medium">No documents found</p>
-          <p className="text-sm text-[#4A5568] mt-2">Click "Upload Document" to add the first document</p>
+          <p className="text-sm text-[#4A5568] mt-2">
+            Click "Upload Document" to add the first document
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {documents.map((doc, index) => {
             const expired = isExpired(doc.expiryDate);
             const expiringSoon = isExpiringSoon(doc.expiryDate);
-            
+
             return (
-              <div key={index} className="bg-white rounded-lg border border-[#E5E7EB] p-6 hover:shadow-md transition-all duration-200">
+              <div
+                key={index}
+                className="bg-white rounded-lg border border-[#E5E7EB] p-6 hover:shadow-md transition-all duration-200"
+              >
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4 pb-4 border-b border-[#E5E7EB]">
                   <div className="flex items-center gap-3 flex-1">
@@ -167,8 +210,12 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                       <FileText className="h-5 w-5 text-[#6366F1]" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="font-bold text-[#0D1A33] text-base truncate">{doc.documentType}</h4>
-                      <p className="text-sm text-[#4A5568] mt-1 truncate">{doc.documentNumber}</p>
+                      <h4 className="font-bold text-[#0D1A33] text-base truncate">
+                        {doc.documentType}
+                      </h4>
+                      <p className="text-sm text-[#4A5568] mt-1 truncate">
+                        {doc.documentNumber}
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 ml-3">
@@ -194,22 +241,31 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                 {/* Details */}
                 <div className="space-y-3 mb-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <InfoField label="Issued Date" value={doc.issuedDate} />
-                    <InfoField label="Expiry Date" value={doc.expiryDate} />
+                    <InfoField
+                      label="Issued Date"
+                      value={formatDate(doc.issuedDate || doc.validFrom)}
+                    />
+                    <InfoField
+                      label="Expiry Date"
+                      value={formatDate(doc.expiryDate || doc.validTo)}
+                    />
                   </div>
-                  <InfoField label="Issuing Authority" value={doc.issuingAuthority} />
+                  <InfoField
+                    label="Issuing Authority"
+                    value={doc.issuingAuthority}
+                  />
                 </div>
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 pt-4 border-t border-[#E5E7EB]">
-                  <button 
+                  <button
                     onClick={() => handlePreviewDocument(doc)}
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#F5F7FA] hover:bg-[#E5E7EB] rounded-lg transition-colors text-sm font-medium text-[#0D1A33]"
                   >
                     <Eye className="h-4 w-4" />
                     View
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDownloadDocument(doc)}
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#F5F7FA] hover:bg-[#E5E7EB] rounded-lg transition-colors text-sm font-medium text-[#0D1A33]"
                   >
@@ -237,8 +293,12 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                   <Upload className="h-5 w-5 text-[#6366F1]" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#0D1A33]">Upload Document</h3>
-                  <p className="text-sm text-[#4A5568]">Add a new vehicle document</p>
+                  <h3 className="text-lg font-bold text-[#0D1A33]">
+                    Upload Document
+                  </h3>
+                  <p className="text-sm text-[#4A5568]">
+                    Add a new vehicle document
+                  </p>
                 </div>
               </div>
               <button
@@ -267,9 +327,13 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                   <label htmlFor="fileUpload" className="cursor-pointer">
                     <Upload className="h-12 w-12 text-[#4A5568] mx-auto mb-3" />
                     <p className="text-sm font-medium text-[#0D1A33] mb-1">
-                      {selectedFile ? selectedFile.name : "Click to upload or drag and drop"}
+                      {selectedFile
+                        ? selectedFile.name
+                        : "Click to upload or drag and drop"}
                     </p>
-                    <p className="text-xs text-[#4A5568]">PDF, JPG, PNG, DOC (Max 10MB)</p>
+                    <p className="text-xs text-[#4A5568]">
+                      PDF, JPG, PNG, DOC (Max 10MB)
+                    </p>
                   </label>
                 </div>
               </div>
@@ -282,7 +346,9 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                   </label>
                   <CustomSelect
                     value={newDocument.documentType}
-                    onChange={(value) => setNewDocument({ ...newDocument, documentType: value })}
+                    onChange={(value) =>
+                      setNewDocument({ ...newDocument, documentType: value })
+                    }
                     options={[
                       { value: "RC", label: "Registration Certificate (RC)" },
                       { value: "Insurance", label: "Insurance Certificate" },
@@ -305,7 +371,12 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="text"
                     value={newDocument.documentNumber}
-                    onChange={(e) => setNewDocument({ ...newDocument, documentNumber: e.target.value })}
+                    onChange={(e) =>
+                      setNewDocument({
+                        ...newDocument,
+                        documentNumber: e.target.value,
+                      })
+                    }
                     placeholder="Enter document number"
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
@@ -318,7 +389,12 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="date"
                     value={newDocument.issuedDate}
-                    onChange={(e) => setNewDocument({ ...newDocument, issuedDate: e.target.value })}
+                    onChange={(e) =>
+                      setNewDocument({
+                        ...newDocument,
+                        issuedDate: e.target.value,
+                      })
+                    }
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
                 </div>
@@ -330,7 +406,12 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                   <input
                     type="date"
                     value={newDocument.expiryDate}
-                    onChange={(e) => setNewDocument({ ...newDocument, expiryDate: e.target.value })}
+                    onChange={(e) =>
+                      setNewDocument({
+                        ...newDocument,
+                        expiryDate: e.target.value,
+                      })
+                    }
                     className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                   />
                 </div>
@@ -343,7 +424,12 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                 <input
                   type="text"
                   value={newDocument.issuingAuthority}
-                  onChange={(e) => setNewDocument({ ...newDocument, issuingAuthority: e.target.value })}
+                  onChange={(e) =>
+                    setNewDocument({
+                      ...newDocument,
+                      issuingAuthority: e.target.value,
+                    })
+                  }
                   placeholder="Enter issuing authority"
                   className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
                 />
@@ -355,7 +441,9 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <textarea
                   value={newDocument.remarks}
-                  onChange={(e) => setNewDocument({ ...newDocument, remarks: e.target.value })}
+                  onChange={(e) =>
+                    setNewDocument({ ...newDocument, remarks: e.target.value })
+                  }
                   placeholder="Additional notes or remarks..."
                   rows={3}
                   className="w-full px-4 py-2.5 border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6366F1] text-sm"
@@ -396,7 +484,7 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
                   {previewDocument.fileName}
                 </h3>
               </div>
-              <button 
+              <button
                 onClick={closePreview}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -421,8 +509,12 @@ const DocumentsViewTab = ({ vehicle, isEditMode }) => {
               ) : (
                 <div className="text-center py-12">
                   <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">Preview not available for this file type</p>
-                  <p className="text-sm text-gray-400 mt-2">You can still download the file</p>
+                  <p className="text-gray-500">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    You can still download the file
+                  </p>
                 </div>
               )}
             </div>

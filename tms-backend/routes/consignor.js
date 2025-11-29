@@ -122,7 +122,7 @@ router.get(
  * Save consignor as draft
  * POST /api/consignors/save-draft
  * - Minimal validation (business_name only)
- * - Creates consignor with status: DRAFT
+ * - Creates consignor with status: SAVE_AS_DRAFT
  */
 router.post(
   "/save-draft",
@@ -137,7 +137,7 @@ router.post(
  * PUT /api/consignors/:id/update-draft
  * - No validation applied
  * - Only creator can update
- * - Status remains: DRAFT
+ * - Status remains: SAVE_AS_DRAFT
  */
 router.put(
   "/:id/update-draft",
@@ -152,7 +152,7 @@ router.put(
  * PUT /api/consignors/:id/submit-draft
  * - Full validation (same as create)
  * - Only creator can submit
- * - Status changes: DRAFT → PENDING
+ * - Status changes: SAVE_AS_DRAFT → PENDING
  */
 router.put(
   "/:id/submit-draft",
