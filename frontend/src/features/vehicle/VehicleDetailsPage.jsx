@@ -43,7 +43,7 @@ import ServiceFrequencyTab from "./components/ServiceFrequencyTab";
 import DocumentsTab from "./components/DocumentsTab";
 
 // Import approval component
-import VehicleApprovalActionBar from "../../components/approval/VehicleApprovalActionBar";
+import ApprovalActionBar from "../../components/approval/ApprovalActionBar";
 
 const VehicleDetailsPage = () => {
   const { id } = useParams();
@@ -524,9 +524,9 @@ const VehicleDetailsPage = () => {
           <div className="flex items-center gap-2">
             {/* User Approval Bar (if vehicle has pending approval) */}
             {currentVehicle.userApprovalStatus && (
-              <VehicleApprovalActionBar
+              <ApprovalActionBar
                 userApprovalStatus={currentVehicle.userApprovalStatus}
-                vehicleId={id}
+                entityId={id}
                 onRefreshData={handleRefreshData}
               />
             )}

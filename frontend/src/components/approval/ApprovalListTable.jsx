@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, RotateCcw, Calendar, User, FileText } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Calendar, User, FileText, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import ApprovalStatusPill from './ApprovalStatusPill';
 
 /**
@@ -32,6 +33,32 @@ const ApprovalListTable = ({
   isRejecting,
   isSendingBack
 }) => {
+  const navigate = useNavigate();
+
+  // Get navigation path based on entity type and entity ID
+  const getNavigationPath = (entityType, entityId) => {
+    if (!entityType || !entityId) return null;
+
+    const entityTypeMap = {
+      'Transporter Admin': `/transporter/${entityId}`, // Navigate to transporter details
+      'Consignor Admin': `/consignor/details/${entityId}`,     // Navigate to consignor details  
+      'Driver User': `/driver/${entityId}`,            // Navigate to driver details
+      'Vehicle Owner': `/vehicle/${entityId}`,         // Navigate to vehicle details
+      'Warehouse Admin': `/warehouse/${entityId}`      // Navigate to warehouse details
+    };
+
+    return entityTypeMap[entityType] || null;
+  };
+
+  // Handle click on Request ID to navigate to details page
+  const handleEntityNavigation = (entityType, entityId) => {
+    const path = getNavigationPath(entityType, entityId);
+    if (path) {
+      navigate(path);
+    } else {
+      console.warn('No navigation path found for:', entityType, entityId);
+    }
+  };
   // Format date
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -85,7 +112,7 @@ const ApprovalListTable = ({
                 Request Type
               </th>
               <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
-                Request ID
+                Entity ID
               </th>
               <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                 Created On
@@ -125,9 +152,16 @@ const ApprovalListTable = ({
                   </div>
                 </td>
 
-                {/* Request ID */}
-                <td className="px-6 py-4 text-sm text-gray-900 font-mono">
-                  {approval.requestId || 'N/A'}
+                {/* Entity ID - Clickable for navigation to entity details page */}
+                <td className="px-6 py-4">
+                  <button
+                    onClick={() => handleEntityNavigation(approval.entityType, approval.entityId)}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-mono underline transition-colors duration-200 flex items-center group"
+                    title={`View ${approval.entityType} details for ${approval.entityId || approval.requestId}`}
+                  >
+                    <span className="mr-1">{approval.entityId || approval.requestId || 'N/A'}</span>
+                    <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
                 </td>
 
                 {/* Created On */}
@@ -204,9 +238,25 @@ const ApprovalListTable = ({
                       </button>
                     </div>
                   ) : (
-                    <span className="text-sm text-gray-400 italic text-center block">
-                      No actions available
-                    </span>
+                    <div className="flex items-center justify-center">
+                      {approval.status === 'Approve' && (
+                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Completed
+                        </span>
+                      )}
+                      {approval.status === 'Sent Back' && (
+                        <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full flex items-center gap-1">
+                          <XCircle className="w-3 h-3" />
+                          Rejected
+                        </span>
+                      )}
+                      {!['Approve', 'Sent Back'].includes(approval.status) && (
+                        <span className="text-xs text-gray-400 italic">
+                          No actions available
+                        </span>
+                      )}
+                    </div>
                   )}
                 </td>
               </motion.tr>

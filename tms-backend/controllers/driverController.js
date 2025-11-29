@@ -1,5 +1,6 @@
 const knex = require("../config/database");
 const { Country, State, City } = require("country-state-city");
+const bcrypt = require("bcrypt");
 const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
 
@@ -132,6 +133,56 @@ const generateDocumentUploadId = async (trx) => {
   }
 
   return `DU${next.toString().padStart(4, "0")}`;
+};
+
+// Generate Driver Admin User ID (format: DA0001, DA0002, etc.)
+const generateDriverAdminUserId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("user_master")
+      .where("user_type_id", "UT004") // Driver user type
+      .andWhere("user_id", "like", "DA%")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `DA${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("user_master").where("user_id", newId).first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique Driver Admin user ID after 100 attempts");
+};
+
+// Generate Approval Flow Transaction ID (format: AF0001, AF0002, etc.)
+const generateApprovalFlowId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("approval_flow_trans")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `AF${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx("approval_flow_trans")
+      .where("approval_flow_trans_id", newId)
+      .first();
+    if (!existing) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error("Failed to generate unique approval flow ID after 100 attempts");
 };
 
 // Validation functions
@@ -1039,13 +1090,127 @@ const createDriver = async (req, res) => {
       }
     }
 
+    // ========================================
+    // PHASE 8: CREATE DRIVER USER ACCOUNT & APPROVAL FLOW
+    // ========================================
+    console.log("🔍 Creating driver user account and approval flow...");
+
+    // Generate user ID for Driver Admin
+    const driverAdminUserId = await generateDriverAdminUserId(trx);
+    console.log(`  Generated user ID: ${driverAdminUserId}`);
+
+    // Get creator details from request (current logged-in Product Owner)
+    const creatorUserId = req.user?.user_id || "SYSTEM";
+    const creatorName = req.user?.user_full_name || "System";
+
+    // Generate initial password (based on full name + random number)
+    const fullNameClean = basicInfo.fullName.replace(/[^a-zA-Z0-9]/g, "");
+    const initialPassword = `${fullNameClean}@123`;
+    const hashedPassword = await bcrypt.hash(initialPassword, 10);
+
+    // Use driver details for user account
+    const userEmail = basicInfo.emailId || `${driverId.toLowerCase()}@driver.com`;
+    const userMobile = basicInfo.phoneNumber || "0000000000";
+
+    // Create user in user_master with PENDING status
+    await trx("user_master").insert({
+      user_id: driverAdminUserId,
+      user_type_id: "UT004", // Driver user type
+      user_full_name: basicInfo.fullName,
+      email_id: userEmail,
+      mobile_number: userMobile,
+      from_date: currentTimestamp,
+      to_date: null,
+      is_active: false, // Inactive until approved
+      created_by_user_id: creatorUserId,
+      password: hashedPassword,
+      password_type: "initial",
+      status: "PENDING", // VARCHAR(20) limit - use short status
+      created_by: creatorUserId,
+      updated_by: creatorUserId,
+      created_at: currentTimestamp,
+      updated_at: currentTimestamp,
+      created_on: currentTimestamp,
+      updated_on: currentTimestamp,
+    });
+
+    console.log(`  ✅ Created user: ${driverAdminUserId} (PENDING approval)`);
+
+    // Get approval configuration for Driver (Level 1 only)
+    const approvalConfig = await trx("approval_configuration")
+      .where({
+        approval_type_id: "AT003", // Driver User
+        approver_level: 1,
+        status: "ACTIVE",
+      })
+      .first();
+
+    if (!approvalConfig) {
+      throw new Error("Approval configuration not found for Driver User");
+    }
+
+    // Determine pending approver (Product Owner who did NOT create this)
+    // If PO001 created, pending with PO002; if PO002 created, pending with PO001
+    let pendingWithUserId = null;
+    let pendingWithName = null;
+
+    if (creatorUserId === "PO001") {
+      const po2 = await trx("user_master").where("user_id", "PO002").first();
+      pendingWithUserId = "PO002";
+      pendingWithName = po2?.user_full_name || "Product Owner 2";
+    } else if (creatorUserId === "PO002") {
+      const po1 = await trx("user_master").where("user_id", "PO001").first();
+      pendingWithUserId = "PO001";
+      pendingWithName = po1?.user_full_name || "Product Owner 1";
+    } else {
+      // If creator is neither PO1 nor PO2, default to PO001
+      const po1 = await trx("user_master").where("user_id", "PO001").first();
+      pendingWithUserId = "PO001";
+      pendingWithName = po1?.user_full_name || "Product Owner 1";
+    }
+
+    // Generate approval flow trans ID
+    const approvalFlowId = await generateApprovalFlowId(trx);
+
+    // Create approval flow transaction entry
+    await trx("approval_flow_trans").insert({
+      approval_flow_trans_id: approvalFlowId,
+      approval_config_id: approvalConfig.approval_config_id,
+      approval_type_id: "AT003", // Driver User
+      user_id_reference_id: driverAdminUserId, // Use Driver Admin user ID
+      s_status: "PENDING",
+      approver_level: 1,
+      pending_with_role_id: "RL001", // Product Owner role
+      pending_with_user_id: pendingWithUserId,
+      pending_with_name: pendingWithName,
+      created_by_user_id: creatorUserId,
+      created_by_name: creatorName,
+      created_by: creatorUserId,
+      updated_by: creatorUserId,
+      created_at: currentTimestamp,
+      updated_at: currentTimestamp,
+      created_on: currentTimestamp,
+      updated_on: currentTimestamp,
+      status: "ACTIVE",
+    });
+
+    console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+    console.log(`  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`);
+    console.log(`  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`);
+
     await trx.commit();
+
+    console.log("✅ Transaction committed successfully");
 
     res.status(201).json({
       success: true,
       message: "Driver created successfully",
       data: {
         driverId,
+        userId: driverAdminUserId,
+        userEmail: userEmail,
+        initialPassword: initialPassword,
+        pendingWith: pendingWithName,
       },
       timestamp: new Date().toISOString(),
     });
@@ -2441,6 +2606,92 @@ const getDriverById = async (req, res) => {
       totalViolations,
     };
 
+    // ========================================================================
+    // FETCH USER APPROVAL STATUS FOR DRIVER USERS
+    // ========================================================================
+    
+    let userApprovalStatus = null;
+    let approvalHistory = [];
+    
+    try {
+      // Find Driver User associated with this driver
+      // IMPORTANT: For drivers, the approval flow stores the ENTITY ID (DRV####) not user ID (DA####)
+      // But we need to find the user account (DA####) that was created for this driver entity
+      
+      // Method 1: Find approval flows for Driver User Creation type
+      // Since we don't know which user was created for this driver, we'll search differently
+      // We need to find the user that was created for this specific driver entity
+      
+      // First, check if there's a user account created for this driver by name pattern
+      // This is not ideal, but it's how the current system works
+      const potentialUsers = await knex('user_master')
+        .where('user_type_id', 'UT004') // Driver user type
+        .where('user_full_name', 'like', `%${driver.full_name}%`) // Match by driver's name
+        .select('*');
+        
+      let approvalFlows = [];
+      
+      if (potentialUsers.length > 0) {
+        // Found potential user(s), now find their approval flows
+        const userIds = potentialUsers.map(user => user.user_id);
+        
+        approvalFlows = await knex('approval_flow_trans as aft')
+          .leftJoin('approval_type_master as atm', 'aft.approval_type_id', 'atm.approval_type_id')
+          .where('aft.approval_type_id', 'AT003') // Driver User Creation
+          .whereIn('aft.user_id_reference_id', userIds) // Check for any of the potential users
+          .select(
+            'aft.*',
+            'atm.approval_type as approval_category',
+            'atm.approval_name'
+          )
+          .orderBy('aft.created_at', 'desc');
+      }
+
+      let associatedUser = null;
+      
+      if (approvalFlows.length > 0) {
+        // Found approval flows, get the associated user from the approval flow
+        const userIdFromApproval = approvalFlows[0].user_id_reference_id;
+        
+        associatedUser = await knex('user_master')
+          .where('user_id', userIdFromApproval)
+          .where('user_type_id', 'UT004') // Driver user type
+          .first();
+          
+        console.log(`✅ Found approval flow for driver ${id}, associated user: ${userIdFromApproval}`);
+      } else {
+        // No approval flow found - this might be a legacy driver
+        console.log(`⚠️  No approval flow found for driver ${id} (legacy driver)`);
+      }
+
+      if (associatedUser) {
+        console.log(`✅ Found associated Driver user: ${associatedUser.user_id} for driver ${id}`);
+
+        userApprovalStatus = {
+          approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id || null,
+          userId: associatedUser.user_id,
+          userEmail: associatedUser.email_id,
+          userMobile: associatedUser.mobile_number,
+          userStatus: associatedUser.status,
+          isActive: associatedUser.is_active,
+          currentApprovalStatus: approvalFlows[0]?.s_status || associatedUser.status,
+          pendingWith: approvalFlows[0]?.pending_with_name || null,
+          pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
+          createdByUserId: approvalFlows[0]?.created_by_user_id || null,
+          createdByName: approvalFlows[0]?.created_by_name || null,
+        };
+
+        // Use the approval flows we already fetched
+        approvalHistory = approvalFlows;
+        
+        console.log(`✅ Found approval status for driver ${id}:`, userApprovalStatus);
+      } else {
+        console.log(`⚠️  No Driver user found for driver ${id}`);
+      }
+    } catch (approvalError) {
+      console.error('❌ Error fetching driver approval status:', approvalError.message);
+    }
+
     // Format response
     const response = {
       driverId: driver.driver_id,
@@ -2555,6 +2806,12 @@ const getDriverById = async (req, res) => {
       })),
     };
 
+    // Add approval status to response if available
+    if (userApprovalStatus) {
+      response.userApprovalStatus = userApprovalStatus;
+      response.approvalHistory = approvalHistory;
+    }
+
     res.json({
       success: true,
       data: response,
@@ -2617,21 +2874,12 @@ const getMasterData = async (req, res) => {
       ];
     }
 
-    // Get gender options with fallback
-    let genderOptions = [];
-    try {
-      genderOptions = await knex("gender_master")
-        .select("gender_id as value", "gender_name as label")
-        .where("status", "ACTIVE")
-        .orderBy("gender_name");
-    } catch (err) {
-      console.warn("gender_master table error:", err.message);
-      genderOptions = [
-        { value: "M", label: "Male" },
-        { value: "F", label: "Female" },
-        { value: "O", label: "Others" },
-      ];
-    }
+    // Get gender options (static - no database table needed)
+    const genderOptions = [
+      { value: "MALE", label: "Male" },
+      { value: "FEMALE", label: "Female" },
+      { value: "OTHERS", label: "Others" },
+    ];
 
     // Get blood group options (static fallback)
     const bloodGroupOptions = [

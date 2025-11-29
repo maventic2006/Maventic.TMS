@@ -400,11 +400,65 @@ const CreateVehiclePage = () => {
   };
 
   /**
+   * Validate and convert fuel type to ensure proper ID format
+   * Returns the validated fuel type ID or shows error toast
+   */
+  const validateFuelTypeId = useCallback((fuelType) => {
+    try {
+      if (!fuelType) return '';
+      
+      // If it's already a valid ID format (FT001-FT999), return as-is
+      if (/^FT\d{3}$/.test(fuelType)) {
+        return fuelType;
+      }
+      
+      // If it's a label, map it to ID (fallback protection)
+      const fuelMapping = {
+        'DIESEL': 'FT001',
+        'CNG': 'FT002', 
+        'ELECTRIC': 'FT003',
+        'PETROL': 'FT004',
+        'GASOLINE': 'FT004'
+      };
+      
+      const mappedId = fuelMapping[fuelType.toUpperCase()];
+      if (mappedId) {
+        console.warn("⚠️  AUTO-CORRECTED: Converted fuel type label to ID:", { label: fuelType, id: mappedId });
+        dispatch(addToast({
+          type: TOAST_TYPES.WARNING,
+          message: `Fuel type auto-corrected from "${fuelType}" to proper ID "${mappedId}"`,
+          duration: 3000
+        }));
+        return mappedId;
+      }
+      
+      console.error("❌ INVALID fuel type:", fuelType);
+      dispatch(addToast({
+        type: TOAST_TYPES.ERROR,
+        message: `Invalid fuel type: "${fuelType}". Please select a valid option.`,
+        duration: 5000
+      }));
+      return '';
+    } catch (error) {
+      console.error("❌ Error in fuel type validation:", error);
+      dispatch(addToast({
+        type: TOAST_TYPES.ERROR,
+        message: "Error validating fuel type. Please refresh and try again.",
+        duration: 5000
+      }));
+      return '';
+    }
+  }, [dispatch]);
+
+  /**
    * Transform frontend formData to backend-compatible format
    * Maps camelCase frontend fields to backend expected structure
-   */
-  const transformFormDataForBackend = (frontendData) => {
-    // Helper function to format date to YYYY-MM-DD
+  */
+ const transformFormDataForBackend = useCallback((frontendData) => {
+   try {
+     // Validate fuel type using the component-level function
+     // Helper function to format date to YYYY-MM-DD
+     const validatedFuelType = validateFuelTypeId(frontendData.specifications?.fuelType);
     const formatDate = (dateStr) => {
       if (!dateStr) return undefined;
       if (dateStr instanceof Date) return dateStr.toISOString().split('T')[0];
@@ -437,7 +491,7 @@ const CreateVehiclePage = () => {
       specifications: {
         engine_type_id: frontendData.specifications.engineType || "",
         engine_number: frontendData.specifications.engineNumber || "",
-        fuel_type_id: frontendData.specifications.fuelType || "",
+        fuel_type_id: validatedFuelType,
         fuel_tank_capacity: frontendData.specifications.fuelTankCapacity || 0,
         transmission_type: frontendData.specifications.transmission || "",
         financer: frontendData.specifications.financer || "",
@@ -505,7 +559,25 @@ const CreateVehiclePage = () => {
         fileData: doc.fileData || "", // Base64 encoded file string
       })).filter(doc => doc.documentType), // Only include documents with type
     };
-  };
+    } catch (error) {
+      console.error("❌ Error transforming form data:", error);
+      dispatch(addToast({
+        type: TOAST_TYPES.ERROR,
+        message: "Error processing form data. Please check your inputs and try again.",
+        duration: 5000
+      }));
+      // Return a minimal valid structure to prevent complete failure
+      return {
+        basicInformation: {},
+        specifications: { fuel_type_id: '' },
+        capacityDetails: {},
+        ownershipDetails: {},
+        maintenanceHistory: {},
+        serviceFrequency: {},
+        documents: []
+      };
+    }
+  }, [validateFuelTypeId]);
 
   const handleSubmit = async () => {
     // Clear previous errors
@@ -541,6 +613,13 @@ const CreateVehiclePage = () => {
     try {
       // Transform form data to backend format
       const transformedData = transformFormDataForBackend(formData);
+      
+      // Production logging for fuel type validation tracking
+      console.log("🔍 Fuel Type Validation:", {
+        frontend: formData.specifications?.fuelType,
+        validated: validateFuelTypeId,
+        backend: transformedData.specifications?.fuel_type_id
+      });
       
       console.log("📤 Submitting vehicle data:", transformedData);
       

@@ -13,12 +13,18 @@ import Dashboard from "../features/dashboard/Dashboard";
 import IndentPage from "../features/indent/IndentPage";
 import TransporterDetailsPage from "../features/transporter/TransporterDetailsPage";
 import CreateTransporterPage from "../features/transporter/CreateTransporterPage";
+import VehicleDetailsPage from "../features/vehicle/VehicleDetailsPage";
+import CreateVehiclePage from "../features/vehicle/CreateVehiclePage";
+import DriverDetailsPage from "../features/driver/pages/DriverDetailsPage";
+import DriverCreatePage from "../features/driver/pages/DriverCreatePage";
 import WarehouseCreatePage from "../features/warehouse/pages/WarehouseCreatePage";
 import WarehouseDetails from "../pages/WarehouseDetails";
 import ConsignorMaintenance from "../pages/ConsignorMaintenance";
 import ConsignorDetailsPage from "../features/consignor/pages/ConsignorDetailsPage";
 import ConsignorCreatePage from "../features/consignor/pages/ConsignorCreatePage";
 import SuperAdminApprovalList from "../pages/SuperAdminApprovalList";
+import ConfigurationPage from "../pages/ConfigurationPage";
+import ConfigurationListPage from "../pages/ConfigurationListPage";
 
 // Protected Route component
 import ProtectedRoute from "./ProtectedRoute";
@@ -98,12 +104,48 @@ const AppRoutes = () => {
         }
       />
 
+      <Route
+        path="/vehicle/create"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <CreateVehiclePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/vehicle/:id"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <VehicleDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Driver Management Routes */}
       <Route
         path="/drivers"
         element={
           <ProtectedRoute roles={["product_owner"]}>
             <DriverMaintenance />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/driver/create"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <DriverCreatePage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/driver/:id"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <DriverDetailsPage />
           </ProtectedRoute>
         }
       />
@@ -180,6 +222,25 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roles={["product_owner"]}>
             <SuperAdminApprovalList />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Master Configuration Management */}
+      <Route
+        path="/configurations"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConfigurationListPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/configuration/:configName"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConfigurationPage />
           </ProtectedRoute>
         }
       />

@@ -32,6 +32,8 @@ import WarehouseCreatePage from "./features/warehouse/pages/WarehouseCreatePage"
 import ConsignorMaintenance from "./pages/ConsignorMaintenance";
 import ConsignorDetailsPage from "./pages/ConsignorDetailsPage";
 import ConsignorCreatePage from "./features/consignor/pages/ConsignorCreatePage";
+import ConfigurationPage from "./pages/ConfigurationPage";
+import ConfigurationListPage from "./pages/ConfigurationListPage";
 import SuperAdminApprovalList from "./pages/SuperAdminApprovalList";
 import SessionExpiryWarningModal from "./components/auth/SessionExpiryWarningModal";
 import {
@@ -527,6 +529,29 @@ function App() {
                       <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                         <Layout>
                           <ConsignorDetailsPage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  {/* Configuration Management Routes */}
+                  <Route
+                    path="/configurations"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <ConfigurationListPage />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/configuration/:configName"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <ConfigurationPage />
                         </Layout>
                       </PrivateRoute>
                     }

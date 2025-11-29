@@ -44,7 +44,7 @@ export const FUEL_TYPES = [
   { value: "FT001", label: "DIESEL" },
   { value: "FT002", label: "CNG" },
   { value: "FT003", label: "ELECTRIC" },
-  { value: "FT004", label: "LNG" },
+  { value: "FT004", label: "PETROL" },
 ];
 
 // Ownership Types (array format for dropdowns)

@@ -156,7 +156,7 @@ const VehicleFilterPanel = ({
                 Year From
               </label>
               <input
-                type="number"
+                type="month"
                 value={filters.yearFrom}
                 onChange={(e) => onFilterChange("yearFrom", e.target.value)}
                 placeholder="Start Year"
@@ -185,7 +185,7 @@ const VehicleFilterPanel = ({
                 Year To
               </label>
               <input
-                type="number"
+                type="month"
                 value={filters.yearTo}
                 onChange={(e) => onFilterChange("yearTo", e.target.value)}
                 placeholder="End Year"
@@ -257,7 +257,7 @@ const VehicleFilterPanel = ({
             </div>
 
             {/* Registration State Filter */}
-            <div>
+            {/* <div>
               <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: theme.colors.text.primary }}>
                 Reg. State
               </label>
@@ -281,7 +281,7 @@ const VehicleFilterPanel = ({
                   e.target.style.boxShadow = "none";
                 }}
               />
-            </div>
+            </div> */}
 
             {/* Towing Capacity Range Filters */}
             <div>

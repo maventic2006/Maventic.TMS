@@ -591,6 +591,7 @@ import {
   accidentViolationSchema,
   formatFieldName,
 } from "../validation";
+import ApprovalActionBar from "../../../components/approval/ApprovalActionBar";
 
 // Import view tab components
 import DriverDashboardViewTab from "../components/DriverDashboardViewTab";
@@ -749,6 +750,13 @@ const DriverDetailsPage = () => {
       dispatch(fetchMasterData());
     }
   }, [id, dispatch]);
+
+  // Refresh data function for approval actions
+  const handleRefreshData = () => {
+    if (id) {
+      dispatch(fetchDriverById(id));
+    }
+  };
 
   // Initialize edit form data when driver loads
   useEffect(() => {
@@ -1200,6 +1208,15 @@ const DriverDetailsPage = () => {
                 </div>
 
                 <div className="flex items-center space-x-3">
+                  {/* Driver Approval Action Bar */}
+                  {selectedDriver?.userApprovalStatus && (
+                    <ApprovalActionBar
+                      userApprovalStatus={selectedDriver.userApprovalStatus}
+                      entityId={id}
+                      onRefreshData={handleRefreshData}
+                    />
+                  )}
+
                   {isEditMode ? (
                     <>
                       <Button

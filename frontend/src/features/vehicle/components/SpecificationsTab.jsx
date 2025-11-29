@@ -5,6 +5,12 @@ import { CustomSelect } from "../../../components/ui/Select";
 
 const SpecificationsTab = ({ formData, setFormData, errors, masterData }) => {
   const handleChange = (field, value) => {
+    // �️ Additional validation for fuel type to ensure only valid IDs
+    if (field === 'fuelType' && value && !value.startsWith('FT')) {
+      console.warn("⚠️  Invalid fuel type value rejected:", value);
+      return;
+    }
+    
     setFormData((prev) => ({
       ...prev,
       specifications: {
@@ -24,12 +30,12 @@ const SpecificationsTab = ({ formData, setFormData, errors, masterData }) => {
     { value: 'ET004', label: 'EURO6' }
   ];
 
-  // ✅ USE MASTER DATA FROM API - NOT HARDCODED CONSTANTS
+  // ✅ USE MASTER DATA FROM API - ENHANCED WITH VALIDATION
   const fuelTypes = masterData?.fuelTypes || [
     { value: 'FT001', label: 'DIESEL' },
     { value: 'FT002', label: 'CNG' },
     { value: 'FT003', label: 'ELECTRIC' },
-    { value: 'FT004', label: 'LNG' }
+    { value: 'FT004', label: 'PETROL' }
   ];
 
   return (
@@ -94,7 +100,14 @@ const SpecificationsTab = ({ formData, setFormData, errors, masterData }) => {
           </label>
           <CustomSelect
             value={data.fuelType || ""}
-            onChange={(value) => handleChange("fuelType", value)}
+            onChange={(value) => {
+              // �️ Final validation layer - ensure only valid fuel type IDs pass through
+              if (value && !value.startsWith('FT')) {
+                console.warn("⚠️  Invalid fuel type value detected in dropdown:", value);
+                return;
+              }
+              handleChange("fuelType", value);
+            }}
             options={fuelTypes}
             placeholder="Select Type"
             error={errors.fuelType}

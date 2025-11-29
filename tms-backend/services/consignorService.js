@@ -458,18 +458,26 @@ const getConsignorById = async (customerId) => {
           .orderBy("created_at", "desc")
           .first();
 
-        userApprovalStatus = {
-          userId: consignorUser.user_id,
-          userEmail: consignorUser.email_id,
-          userMobile: consignorUser.mobile_number,
-          userStatus: consignorUser.status,
-          isActive: consignorUser.is_active || false,
-          currentApprovalStatus: approvalFlow?.s_status || "Not in Approval Flow",
-          pendingWith: approvalFlow?.pending_with_name || null,
-          pendingWithUserId: approvalFlow?.pending_with_user_id || null,
-        };
-        
-        console.log(`👤 Found user approval status for ${consignorUser.user_id}`);
+        // Only return userApprovalStatus if there's an actual approval flow
+        if (approvalFlow) {
+          userApprovalStatus = {
+            userId: consignorUser.user_id,
+            userEmail: consignorUser.email_id,
+            userMobile: consignorUser.mobile_number,
+            userStatus: consignorUser.status,
+            isActive: consignorUser.is_active || false,
+            currentApprovalStatus: approvalFlow.s_status,
+            pendingWith: approvalFlow.pending_with_name,
+            pendingWithUserId: approvalFlow.pending_with_user_id,
+            createdByUserId: approvalFlow.created_by_user_id,
+            createdByName: approvalFlow.created_by_name,
+          };
+          
+          console.log(`👤 Found user approval status for ${consignorUser.user_id}: ${approvalFlow.s_status}`);
+        } else {
+          console.log(`⚠️  User ${consignorUser.user_id} has no approval flow record - legacy consignor`);
+          // Don't set userApprovalStatus for legacy records without approval flow
+        }
       }
     } catch (approvalError) {
       console.warn('⚠️  Could not fetch approval status:', approvalError.message);

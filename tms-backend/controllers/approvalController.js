@@ -1,7 +1,7 @@
 const knex = require('../config/database');
 
 /**
- * Get approval list with filters
+ * Get approvals list with filters
  * GET /api/approvals
  * Query params: requestType, dateFrom, dateTo, status, page, limit
  */
@@ -52,7 +52,9 @@ exports.getApprovals = async (req, res) => {
         'aft.approval_flow_trans_id as approvalId',
         'aft.approval_type_id as approvalTypeId',
         'atm.approval_name as requestType',
-        'aft.user_id_reference_id as requestId',
+        'atm.approval_type as entityType', // Add entity type for navigation
+        'aft.user_id_reference_id as requestId', // IMPORTANT: This contains ENTITY ID (T0002, CON0008, DRV0001, etc.) for navigation
+        'aft.user_id_reference_id as entityId', // Clearer alias - this contains the entity ID, not user account ID
         'aft.created_at as requestCreatedOn',
         'aft.created_by_user_id as requestorId',
         'aft.created_by_name as requestorName',
@@ -62,9 +64,15 @@ exports.getApprovals = async (req, res) => {
         'aft.approver_level as approverLevel',
         'aft.pending_with_user_id as pendingWithUserId',
         'aft.pending_with_name as pendingWithName'
+        // NOTE: user_id_reference_id contains entity IDs (T0002, CON0008, DRV0001, etc.) 
+        // These are used for navigation to entity details pages, NOT user account IDs (TA0002, CA0008, DA0001, etc.)
       )
       .leftJoin('approval_type_master as atm', 'aft.approval_type_id', 'atm.approval_type_id')
-      .where('aft.pending_with_user_id', userId); // Only approvals pending with logged-in user
+      .where(function() {
+        // Show records where user is currently the pending approver OR user previously actioned
+        this.where('aft.pending_with_user_id', userId)  // Currently pending with user
+          .orWhere('aft.actioned_by_id', userId);        // Previously actioned by user
+      });
 
     // Filter by request type
     if (requestType) {
@@ -94,7 +102,11 @@ exports.getApprovals = async (req, res) => {
     // Count total records (for pagination) - Build separate count query without limit
     let countQuery = knex('approval_flow_trans as aft')
       .leftJoin('approval_type_master as atm', 'aft.approval_type_id', 'atm.approval_type_id')
-      .where('aft.pending_with_user_id', userId);
+      .where(function() {
+        // Same logic: currently pending with user OR previously actioned by user
+        this.where('aft.pending_with_user_id', userId)
+          .orWhere('aft.actioned_by_id', userId);
+      });
 
     // Apply same filters to count query (but no limit!)
     if (requestType) {
@@ -516,6 +528,158 @@ exports.getMasterData = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch master data',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Approve user (user-based approval workflow)
+ * POST /api/approvals/user/:userId/approve
+ */
+exports.approveUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { remarks } = req.body;
+    const approverUserId = req.user?.user_id;
+    const approverName = req.user?.name;
+
+    console.log(`🟢 Approving user ${userId} by ${approverUserId} (${approverName})`);
+
+    // Check if user exists
+    const user = await knex('user_master')
+      .where('user_id', userId)
+      .first();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update user status to Active
+    await knex('user_master')
+      .where('user_id', userId)
+      .update({
+        status: 'Active',
+        is_active: 1,
+        updated_at: new Date(),
+        updated_by: approverUserId
+      });
+
+    // Update approval flow with correct status and approver information
+    await knex('approval_flow_trans')
+      .where('user_id_reference_id', userId)
+      .update({
+        s_status: 'Approve', // Fixed: Use 'Approve' not 'APPROVED'
+        actioned_by_id: approverUserId, // Added: Who approved
+        actioned_by_name: approverName, // Added: Approver name
+        approved_on: knex.fn.now(), // Added: Approval timestamp
+        pending_with_user_id: null, // Clear: No longer pending
+        pending_with_name: null, // Clear: No longer pending
+        updated_at: new Date(),
+        remarks: remarks || 'Approved by Product Owner'
+      });
+
+    console.log(`✅ User ${userId} approved successfully`);
+
+    res.json({
+      success: true,
+      message: 'User approved successfully',
+      data: {
+        userId,
+        status: 'Active',
+        approvedBy: approverName,
+        approvedOn: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error approving user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to approve user',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Reject user (user-based approval workflow)
+ * POST /api/approvals/user/:userId/reject
+ */
+exports.rejectUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { remarks } = req.body;
+    const approverUserId = req.user?.user_id;
+    const approverName = req.user?.name;
+
+    if (!remarks || remarks.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Remarks are required to reject a user'
+      });
+    }
+
+    console.log(`🔴 Rejecting user ${userId} by ${approverUserId} (${approverName})`);
+
+    // Check if user exists
+    const user = await knex('user_master')
+      .where('user_id', userId)
+      .first();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update user status to Rejected
+    await knex('user_master')
+      .where('user_id', userId)
+      .update({
+        status: 'Sent Back', // Fixed: Use 'Sent Back' not 'REJECTED'
+        is_active: 0,
+        updated_at: new Date(),
+        updated_by: approverUserId
+      });
+
+    // Update approval flow with correct status and approver information
+    await knex('approval_flow_trans')
+      .where('user_id_reference_id', userId)
+      .update({
+        s_status: 'Sent Back', // Fixed: Use 'Sent Back' not 'REJECTED'
+        actioned_by_id: approverUserId, // Added: Who rejected
+        actioned_by_name: approverName, // Added: Rejector name
+        approved_on: knex.fn.now(), // Added: Action timestamp (rejection time)
+        pending_with_user_id: null, // Clear: No longer pending
+        pending_with_name: null, // Clear: No longer pending
+        updated_at: new Date(),
+        remarks: remarks.trim()
+      });
+
+    console.log(`✅ User ${userId} rejected successfully`);
+
+    res.json({
+      success: true,
+      message: 'User rejected successfully',
+      data: {
+        userId,
+        status: 'Sent Back',
+        rejectedBy: approverName,
+        rejectedOn: new Date(),
+        remarks: remarks.trim()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error rejecting user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reject user',
       error: error.message
     });
   }

@@ -1,0 +1,212 @@
+﻿{
+  "sla-master": {
+    "name": "SLA Master",
+    "table": "sla_master",
+    "primaryKey": "sla_master_id",
+    "displayField": "sla_type",
+    "description": "Manage SLA (Service Level Agreement) master configurations",
+    "fields": {
+      "sla_master_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Master ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "SL"
+      },
+      "sla_type": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "SLA Type",
+        "validation": "required|max:100"
+      },
+      "sla_description": {
+        "type": "varchar",
+        "maxLength": 255,
+        "required": true,
+        "label": "SLA Description",
+        "validation": "required|max:255"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": [
+          "Active",
+          "Inactive"
+        ],
+        "default": "Active"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "sla-area-mapping": {
+    "name": "SLA Area Mapping",
+    "table": "sla_area_mapping",
+    "primaryKey": "sla_mapping_id",
+    "displayField": "sla_mapping_id",
+    "description": "Manage SLA to Area mapping configurations",
+    "fields": {
+      "sla_mapping_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Mapping ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "SM"
+      },
+      "sla_area_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Area ID",
+        "validation": "required",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "sla_area_master",
+          "valueField": "sla_area_id",
+          "labelField": "area_name"
+        }
+      },
+      "sla_master_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Master ID",
+        "validation": "required",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "sla_master",
+          "valueField": "sla_master_id",
+          "labelField": "sla_type"
+        }
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "sla-measurement-method-mapping": {
+    "name": "SLA Measurement Method Mapping",
+    "table": "sla_measurement_method_mapping",
+    "primaryKey": "sm_mapping_id",
+    "displayField": "sm_mapping_id",
+    "description": "Manage SLA to Measurement Method mapping configurations",
+    "fields": {
+      "sm_mapping_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SM Mapping ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "SMM"
+      },
+      "sla_master_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Master ID",
+        "validation": "required",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "sla_master",
+          "valueField": "sla_master_id",
+          "labelField": "sla_type"
+        }
+      },
+      "measurement_method_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Measurement Method ID",
+        "validation": "required",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "measurement_method_master",
+          "valueField": "measurement_method_id",
+          "labelField": "method_name"
+        }
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  }
+}

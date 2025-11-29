@@ -2,16 +2,17 @@ import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, Clock, MessageSquare, X } from "lucide-react";
-import { approveUser, rejectUser } from "../../redux/slices/approvalSlice";
+import { approveUser, rejectUser, approveApprovalFlow, rejectApprovalFlow } from "../../redux/slices/approvalSlice";
 import { addToast } from "../../redux/slices/uiSlice";
 import { TOAST_TYPES } from "../../utils/constants";
 
 /**
  * ApprovalActionBar Component
- * Displays approval status and action buttons (Approve/Reject) for Transporter Admin users
- * Only visible to Product Owners who did NOT create the transporter
+ * Displays approval status and action buttons (Approve/Reject) for entity admin users
+ * Only shows action buttons to assigned approvers who did NOT create the entity
+ * Creators can see the status but cannot approve their own entities
  */
-const ApprovalActionBar = ({ userApprovalStatus, transporterId, onRefreshData }) => {
+const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { isApproving, isRejecting } = useSelector((state) => state.approval);
@@ -30,16 +31,41 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId, onRefreshData })
     currentApprovalStatus,
     pendingWith,
     pendingWithUserId,
+    createdByUserId,
+    createdByName,
   } = userApprovalStatus;
+
+  // Debug logging for approval system
+  console.log('🔍 ApprovalActionBar Debug:');
+  console.log('Current user:', user);
+  console.log('Current user ID:', user?.user_id);
+  console.log('Pending with user ID:', pendingWithUserId);
+  console.log('Current approval status:', currentApprovalStatus);
+  console.log('Created by user ID:', createdByUserId);
+  console.log('User approval status object:', userApprovalStatus);
 
   // Check if current user is the assigned approver
   const isAssignedApprover = user?.user_id === pendingWithUserId;
 
-  // Only show approval actions if status is pending and user is assigned approver
+  // Check if current user is the creator (who should NOT see approval buttons)
+  const isCreator = user?.user_id === createdByUserId;
+
+  // Enhanced Product Owner Detection
+  const isProductOwner = 
+    user?.role === 'Product Owner' || 
+    user?.user_type_id === 'UT001' || 
+    user?.user_id?.startsWith('PO') ||
+    user?.user_id?.startsWith('UT001') ||
+    user?.role?.toLowerCase().includes('product owner');
+
+  // FIXED LOGIC: Show approval buttons ONLY when:
+  // 1. Status is pending AND
+  // 2. User is specifically assigned as approver AND
+  // 3. User is NOT the creator (creators cannot approve their own entities)
   const showApprovalActions =
-    (currentApprovalStatus === "PENDING" ||
-      currentApprovalStatus === "Pending for Approval") &&
-    isAssignedApprover;
+    (currentApprovalStatus === "PENDING" || currentApprovalStatus === "Pending for Approval") &&
+    isAssignedApprover &&
+    !isCreator; // CRITICAL: Hide buttons if user is the creator
 
   // Determine status badge color and icon
   const getStatusBadge = (status) => {
@@ -82,9 +108,22 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId, onRefreshData })
   // Handle Approve Action
   const handleApprove = async () => {
     try {
-      const result = await dispatch(
-        approveUser({ userId, remarks: "Approved by Product Owner" })
-      ).unwrap();
+      let result;
+      
+      // Check if we have an approval flow trans ID (new approval system)
+      if (userApprovalStatus.approvalFlowTransId) {
+        result = await dispatch(
+          approveApprovalFlow({ 
+            approvalFlowTransId: userApprovalStatus.approvalFlowTransId, 
+            remarks: "Approved by Product Owner" 
+          })
+        ).unwrap();
+      } else {
+        // Fallback to old user-based approval system
+        result = await dispatch(
+          approveUser({ userId, remarks: "Approved by Product Owner" })
+        ).unwrap();
+      }
 
       dispatch(
         addToast({
@@ -120,9 +159,22 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId, onRefreshData })
     }
 
     try {
-      const result = await dispatch(
-        rejectUser({ userId, remarks: rejectRemarks })
-      ).unwrap();
+      let result;
+      
+      // Check if we have an approval flow trans ID (new approval system)
+      if (userApprovalStatus.approvalFlowTransId) {
+        result = await dispatch(
+          rejectApprovalFlow({ 
+            approvalFlowTransId: userApprovalStatus.approvalFlowTransId, 
+            remarks: rejectRemarks 
+          })
+        ).unwrap();
+      } else {
+        // Fallback to old user-based approval system
+        result = await dispatch(
+          rejectUser({ userId, remarks: rejectRemarks })
+        ).unwrap();
+      }
 
       dispatch(
         addToast({
@@ -152,30 +204,45 @@ const ApprovalActionBar = ({ userApprovalStatus, transporterId, onRefreshData })
     <>
       {/* Approval Status Badge and Actions */}
       <div className="flex items-center gap-3">
-        {pendingWith !== user?.user_full_name && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 font-medium text-sm ${statusBadge.color}`}
-          >
-            <StatusIcon className="w-4 h-4" />
-            <span>{statusBadge.text}</span>
-          </motion.div>
-        )}
+        {/* Status Badge - Always show for creators and approvers */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 font-medium text-sm ${statusBadge.color}`}
+        >
+          <StatusIcon className="w-4 h-4" />
+          <span>{statusBadge.text}</span>
+        </motion.div>
 
-        {/* Pending With Info (only if pending) */}
+        {/* Pending With Info - Show different messages based on user role */}
         {(currentApprovalStatus === "PENDING" ||
           currentApprovalStatus === "Pending for Approval") &&
-          pendingWith !== user?.user_full_name && (
+          pendingWith && (
             <motion.div
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: 0.1 }}
               className="text-sm text-blue-100/80"
             >
-              Pending with:{" "}
-              <span className="font-semibold text-white">{pendingWith}</span>
+              {isCreator ? (
+                // Show to creator - who cannot approve their own entity
+                <>
+                  Pending approval from:{" "}
+                  <span className="font-semibold text-white">{pendingWith}</span>
+                </>
+              ) : isAssignedApprover ? (
+                // Show to assigned approver - who can take action
+                <>
+                  Assigned to you for approval
+                </>
+              ) : (
+                // Show to other users
+                <>
+                  Pending with:{" "}
+                  <span className="font-semibold text-white">{pendingWith}</span>
+                </>
+              )}
             </motion.div>
           )}
 

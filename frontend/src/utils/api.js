@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
 
 // Debug logging (can be removed in production)
 if (import.meta.env.NODE_ENV === "development") {
@@ -284,6 +284,11 @@ export const vehicleAPI = {
   // Get master data for dropdowns
   getMasterData: () => {
     return api.get('/vehicles/master-data');
+  },
+
+  // RC Lookup API - Get vehicle details by registration number
+  lookupVehicleByRC: (registrationNumber) => {
+    return api.get(`/vehicles/rc-lookup/${encodeURIComponent(registrationNumber)}`);
   }
 };
 

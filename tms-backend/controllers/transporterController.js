@@ -1061,7 +1061,7 @@ const createTransporter = async (req, res) => {
         approval_flow_trans_id: approvalFlowId,
         approval_config_id: approvalConfig.approval_config_id,
         approval_type_id: "AT001", // Transporter Admin
-        user_id_reference_id: transporterAdminUserId,
+        user_id_reference_id: transporterAdminUserId, // FIXED: Use Transporter Admin user ID, not transporter ID
         s_status: "PENDING",
         approver_level: 1,
         pending_with_role_id: "RL001", // Product Owner role
@@ -2693,6 +2693,7 @@ const getTransporterById = async (req, res) => {
           .orderBy("aft.created_at", "desc");
 
         userApprovalStatus = {
+          approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id || null,
           userId: associatedUser.user_id,
           userEmail: associatedUser.email_id,
           userMobile: associatedUser.mobile_number,
@@ -2702,6 +2703,8 @@ const getTransporterById = async (req, res) => {
             approvalFlows[0]?.s_status || associatedUser.status,
           pendingWith: approvalFlows[0]?.pending_with_name || null,
           pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
+          createdByUserId: approvalFlows[0]?.created_by_user_id || null,
+          createdByName: approvalFlows[0]?.created_by_name || null,
         };
 
         approvalHistory = approvalFlows;

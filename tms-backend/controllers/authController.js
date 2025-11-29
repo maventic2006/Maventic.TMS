@@ -21,18 +21,34 @@ const login = async (req, res) => {
       });
     }
 
+    
+
     // Find user in database
     const user = await knex("user_master")
       .where({ user_id: user_id })
       .andWhere({ status: "ACTIVE" })
       .first();
 
+      // console.log("User fetched for login:", user);
+
+    //    let isPasswordValid = false;
+    // try {
+    //   isPasswordValid = await bcrypt.compare(password, user.password);
+    // } catch (error) {
+    //   console.error("Password comparison error:", error);
+    //   isPasswordValid = false;
+      
+    // }
+    // console.log("Password validation result:", isPasswordValid);
     if (!user) {
       return res.status(401).json({
         success: false,
         message: "Invalid user ID or password",
       });
     }
+
+    console.log("Stored password in DB:", user.password);
+console.log("Length:", user.password?.length);
 
     // Validate password using bcrypt
     let isPasswordValid = false;

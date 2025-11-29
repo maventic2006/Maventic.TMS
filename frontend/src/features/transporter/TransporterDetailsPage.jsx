@@ -536,7 +536,7 @@ const TransporterDetailsPage = () => {
             {selectedTransporter.userApprovalStatus && (
               <ApprovalActionBar
                 userApprovalStatus={selectedTransporter.userApprovalStatus}
-                transporterId={selectedTransporter.transporterId}
+                entityId={selectedTransporter.transporterId}
                 onRefreshData={handleRefreshData}
               />
             )}

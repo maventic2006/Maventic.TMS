@@ -17,8 +17,10 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
+  "http://localhost:5175",
   "http://192.168.2.32:5173",
   "http://192.168.2.32:5174",
+  "http://192.168.2.32:5175",
   // Add production server origins here when deployed
   // Example: "https://tms.yourdomain.com"
 ];
@@ -113,6 +115,7 @@ driverBulkUploadQueue.process(async (job) => {
   return await processDriverBulkUpload(job, io);
 });
 const driverRoutes = require("./routes/driver");
+const configurationRoutes = require("./routes/configuration");
 
 // Routes
 app.use("/api/warehouse", warehouseRoutes);
@@ -130,6 +133,7 @@ app.use("/api/warehouse-bulk-upload", warehouseBulkUploadRoutes);
 app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
 app.use("/api/approvals", approvalRoutes);
+app.use("/api/configuration", configurationRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

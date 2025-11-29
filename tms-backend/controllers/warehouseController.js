@@ -1130,7 +1130,7 @@ const createWarehouse = async (req, res) => {
       approval_flow_trans_id: approvalFlowId,
       approval_config_id: approvalConfig.approval_config_id,
       approval_type_id: "AT002", // Consignor Admin (used for warehouse managers)
-      user_id_reference_id: warehouseManagerUserId,
+      user_id_reference_id: warehouseManagerUserId, // FIXED: Use Warehouse Manager user ID, not warehouse ID
       s_status: "PENDING",
       approver_level: 1,
       pending_with_role_id: "RL001", // Product Owner role

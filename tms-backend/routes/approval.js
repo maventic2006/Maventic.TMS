@@ -36,4 +36,18 @@ router.post('/:id/reject', authenticateToken, approvalController.rejectRequest);
  */
 router.post('/:id/sendBack', authenticateToken, approvalController.sendBackRequest);
 
+/**
+ * Approve a user (user-based approval workflow)
+ * POST /api/approvals/user/:userId/approve
+ * Body: { remarks: string (optional) }
+ */
+router.post('/user/:userId/approve', authenticateToken, approvalController.approveUser);
+
+/**
+ * Reject a user (user-based approval workflow)
+ * POST /api/approvals/user/:userId/reject
+ * Body: { remarks: string (required) }
+ */
+router.post('/user/:userId/reject', authenticateToken, approvalController.rejectUser);
+
 module.exports = router;

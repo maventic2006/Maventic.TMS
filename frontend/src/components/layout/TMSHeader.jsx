@@ -39,7 +39,7 @@ import {
 import { logoutUser } from "../../redux/slices/authSlice";
 
 const TMSHeader = ({ theme }) => {
-  const [hoveredDropdown, setHoveredDropdown] = useState(null);
+  const [activeDropdown, setActiveDropdown] = useState(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -283,32 +283,173 @@ const TMSHeader = ({ theme }) => {
     },
   ];
 
-  const handleMouseEnter = (menuId) => {
-    setHoveredDropdown(menuId);
-  };
-
-  const handleMouseLeave = () => {
-    setHoveredDropdown(null);
+  const handleMenuClick = (menuId) => {
+    // Toggle dropdown - close if already open, open if closed
+    setActiveDropdown(activeDropdown === menuId ? null : menuId);
   };
 
   const handleMenuItemClick = (item) => {
-    console.log("Menu item clicked:", item.title);
-    setHoveredDropdown(null);
+    console.log("🖱️ Menu item clicked:", item.title);
+    console.log("🧭 Navigation details:", {
+      itemTitle: item.title,
+      timestamp: new Date().toISOString(),
+      currentPath: window.location.pathname
+    });
+    
+    // Close dropdown after selecting an item
+    setActiveDropdown(null);
 
+    // Master Data Maintenance navigation
     if (item.title === "Transporter Maintenance") {
+      console.log("➡️ Navigating to /transporters");
       navigate("/transporters");
     } else if (item.title === "Vehicle Maintenance") {
+      console.log("➡️ Navigating to /vehicles");
       navigate("/vehicles");
     } else if (item.title === "Driver Maintenance") {
+      console.log("➡️ Navigating to /drivers");
       navigate("/drivers");
     } else if (item.title === "Consignor Maintenance") {
+      console.log("➡️ Navigating to /consignor");
       navigate("/consignor");
     } else if (item.title === "Consignor WH Maintenance") {
+      console.log("➡️ Navigating to /warehouse");
       navigate("/warehouse");
-    } else if (item.title === "Super Admin Approval List") {
-      console.log("Navigating to /approvals/super-admin");
+    } 
+    
+    // My Approval navigation
+    else if (item.title === "Super Admin Approval List") {
+      console.log("➡️ Navigating to /approvals/super-admin");
       navigate("/approvals/super-admin");
     }
+    
+    // Global Master Config navigation - Enhanced with debugging
+    else if (item.title === "Consignor General Config Parameter Name") {
+      const targetPath = "/configuration/consignor-general-parameter";
+      console.log("🔧 Global Master Config - Consignor General Config");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Transporter Vehicle Configure Parameter Name") {
+      const targetPath = "/configuration/transporter-vehicle-config";
+      console.log("🔧 Global Master Config - Vehicle Configure");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Master - Vehicle Type for Indent") {
+      const targetPath = "/configuration/vehicle-type";
+      console.log("🔧 Global Master Config - Vehicle Type for Indent");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Document Name Master") {
+      const targetPath = "/configuration/document-name";
+      console.log("🔧 Global Master Config - Document Name Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Doc Type Configuration") {
+      const targetPath = "/configuration/document-type";
+      console.log("🔧 Global Master Config - Doc Type Configuration");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Material Master Information") {
+      const targetPath = "/configuration/material-master";
+      console.log("🔧 Global Master Config - Material Master Information");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Approval Configuration") {
+      const targetPath = "/configuration/approval-configuration";
+      console.log("🔧 Global Master Config - Approval Configuration");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "General Config") {
+      const targetPath = "/configuration/general-config";
+      console.log("🔧 Global Master Config - General Config");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Message Master") {
+      const targetPath = "/configuration/message-master";
+      console.log("🔧 Global Master Config - Message Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Payment Term Master") {
+      const targetPath = "/configuration/payment-term";
+      console.log("🔧 Global Master Config - Payment Term Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Currency Master") {
+      const targetPath = "/configuration/currency-master";
+      console.log("🔧 Global Master Config - Currency Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Status Master") {
+      const targetPath = "/configuration/status";
+      console.log("🔧 Global Master Config - Status Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Vehicle IMEI Mapping") {
+      const targetPath = "/configuration/vehicle-imei-mapping";
+      console.log("🔧 Global Master Config - Vehicle IMEI Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Vehicle Type/Container Type/ULD Type Master") {
+      const targetPath = "/configuration/vehicle-type";
+      console.log("🔧 Global Master Config - Vehicle Type/Container Type/ULD Type Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Milestone Master") {
+      const targetPath = "/configuration/milestone";
+      console.log("🔧 Global Master Config - Milestone Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "SLA Master") {
+      const targetPath = "/configuration/sla-master";
+      console.log("🔧 Global Master Config - SLA Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "SLA to SLA Area Mapping") {
+      const targetPath = "/configuration/sla-area-mapping";
+      console.log("🔧 Global Master Config - SLA to SLA Area Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "SLA & Measurement Method Mapping") {
+      const targetPath = "/configuration/sla-measurement-method-mapping";
+      console.log("🔧 Global Master Config - SLA & Measurement Method Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Rate Type Mapping") {
+      const targetPath = "/configuration/rate-type";
+      console.log("🔧 Global Master Config - Rate Type Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else {
+      console.warn("⚠️ Unknown menu item clicked:", item.title);
+      console.warn("❓ No navigation rule defined for this menu item");
+    }
+    
+    // Log final state after navigation attempt
+    setTimeout(() => {
+      console.log("🔍 Post-navigation state:", {
+        currentPath: window.location.pathname,
+        timestamp: new Date().toISOString()
+      });
+    }, 100);
   };
 
   // Get theme colors or use defaults
@@ -425,28 +566,27 @@ const TMSHeader = ({ theme }) => {
             <div className="hidden sm:flex flex-wrap justify-center gap-0.5 py-2 max-w-full overflow-x-auto">
               {menuItems.map((menu) => {
                 const Icon = menu.icon;
-                const isHovered = hoveredDropdown === menu.id;
+                const isActive = activeDropdown === menu.id;
 
                 return (
                   <div
                     key={menu.id}
                     className="relative flex-shrink-0"
-                    onMouseEnter={() => handleMouseEnter(menu.id)}
-                    onMouseLeave={handleMouseLeave}
                   >
                     <button
+                      onClick={() => handleMenuClick(menu.id)}
                       className="flex items-center justify-center space-x-1.5 px-2 py-2 md:px-3 md:py-2.5 lg:px-4 lg:py-2.5 rounded-lg text-xs font-medium transition-all duration-300 transform hover:scale-[1.02] min-w-[140px] lg:min-w-[180px]"
                       style={{
-                        backgroundColor: isHovered ? headerBg : "transparent",
-                        color: isHovered ? textPrimary : "#FFFFFF",
-                        boxShadow: isHovered
+                        backgroundColor: isActive ? headerBg : "transparent",
+                        color: isActive ? textPrimary : "#FFFFFF",
+                        boxShadow: isActive
                           ? "0 2px 6px rgba(0, 0, 0, 0.1)"
                           : "none",
                       }}
                     >
                       <Icon
                         className="h-4 w-4 transition-all duration-300 flex-shrink-0"
-                        style={{ color: isHovered ? accentColor : "#FFFFFF" }}
+                        style={{ color: isActive ? accentColor : "#FFFFFF" }}
                       />
                       <span className="hidden lg:inline text-xs font-medium leading-tight text-center">
                         {menu.title}
@@ -454,8 +594,8 @@ const TMSHeader = ({ theme }) => {
                       <ChevronDown
                         className="h-3 w-3 transition-all duration-300 flex-shrink-0"
                         style={{
-                          color: isHovered ? accentColor : "#FFFFFF",
-                          transform: isHovered
+                          color: isActive ? accentColor : "#FFFFFF",
+                          transform: isActive
                             ? "rotate(180deg)"
                             : "rotate(0deg)",
                         }}
@@ -576,7 +716,7 @@ const TMSHeader = ({ theme }) => {
 
         {/* Desktop Dropdown Panels */}
         <AnimatePresence>
-          {hoveredDropdown && (
+          {activeDropdown && (
             <motion.div
               initial={{ opacity: 0, y: -10, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -590,13 +730,11 @@ const TMSHeader = ({ theme }) => {
                 boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
                 borderTop: `2px solid ${accentColor}`,
               }}
-              onMouseEnter={() => setHoveredDropdown(hoveredDropdown)}
-              onMouseLeave={handleMouseLeave}
             >
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {menuItems
-                    .find((menu) => menu.id === hoveredDropdown)
+                    .find((menu) => menu.id === activeDropdown)
                     ?.items.map((item, index) => {
                       const Icon = item.icon;
                       return (

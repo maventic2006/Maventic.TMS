@@ -139,5 +139,7 @@ After login, verify:
 
 ---
 
-**Last Updated**: November 15, 2025  
-**Issue Fixed**: bcrypt vs bcryptjs mismatch - Changed authController to use `bcrypt`
+**Last Updated**: November 22, 2025  
+**Issue Fixed**: Login password corrected - PO001/PO002 can now login with ProductOwner@123
+
+**✅ VERIFIED WORKING**: Both users tested and confirmed working on November 22, 2025

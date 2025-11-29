@@ -1,9 +1,23 @@
-﻿import React from "react";
-import { Info, Truck } from "lucide-react";
+﻿import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { Info, Truck, Search, Loader2, CheckCircle, AlertCircle, X } from "lucide-react";
 import { CustomSelect } from "../../../components/ui/Select";
 import { Country, State } from "country-state-city";
+import { vehicleAPI } from "../../../utils/api";
+import { addToast } from "../../../redux/slices/uiSlice";
+import { TOAST_TYPES } from "../../../utils/constants";
 
 const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
+  const dispatch = useDispatch();
+  
+  // RC Lookup states
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [lookupStatus, setLookupStatus] = useState(null); // 'success', 'error', null
+  const [lookupMessage, setLookupMessage] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingRCData, setPendingRCData] = useState(null);
+  const debounceRef = useRef(null);
+
   const handleChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -12,7 +26,257 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
         [field]: value,
       },
     }));
+
+    // If registration number is being changed, trigger RC lookup
+    if (field === 'registrationNumber') {
+      handleRegistrationNumberChange(value);
+    }
   };
+
+  /**
+   * Maps RC API response to vehicle form data structure
+   */
+  const mapRCResponseToFormData = useCallback((rcData) => {
+    const vehicleDetails = rcData.VehicleDetails;
+    if (!vehicleDetails) return null;
+
+    // Extract manufacturing year from month/year format
+    const extractYear = (monthYear) => {
+      if (!monthYear) return new Date().getFullYear();
+      const parts = monthYear.split('/');
+      return parts.length === 2 ? parseInt(parts[1]) : new Date().getFullYear();
+    };
+
+    // Map state code to full name
+    const getStateName = (stateCode) => {
+      const states = State.getStatesOfCountry('IN');
+      const state = states.find(s => s.isoCode === stateCode);
+      return state ? state.name : stateCode;
+    };
+
+    // Map RC fuel description to fuel type ID
+    const mapFuelTypeToId = (fuelDesc) => {
+      if (!fuelDesc) return '';
+      const fuelLower = fuelDesc.toLowerCase();
+      
+      let mappedId = '';
+      if (fuelLower.includes('diesel')) mappedId = 'FT001';
+      else if (fuelLower.includes('cng')) mappedId = 'FT002';
+      else if (fuelLower.includes('electric')) mappedId = 'FT003';
+      else if (fuelLower.includes('petrol') || fuelLower.includes('gasoline')) mappedId = 'FT004';
+      
+      // Return empty string if no match found
+      return mappedId;
+    };
+
+    return {
+      basicInformation: {
+        ...formData.basicInformation,
+        registrationNumber: vehicleDetails.rc_regn_no || '',
+        vin: vehicleDetails.rc_chasi_no || '',
+        make: vehicleDetails.rc_maker_desc || '',
+        model: vehicleDetails.rc_maker_model || '',
+        year: extractYear(vehicleDetails.rc_manu_month_yr),
+        color: vehicleDetails.rc_color || '',
+        vehicleRegisteredAtCountry: vehicleDetails.state_cd ? 'IN' : '',
+        vehicleRegisteredAtState: vehicleDetails.state_cd || '',
+      },
+      specifications: {
+        ...formData.specifications,
+        engineNumber: vehicleDetails.rc_eng_no || '',
+        fuelType: mapFuelTypeToId(vehicleDetails.rc_fuel_desc),
+        emissionStandard: vehicleDetails.rc_norms_desc || '',
+        noOfCylinders: parseInt(vehicleDetails.rc_no_cyl) || 0,
+        engineCapacity: parseFloat(vehicleDetails.rc_cubic_cap) || 0,
+      },
+      capacityDetails: {
+        ...formData.capacityDetails,
+        gvw: parseFloat(vehicleDetails.rc_gvw) || 0,
+        unladenWeight: parseFloat(vehicleDetails.rc_unld_wt) || 0,
+        payloadCapacity: (parseFloat(vehicleDetails.rc_gvw) || 0) - (parseFloat(vehicleDetails.rc_unld_wt) || 0),
+        seatingCapacity: parseInt(vehicleDetails.rc_seat_cap) || 0,
+        wheelbase: parseFloat(vehicleDetails.rc_wheelbase) || 0,
+      }
+    };
+  }, [formData]);
+
+  /**
+   * Check if form has existing data that would be overwritten
+   */
+  const checkForExistingData = useCallback(() => {
+    const basic = formData.basicInformation || {};
+    const specs = formData.specifications || {};
+    const capacity = formData.capacityDetails || {};
+    
+    // Check key fields that would be overwritten
+    return !!(
+      basic.make ||
+      basic.model ||
+      basic.year !== new Date().getFullYear() ||
+      basic.color ||
+      basic.vin ||
+      specs.engineNumber ||
+      specs.fuelType ||
+      specs.emissionStandard ||
+      capacity.gvw ||
+      capacity.unladenWeight
+    );
+  }, [formData]);
+
+  /**
+   * Apply RC data to form
+   */
+  const applyRCData = useCallback((mappedData) => {
+    setFormData(prev => ({
+      ...prev,
+      ...mappedData
+    }));
+    
+    setLookupStatus('success');
+    setLookupMessage('Vehicle details fetched and applied successfully');
+    dispatch(addToast({
+      type: TOAST_TYPES.SUCCESS,
+      message: 'Vehicle details auto-populated from RC database'
+    }));
+  }, [setFormData, dispatch]);
+
+  /**
+   * Handle confirmation dialog - confirm overwrite
+   */
+  const handleConfirmOverwrite = useCallback(() => {
+    if (pendingRCData) {
+      applyRCData(pendingRCData);
+      setPendingRCData(null);
+      setShowConfirmModal(false);
+    }
+  }, [pendingRCData, applyRCData]);
+
+  /**
+   * Handle confirmation dialog - cancel overwrite
+   */
+  const handleCancelOverwrite = useCallback(() => {
+    setPendingRCData(null);
+    setShowConfirmModal(false);
+    setLookupStatus('error');
+    setLookupMessage('Data overwrite cancelled');
+  }, []);
+
+  /**
+   * Performs RC lookup API call
+   */
+  const performRCLookup = useCallback(async (registrationNumber) => {
+    if (!registrationNumber || registrationNumber.length < 8) {
+      setLookupStatus(null);
+      setLookupMessage('');
+      return;
+    }
+
+    setIsLookingUp(true);
+    setLookupStatus(null);
+
+    try {
+      const response = await vehicleAPI.lookupVehicleByRC(registrationNumber);
+      
+      if (response.data && response.data.response && response.data.response.length > 0) {
+        const rcData = response.data.response[0].jsonResponse;
+        
+        if (rcData && rcData.VehicleDetails && rcData.VehicleDetails.stautsMessage === 'OK') {
+          // Map API response to form data
+          const mappedData = mapRCResponseToFormData(rcData);
+          
+          if (mappedData) {
+            // Check if form has existing data
+            const hasExistingData = checkForExistingData();
+            
+            if (hasExistingData) {
+              // Show confirmation dialog
+              setPendingRCData(mappedData);
+              setShowConfirmModal(true);
+              setLookupStatus('success');
+              setLookupMessage('Vehicle details found - Click confirm to overwrite existing data');
+            } else {
+              // Auto-populate without confirmation
+              applyRCData(mappedData);
+            }
+          } else {
+            setLookupStatus('error');
+            setLookupMessage('Unable to parse vehicle details');
+          }
+        } else {
+          setLookupStatus('error');
+          setLookupMessage('Registration number not found');
+          dispatch(addToast({
+            type: TOAST_TYPES.WARNING,
+            message: 'Registration number not found'
+          }));
+        }
+      } else {
+        setLookupStatus('error');
+        setLookupMessage('Registration number not found');
+        dispatch(addToast({
+          type: TOAST_TYPES.WARNING,
+          message: 'Registration number not found'
+        }));
+      }
+    } catch (error) {
+      console.error('RC Lookup error:', error);
+      
+      let errorMessage = 'Error occurred in server';
+      let toastMessage = 'Error occurred in server';
+      
+      if (error.response?.status === 404) {
+        errorMessage = 'Registration number not found';
+        toastMessage = 'Registration number not found';
+      } else if (error.response?.status === 408) {
+        errorMessage = 'Request timeout';
+        toastMessage = 'Error occurred in server - Request timeout';
+      } else if (error.response?.status >= 500 || error.response?.status === 502) {
+        errorMessage = 'Server error occurred';
+        toastMessage = 'Error occurred in server';
+      }
+      
+      setLookupStatus('error');
+      setLookupMessage(errorMessage);
+      dispatch(addToast({
+        type: TOAST_TYPES.ERROR,
+        message: toastMessage
+      }));
+    } finally {
+      setIsLookingUp(false);
+    }
+  }, [mapRCResponseToFormData, checkForExistingData, applyRCData, dispatch]);
+
+  /**
+   * Handles registration number change with debouncing
+   */
+  const handleRegistrationNumberChange = useCallback((value) => {
+    // Clear previous debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    // Reset lookup status when typing
+    if (value !== formData.basicInformation?.registrationNumber) {
+      setLookupStatus(null);
+      setLookupMessage('');
+    }
+
+    // Debounce the API call
+    debounceRef.current = setTimeout(() => {
+      if (value && value.length >= 8) {
+        performRCLookup(value.trim().toUpperCase());
+      }
+    }, 1000); // 1 second delay
+  }, [performRCLookup, formData.basicInformation?.registrationNumber]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   // Helper function to handle numeric inputs with leading zeros
   const handleNumericChange = (field, value) => {
@@ -70,21 +334,64 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
       {/* 3-column grid layout with smaller inputs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Registration Number */}
+        {/* Registration Number with RC Lookup */}
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">
             Registration Number <span className="text-red-500">*</span>
+            <span className="text-xs font-normal text-gray-500 ml-2">
+              (Auto-fetches vehicle details from RC database)
+            </span>
           </label>
-          <input
-            type="text"
-            value={data.registrationNumber || ""}
-            onChange={(e) => handleChange("registrationNumber", e.target.value.toUpperCase())}
-            placeholder="e.g., MH12AB1234"
-            maxLength={15}
-            className={`w-full px-3 py-2 text-sm border ${
-              errors.registrationNumber ? "border-red-500" : "border-gray-300"
-            } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
-          />
-          {errors.registrationNumber && <p className="mt-1 text-xs text-red-600">{errors.registrationNumber}</p>}
+          <div className="relative">
+            <input
+              type="text"
+              value={data.registrationNumber || ""}
+              onChange={(e) => handleChange("registrationNumber", e.target.value.toUpperCase())}
+              placeholder="e.g., MH12AB1234"
+              maxLength={15}
+              className={`w-full px-3 py-2 pr-10 text-sm border ${
+                errors.registrationNumber 
+                  ? "border-red-500" 
+                  : lookupStatus === 'success' 
+                  ? "border-green-500" 
+                  : lookupStatus === 'error'
+                  ? "border-orange-500"
+                  : "border-gray-300"
+              } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
+            />
+            
+            {/* Loading/Status Icon */}
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+              {isLookingUp ? (
+                <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+              ) : lookupStatus === 'success' ? (
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              ) : lookupStatus === 'error' ? (
+                <AlertCircle className="h-4 w-4 text-orange-500" />
+              ) : null}
+            </div>
+          </div>
+          
+          {/* Status Messages */}
+          {errors.registrationNumber && (
+            <p className="mt-1 text-xs text-red-600">{errors.registrationNumber}</p>
+          )}
+          {lookupMessage && !errors.registrationNumber && (
+            <p className={`mt-1 text-xs ${
+              lookupStatus === 'success' 
+                ? 'text-green-600' 
+                : lookupStatus === 'error' 
+                ? 'text-orange-600' 
+                : 'text-gray-600'
+            }`}>
+              {lookupMessage}
+            </p>
+          )}
+          {isLookingUp && (
+            <p className="mt-1 text-xs text-blue-600">
+              Fetching vehicle details from RC database...
+            </p>
+          )}
         </div>
 
         {/* Make/Brand */}
@@ -371,6 +678,80 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <p className="text-blue-700">Fields marked with * are mandatory. Ensure Make/Brand, VIN, and Manufacturing details are accurate for proper vehicle identification.</p>
         </div>
       </div>
+
+      {/* Confirmation Modal for RC Data Overwrite */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Confirm Vehicle Details Overwrite
+              </h3>
+              <button
+                onClick={handleCancelOverwrite}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-6 w-6 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-2">
+                    Vehicle details found in RC database
+                  </p>
+                  <p className="text-sm text-gray-600 mb-4">
+                    This will overwrite any existing data in the form with details from the RC database. This action cannot be undone.
+                  </p>
+                  
+                  {/* Show some key fields that will be overwritten */}
+                  {pendingRCData && (
+                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                      <p className="text-xs font-semibold text-gray-700 mb-2">
+                        Data to be populated:
+                      </p>
+                      <div className="space-y-1 text-xs text-gray-600">
+                        {pendingRCData.basicInformation?.make && (
+                          <p><span className="font-medium">Make:</span> {pendingRCData.basicInformation.make}</p>
+                        )}
+                        {pendingRCData.basicInformation?.model && (
+                          <p><span className="font-medium">Model:</span> {pendingRCData.basicInformation.model}</p>
+                        )}
+                        {pendingRCData.basicInformation?.year && (
+                          <p><span className="font-medium">Year:</span> {pendingRCData.basicInformation.year}</p>
+                        )}
+                        {pendingRCData.basicInformation?.color && (
+                          <p><span className="font-medium">Color:</span> {pendingRCData.basicInformation.color}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Modal Actions */}
+            <div className="flex justify-end gap-3 p-4 border-t bg-gray-50">
+              <button
+                onClick={handleCancelOverwrite}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmOverwrite}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#10B981] rounded-lg hover:bg-[#059669] transition-colors"
+              >
+                Confirm Overwrite
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -21,6 +21,14 @@ const vehicleController = require('../controllers/vehicleController');
 router.get('/master-data', authenticateToken, vehicleController.getMasterData);
 
 /**
+ * @route   GET /api/vehicle/rc-lookup/:registrationNumber
+ * @desc    Lookup vehicle details from RC database
+ * @access  Private
+ * @param   {string} registrationNumber - Vehicle registration number
+ */
+router.get('/rc-lookup/:registrationNumber', authenticateToken, vehicleController.lookupVehicleByRC);
+
+/**
  * @route   GET /api/vehicle
  * @desc    Get all vehicles with pagination and filtering
  * @access  Private

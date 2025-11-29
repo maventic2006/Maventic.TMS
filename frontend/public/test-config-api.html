@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow: auto;
+            max-height: 300px;
+        }
+        .loading {
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TMS Configuration System API Test</h1>
+        <p>This page tests the configuration API endpoints to identify any issues preventing the Configuration Page from rendering.</p>
+
+        <!-- Test 1: Basic API Connection -->
+        <div class="test-section" id="api-test">
+            <h3>Test 1: API Connection</h3>
+            <button onclick="testAPIConnection()">Test API Connection</button>
+            <div id="api-result" class="loading">Click the button to test API connection</div>
+        </div>
+
+        <!-- Test 2: Get All Configurations -->
+        <div class="test-section" id="config-list-test">
+            <h3>Test 2: Get All Configurations</h3>
+            <button onclick="testGetConfigurations()">Get Configurations</button>
+            <div id="config-list-result" class="loading">Click the button to fetch configurations</div>
+            <pre id="config-list-data"></pre>
+        </div>
+
+        <!-- Test 3: Get Configuration Metadata -->
+        <div class="test-section" id="metadata-test">
+            <h3>Test 3: Get Configuration Metadata</h3>
+            <select id="config-select">
+                <option value="">Select a configuration...</option>
+                <option value="vehicle-type">Vehicle Type</option>
+                <option value="document-type">Document Type</option>
+                <option value="user-type">User Type</option>
+            </select>
+            <button onclick="testGetMetadata()">Get Metadata</button>
+            <div id="metadata-result" class="loading">Select a configuration and click the button</div>
+            <pre id="metadata-data"></pre>
+        </div>
+
+        <!-- Test 4: CORS Check -->
+        <div class="test-section" id="cors-test">
+            <h3>Test 4: CORS Configuration</h3>
+            <button onclick="testCORS()">Test CORS</button>
+            <div id="cors-result" class="loading">Click the button to test CORS</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000/api';
+        
+        async function testAPIConnection() {
+            const resultDiv = document.getElementById('api-result');
+            const testDiv = document.getElementById('api-test');
+            
+            resultDiv.innerHTML = 'Testing API connection...';
+            testDiv.className = 'test-section loading';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/configuration`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `✅ API Connection successful! Status: ${response.status}`;
+                    testDiv.className = 'test-section success';
+                } else {
+                    resultDiv.innerHTML = `❌ API Connection failed! Status: ${response.status}`;
+                    testDiv.className = 'test-section error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ API Connection error: ${error.message}`;
+                testDiv.className = 'test-section error';
+                console.error('API Connection Error:', error);
+            }
+        }
+        
+        async function testGetConfigurations() {
+            const resultDiv = document.getElementById('config-list-result');
+            const dataDiv = document.getElementById('config-list-data');
+            const testDiv = document.getElementById('config-list-test');
+            
+            resultDiv.innerHTML = 'Fetching configurations...';
+            dataDiv.innerHTML = '';
+            testDiv.className = 'test-section loading';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/configuration`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `✅ Successfully fetched ${data.data.length} configurations`;
+                    dataDiv.innerHTML = JSON.stringify(data, null, 2);
+                    testDiv.className = 'test-section success';
+                    
+                    // Populate the select dropdown
+                    const select = document.getElementById('config-select');
+                    select.innerHTML = '<option value="">Select a configuration...</option>';
+                    data.data.forEach(config => {
+                        const option = document.createElement('option');
+                        option.value = config.configName;
+                        option.textContent = config.name;
+                        select.appendChild(option);
+                    });
+                } else {
+                    resultDiv.innerHTML = `❌ Failed to fetch configurations. Status: ${response.status}`;
+                    dataDiv.innerHTML = JSON.stringify(data, null, 2);
+                    testDiv.className = 'test-section error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Error fetching configurations: ${error.message}`;
+                testDiv.className = 'test-section error';
+                console.error('Get Configurations Error:', error);
+            }
+        }
+        
+        async function testGetMetadata() {
+            const configName = document.getElementById('config-select').value;
+            const resultDiv = document.getElementById('metadata-result');
+            const dataDiv = document.getElementById('metadata-data');
+            const testDiv = document.getElementById('metadata-test');
+            
+            if (!configName) {
+                alert('Please select a configuration first');
+                return;
+            }
+            
+            resultDiv.innerHTML = `Fetching metadata for ${configName}...`;
+            dataDiv.innerHTML = '';
+            testDiv.className = 'test-section loading';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/configuration/${configName}/metadata`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `✅ Successfully fetched metadata for ${configName}`;
+                    dataDiv.innerHTML = JSON.stringify(data, null, 2);
+                    testDiv.className = 'test-section success';
+                } else {
+                    resultDiv.innerHTML = `❌ Failed to fetch metadata. Status: ${response.status}`;
+                    dataDiv.innerHTML = JSON.stringify(data, null, 2);
+                    testDiv.className = 'test-section error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Error fetching metadata: ${error.message}`;
+                testDiv.className = 'test-section error';
+                console.error('Get Metadata Error:', error);
+            }
+        }
+        
+        async function testCORS() {
+            const resultDiv = document.getElementById('cors-result');
+            const testDiv = document.getElementById('cors-test');
+            
+            resultDiv.innerHTML = 'Testing CORS configuration...';
+            testDiv.className = 'test-section loading';
+            
+            try {
+                // Test with different origins
+                const currentOrigin = window.location.origin;
+                resultDiv.innerHTML = `✅ CORS working - Current origin: ${currentOrigin}`;
+                testDiv.className = 'test-section success';
+                
+                // Add CORS headers check
+                const response = await fetch(`${API_BASE_URL}/configuration`, {
+                    method: 'OPTIONS'
+                });
+                
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
+                };
+                
+                resultDiv.innerHTML += `<br><strong>CORS Headers:</strong><br>${JSON.stringify(corsHeaders, null, 2)}`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `❌ CORS error: ${error.message}`;
+                testDiv.className = 'test-section error';
+                console.error('CORS Test Error:', error);
+            }
+        }
+        
+        // Auto-run API connection test on page load
+        window.addEventListener('load', () => {
+            testAPIConnection();
+        });
+    </script>
+</body>
+</html>

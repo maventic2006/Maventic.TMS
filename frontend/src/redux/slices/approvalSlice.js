@@ -126,6 +126,40 @@ export const rejectUser = createAsyncThunk(
   }
 );
 
+// Approve approval flow (for entity approval workflow using approval_flow_trans_id)
+export const approveApprovalFlow = createAsyncThunk(
+  'approval/approveApprovalFlow',
+  async ({ approvalFlowTransId, remarks }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/approvals/${approvalFlowTransId}/approve`, {
+        remarks
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
+// Reject approval flow (for entity approval workflow using approval_flow_trans_id)
+export const rejectApprovalFlow = createAsyncThunk(
+  'approval/rejectApprovalFlow',
+  async ({ approvalFlowTransId, remarks }, { rejectWithValue }) => {
+    try {
+      if (!remarks || remarks.trim().length === 0) {
+        return rejectWithValue('Remarks are required to reject this approval');
+      }
+
+      const response = await api.post(`/approvals/${approvalFlowTransId}/reject`, {
+        remarks: remarks.trim()
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
 // Initial State
 const initialState = {
   approvals: [],
@@ -301,6 +335,34 @@ const approvalSlice = createSlice({
       .addCase(rejectUser.rejected, (state, action) => {
         state.isRejecting = false;
         state.actionError = action.payload || 'Failed to reject user';
+      });
+
+    // Approve Approval Flow (Entity Approval using approval_flow_trans_id)
+    builder
+      .addCase(approveApprovalFlow.pending, (state) => {
+        state.isApproving = true;
+        state.actionError = null;
+      })
+      .addCase(approveApprovalFlow.fulfilled, (state) => {
+        state.isApproving = false;
+      })
+      .addCase(approveApprovalFlow.rejected, (state, action) => {
+        state.isApproving = false;
+        state.actionError = action.payload || 'Failed to approve approval';
+      });
+
+    // Reject Approval Flow (Entity Approval using approval_flow_trans_id)
+    builder
+      .addCase(rejectApprovalFlow.pending, (state) => {
+        state.isRejecting = true;
+        state.actionError = null;
+      })
+      .addCase(rejectApprovalFlow.fulfilled, (state) => {
+        state.isRejecting = false;
+      })
+      .addCase(rejectApprovalFlow.rejected, (state, action) => {
+        state.isRejecting = false;
+        state.actionError = action.payload || 'Failed to reject approval';
       });
   }
 });

@@ -31,7 +31,7 @@ import { getComponentTheme } from "../../../utils/theme";
 import { validateTab } from "../validation";
 import { TOAST_TYPES } from "../../../utils/constants";
 import EmptyState from "../../../components/ui/EmptyState";
-import ConsignorApprovalActionBar from "../../../components/approval/ConsignorApprovalActionBar";
+import ApprovalActionBar from "../../../components/approval/ApprovalActionBar";
 
 // Import view tab components
 import GeneralInfoViewTab from "../components/GeneralInfoViewTab";
@@ -533,14 +533,15 @@ const ConsignorDetailsPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Approval Action Bar - Inline in Header */}
-            {currentConsignor.userApprovalStatus && (
+            {/* Approval Action Bar - Only show for records with actual approval flow */}
+            {currentConsignor.userApprovalStatus && 
+             currentConsignor.userApprovalStatus.currentApprovalStatus !== "Not in Approval Flow" && (
               <>
                 {console.log("🎯 ConsignorDetailsPage - Passing userApprovalStatus:", currentConsignor.userApprovalStatus)}
                 {console.log("🎯 ConsignorDetailsPage - Current user from Redux:", user)}
-                <ConsignorApprovalActionBar
+                <ApprovalActionBar
                   userApprovalStatus={currentConsignor.userApprovalStatus}
-                  consignorId={id}
+                  entityId={id}
                   onRefreshData={handleRefreshData}
                 />
               </>

@@ -30,7 +30,7 @@ const WarehouseApprovalActionBar = ({ warehouseId }) => {
   return (
     <ApprovalActionBar
       userApprovalStatus={mappedApprovalStatus}
-      transporterId={warehouseId} // Using same prop name for compatibility
+      entityId={warehouseId}
     />
   );
 };

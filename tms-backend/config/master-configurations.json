@@ -1,0 +1,2193 @@
+{
+  "address-type": {
+    "name": "Address Type",
+    "table": "address_type_master",
+    "primaryKey": "address_type_id",
+    "displayField": "address",
+    "description": "Manage address type configurations",
+    "fields": {
+      "address_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Address Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "AT"
+      },
+      "address": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Address Type",
+        "validation": "required|max:30"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "application": {
+    "name": "Application",
+    "table": "application_master",
+    "primaryKey": "application_id",
+    "displayField": "application_name",
+    "description": "Manage application configurations",
+    "fields": {
+      "application_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Application ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "APP"
+      },
+      "application_name": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "Application Name",
+        "validation": "required|max:100"
+      },
+      "application_description": {
+        "type": "varchar",
+        "maxLength": 255,
+        "required": false,
+        "label": "Description",
+        "validation": "max:255"
+      },
+      "application_url": {
+        "type": "varchar",
+        "maxLength": 255,
+        "required": false,
+        "label": "Application URL",
+        "validation": "url|max:255"
+      },
+      "application_icon": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Application Icon",
+        "validation": "max:50"
+      },
+      "application_category": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Category",
+        "validation": "max:50"
+      },
+      "display_order": {
+        "type": "int",
+        "required": false,
+        "label": "Display Order",
+        "validation": "integer|min:0",
+        "default": 0
+      },
+      "is_active": {
+        "type": "boolean",
+        "required": false,
+        "label": "Is Active",
+        "inputType": "switch",
+        "default": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "approval-type": {
+    "name": "Approval Type",
+    "table": "approval_type_master",
+    "primaryKey": "approval_type_id",
+    "displayField": "approval_type",
+    "description": "Manage approval type configurations",
+    "fields": {
+      "approval_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Approval Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "APT"
+      },
+      "approval_type": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "Approval Type",
+        "validation": "required|max:100"
+      },
+      "approval_name": {
+        "type": "varchar",
+        "maxLength": 200,
+        "required": false,
+        "label": "Approval Name",
+        "validation": "max:200"
+      },
+      "approval_category": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Category",
+        "validation": "max:50"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "document-name": {
+    "name": "Document Name",
+    "table": "document_name_master",
+    "primaryKey": "doc_name_master_id",
+    "displayField": "document_name",
+    "description": "Manage document name configurations",
+    "fields": {
+      "doc_name_master_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Document Name ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "DNM"
+      },
+      "document_name": {
+        "type": "varchar",
+        "maxLength": 200,
+        "required": false,
+        "label": "Document Name",
+        "validation": "max:200"
+      },
+      "user_type": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "User Type",
+        "validation": "max:50"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "document-type": {
+    "name": "Document Type Configuration",
+    "table": "document_type_master",
+    "primaryKey": "document_type_id",
+    "displayField": "document_type",
+    "description": "Manage document type configurations",
+    "fields": {
+      "document_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Document Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "DT"
+      },
+      "doc_name_master_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": false,
+        "label": "Doc Name Master ID",
+        "validation": "max:20"
+      },
+      "user_type": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "User Type",
+        "validation": "max:50"
+      },
+      "service_area_country": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": false,
+        "label": "Service Area - Country",
+        "validation": "max:100"
+      },
+      "is_mandatory": {
+        "type": "boolean",
+        "required": false,
+        "label": "Is Mandatory",
+        "inputType": "switch",
+        "default": false
+      },
+      "is_expiry_required": {
+        "type": "boolean",
+        "required": false,
+        "label": "Is Expiry Required",
+        "inputType": "switch",
+        "default": false
+      },
+      "is_verification_required": {
+        "type": "boolean",
+        "required": false,
+        "label": "Is Verification Required",
+        "inputType": "switch",
+        "default": false
+      },
+      "document_type": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": true,
+        "label": "Document Type",
+        "validation": "required|max:50"
+      },
+      "description": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": false,
+        "label": "Description",
+        "validation": "max:100"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "vehicle-type": {
+    "name": "Vehicle Type",
+    "table": "vehicle_type_master",
+    "primaryKey": "vehicle_type_id",
+    "displayField": "vehicle_type_description",
+    "description": "Manage vehicle type configurations",
+    "fields": {
+      "vehicle_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Vehicle Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "VT"
+      },
+      "vehicle_type_description": {
+        "type": "varchar",
+        "maxLength": 200,
+        "required": false,
+        "label": "Vehicle Type Description",
+        "validation": "max:200"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "warehouse-type": {
+    "name": "Warehouse Type",
+    "table": "warehouse_type_master",
+    "primaryKey": "warehouse_type_id",
+    "displayField": "warehouse_type",
+    "description": "Manage warehouse type configurations",
+    "fields": {
+      "warehouse_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Warehouse Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "WT"
+      },
+      "warehouse_type": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Warehouse Type",
+        "validation": "required|max:30"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "engine-type": {
+    "name": "Engine Type",
+    "table": "engine_type_master",
+    "primaryKey": "engine_type_id",
+    "displayField": "engine_type",
+    "description": "Manage engine type configurations",
+    "fields": {
+      "engine_type_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Engine Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "ET"
+      },
+      "engine_type": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Engine Type",
+        "validation": "required|max:30"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "fuel-type": {
+    "name": "Fuel Type",
+    "table": "fuel_type_master",
+    "primaryKey": "fuel_type_id",
+    "displayField": "fuel_type",
+    "description": "Manage fuel type configurations",
+    "fields": {
+      "fuel_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Fuel Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "FT"
+      },
+      "fuel_type": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Fuel Type",
+        "validation": "required|max:30"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "material-types": {
+    "name": "Material Types",
+    "table": "material_types_master",
+    "primaryKey": "material_types_id",
+    "displayField": "material_types",
+    "description": "Manage material type configurations",
+    "fields": {
+      "material_types_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Material Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "MT"
+      },
+      "material_types": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Material Type",
+        "validation": "required|max:30"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "role": {
+    "name": "Role",
+    "table": "role_master",
+    "primaryKey": "role_id",
+    "displayField": "role",
+    "description": "Manage role configurations",
+    "fields": {
+      "role_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Role ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "RL"
+      },
+      "role": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "Role",
+        "validation": "required|max:100"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "user-type": {
+    "name": "User Type",
+    "table": "user_type_master",
+    "primaryKey": "user_type_id",
+    "displayField": "user_type",
+    "description": "Manage user type configurations",
+    "fields": {
+      "user_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "User Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "UT"
+      },
+      "user_type": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "User Type",
+        "validation": "required|max:30"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "status": {
+    "name": "Status Master",
+    "table": "status_master",
+    "primaryKey": "status_id",
+    "displayField": "status_name",
+    "description": "Manage status configurations",
+    "fields": {
+      "status_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Status ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "ST"
+      },
+      "status_purpose_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status Purpose ID",
+        "validation": "max:10"
+      },
+      "status_name": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "Status Name",
+        "validation": "required|max:100"
+      },
+      "status_description": {
+        "type": "text",
+        "required": false,
+        "label": "Description",
+        "inputType": "textarea"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "isActive": {
+        "type": "boolean",
+        "required": false,
+        "label": "Is Active",
+        "inputType": "switch",
+        "default": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "status-purpose": {
+    "name": "Status Purpose",
+    "table": "status_purpose_master",
+    "primaryKey": "status_purpose_id",
+    "displayField": "status_purpose",
+    "description": "Manage status purpose configurations - purposes for which status will be fetched",
+    "fields": {
+      "status_purpose_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Status Purpose ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "SP"
+      },
+      "status_purpose": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": true,
+        "label": "Status Purpose",
+        "validation": "required|max:50"
+      },
+      "created_at": {
+        "type": "date",
+        "required": false,
+        "label": "Created Date",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "time",
+        "required": false,
+        "label": "Created Time",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "date",
+        "required": false,
+        "label": "Updated Date",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "time",
+        "required": false,
+        "label": "Updated Time",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "item": {
+    "name": "Item",
+    "table": "item_master",
+    "primaryKey": "item_id",
+    "displayField": "item_description",
+    "description": "Manage item configurations",
+    "fields": {
+      "item_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Item ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "IT"
+      },
+      "item_description": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "Item Description",
+        "validation": "required|max:100"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "vmodel": {
+    "name": "Vehicle Model",
+    "table": "vmodel_master",
+    "primaryKey": "vmodel_id",
+    "displayField": "vmodel",
+    "description": "Manage vehicle model configurations",
+    "fields": {
+      "vmodel_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Vehicle Model ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "VM"
+      },
+      "vmodel": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "Vehicle Model",
+        "validation": "required|max:100"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "packaging-type": {
+    "name": "Packaging Type",
+    "table": "packaging_type_master",
+    "primaryKey": "packaging_type_id",
+    "displayField": "package_types",
+    "description": "Manage packaging type configurations",
+    "fields": {
+      "packaging_type_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Packaging Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "PT"
+      },
+      "package_types": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": false,
+        "label": "Package Types",
+        "validation": "max:100"
+      },
+      "description": {
+        "type": "text",
+        "required": false,
+        "label": "Description",
+        "inputType": "textarea"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "payment-term": {
+    "name": "Payment Term",
+    "table": "payment_term_master",
+    "primaryKey": "payment_term_id",
+    "displayField": "description",
+    "description": "Manage payment term configurations",
+    "fields": {
+      "payment_term_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Payment Term ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "PT"
+      },
+      "number_of_days": {
+        "type": "int",
+        "required": false,
+        "label": "Number of Days",
+        "validation": "integer|min:0"
+      },
+      "description": {
+        "type": "text",
+        "required": false,
+        "label": "Description",
+        "inputType": "textarea"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "usage-type": {
+    "name": "Usage Type",
+    "table": "usage_type_master",
+    "primaryKey": "usage_type_id",
+    "displayField": "usage_type",
+    "description": "Manage usage type configurations",
+    "fields": {
+      "usage_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Usage Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "UG"
+      },
+      "usage_type": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Usage Type",
+        "validation": "required|max:30"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "rate-type": {
+    "name": "Rate Type",
+    "table": "rate_type_master",
+    "primaryKey": "rate_type_id",
+    "displayField": "rate_type",
+    "description": "Manage rate type configurations",
+    "fields": {
+      "rate_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Rate Type ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "RT"
+      },
+      "rate_type": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": true,
+        "label": "Rate Type",
+        "validation": "required|max:50"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "trans-mode": {
+    "name": "Transportation Mode",
+    "table": "trans_mode_master",
+    "primaryKey": "trans_mode_id",
+    "displayField": "trans_mode",
+    "description": "Manage transportation mode configurations",
+    "fields": {
+      "trans_mode_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Transportation Mode ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "TM"
+      },
+      "trans_mode": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": true,
+        "label": "Transportation Mode",
+        "validation": "required|max:50"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "consignor-general-config": {
+    "name": "Consignor General Configuration",
+    "table": "consignor_general_config_master",
+    "primaryKey": "g_config_id",
+    "displayField": "parameter_name_key",
+    "description": "Manage consignor general configuration parameters",
+    "fields": {
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Consignor ID",
+        "validation": "required|max:10"
+      },
+      "warehouse_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Warehouse ID",
+        "validation": "max:10"
+      },
+      "parameter_name_key": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "Parameter Name Key",
+        "validation": "required|max:100"
+      },
+      "parameter_value": {
+        "type": "varchar",
+        "maxLength": 500,
+        "required": false,
+        "label": "Parameter Value",
+        "validation": "max:500"
+      },
+      "description": {
+        "type": "text",
+        "required": false,
+        "label": "Description",
+        "inputType": "textarea"
+      },
+      "active": {
+        "type": "boolean",
+        "required": false,
+        "label": "Active",
+        "inputType": "switch",
+        "default": true
+      },
+      "valid_from": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Valid From",
+        "inputType": "datetime"
+      },
+      "valid_to": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Valid To",
+        "inputType": "datetime"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      }
+    }
+  },
+  "material-master": {
+    "name": "Material Master Information",
+    "table": "material_master_information",
+    "primaryKey": "material_master_unique_id",
+    "displayField": "material_master_id",
+    "description": "Manage material master information",
+    "fields": {
+      "material_master_unique_id": {
+        "type": "int",
+        "required": true,
+        "label": "Material Master Unique ID",
+        "validation": "unique",
+        "autoGenerate": true
+      },
+      "material_master_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Material Master ID",
+        "validation": "required|max:20|unique",
+        "autoGenerate": true,
+        "prefix": "MAT"
+      },
+      "material_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": false,
+        "label": "Material ID",
+        "validation": "max:20"
+      },
+      "material_sector": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": false,
+        "label": "Material Sector",
+        "validation": "max:100"
+      },
+      "material_types_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Material Type ID",
+        "validation": "max:10",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "material_types_master",
+          "valueField": "material_types_id",
+          "labelField": "type_name"
+        }
+      },
+      "description": {
+        "type": "text",
+        "required": false,
+        "label": "Description",
+        "inputType": "textarea"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created On",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated On",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      }
+    }
+  },
+  "message-master": {
+    "name": "Message Master",
+    "table": "message_master",
+    "primaryKey": "message_master_unique_id",
+    "displayField": "message_master_id",
+    "description": "Manage message master configurations",
+    "fields": {
+      "message_master_unique_id": {
+        "type": "int",
+        "required": true,
+        "label": "Message Master Unique ID",
+        "validation": "unique",
+        "autoGenerate": true
+      },
+      "message_master_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Message Master ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "MSG"
+      },
+      "message_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Message Type ID",
+        "validation": "max:10"
+      },
+      "application_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": false,
+        "label": "Application ID",
+        "validation": "max:20"
+      },
+      "subject": {
+        "type": "varchar",
+        "maxLength": 255,
+        "required": false,
+        "label": "Subject",
+        "validation": "max:255"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created On",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated On",
+        "autoGenerate": true
+      }
+    }
+  },
+  "currency-master": {
+    "name": "Currency Master",
+    "table": "currency_master",
+    "primaryKey": "currency_id",
+    "displayField": "currency",
+    "description": "Manage currency master configurations",
+    "fields": {
+      "currency_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Currency ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "CUR"
+      },
+      "currency": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Currency Name",
+        "validation": "max:30"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "date",
+        "required": false,
+        "label": "Created Date",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "time",
+        "required": false,
+        "label": "Created Time",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "date",
+        "required": false,
+        "label": "Updated Date",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "time",
+        "required": false,
+        "label": "Updated Time",
+        "autoGenerate": true
+      }
+    }
+  },
+  "general-config": {
+    "name": "General Configuration",
+    "table": "general_config",
+    "primaryKey": "general_config_unique_id",
+    "displayField": "parameter_name",
+    "description": "Manage general configuration parameters",
+    "fields": {
+      "general_config_unique_id": {
+        "type": "int",
+        "required": true,
+        "label": "General Config Unique ID",
+        "validation": "unique",
+        "autoGenerate": true
+      },
+      "general_config_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "General Config ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "GC"
+      },
+      "parameter_name": {
+        "type": "varchar",
+        "maxLength": 200,
+        "required": false,
+        "label": "Parameter Name",
+        "validation": "max:200"
+      },
+      "parameter_value_min": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": false,
+        "label": "Parameter Value Min",
+        "validation": "max:100"
+      },
+      "parameter_value_max": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": false,
+        "label": "Parameter Value Max",
+        "validation": "max:100"
+      },
+      "valid_from": {
+        "type": "date",
+        "required": false,
+        "label": "Valid From",
+        "inputType": "date"
+      },
+      "valid_to": {
+        "type": "date",
+        "required": false,
+        "label": "Valid To",
+        "inputType": "date"
+      },
+      "active_flag": {
+        "type": "tinyint",
+        "required": false,
+        "label": "Active Flag",
+        "inputType": "switch",
+        "default": 1
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created On",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated On",
+        "autoGenerate": true
+      }
+    }
+  },
+  "approval-configuration": {
+    "name": "Approval Configuration",
+    "table": "approval_configuration",
+    "primaryKey": "approval_config_unique_id",
+    "displayField": "approval_config_id",
+    "description": "Manage approval configuration settings",
+    "fields": {
+      "approval_config_unique_id": {
+        "type": "int",
+        "required": true,
+        "label": "Approval Config Unique ID",
+        "validation": "unique",
+        "autoGenerate": true
+      },
+      "approval_config_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Approval Config ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "AC"
+      },
+      "approval_type_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Approval Type",
+        "validation": "required|max:10",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "approval_type_master",
+          "valueField": "approval_type_id",
+          "labelField": "approval_type"
+        }
+      },
+      "approver_level": {
+        "type": "int",
+        "required": true,
+        "label": "Approver Level",
+        "validation": "required|integer|min:1"
+      },
+      "approval_control": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": false,
+        "label": "Approval Control",
+        "validation": "max:100"
+      },
+      "role_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Role",
+        "validation": "required|max:10",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "role_master",
+          "valueField": "role_id",
+          "labelField": "role"
+        }
+      },
+      "user_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": false,
+        "label": "User ID",
+        "validation": "max:20"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "transporter-vehicle-config": {
+    "name": "Transporter Vehicle Config Parameter",
+    "table": "transporter_vehicle_config_param_name",
+    "primaryKey": "tv_config_param_auto_id",
+    "displayField": "tv_config_parameter_name_id",
+    "description": "Manage transporter vehicle configuration parameters",
+    "fields": {
+      "tv_config_param_auto_id": {
+        "type": "int",
+        "required": true,
+        "label": "TV Config Param Auto ID",
+        "validation": "unique",
+        "autoGenerate": true
+      },
+      "tv_config_parameter_name_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "TV Config Parameter Name ID",
+        "validation": "required|max:20|unique",
+        "autoGenerate": true,
+        "prefix": "TVC"
+      },
+      "parameter_name": {
+        "type": "varchar",
+        "maxLength": 200,
+        "required": true,
+        "label": "Parameter Name",
+        "validation": "required|max:200"
+      },
+      "is_minimum_required": {
+        "type": "tinyint",
+        "required": false,
+        "label": "Is Minimum Required",
+        "inputType": "switch",
+        "default": 0
+      },
+      "is_maximum_required": {
+        "type": "tinyint",
+        "required": false,
+        "label": "Is Maximum Required",
+        "inputType": "switch",
+        "default": 0
+      },
+      "tv_config_parameter_name_id_ref": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": false,
+        "label": "TV Config Parameter Name ID Ref",
+        "validation": "max:20"
+      },
+      "parameter_value_min": {
+        "type": "decimal",
+        "required": false,
+        "label": "Parameter Value Min",
+        "validation": "numeric"
+      },
+      "parameter_value_max": {
+        "type": "decimal",
+        "required": false,
+        "label": "Parameter Value Max",
+        "validation": "numeric"
+      },
+      "valid_from": {
+        "type": "date",
+        "required": false,
+        "label": "Valid From",
+        "inputType": "date"
+      },
+      "valid_to": {
+        "type": "date",
+        "required": false,
+        "label": "Valid To",
+        "inputType": "date"
+      },
+      "active_flag": {
+        "type": "tinyint",
+        "required": false,
+        "label": "Active Flag",
+        "inputType": "switch",
+        "default": 1
+      },
+      "is_alert_required": {
+        "type": "tinyint",
+        "required": false,
+        "label": "Is Alert Required",
+        "inputType": "switch",
+        "default": 0
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created On",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated On",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      }
+    }
+  },
+  "consignor-general-parameter": {
+    "name": "Consignor General Config Parameter Name",
+    "table": "consignor_general_config_parameter_name",
+    "primaryKey": "parameter_name_key",
+    "displayField": "parameter_name_description",
+    "description": "Manage consignor general configuration parameter names",
+    "fields": {
+      "parameter_name_key": {
+        "type": "int",
+        "required": true,
+        "label": "Parameter Name Key",
+        "validation": "unique",
+        "autoGenerate": true
+      },
+      "parameter_name_description": {
+        "type": "varchar",
+        "maxLength": 200,
+        "required": true,
+        "label": "Parameter Name Description",
+        "validation": "required|max:200"
+      },
+      "parameter_name_key_code": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "Parameter Name Key Code",
+        "validation": "required|max:100"
+      },
+      "probable_values": {
+        "type": "text",
+        "required": false,
+        "label": "Probable Values",
+        "inputType": "textarea"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created On",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated On",
+        "autoGenerate": true
+      }
+    }
+  },
+  "vehicle-imei-mapping": {
+    "name": "Vehicle IMEI Mapping",
+    "table": "vehicle_imei_mapping",
+    "primaryKey": "vehicle_imei_mapping_id",
+    "displayField": "imei_number",
+    "description": "Manage vehicle IMEI mapping configurations",
+    "fields": {
+      "vehicle_imei_mapping_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": true,
+        "label": "Vehicle IMEI Mapping ID",
+        "validation": "unique",
+        "autoGenerate": true,
+        "prefix": "VIM"
+      },
+      "vehicle_id": {
+        "type": "varchar",
+        "maxLength": 20,
+        "required": false,
+        "label": "Vehicle ID",
+        "validation": "max:20"
+      },
+      "imei_number": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "IMEI Number",
+        "validation": "max:50"
+      },
+      "unit_id": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Unit ID",
+        "validation": "max:50"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 50,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "milestone": {
+    "name": "Milestone Master",
+    "table": "milestone_master",
+    "primaryKey": "milestone_id",
+    "displayField": "description",
+    "description": "Manage milestone configurations for shipment tracking",
+    "fields": {
+      "milestone_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Milestone ID",
+        "validation": "unique|max:10",
+        "autoGenerate": true,
+        "prefix": "MS"
+      },
+      "description": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Description",
+        "validation": "required|max:30"
+      },
+      "country_id": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Country ID",
+        "validation": "required|max:30"
+      },
+      "document_required": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Document Required",
+        "validation": "required|max:30",
+        "inputType": "select",
+        "options": ["YES", "NO", "OPTIONAL"]
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Created On",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "datetime",
+        "required": false,
+        "label": "Updated On",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      }
+    }
+  },
+  "sla-master": {
+    "name": "SLA Master",
+    "table": "sla_master",
+    "primaryKey": "sla_master_id",
+    "displayField": "sla_type",
+    "description": "Manage service level agreement configurations",
+    "fields": {
+      "sla_master_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Master ID",
+        "validation": "unique|max:10",
+        "autoGenerate": true,
+        "prefix": "SLA"
+      },
+      "sla_type": {
+        "type": "varchar",
+        "maxLength": 100,
+        "required": true,
+        "label": "SLA Type",
+        "validation": "required|max:100"
+      },
+      "sla_description": {
+        "type": "varchar",
+        "maxLength": 255,
+        "required": false,
+        "label": "SLA Description",
+        "validation": "max:255"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "options": ["ACTIVE", "INACTIVE"],
+        "default": "ACTIVE"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "sla-area-mapping": {
+    "name": "SLA Area Mapping",
+    "table": "sla_area_mapping",
+    "primaryKey": "sla_mapping_id",
+    "displayField": "sla_mapping_id",
+    "description": "Manage SLA to area mapping configurations",
+    "fields": {
+      "sla_mapping_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Mapping ID",
+        "validation": "unique|max:10",
+        "autoGenerate": true,
+        "prefix": "SAM"
+      },
+      "sla_area_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Area ID",
+        "validation": "required|max:10"
+      },
+      "sla_master_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Master ID",
+        "validation": "required|max:10",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "sla_master",
+          "valueField": "sla_master_id",
+          "labelField": "sla_type"
+        }
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "sla-measurement-method-mapping": {
+    "name": "SLA Measurement Method Mapping",
+    "table": "sla_measurement_method_mapping",
+    "primaryKey": "sm_mapping_id",
+    "displayField": "sm_mapping_id",
+    "description": "Manage SLA measurement method mapping configurations",
+    "fields": {
+      "sm_mapping_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SM Mapping ID",
+        "validation": "unique|max:10",
+        "autoGenerate": true,
+        "prefix": "SMM"
+      },
+      "sla_master_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "SLA Master ID",
+        "validation": "required|max:10",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "sla_master",
+          "valueField": "sla_master_id",
+          "labelField": "sla_type"
+        }
+      },
+      "measurement_method_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Measurement Method ID",
+        "validation": "required|max:10"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      }
+    }
+  },
+  "material-state-config": {
+    "name": "Material State Configuration",
+    "table": "consignor_material_state_config",
+    "primaryKey": "material_state_config_id",
+    "displayField": "material_state_config_id",
+    "description": "Manage material state configuration for consignors",
+    "fields": {
+      "material_state_config_id": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Material State Config ID",
+        "validation": "unique|max:10",
+        "autoGenerate": true,
+        "prefix": "MSC"
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Consignor ID",
+        "validation": "required|max:30",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "consignor_master",
+          "valueField": "consignor_id",
+          "labelField": "business_name"
+        }
+      },
+      "material_state_id": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Material State ID",
+        "validation": "required|max:30",
+        "inputType": "select",
+        "foreignKey": {
+          "table": "material_state_master",
+          "valueField": "material_state_id",
+          "labelField": "material_state"
+        }
+      },
+      "is_active": {
+        "type": "varchar",
+        "maxLength": 30,
+        "required": true,
+        "label": "Is Active",
+        "validation": "required|max:30",
+        "inputType": "select",
+        "options": [
+          {"value": "Y", "label": "Yes"},
+          {"value": "N", "label": "No"}
+        ],
+        "defaultValue": "Y"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Status",
+        "validation": "max:10",
+        "inputType": "select",
+        "options": [
+          {"value": "ACTIVE", "label": "Active"},
+          {"value": "INACTIVE", "label": "Inactive"}
+        ]
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": true,
+        "label": "Created By",
+        "autoGenerate": true
+      },
+      "created_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Created At",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "time",
+        "required": false,
+        "label": "Created On",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": 10,
+        "required": false,
+        "label": "Updated By",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "required": false,
+        "label": "Updated At",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "time",
+        "required": false,
+        "label": "Updated On",
+        "autoGenerate": true
+      }
+    }
+  }
+}

@@ -8,8 +8,18 @@ const ProtectedRoute = ({ children, roles = [] }) => {
   );
   const location = useLocation();
 
+  console.log("🔒 ProtectedRoute - Auth Check:", {
+    isAuthenticated,
+    isLoading,
+    role,
+    requiredRoles: roles,
+    currentPath: location.pathname,
+    timestamp: new Date().toISOString()
+  });
+
   // Show loading while verifying token
   if (isLoading) {
+    console.log("⏳ ProtectedRoute - Showing loading state");
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -21,15 +31,22 @@ const ProtectedRoute = ({ children, roles = [] }) => {
   }
 
   if (!isAuthenticated) {
+    console.log("❌ ProtectedRoute - Not authenticated, redirecting to login");
     // Redirect to login page with return url
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (roles.length > 0 && !roles.includes(role)) {
+    console.log("🚫 ProtectedRoute - Role check failed:", {
+      userRole: role,
+      requiredRoles: roles,
+      hasRequiredRole: roles.includes(role)
+    });
     // User doesn't have the required role
     return <Navigate to="/unauthorized" replace />;
   }
 
+  console.log("✅ ProtectedRoute - Authentication and authorization passed, rendering children");
   return children;
 };
 

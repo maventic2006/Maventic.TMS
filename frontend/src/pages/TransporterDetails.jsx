@@ -8,6 +8,7 @@ import GeneralInfoTab from '../components/transporter/details/GeneralInfoTab';
 import AddressContactsTab from '../components/transporter/details/AddressContactsTab';
 import ServiceAreaTab from '../components/transporter/details/ServiceAreaTab';
 import DocumentsTab from '../components/transporter/details/DocumentsTab';
+import ApprovalActionBar from '../components/approval/ApprovalActionBar';
 import { transporterAPI } from '../utils/api';
 
 const TransporterDetails = () => {
@@ -211,6 +212,17 @@ const TransporterDetails = () => {
                 <p className="text-sm text-text-secondary">ID: {id}</p>
               </div>
             </div>
+
+            {/* Approval Action Bar */}
+            <div className="flex items-center gap-2">
+              {transporter?.userApprovalStatus && (
+                <ApprovalActionBar
+                  userApprovalStatus={transporter.userApprovalStatus}
+                  entityId={id}
+                  onRefreshData={handleRefreshData}
+                />
+              )}
+            </div>
           </div>
 
           {/* Business Info Card */}
@@ -274,7 +286,7 @@ const TransporterDetails = () => {
           {ActiveTabComponent && (
             <ActiveTabComponent 
               transporter={transporter} 
-              transporterId={id}
+              entityId={id}
               onUpdate={(updatedData) => setTransporter(prev => ({ ...prev, ...updatedData }))}
             />
           )}
