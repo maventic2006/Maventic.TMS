@@ -81,6 +81,10 @@ const initialState = {
   },
   loading: false,
   isCreating: false,
+  isSavingDraft: false,
+  isUpdatingDraft: false,
+  isSubmittingDraft: false,
+  isDeletingDraft: false,
   error: null,
   pagination: {
     page: 1,
@@ -384,6 +388,153 @@ export const downloadWarehouseBulkErrorReport = createAsyncThunk(
   }
 );
 
+/**
+ * Save warehouse as draft
+ * Creates a new draft record with minimal validation (warehouse_name + consignor_id only)
+ */
+export const saveWarehouseAsDraft = createAsyncThunk(
+  "warehouse/saveAsDraft",
+  async (warehouseData, { rejectWithValue }) => {
+    try {
+      console.log("🏭 Saving warehouse as draft:", warehouseData);
+
+      const response = await api.post("/warehouse/save-draft", warehouseData);
+
+      console.log("✅ Warehouse draft saved successfully:", response.data);
+
+      return {
+        success: response.data.success,
+        warehouseId: response.data.data?.warehouseId,
+        status: response.data.data?.status,
+        message:
+          response.data.message || "Warehouse saved as draft successfully",
+      };
+    } catch (error) {
+      console.error("❌ Error saving warehouse draft:", error);
+      return rejectWithValue({
+        code: error.response?.data?.error?.code || "DRAFT_SAVE_ERROR",
+        message:
+          error.response?.data?.error?.message ||
+          "Failed to save warehouse as draft",
+        errors: error.response?.data?.errors || [],
+      });
+    }
+  }
+);
+
+/**
+ * Update existing warehouse draft
+ * No validation, only allows updating drafts created by current user
+ */
+export const updateWarehouseDraft = createAsyncThunk(
+  "warehouse/updateDraft",
+  async ({ warehouseId, warehouseData }, { rejectWithValue }) => {
+    try {
+      console.log("🏭 Updating warehouse draft:", warehouseId, warehouseData);
+
+      const response = await api.put(
+        `/warehouse/${warehouseId}/update-draft`,
+        warehouseData
+      );
+
+      console.log("✅ Warehouse draft updated successfully:", response.data);
+
+      return {
+        success: response.data.success,
+        warehouseId: response.data.data?.warehouseId,
+        status: response.data.data?.status,
+        message:
+          response.data.message || "Warehouse draft updated successfully",
+      };
+    } catch (error) {
+      console.error("❌ Error updating warehouse draft:", error);
+      return rejectWithValue({
+        code: error.response?.data?.error?.code || "DRAFT_UPDATE_ERROR",
+        message:
+          error.response?.data?.error?.message ||
+          "Failed to update warehouse draft",
+        errors: error.response?.data?.errors || [],
+      });
+    }
+  }
+);
+
+/**
+ * Submit warehouse from draft to PENDING status
+ * Performs full validation and changes status from DRAFT to PENDING
+ */
+export const submitWarehouseFromDraft = createAsyncThunk(
+  "warehouse/submitFromDraft",
+  async ({ warehouseId, warehouseData }, { rejectWithValue }) => {
+    try {
+      console.log(
+        "🏭 Submitting warehouse draft for approval:",
+        warehouseId,
+        warehouseData
+      );
+
+      const response = await api.put(
+        `/warehouse/${warehouseId}/submit-draft`,
+        warehouseData
+      );
+
+      console.log("✅ Warehouse draft submitted successfully:", response.data);
+
+      return {
+        success: response.data.success,
+        warehouseId: response.data.data?.warehouseId,
+        status: response.data.data?.status,
+        message:
+          response.data.message ||
+          "Warehouse submitted for approval successfully",
+      };
+    } catch (error) {
+      console.error("❌ Error submitting warehouse draft:", error);
+      return rejectWithValue({
+        code: error.response?.data?.error?.code || "DRAFT_SUBMIT_ERROR",
+        message:
+          error.response?.data?.error?.message ||
+          "Failed to submit warehouse draft",
+        field: error.response?.data?.error?.field || null,
+        expectedFormat: error.response?.data?.error?.expectedFormat || null,
+        errors: error.response?.data?.errors || [],
+      });
+    }
+  }
+);
+
+/**
+ * Delete warehouse draft
+ * Hard delete - only allows deleting drafts created by current user
+ */
+export const deleteWarehouseDraft = createAsyncThunk(
+  "warehouse/deleteDraft",
+  async (warehouseId, { rejectWithValue }) => {
+    try {
+      console.log("🏭 Deleting warehouse draft:", warehouseId);
+
+      await api.delete(`/warehouse/${warehouseId}/delete-draft`);
+
+      console.log("✅ Warehouse draft deleted successfully");
+
+      return {
+        success: true,
+        warehouseId,
+        message: "Warehouse draft deleted successfully",
+      };
+    } catch (error) {
+      console.error("❌ Error deleting warehouse draft:", error);
+      return rejectWithValue({
+        code: error.response?.data?.error?.code || "DRAFT_DELETE_ERROR",
+        message:
+          error.response?.data?.error?.message ||
+          "Failed to delete warehouse draft",
+        errors: error.response?.data?.errors || [],
+      });
+    }
+  }
+);
+
 // Warehouse slice
 const warehouseSlice = createSlice({
   name: "warehouse",
@@ -480,7 +631,10 @@ const warehouseSlice = createSlice({
       })
       .addCase(createWarehouse.rejected, (state, action) => {
         state.isCreating = false;
-        state.error = action.payload;
+        // ✅ Don't set error state for validation errors (they'll be shown as toast)
+        if (action.payload?.code !== "VALIDATION_ERROR") {
+          state.error = action.payload;
+        }
       })
 
       // Update warehouse
@@ -510,7 +664,10 @@ const warehouseSlice = createSlice({
       })
       .addCase(updateWarehouse.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        // ✅ Don't set error state for validation errors (they'll be shown as toast)
+        if (action.payload?.code !== "VALIDATION_ERROR") {
+          state.error = action.payload;
+        }
       })
 
       // Fetch master data
@@ -561,6 +718,75 @@ const warehouseSlice = createSlice({
       .addCase(fetchWarehouseBulkHistory.fulfilled, (state, action) => {
         state.bulkUpload.batches = action.payload.batches;
         state.bulkUpload.pagination = action.payload.pagination;
+      })
+
+      // Save warehouse as draft
+      .addCase(saveWarehouseAsDraft.pending, (state) => {
+        state.isSavingDraft = true;
+        state.error = null;
+      })
+      .addCase(saveWarehouseAsDraft.fulfilled, (state, action) => {
+        state.isSavingDraft = false;
+        state.lastCreatedWarehouse = action.payload;
+      })
+      .addCase(saveWarehouseAsDraft.rejected, (state, action) => {
+        state.isSavingDraft = false;
+        // ✅ Don't set error state for validation errors (they'll be shown as toast)
+        if (action.payload?.code !== "VALIDATION_ERROR") {
+          state.error = action.payload;
+        }
+      })
+
+      // Update warehouse draft
+      .addCase(updateWarehouseDraft.pending, (state) => {
+        state.isUpdatingDraft = true;
+        state.error = null;
+      })
+      .addCase(updateWarehouseDraft.fulfilled, (state, action) => {
+        state.isUpdatingDraft = false;
+        state.lastCreatedWarehouse = action.payload;
+      })
+      .addCase(updateWarehouseDraft.rejected, (state, action) => {
+        state.isUpdatingDraft = false;
+        // ✅ Don't set error state for validation errors (they'll be shown as toast)
+        if (action.payload?.code !== "VALIDATION_ERROR") {
+          state.error = action.payload;
+        }
+      })
+
+      // Submit warehouse draft
+      .addCase(submitWarehouseFromDraft.pending, (state) => {
+        state.isSubmittingDraft = true;
+        state.error = null;
+      })
+      .addCase(submitWarehouseFromDraft.fulfilled, (state, action) => {
+        state.isSubmittingDraft = false;
+        state.lastCreatedWarehouse = action.payload;
+      })
+      .addCase(submitWarehouseFromDraft.rejected, (state, action) => {
+        state.isSubmittingDraft = false;
+        // ✅ Don't set error state for validation errors (they'll be shown as toast)
+        // Only set error state for critical errors (server errors, network errors, etc.)
+        if (action.payload?.code !== "VALIDATION_ERROR") {
+          state.error = action.payload;
+        }
+      })
+
+      // Delete warehouse draft
+      .addCase(deleteWarehouseDraft.pending, (state) => {
+        state.isDeletingDraft = true;
+        state.error = null;
+      })
+      .addCase(deleteWarehouseDraft.fulfilled, (state, action) => {
+        state.isDeletingDraft = false;
+        // Remove draft from warehouses list if present
+        state.warehouses = state.warehouses.filter(
+          (w) => w.warehouse_id !== action.payload.warehouseId
+        );
+      })
+      .addCase(deleteWarehouseDraft.rejected, (state, action) => {
+        state.isDeletingDraft = false;
+        state.error = action.payload;
       });
   },
 });

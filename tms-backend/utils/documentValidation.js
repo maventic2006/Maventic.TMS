@@ -60,10 +60,10 @@ const documentValidationPatterns = {
       "State Code (2 letters) + RTO Code (2 digits) + Issue Year (4 digits) + Unique Number (7 digits)",
   },
   "Driver License": {
-    regex: /^[A-Z]{2}[0-9]{2}[0-9]{11}$/,
-    format: "DL0120230012345",
+    regex: /^[A-Z]{2}[0-9]{2}[A-Z]?[0-9]{4}[0-9]{7,8}$/,
+    format: "MP04N20250473076",
     description:
-      "State Code (2 letters) + RTO Code (2 digits) + Issue Year (4 digits) + Unique Number (7 digits)",
+      "State Code (2 letters) + RTO Code (2 digits) + Optional Letter + Issue Year (4 digits) + Unique Number (7-8 digits)",
   },
 };
 

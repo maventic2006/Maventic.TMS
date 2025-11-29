@@ -7,7 +7,11 @@ import TopActionBar from "../components/transporter/TopActionBar";
 import TransporterFilterPanel from "../components/transporter/TransporterFilterPanel";
 import TransporterListTable from "../components/transporter/TransporterListTable";
 import PaginationBar from "../components/transporter/PaginationBar";
-import { fetchTransporters } from "../redux/slices/transporterSlice";
+import {
+  fetchTransporters,
+  deleteTransporterDraft,
+} from "../redux/slices/transporterSlice";
+import { addToast, TOAST_TYPES } from "../redux/slices/uiSlice";
 
 // Fuzzy search utility function
 const fuzzySearch = (searchText, transporters) => {
@@ -63,6 +67,8 @@ const TransporterMaintenance = () => {
     tinPan: "",
     vatGst: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
     transportMode: [],
   });
 
@@ -72,6 +78,8 @@ const TransporterMaintenance = () => {
     tinPan: "",
     vatGst: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
     transportMode: [],
   });
 
@@ -101,6 +109,12 @@ const TransporterMaintenance = () => {
       }
       if (appliedFilters.transportMode.length > 0) {
         params.transportMode = appliedFilters.transportMode.join(",");
+      }
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
       }
 
       dispatch(fetchTransporters(params));
@@ -134,6 +148,8 @@ const TransporterMaintenance = () => {
       tinPan: "",
       vatGst: "",
       status: "",
+      createdOnStart: "",
+      createdOnEnd: "",
       transportMode: [],
     };
     setFilters(emptyFilters);
@@ -196,10 +212,54 @@ const TransporterMaintenance = () => {
       if (appliedFilters.transportMode.length > 0) {
         params.transportMode = appliedFilters.transportMode.join(",");
       }
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
+      }
 
       dispatch(fetchTransporters(params));
     },
     [dispatch, pagination.limit, appliedFilters]
+  );
+
+  const handleDeleteDraft = useCallback(
+    async (transporterId) => {
+      if (
+        window.confirm(
+          "Are you sure you want to delete this draft? This action cannot be undone."
+        )
+      ) {
+        try {
+          await dispatch(deleteTransporterDraft(transporterId)).unwrap();
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.SUCCESS,
+              message: "Draft deleted successfully",
+              duration: 3000,
+            })
+          );
+          // Refresh the list
+          dispatch(
+            fetchTransporters({
+              page: pagination.page,
+              limit: pagination.limit || 25,
+            })
+          );
+        } catch (error) {
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.ERROR,
+              message: "Failed to delete draft",
+              details: [error.message || "An error occurred"],
+              duration: 5000,
+            })
+          );
+        }
+      }
+    },
+    [dispatch, pagination.page, pagination.limit]
   );
 
   const handleToggleFilters = useCallback(() => {
@@ -212,49 +272,52 @@ const TransporterMaintenance = () => {
       <div className="px-4 py-1 lg:px-6 lg:py-1">
         <div className="max-w-7xl mx-auto space-y-0">
           <TopActionBar
-          onCreateNew={handleCreateNew}
-          onLogout={handleLogout}
-          onBack={handleBack}
-          totalCount={pagination.total || 0}
-          showFilters={showFilters}
-          onToggleFilters={handleToggleFilters}
-          searchText={searchText}
-          onSearchChange={handleSearchChange}
-        />
+            onCreateNew={handleCreateNew}
+            onLogout={handleLogout}
+            onBack={handleBack}
+            totalCount={pagination.total || 0}
+            showFilters={showFilters}
+            onToggleFilters={handleToggleFilters}
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
+          />
 
-        <TransporterFilterPanel
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onApplyFilters={handleApplyFilters}
-          onClearFilters={handleClearFilters}
-          showFilters={showFilters}
-        />
+          <TransporterFilterPanel
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onApplyFilters={handleApplyFilters}
+            onClearFilters={handleClearFilters}
+            showFilters={showFilters}
+          />
 
-        <TransporterListTable
-          transporters={filteredTransporters}
-          loading={isFetching}
-          onTransporterClick={handleTransporterClick}
-          currentPage={pagination.page}
-          totalPages={pagination.pages}
-          totalItems={pagination.total}
-          itemsPerPage={pagination.limit}
-          onPageChange={handlePageChange}
-          filteredCount={filteredTransporters.length}
-          searchText={searchText}
-          onSearchChange={handleSearchChange}
-        />
+          <TransporterListTable
+            transporters={filteredTransporters}
+            loading={isFetching}
+            onTransporterClick={handleTransporterClick}
+            onDeleteDraft={handleDeleteDraft}
+            currentPage={pagination.page}
+            totalPages={pagination.pages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={handlePageChange}
+            filteredCount={filteredTransporters.length}
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
+          />
 
-        {error && (
-          <div
-            className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]"
-            style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
-          >
-            <p className="font-semibold text-sm">Error loading transporters:</p>
-            <p className="text-sm mt-1">
-              {error.message || "Something went wrong"}
-            </p>
-          </div>
-        )}
+          {error && (
+            <div
+              className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]"
+              style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+            >
+              <p className="font-semibold text-sm">
+                Error loading transporters:
+              </p>
+              <p className="text-sm mt-1">
+                {error.message || "Something went wrong"}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -84,6 +84,8 @@ const DriverMaintenance = () => {
     gender: "",
     bloodGroup: "",
     avgRating: "",
+    createdOnStart: "",
+    createdOnEnd: "",
   });
 
   const [appliedFilters, setAppliedFilters] = useState({
@@ -99,6 +101,8 @@ const DriverMaintenance = () => {
     gender: "",
     bloodGroup: "",
     avgRating: "",
+    createdOnStart: "",
+    createdOnEnd: "",
   });
 
   // Fetch drivers when component mounts or when appliedFilters change
@@ -126,6 +130,10 @@ const DriverMaintenance = () => {
       if (appliedFilters.bloodGroup)
         params.bloodGroup = appliedFilters.bloodGroup;
       if (appliedFilters.avgRating) params.avgRating = appliedFilters.avgRating;
+      if (appliedFilters.createdOnStart)
+        params.createdOnStart = appliedFilters.createdOnStart;
+      if (appliedFilters.createdOnEnd)
+        params.createdOnEnd = appliedFilters.createdOnEnd;
 
       dispatch(fetchDrivers(params));
     };
@@ -163,6 +171,8 @@ const DriverMaintenance = () => {
       gender: "",
       bloodGroup: "",
       avgRating: "",
+      createdOnStart: "",
+      createdOnEnd: "",
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
@@ -216,6 +226,10 @@ const DriverMaintenance = () => {
       if (appliedFilters.bloodGroup)
         params.bloodGroup = appliedFilters.bloodGroup;
       if (appliedFilters.avgRating) params.avgRating = appliedFilters.avgRating;
+      if (appliedFilters.createdOnStart)
+        params.createdOnStart = appliedFilters.createdOnStart;
+      if (appliedFilters.createdOnEnd)
+        params.createdOnEnd = appliedFilters.createdOnEnd;
 
       dispatch(fetchDrivers(params));
     },
@@ -232,46 +246,46 @@ const DriverMaintenance = () => {
       <div className="px-4 py-1 lg:px-6 lg:py-1">
         <div className="max-w-7xl mx-auto space-y-0">
           <DriverTopActionBar
-          onCreateNew={handleCreateNew}
-          onBack={handleBack}
-          totalCount={pagination.total || 0}
-          showFilters={showFilters}
-          onToggleFilters={handleToggleFilters}
-        />
+            onCreateNew={handleCreateNew}
+            onBack={handleBack}
+            totalCount={pagination.total || 0}
+            showFilters={showFilters}
+            onToggleFilters={handleToggleFilters}
+          />
 
-        <DriverFilterPanel
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onApplyFilters={handleApplyFilters}
-          onClearFilters={handleClearFilters}
-          showFilters={showFilters}
-        />
+          <DriverFilterPanel
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onApplyFilters={handleApplyFilters}
+            onClearFilters={handleClearFilters}
+            showFilters={showFilters}
+          />
 
-        <DriverListTable
-          drivers={filteredDrivers}
-          loading={isFetching}
-          onDriverClick={handleDriverClick}
-          currentPage={pagination.page}
-          totalPages={pagination.pages}
-          totalItems={pagination.total}
-          itemsPerPage={pagination.limit}
-          onPageChange={handlePageChange}
-          filteredCount={filteredDrivers.length}
-          searchText={searchText}
-          onSearchChange={handleSearchChange}
-        />
+          <DriverListTable
+            drivers={filteredDrivers}
+            loading={isFetching}
+            onDriverClick={handleDriverClick}
+            currentPage={pagination.page}
+            totalPages={pagination.pages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={handlePageChange}
+            filteredCount={filteredDrivers.length}
+            searchText={searchText}
+            onSearchChange={handleSearchChange}
+          />
 
-        {error && (
-          <div
-            className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]"
-            style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
-          >
-            <p className="font-semibold text-sm">Error loading drivers:</p>
-            <p className="text-sm mt-1">
-              {error.message || "Something went wrong"}
-            </p>
-          </div>
-        )}
+          {error && (
+            <div
+              className="bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-6 text-[#EF4444]"
+              style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+            >
+              <p className="font-semibold text-sm">Error loading drivers:</p>
+              <p className="text-sm mt-1">
+                {error.message || "Something went wrong"}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

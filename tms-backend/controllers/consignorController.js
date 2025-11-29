@@ -4,15 +4,15 @@
  * Delegates business logic to consignorService
  */
 
-const consignorService = require('../services/consignorService');
+const consignorService = require("../services/consignorService");
 const {
   successResponse,
   validationErrorResponse,
   databaseErrorResponse,
   notFoundResponse,
   internalServerErrorResponse,
-  getPaginationMeta
-} = require('../utils/responseHelper');
+  getPaginationMeta,
+} = require("../utils/responseHelper");
 
 /**
  * GET /api/consignors
@@ -20,17 +20,17 @@ const {
  */
 const getConsignors = async (req, res) => {
   try {
-    console.log('\n📋 ===== GET CONSIGNORS LIST =====');
-    console.log('Query params:', req.query);
+    console.log("\n📋 ===== GET CONSIGNORS LIST =====");
+    console.log("Query params:", req.query);
 
     const result = await consignorService.getConsignorList(req.query);
 
     console.log(`✅ Retrieved ${result.data.length} consignors`);
     return successResponse(res, result.data, result.meta, 200);
   } catch (error) {
-    console.error('❌ Get consignors error:', error);
+    console.error("❌ Get consignors error:", error);
 
-    if (error.type === 'VALIDATION_ERROR') {
+    if (error.type === "VALIDATION_ERROR") {
       return validationErrorResponse(res, { details: error.details });
     }
 
@@ -49,13 +49,13 @@ const getConsignorById = async (req, res) => {
 
     const consignor = await consignorService.getConsignorById(id);
 
-    console.log('✅ Consignor retrieved successfully');
+    console.log("✅ Consignor retrieved successfully");
     return successResponse(res, consignor, null, 200);
   } catch (error) {
-    console.error('❌ Get consignor by ID error:', error);
+    console.error("❌ Get consignor by ID error:", error);
 
-    if (error.type === 'NOT_FOUND') {
-      return notFoundResponse(res, 'Consignor', req.params.id);
+    if (error.type === "NOT_FOUND") {
+      return notFoundResponse(res, "Consignor", req.params.id);
     }
 
     return internalServerErrorResponse(res, error);
@@ -68,35 +68,35 @@ const getConsignorById = async (req, res) => {
  */
 const createConsignor = async (req, res) => {
   try {
-    console.log('\n➕ ===== CREATE CONSIGNOR =====');
-    console.log('User ID:', req.user.user_id);
+    console.log("\n➕ ===== CREATE CONSIGNOR =====");
+    console.log("User ID:", req.user.user_id);
 
     // Parse JSON payload from body field (for multipart/form-data)
     let payload = req.body;
-    if (req.body.payload && typeof req.body.payload === 'string') {
+    if (req.body.payload && typeof req.body.payload === "string") {
       try {
         payload = JSON.parse(req.body.payload);
       } catch (parseError) {
-        console.error('JSON parse error:', parseError);
+        console.error("JSON parse error:", parseError);
         return validationErrorResponse(res, {
           details: [
             {
-              field: 'payload',
-              message: 'Invalid JSON format in payload field'
-            }
-          ]
+              field: "payload",
+              message: "Invalid JSON format in payload field",
+            },
+          ],
         });
       }
     }
 
-    console.log('Payload:', JSON.stringify(payload, null, 2));
-    
+    console.log("Payload:", JSON.stringify(payload, null, 2));
+
     // 🔍 DETAILED FILE DEBUG LOGGING
-    console.log('\n🔍 ===== FILE DEBUG INFO =====');
-    console.log('req.files type:', typeof req.files);
-    console.log('req.files is array?', Array.isArray(req.files));
-    console.log('req.files exists?', !!req.files);
-    
+    console.log("\n🔍 ===== FILE DEBUG INFO =====");
+    console.log("req.files type:", typeof req.files);
+    console.log("req.files is array?", Array.isArray(req.files));
+    console.log("req.files exists?", !!req.files);
+
     if (req.files) {
       if (Array.isArray(req.files)) {
         console.log(`📎 Total files received: ${req.files.length}`);
@@ -109,20 +109,20 @@ const createConsignor = async (req, res) => {
           console.log(`    - buffer exists: ${!!file.buffer}`);
         });
       } else {
-        console.log('req.files keys:', Object.keys(req.files));
+        console.log("req.files keys:", Object.keys(req.files));
       }
     } else {
-      console.log('❌ No files received!');
+      console.log("❌ No files received!");
     }
-    console.log('===========================\n');
+    console.log("===========================\n");
 
     // Convert array to object keyed by fieldname for easier access
     const filesObj = {};
     if (req.files && Array.isArray(req.files)) {
-      req.files.forEach(file => {
+      req.files.forEach((file) => {
         filesObj[file.fieldname] = file;
       });
-      console.log('📦 Files object created with keys:', Object.keys(filesObj));
+      console.log("📦 Files object created with keys:", Object.keys(filesObj));
     }
 
     const consignor = await consignorService.createConsignor(
@@ -131,12 +131,12 @@ const createConsignor = async (req, res) => {
       req.user.user_id
     );
 
-    console.log('✅ Consignor created successfully');
-    
+    console.log("✅ Consignor created successfully");
+
     // Extract approval info if present
     if (consignor.approvalInfo) {
       const { approvalInfo, ...consignorData } = consignor;
-      
+
       return res.status(201).json({
         success: true,
         data: {
@@ -144,20 +144,21 @@ const createConsignor = async (req, res) => {
           userId: approvalInfo.userId,
           userEmail: approvalInfo.userEmail,
           initialPassword: approvalInfo.initialPassword,
-          message: "Consignor created successfully. Consignor Admin user created and pending approval.",
+          message:
+            "Consignor created successfully. Consignor Admin user created and pending approval.",
           approvalStatus: approvalInfo.approvalStatus,
           pendingWith: approvalInfo.pendingWith,
         },
         timestamp: new Date().toISOString(),
       });
     }
-    
+
     // Fallback for backward compatibility (if no approval info)
     return successResponse(res, consignor, null, 201);
   } catch (error) {
-    console.error('❌ Create consignor error:', error);
+    console.error("❌ Create consignor error:", error);
 
-    if (error.type === 'VALIDATION_ERROR') {
+    if (error.type === "VALIDATION_ERROR") {
       return validationErrorResponse(res, { details: error.details });
     }
 
@@ -177,28 +178,28 @@ const updateConsignor = async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`\n✏️  ===== UPDATE CONSIGNOR: ${id} =====`);
-    console.log('User ID:', req.user.user_id);
+    console.log("User ID:", req.user.user_id);
 
     // Parse JSON payload from body field (for multipart/form-data)
     let payload = req.body;
-    if (req.body.payload && typeof req.body.payload === 'string') {
+    if (req.body.payload && typeof req.body.payload === "string") {
       try {
         payload = JSON.parse(req.body.payload);
       } catch (parseError) {
-        console.error('JSON parse error:', parseError);
+        console.error("JSON parse error:", parseError);
         return validationErrorResponse(res, {
           details: [
             {
-              field: 'payload',
-              message: 'Invalid JSON format in payload field'
-            }
-          ]
+              field: "payload",
+              message: "Invalid JSON format in payload field",
+            },
+          ],
         });
       }
     }
 
-    console.log('Payload:', JSON.stringify(payload, null, 2));
-    console.log('Files:', req.files ? Object.keys(req.files) : 'No files');
+    console.log("Payload:", JSON.stringify(payload, null, 2));
+    console.log("Files:", req.files ? Object.keys(req.files) : "No files");
 
     const consignor = await consignorService.updateConsignor(
       id,
@@ -207,16 +208,16 @@ const updateConsignor = async (req, res) => {
       req.user.user_id
     );
 
-    console.log('✅ Consignor updated successfully');
+    console.log("✅ Consignor updated successfully");
     return successResponse(res, consignor, null, 200);
   } catch (error) {
-    console.error('❌ Update consignor error:', error);
+    console.error("❌ Update consignor error:", error);
 
-    if (error.type === 'NOT_FOUND') {
-      return notFoundResponse(res, 'Consignor', req.params.id);
+    if (error.type === "NOT_FOUND") {
+      return notFoundResponse(res, "Consignor", req.params.id);
     }
 
-    if (error.type === 'VALIDATION_ERROR') {
+    if (error.type === "VALIDATION_ERROR") {
       return validationErrorResponse(res, { details: error.details });
     }
 
@@ -236,17 +237,17 @@ const deleteConsignor = async (req, res) => {
   try {
     const { id } = req.params;
     console.log(`\n🗑️  ===== DELETE CONSIGNOR: ${id} =====`);
-    console.log('User ID:', req.user.user_id);
+    console.log("User ID:", req.user.user_id);
 
     const result = await consignorService.deleteConsignor(id, req.user.user_id);
 
-    console.log('✅ Consignor deleted successfully');
+    console.log("✅ Consignor deleted successfully");
     return successResponse(res, result, null, 200);
   } catch (error) {
-    console.error('❌ Delete consignor error:', error);
+    console.error("❌ Delete consignor error:", error);
 
-    if (error.type === 'NOT_FOUND') {
-      return notFoundResponse(res, 'Consignor', req.params.id);
+    if (error.type === "NOT_FOUND") {
+      return notFoundResponse(res, "Consignor", req.params.id);
     }
 
     return internalServerErrorResponse(res, error);
@@ -259,14 +260,14 @@ const deleteConsignor = async (req, res) => {
  */
 const getMasterData = async (req, res) => {
   try {
-    console.log('\n📊 ===== GET MASTER DATA =====');
+    console.log("\n📊 ===== GET MASTER DATA =====");
 
     const masterData = await consignorService.getMasterData();
 
-    console.log('✅ Master data retrieved successfully');
+    console.log("✅ Master data retrieved successfully");
     return successResponse(res, masterData, null, 200);
   } catch (error) {
-    console.error('❌ Get master data error:', error);
+    console.error("❌ Get master data error:", error);
     return internalServerErrorResponse(res, error);
   }
 };
@@ -279,25 +280,28 @@ const downloadDocument = async (req, res) => {
   try {
     const { customerId, documentId } = req.params;
     console.log(`\n📥 ===== DOWNLOAD DOCUMENT =====`);
-    console.log('Customer ID:', customerId);
-    console.log('Document ID:', documentId);
+    console.log("Customer ID:", customerId);
+    console.log("Document ID:", documentId);
 
     const file = await consignorService.getDocumentFile(customerId, documentId);
 
     if (!file) {
-      console.log('❌ Document not found');
-      return notFoundResponse(res, 'Document', documentId);
+      console.log("❌ Document not found");
+      return notFoundResponse(res, "Document", documentId);
     }
 
     // Set headers for file download
-    res.setHeader('Content-Type', file.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
-    res.setHeader('Content-Length', file.buffer.length);
+    res.setHeader("Content-Type", file.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${file.fileName}"`
+    );
+    res.setHeader("Content-Length", file.buffer.length);
 
-    console.log('✅ Document sent successfully');
+    console.log("✅ Document sent successfully");
     return res.send(file.buffer);
   } catch (error) {
-    console.error('❌ Download document error:', error);
+    console.error("❌ Download document error:", error);
     return internalServerErrorResponse(res, error);
   }
 };
@@ -310,26 +314,26 @@ const downloadContactPhoto = async (req, res) => {
   try {
     const { customerId, contactId } = req.params;
     console.log(`\n📸 ===== DOWNLOAD CONTACT PHOTO =====`);
-    console.log('Customer ID:', customerId);
-    console.log('Contact ID:', contactId);
+    console.log("Customer ID:", customerId);
+    console.log("Contact ID:", contactId);
 
     const file = await consignorService.getContactPhoto(customerId, contactId);
 
     if (!file) {
-      console.log('❌ Photo not found');
-      return notFoundResponse(res, 'Contact Photo', contactId);
+      console.log("❌ Photo not found");
+      return notFoundResponse(res, "Contact Photo", contactId);
     }
 
     // Set headers for inline display (not download)
-    res.setHeader('Content-Type', file.mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
-    res.setHeader('Content-Length', file.buffer.length);
-    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    res.setHeader("Content-Type", file.mimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${file.fileName}"`);
+    res.setHeader("Content-Length", file.buffer.length);
+    res.setHeader("Cache-Control", "public, max-age=31536000"); // Cache for 1 year
 
-    console.log('✅ Photo sent successfully');
+    console.log("✅ Photo sent successfully");
     return res.send(file.buffer);
   } catch (error) {
-    console.error('❌ Download photo error:', error);
+    console.error("❌ Download photo error:", error);
     return internalServerErrorResponse(res, error);
   }
 };
@@ -343,35 +347,45 @@ const downloadGeneralDocument = async (req, res) => {
   try {
     const { customerId, fileType } = req.params;
     console.log(`\n📄 ===== DOWNLOAD GENERAL DOCUMENT =====`);
-    console.log('Customer ID:', customerId);
-    console.log('File Type:', fileType);
+    console.log("Customer ID:", customerId);
+    console.log("File Type:", fileType);
 
-    if (!['nda', 'msa'].includes(fileType.toLowerCase())) {
+    if (!["nda", "msa"].includes(fileType.toLowerCase())) {
       return res.status(400).json({
         success: false,
         error: {
-          code: 'INVALID_FILE_TYPE',
-          message: 'File type must be either "nda" or "msa"'
-        }
+          code: "INVALID_FILE_TYPE",
+          message: 'File type must be either "nda" or "msa"',
+        },
       });
     }
 
-    const file = await consignorService.getGeneralDocument(customerId, fileType);
+    const file = await consignorService.getGeneralDocument(
+      customerId,
+      fileType
+    );
 
     if (!file) {
-      console.log('❌ Document not found');
-      return notFoundResponse(res, `${fileType.toUpperCase()} Document`, customerId);
+      console.log("❌ Document not found");
+      return notFoundResponse(
+        res,
+        `${fileType.toUpperCase()} Document`,
+        customerId
+      );
     }
 
     // Set headers for file download
-    res.setHeader('Content-Type', file.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
-    res.setHeader('Content-Length', file.buffer.length);
+    res.setHeader("Content-Type", file.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${file.fileName}"`
+    );
+    res.setHeader("Content-Length", file.buffer.length);
 
-    console.log('✅ Document sent successfully');
+    console.log("✅ Document sent successfully");
     return res.send(file.buffer);
   } catch (error) {
-    console.error('❌ Download general document error:', error);
+    console.error("❌ Download general document error:", error);
     return internalServerErrorResponse(res, error);
   }
 };
@@ -384,14 +398,741 @@ const getConsignorWarehouses = async (req, res) => {
   try {
     const { customerId } = req.params;
     console.log(`\n🏭 ===== GET CONSIGNOR WAREHOUSES: ${customerId} =====`);
-    console.log('Query params:', req.query);
+    console.log("Query params:", req.query);
 
-    const result = await consignorService.getConsignorWarehouses(customerId, req.query);
+    const result = await consignorService.getConsignorWarehouses(
+      customerId,
+      req.query
+    );
 
     console.log(`✅ Retrieved ${result.data.length} warehouses`);
     return successResponse(res, result.data, result.meta, 200);
   } catch (error) {
-    console.error('❌ Get consignor warehouses error:', error);
+    console.error("❌ Get consignor warehouses error:", error);
+    return internalServerErrorResponse(res, error);
+  }
+};
+
+// ==================== DRAFT WORKFLOW FUNCTIONS ====================
+
+/**
+ * POST /api/consignors/save-draft
+ * Save consignor as draft with minimal validation (business_name only)
+ * Status: SAVE_AS_DRAFT
+ */
+const saveConsignorAsDraft = async (req, res) => {
+  const db = require("../config/database");
+
+  try {
+    console.log("\n💾 ===== SAVE CONSIGNOR AS DRAFT =====");
+    console.log("User ID:", req.user.user_id);
+
+    // Parse JSON payload
+    let payload = req.body;
+    if (req.body.payload && typeof req.body.payload === "string") {
+      try {
+        payload = JSON.parse(req.body.payload);
+      } catch (parseError) {
+        return validationErrorResponse(res, {
+          details: [{ field: "payload", message: "Invalid JSON format" }],
+        });
+      }
+    }
+
+    // Extract customer_name from general section (frontend sends nested structure)
+    const customerName =
+      payload.general?.customer_name ||
+      payload.customer_name ||
+      payload.business_name;
+
+    // ✅ MINIMAL VALIDATION - only customer_name required
+    if (!customerName || customerName.trim().length < 2) {
+      return validationErrorResponse(res, {
+        details: [
+          {
+            field: "general.customer_name",
+            message: "Customer name is required (minimum 2 characters)",
+          },
+        ],
+      });
+    }
+
+    // Generate consignor ID with collision resistance
+    const generateConsignorId = async (trx) => {
+      let attempts = 0;
+      const maxAttempts = 100;
+
+      // First, find the highest valid CON#### ID in the database
+      const allConsignors = await trx("consignor_basic_information")
+        .select("customer_id")
+        .where("customer_id", "like", "CON%")
+        .orderBy("customer_id", "desc");
+
+      let maxNumber = 0;
+
+      // Parse all CON#### IDs to find the maximum number
+      for (const consignor of allConsignors) {
+        const id = consignor.customer_id;
+        if (id && id.startsWith("CON") && id.length === 7) {
+          const numericPart = id.substring(3);
+          const parsedNumber = parseInt(numericPart, 10);
+
+          if (!isNaN(parsedNumber) && parsedNumber > maxNumber) {
+            maxNumber = parsedNumber;
+          }
+        }
+      }
+
+      console.log(`  📊 Highest existing CON ID number: ${maxNumber}`);
+
+      // Start from max + 1 and try to find an available ID
+      while (attempts < maxAttempts) {
+        const nextNumber = maxNumber + 1 + attempts;
+        const newId = `CON${nextNumber.toString().padStart(4, "0")}`;
+
+        console.log(
+          `  🔍 Checking consignor ID: ${newId} (attempt ${attempts + 1})`
+        );
+
+        // Check if this ID already exists in database
+        const existsInDb = await trx("consignor_basic_information")
+          .where("customer_id", newId)
+          .first();
+
+        if (!existsInDb) {
+          console.log(`  ✅ Consignor ID ${newId} is unique`);
+          return newId;
+        }
+
+        console.log(
+          `  ❌ Consignor ID ${newId} already exists, trying next...`
+        );
+        attempts++;
+      }
+
+      throw new Error(
+        "Failed to generate unique consignor ID after 100 attempts"
+      );
+    };
+
+    const result = await db.transaction(async (trx) => {
+      const customerId = await generateConsignorId(trx);
+
+      // Extract general information fields
+      const general = payload.general || {};
+
+      // Insert consignor basic information with status SAVE_AS_DRAFT
+      await trx("consignor_basic_information").insert({
+        customer_id: customerId,
+        customer_name: customerName.trim(),
+        search_term: general.search_term || customerName.trim(), // Default to customer_name if not provided
+        industry_type: general.industry_type || "GENERAL", // Default value
+        currency_type: general.currency_type || null,
+        payment_term: general.payment_term || "NET30", // Default value
+        website_url: general.website_url || null,
+        remark: general.remark || null,
+        name_on_po: general.name_on_po || null,
+        approved_by: general.approved_by || null,
+        approved_date: general.approved_date || null,
+        upload_nda: null, // File uploads handled separately
+        upload_msa: null, // File uploads handled separately
+        address_id: general.address_id || null,
+        status: "SAVE_AS_DRAFT",
+        created_by: req.user.user_id,
+        created_at: new Date(),
+        updated_by: req.user.user_id,
+        updated_at: new Date(),
+      });
+
+      // Optional: Insert contacts if provided
+      if (payload.contacts && Array.isArray(payload.contacts)) {
+        for (let i = 0; i < payload.contacts.length; i++) {
+          const contact = payload.contacts[i];
+          if (contact.contact_name || contact.name) {
+            // ✅ Generate unique contact ID in format: CON##### (max 10 chars)
+            // Find the highest existing numeric ID and increment from there
+            const generateUniqueContactId = async () => {
+              let attempts = 0;
+              const maxAttempts = 10;
+
+              // Get all existing contact IDs to find the max numeric value
+              const existingIds = await trx("contact").select("contact_id");
+
+              let maxNumericId = 0;
+              if (existingIds && existingIds.length > 0) {
+                maxNumericId = Math.max(
+                  ...existingIds.map((row) => {
+                    const numPart = row.contact_id.replace("CON", "");
+                    return parseInt(numPart) || 0;
+                  })
+                );
+              }
+
+              while (attempts < maxAttempts) {
+                const nextId = maxNumericId + 1 + attempts;
+                const contactId = `CON${nextId.toString().padStart(5, "0")}`;
+
+                // Double-check ID doesn't exist (should be unique on first try)
+                const existing = await trx("contact")
+                  .where("contact_id", contactId)
+                  .first();
+
+                if (!existing) {
+                  return contactId;
+                }
+                attempts++;
+              }
+
+              throw new Error("Failed to generate unique contact ID");
+            };
+
+            const contactId = await generateUniqueContactId();
+
+            await trx("contact").insert({
+              contact_id: contactId,
+              customer_id: customerId,
+              contact_name: contact.contact_name || contact.name,
+              contact_designation:
+                contact.contact_designation || contact.designation || "N/A", // Required field
+              contact_number:
+                contact.contact_number ||
+                contact.phone_number ||
+                contact.phone ||
+                null,
+              email_id: contact.email_id || contact.email || null,
+              contact_role: contact.contact_role || contact.role || null,
+              contact_team: contact.contact_team || contact.team || null,
+              country_code: contact.country_code || null,
+              linkedin_link: contact.linkedin_link || null,
+              contact_photo: null, // File uploads handled separately
+              status: "Active", // ✅ FIX: Changed from "SAVE_AS_DRAFT" (15 chars) to "DRAFT" (5 chars) to fit varchar(10) constraint
+              created_by: req.user.user_id,
+              created_at: new Date(),
+              updated_by: req.user.user_id,
+              updated_at: new Date(),
+            });
+          }
+        }
+      }
+
+      // Optional: Insert organization details if provided (and both required fields are present)
+      if (payload.organization) {
+        const org = payload.organization;
+        // Only insert if BOTH company_code AND business_area are provided (both are required in schema)
+        if (org.company_code && org.business_area) {
+          // Convert business_area array to JSON string for database storage
+          const businessAreaJson = Array.isArray(org.business_area)
+            ? JSON.stringify(org.business_area)
+            : org.business_area;
+
+          await trx("consignor_organization").insert({
+            customer_id: customerId,
+            company_code: org.company_code,
+            business_area: businessAreaJson,
+            status: "Active", // ✅ FIX: Changed from "SAVE_AS_DRAFT" (15 chars) to "DRAFT" (5 chars) to fit varchar(10) constraint
+            created_by: req.user.user_id,
+            created_at: new Date(),
+            updated_by: req.user.user_id,
+            updated_at: new Date(),
+          });
+        }
+      }
+
+      return { customerId };
+    });
+
+    console.log("✅ Consignor draft saved successfully");
+    return res.status(201).json({
+      success: true,
+      data: { customerId: result.customerId, status: "SAVE_AS_DRAFT" },
+      message: "Consignor saved as draft successfully",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Save consignor draft error:", error);
+    return internalServerErrorResponse(res, error);
+  }
+};
+
+/**
+ * PUT /api/consignors/:id/update-draft
+ * Update consignor draft with NO validation
+ * Only allows updating drafts created by current user
+ */
+const updateConsignorDraft = async (req, res) => {
+  const db = require("../config/database");
+
+  try {
+    const { id } = req.params;
+    console.log(`\n✏️  ===== UPDATE CONSIGNOR DRAFT: ${id} =====`);
+    console.log("User ID:", req.user.user_id);
+
+    // Parse JSON payload
+    let payload = req.body;
+    if (req.body.payload && typeof req.body.payload === "string") {
+      try {
+        payload = JSON.parse(req.body.payload);
+      } catch (parseError) {
+        return validationErrorResponse(res, {
+          details: [{ field: "payload", message: "Invalid JSON format" }],
+        });
+      }
+    }
+
+    console.log("📦 Payload structure:", JSON.stringify(payload, null, 2));
+
+    // Extract data from nested structure (frontend sends { general, contacts, organization, documents })
+    const generalData = payload.general || payload;
+    const contactsData = payload.contacts || [];
+    const organizationData = payload.organization || {};
+
+    const result = await db.transaction(async (trx) => {
+      // Check if consignor exists and is a draft
+      const existing = await trx("consignor_basic_information")
+        .where({ customer_id: id })
+        .first();
+
+      if (!existing) {
+        throw { type: "NOT_FOUND", message: "Consignor not found" };
+      }
+
+      if (existing.status !== "SAVE_AS_DRAFT") {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "INVALID_STATUS",
+            message:
+              "Can only update drafts. Current status: " + existing.status,
+          },
+        });
+      }
+
+      // Verify creator ownership
+      if (existing.created_by !== req.user.user_id) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "You can only update your own drafts",
+          },
+        });
+      }
+
+      // Update consignor general information (NO VALIDATION)
+      const updateFields = {};
+
+      if (generalData.customer_name !== undefined)
+        updateFields.customer_name = generalData.customer_name;
+      if (generalData.search_term !== undefined)
+        updateFields.search_term = generalData.search_term;
+      if (generalData.industry_type !== undefined)
+        updateFields.industry_type = generalData.industry_type;
+      if (generalData.currency_type !== undefined)
+        updateFields.currency_type = generalData.currency_type;
+      if (generalData.payment_term !== undefined)
+        updateFields.payment_term = generalData.payment_term;
+      if (generalData.website_url !== undefined)
+        updateFields.website_url = generalData.website_url;
+      if (generalData.remark !== undefined)
+        updateFields.remark = generalData.remark;
+      if (generalData.name_on_po !== undefined)
+        updateFields.name_on_po = generalData.name_on_po;
+
+      updateFields.updated_by = req.user.user_id;
+      updateFields.updated_at = new Date();
+
+      await trx("consignor_basic_information")
+        .where({ customer_id: id })
+        .update(updateFields);
+
+      // Update contacts if provided (delete & re-insert)
+      if (
+        contactsData &&
+        Array.isArray(contactsData) &&
+        contactsData.length > 0
+      ) {
+        // Delete existing contacts
+        await trx("contact").where({ customer_id: id }).del();
+
+        // Generate unique contact ID helper (same as saveConsignorAsDraft)
+        const generateUniqueContactId = async () => {
+          let attempts = 0;
+          const maxAttempts = 10;
+
+          // Get all existing contact IDs to find the max numeric value
+          const existingIds = await trx("contact").select("contact_id");
+
+          let maxNumericId = 0;
+          if (existingIds && existingIds.length > 0) {
+            maxNumericId = Math.max(
+              ...existingIds.map((row) => {
+                const numPart = row.contact_id.replace("CON", "");
+                return parseInt(numPart) || 0;
+              })
+            );
+          }
+
+          while (attempts < maxAttempts) {
+            const nextId = maxNumericId + 1 + attempts;
+            const contactId = `CON${nextId.toString().padStart(5, "0")}`;
+
+            // Double-check ID doesn't exist
+            const existing = await trx("contact")
+              .where("contact_id", contactId)
+              .first();
+
+            if (!existing) {
+              return contactId;
+            }
+            attempts++;
+          }
+
+          throw new Error("Failed to generate unique contact ID");
+        };
+
+        // Insert new contacts
+        for (const contact of contactsData) {
+          if (contact.contact_name || contact.name) {
+            const contactId = await generateUniqueContactId();
+
+            await trx("contact").insert({
+              contact_id: contactId,
+              customer_id: id,
+              contact_name: contact.contact_name || contact.name,
+              contact_designation:
+                contact.contact_designation || contact.designation || "N/A",
+              contact_number:
+                contact.contact_number ||
+                contact.phone_number ||
+                contact.phone ||
+                contact.number ||
+                null,
+              email_id: contact.email_id || contact.email || null,
+              contact_role: contact.contact_role || contact.role || null,
+              contact_team: contact.contact_team || contact.team || null,
+              country_code: contact.country_code || null,
+              linkedin_link: contact.linkedin_link || null,
+              contact_photo: null,
+              status: "Active",
+              created_by: req.user.user_id,
+              created_at: new Date(),
+              updated_by: req.user.user_id,
+              updated_at: new Date(),
+            });
+          }
+        }
+      }
+
+      // Update organization if provided
+      if (organizationData && Object.keys(organizationData).length > 0) {
+        const existingOrg = await trx("consignor_organization")
+          .where({ customer_id: id })
+          .first();
+
+        const orgUpdateFields = {};
+        if (organizationData.company_code !== undefined)
+          orgUpdateFields.company_code = organizationData.company_code;
+        if (organizationData.business_area !== undefined) {
+          // Convert business_area array to JSON string for database storage
+          orgUpdateFields.business_area = Array.isArray(
+            organizationData.business_area
+          )
+            ? JSON.stringify(organizationData.business_area)
+            : organizationData.business_area;
+        }
+        orgUpdateFields.updated_by = req.user.user_id;
+        orgUpdateFields.updated_at = new Date();
+
+        if (existingOrg) {
+          // Update existing
+          await trx("consignor_organization")
+            .where({ customer_id: id })
+            .update(orgUpdateFields);
+        } else if (organizationData.company_code) {
+          // Insert new - ensure business_area is JSON string
+          const businessAreaJson = Array.isArray(organizationData.business_area)
+            ? JSON.stringify(organizationData.business_area)
+            : organizationData.business_area || null;
+
+          await trx("consignor_organization").insert({
+            customer_id: id,
+            company_code: organizationData.company_code,
+            business_area: businessAreaJson,
+            status: "Active",
+            created_by: req.user.user_id,
+            created_at: new Date(),
+            updated_by: req.user.user_id,
+            updated_at: new Date(),
+          });
+        }
+      }
+
+      return { customerId: id };
+    });
+
+    // Handle early returns from transaction
+    if (result.success === false) {
+      return result;
+    }
+
+    console.log("✅ Consignor draft updated successfully");
+    return res.status(200).json({
+      success: true,
+      data: { customerId: result.customerId, status: "DRAFT" },
+      message: "Consignor draft updated successfully",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Update consignor draft error:", error);
+
+    if (error.type === "NOT_FOUND") {
+      return notFoundResponse(res, "Consignor", id);
+    }
+
+    return internalServerErrorResponse(res, error);
+  }
+};
+
+/**
+ * PUT /api/consignors/:id/submit-draft
+ * Submit consignor draft for approval (DRAFT → PENDING)
+ * Performs FULL validation
+ */
+const submitConsignorFromDraft = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`\n🚀 ===== SUBMIT CONSIGNOR DRAFT: ${id} =====`);
+    console.log("User ID:", req.user.user_id);
+
+    // Parse JSON payload
+    let payload = req.body;
+    if (req.body.payload && typeof req.body.payload === "string") {
+      try {
+        payload = JSON.parse(req.body.payload);
+      } catch (parseError) {
+        return validationErrorResponse(res, {
+          details: [{ field: "payload", message: "Invalid JSON format" }],
+        });
+      }
+    }
+
+    const db = require("../config/database");
+
+    // Check if consignor exists and is a draft
+    const existing = await db("consignor_basic_information")
+      .where({ customer_id: id })
+      .first();
+
+    if (!existing) {
+      return notFoundResponse(res, "Consignor", id);
+    }
+
+    if (existing.status !== "SAVE_AS_DRAFT") {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "INVALID_STATUS",
+          message: "Can only submit drafts. Current status: " + existing.status,
+        },
+      });
+    }
+
+    // Verify creator ownership
+    if (existing.created_by !== req.user.user_id) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "You can only submit your own drafts",
+        },
+      });
+    }
+
+    // ✅ FULL VALIDATION (same as createConsignor)
+    // Use the existing createConsignor service with validation
+    // Then update status from ACTIVE to PENDING
+
+    // For now, delegate to service layer with files
+    const filesObj = {};
+    if (req.files && Array.isArray(req.files)) {
+      req.files.forEach((file) => {
+        filesObj[file.fieldname] = file;
+      });
+    }
+
+    console.log("📦 Payload for submit:", JSON.stringify(payload, null, 2));
+
+    // Update using service (which has full validation)
+    const consignor = await consignorService.updateConsignor(
+      id,
+      payload,
+      filesObj,
+      req.user.user_id
+    );
+
+    // Change status from SAVE_AS_DRAFT to PENDING
+    await db("consignor_basic_information").where({ customer_id: id }).update({
+      status: "PENDING",
+      updated_by: req.user.user_id,
+      updated_at: new Date(),
+    });
+
+    // Update child records status to ACTIVE (using correct table name: contact)
+    await db("contact").where({ customer_id: id }).update({
+      status: "ACTIVE",
+      updated_by: req.user.user_id,
+      updated_at: new Date(),
+    });
+
+    // Update organization status if exists
+    const orgExists = await db("consignor_organization")
+      .where({ customer_id: id })
+      .first();
+
+    if (orgExists) {
+      await db("consignor_organization").where({ customer_id: id }).update({
+        status: "ACTIVE",
+        updated_by: req.user.user_id,
+        updated_at: new Date(),
+      });
+    }
+
+    console.log("✅ Consignor draft submitted successfully");
+    return res.status(200).json({
+      success: true,
+      data: { customerId: id, status: "PENDING" },
+      message: "Consignor submitted for approval successfully",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Submit consignor draft error:", error);
+
+    if (error.type === "VALIDATION_ERROR") {
+      return validationErrorResponse(res, { details: error.details });
+    }
+
+    if (error.type === "NOT_FOUND") {
+      return notFoundResponse(res, "Consignor", req.params.id);
+    }
+
+    return internalServerErrorResponse(res, error);
+  }
+};
+
+/**
+ * DELETE /api/consignors/:id/delete-draft
+ * Hard delete consignor draft (permanent removal)
+ * Only allows deleting drafts created by current user
+ */
+const deleteConsignorDraft = async (req, res) => {
+  const db = require("../config/database");
+
+  try {
+    const { id } = req.params;
+    console.log(`\n🗑️  ===== DELETE CONSIGNOR DRAFT: ${id} =====`);
+    console.log("User ID:", req.user.user_id);
+
+    const result = await db.transaction(async (trx) => {
+      // Check if consignor exists and is a draft
+      const existing = await trx("consignor_basic_information")
+        .where({ customer_id: id })
+        .first();
+
+      if (!existing) {
+        throw { type: "NOT_FOUND", message: "Consignor not found" };
+      }
+
+      if (existing.status !== "SAVE_AS_DRAFT") {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "INVALID_STATUS",
+            message:
+              "Can only delete drafts. Current status: " + existing.status,
+          },
+        });
+      }
+
+      // Verify creator ownership
+      if (existing.created_by !== req.user.user_id) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "You can only delete your own drafts",
+          },
+        });
+      }
+
+      // Hard delete cascade (order matters: children first, parent last)
+      // 1. Delete document uploads
+      const documentIds = await trx("consignor_documents")
+        .where({ customer_id: id })
+        .pluck("document_upload_file_id");
+
+      if (documentIds.length > 0) {
+        await trx("document_upload")
+          .whereIn("upload_file_id", documentIds)
+          .del();
+      }
+
+      // 2. Delete business areas
+      await trx("consignor_business_area").where({ customer_id: id }).del();
+
+      // 3. Delete contact photos
+      const contactPhotoIds = await trx("consignor_contact_person")
+        .where({ customer_id: id })
+        .whereNotNull("photo_upload_file_id")
+        .pluck("photo_upload_file_id");
+
+      if (contactPhotoIds.length > 0) {
+        await trx("document_upload")
+          .whereIn("upload_file_id", contactPhotoIds)
+          .del();
+      }
+
+      // 4. Delete contacts
+      await trx("consignor_contact_person").where({ customer_id: id }).del();
+
+      // 5. Delete documents table records
+      await trx("consignor_documents").where({ customer_id: id }).del();
+
+      // 6. Delete NDA/MSA files if they exist
+      if (existing.nda_upload_file_id) {
+        await trx("document_upload")
+          .where({ upload_file_id: existing.nda_upload_file_id })
+          .del();
+      }
+      if (existing.msa_upload_file_id) {
+        await trx("document_upload")
+          .where({ upload_file_id: existing.msa_upload_file_id })
+          .del();
+      }
+
+      // 7. Finally, delete the main consignor record
+      await trx("consignor_basic_information").where({ customer_id: id }).del();
+
+      return { customerId: id };
+    });
+
+    // Handle early returns from transaction
+    if (result.success === false) {
+      return result;
+    }
+
+    console.log("✅ Consignor draft deleted successfully");
+    return res.status(200).json({
+      success: true,
+      message: "Consignor draft deleted successfully",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Delete consignor draft error:", error);
+
+    if (error.type === "NOT_FOUND") {
+      return notFoundResponse(res, "Consignor", req.params.id);
+    }
+
     return internalServerErrorResponse(res, error);
   }
 };
@@ -406,5 +1147,10 @@ module.exports = {
   downloadDocument,
   downloadContactPhoto,
   downloadGeneralDocument,
-  getConsignorWarehouses
+  getConsignorWarehouses,
+  // Draft workflow functions
+  saveConsignorAsDraft,
+  updateConsignorDraft,
+  submitConsignorFromDraft,
+  deleteConsignorDraft,
 };

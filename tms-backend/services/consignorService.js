@@ -3,13 +3,13 @@
  * Handles all business logic, validations, and database transactions for consignor operations
  */
 
-const knex = require('../config/database');
-const bcrypt = require('bcrypt');
+const knex = require("../config/database");
+const bcrypt = require("bcrypt");
 const {
   consignorCreateSchema,
   consignorUpdateSchema,
-  listQuerySchema
-} = require('../validation/consignorValidation');
+  listQuerySchema,
+} = require("../validation/consignorValidation");
 
 /**
  * Generate unique contact ID
@@ -19,18 +19,18 @@ const generateContactId = async (trx = knex) => {
   const maxAttempts = 100;
 
   while (attempts < maxAttempts) {
-    const result = await trx('contact').count('* as count').first();
+    const result = await trx("contact").count("* as count").first();
     const count = parseInt(result.count) + 1 + attempts;
-    const newId = `CON${count.toString().padStart(5, '0')}`;
+    const newId = `CON${count.toString().padStart(5, "0")}`;
 
-    const existing = await trx('contact').where('contact_id', newId).first();
+    const existing = await trx("contact").where("contact_id", newId).first();
     if (!existing) {
       return newId;
     }
     attempts++;
   }
 
-  throw new Error('Failed to generate unique contact ID');
+  throw new Error("Failed to generate unique contact ID");
 };
 
 /**
@@ -41,12 +41,12 @@ const generateDocumentId = async (trx = knex) => {
   const maxAttempts = 100;
 
   while (attempts < maxAttempts) {
-    const result = await trx('consignor_documents').count('* as count').first();
+    const result = await trx("consignor_documents").count("* as count").first();
     const count = parseInt(result.count) + 1 + attempts;
-    const newId = `CDOC${count.toString().padStart(5, '0')}`;
+    const newId = `CDOC${count.toString().padStart(5, "0")}`;
 
-    const existing = await trx('consignor_documents')
-      .where('document_unique_id', newId)
+    const existing = await trx("consignor_documents")
+      .where("document_unique_id", newId)
       .first();
     if (!existing) {
       return newId;
@@ -54,7 +54,7 @@ const generateDocumentId = async (trx = knex) => {
     attempts++;
   }
 
-  throw new Error('Failed to generate unique document ID');
+  throw new Error("Failed to generate unique document ID");
 };
 
 /**
@@ -66,12 +66,12 @@ const generateDocumentUploadId = async (trx = knex) => {
 
   while (attempts < maxAttempts) {
     // Assuming document_upload table exists
-    const result = await trx('document_upload').count('* as count').first();
+    const result = await trx("document_upload").count("* as count").first();
     const count = parseInt(result.count) + 1 + attempts;
-    const newId = `DU${count.toString().padStart(6, '0')}`;
+    const newId = `DU${count.toString().padStart(6, "0")}`;
 
-    const existing = await trx('document_upload')
-      .where('document_id', newId)
+    const existing = await trx("document_upload")
+      .where("document_id", newId)
       .first();
     if (!existing) {
       return newId;
@@ -79,18 +79,20 @@ const generateDocumentUploadId = async (trx = knex) => {
     attempts++;
   }
 
-  throw new Error('Failed to generate unique document upload ID');
+  throw new Error("Failed to generate unique document upload ID");
 };
 
 /**
  * Check if customer ID is unique
  */
 const isCustomerIdUnique = async (customerId, excludeUniqueId = null) => {
-  const query = knex('consignor_basic_information')
-    .where('customer_id', customerId);
+  const query = knex("consignor_basic_information").where(
+    "customer_id",
+    customerId
+  );
 
   if (excludeUniqueId) {
-    query.where('consignor_unique_id', '!=', excludeUniqueId);
+    query.where("consignor_unique_id", "!=", excludeUniqueId);
   }
 
   const existing = await query.first();
@@ -101,11 +103,13 @@ const isCustomerIdUnique = async (customerId, excludeUniqueId = null) => {
  * Check if company code is unique
  */
 const isCompanyCodeUnique = async (companyCode, excludeCustomerId = null) => {
-  const query = knex('consignor_organization')
-    .where('company_code', companyCode);
+  const query = knex("consignor_organization").where(
+    "company_code",
+    companyCode
+  );
 
   if (excludeCustomerId) {
-    query.where('customer_id', '!=', excludeCustomerId);
+    query.where("customer_id", "!=", excludeCustomerId);
   }
 
   const existing = await query.first();
@@ -174,88 +178,217 @@ const generateApprovalFlowId = async (trx = knex) => {
 /**
  * Get Consignor List with Filters, Search, Pagination
  */
+// const getConsignorList = async (queryParams) => {
+//   try {
+//     // Validate query parameters
+//     const { error, value } = listQuerySchema.validate(queryParams);
+//     if (error) {
+//       throw {
+//         type: "VALIDATION_ERROR",
+//         details: error.details,
+//         message: "Invalid query parameters",
+//       };
+//     }
+
+//     const {
+//       page,
+//       limit,
+//       search,
+//       customer_id,
+//       status,
+//       industry_type,
+//       currency_type,
+//       sortBy,
+//       sortOrder,
+//     } = value;
+
+//     // Build base query with filters
+//     const baseQuery = knex("consignor_basic_information");
+
+//     // Apply filters
+//     if (customer_id) {
+//       baseQuery.where("customer_id", "like", `%${customer_id}%`);
+//     }
+
+//     if (status) {
+//       baseQuery.where("status", status);
+//     }
+
+//     if (industry_type) {
+//       baseQuery.where("industry_type", "like", `%${industry_type}%`);
+//     }
+
+//     if (currency_type) {
+//       baseQuery.where("currency_type", "like", `%${currency_type}%`);
+//     }
+
+//     // Apply search (searches across customer_id, customer_name, search_term)
+//     if (search) {
+//       baseQuery.where(function () {
+//         this.where("customer_id", "like", `%${search}%`)
+//           .orWhere("customer_name", "like", `%${search}%`)
+//           .orWhere("search_term", "like", `%${search}%`);
+//       });
+//     }
+
+//     // Get total count with a separate query
+//     const countQuery = baseQuery.clone().count("* as total").first();
+//     const totalResult = await countQuery;
+//     const total = parseInt(totalResult.total);
+
+//     // Build data query with select columns
+//     const dataQuery = baseQuery
+//       .clone()
+//       .select(
+//         "consignor_unique_id",
+//         "customer_id",
+//         "customer_name",
+//         "search_term",
+//         "industry_type",
+//         "currency_type",
+//         "payment_term",
+//         "status",
+//         "approved_by",
+//         "approved_date",
+//         "created_at",
+//         "updated_at"
+//       );
+
+//     // Apply sorting
+//     const sortColumn = sortBy || "created_at";
+//     const sortDirection = (sortOrder || "desc").toUpperCase();
+//     dataQuery.orderBy(sortColumn, sortDirection);
+
+//     // Apply pagination
+//     const offset = (page - 1) * limit;
+//     dataQuery.limit(limit).offset(offset);
+
+//     // Execute query
+//     const consignors = await dataQuery;
+
+//     // Return with metadata
+//     return {
+//       data: consignors,
+//       meta: {
+//         page,
+//         limit,
+//         total,
+//         totalPages: Math.ceil(total / limit),
+//         hasNextPage: page < Math.ceil(total / limit),
+//         hasPrevPage: page > 1,
+//       },
+//     };
+//   } catch (error) {
+//     console.error("Get consignor list error:", error);
+//     throw error;
+//   }
+// };
+
 const getConsignorList = async (queryParams) => {
   try {
     // Validate query parameters
     const { error, value } = listQuerySchema.validate(queryParams);
     if (error) {
       throw {
-        type: 'VALIDATION_ERROR',
+        type: "VALIDATION_ERROR",
         details: error.details,
-        message: 'Invalid query parameters'
+        message: "Invalid query parameters",
       };
     }
 
+    // Destructure validated values. Accept createdOnStart / createdOnEnd.
     const {
-      page,
-      limit,
+      page = 1,
+      limit = 25,
       search,
       customer_id,
       status,
       industry_type,
       currency_type,
       sortBy,
-      sortOrder
+      sortOrder,
+      createdOnStart,
+      createdOnEnd,
     } = value;
 
+    // Ensure numeric paging values (safe defaults)
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 25;
+    const offset = (pageNum - 1) * limitNum;
+
+    // Normalize date inputs for accurate filtering
+    let dateStart = createdOnStart ? `${createdOnStart} 00:00:00` : null;
+    let dateEnd = createdOnEnd ? `${createdOnEnd} 23:59:59` : null;
+
     // Build base query with filters
-    const baseQuery = knex('consignor_basic_information');
+    const baseQuery = knex("consignor_basic_information");
 
     // Apply filters
     if (customer_id) {
-      baseQuery.where('customer_id', 'like', `%${customer_id}%`);
+      baseQuery.where("customer_id", "like", `%${customer_id}%`);
     }
 
     if (status) {
-      baseQuery.where('status', status);
+      baseQuery.where("status", status);
     }
 
     if (industry_type) {
-      baseQuery.where('industry_type', 'like', `%${industry_type}%`);
+      baseQuery.where("industry_type", "like", `%${industry_type}%`);
     }
 
     if (currency_type) {
-      baseQuery.where('currency_type', 'like', `%${currency_type}%`);
+      baseQuery.where("currency_type", "like", `%${currency_type}%`);
     }
 
     // Apply search (searches across customer_id, customer_name, search_term)
     if (search) {
       baseQuery.where(function () {
-        this.where('customer_id', 'like', `%${search}%`)
-          .orWhere('customer_name', 'like', `%${search}%`)
-          .orWhere('search_term', 'like', `%${search}%`);
+        this.where("customer_id", "like", `%${search}%`)
+          .orWhere("customer_name", "like", `%${search}%`)
+          .orWhere("search_term", "like", `%${search}%`);
       });
     }
 
-    // Get total count with a separate query
-    const countQuery = baseQuery.clone().count('* as total').first();
-    const totalResult = await countQuery;
-    const total = parseInt(totalResult.total);
+    // --- Created On Date Range Filter ---
+    if (dateStart && dateEnd) {
+      baseQuery.whereBetween("created_at", [dateStart, dateEnd]);
+    } else if (dateStart) {
+      baseQuery.where("created_at", ">=", dateStart);
+    } else if (dateEnd) {
+      baseQuery.where("created_at", "<=", dateEnd);
+    }
+    // --- End date range filter ---
 
-    // Build data query with select columns
-    const dataQuery = baseQuery.clone().select(
-      'consignor_unique_id',
-      'customer_id',
-      'customer_name',
-      'search_term',
-      'industry_type',
-      'currency_type',
-      'payment_term',
-      'status',
-      'approved_by',
-      'approved_date',
-      'created_at',
-      'updated_at'
-    );
+    // Get total count with a separate query (clone of baseQuery)
+    const countQuery = baseQuery.clone().count("* as total").first();
+    const totalResult = await countQuery;
+    const total = parseInt(totalResult.total, 10) || 0;
+
+    // Build data query with select columns (clone again)
+    const dataQuery = baseQuery
+      .clone()
+      .select(
+        "consignor_unique_id",
+        "customer_id",
+        "customer_name",
+        "search_term",
+        "industry_type",
+        "currency_type",
+        "payment_term",
+        "status",
+        "approved_by",
+        "approved_date",
+        "created_at",
+        "updated_at"
+      );
 
     // Apply sorting
-    const sortColumn = sortBy || 'created_at';
-    const sortDirection = (sortOrder || 'desc').toUpperCase();
+    const sortColumn = sortBy || "created_at";
+    const sortDirection = (sortOrder || "desc").toUpperCase();
     dataQuery.orderBy(sortColumn, sortDirection);
 
     // Apply pagination
-    const offset = (page - 1) * limit;
-    dataQuery.limit(limit).offset(offset);
+    dataQuery.limit(limitNum).offset(offset);
 
     // Execute query
     const consignors = await dataQuery;
@@ -264,16 +397,16 @@ const getConsignorList = async (queryParams) => {
     return {
       data: consignors,
       meta: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPrevPage: page > 1
-      }
+        totalPages: Math.ceil(total / limitNum),
+        hasNextPage: pageNum < Math.ceil(total / limitNum),
+        hasPrevPage: pageNum > 1,
+      },
     };
   } catch (error) {
-    console.error('Get consignor list error:', error);
+    console.error("Get consignor list error:", error);
     throw error;
   }
 };
@@ -286,55 +419,61 @@ const getConsignorWarehouses = async (customerId, filters = {}) => {
     const { search, status, warehouse_type, page = 1, limit = 10 } = filters;
 
     // Build base query - join consignor_warehouse_mapping with warehouse_basic_information
-    let query = knex('consignor_warehouse_mapping as cwm')
-      .leftJoin('warehouse_basic_information as wbi', 'cwm.warehouse_id', 'wbi.warehouse_id')
-      .where('cwm.customer_id', customerId)
+    let query = knex("consignor_warehouse_mapping as cwm")
+      .leftJoin(
+        "warehouse_basic_information as wbi",
+        "cwm.warehouse_id",
+        "wbi.warehouse_id"
+      )
+      .where("cwm.customer_id", customerId)
       .select(
-        'cwm.mapping_id',
-        'cwm.warehouse_id',
-        'cwm.customer_id',
-        'cwm.status as mapping_status',
-        'cwm.created_at as mapped_at',
-        'wbi.warehouse_name',
-        'wbi.warehouse_type',
-        'wbi.contact_person',
-        'wbi.contact_number',
-        'wbi.email_id',
-        'wbi.city',
-        'wbi.state',
-        'wbi.country',
-        'wbi.status as warehouse_status'
+        "cwm.mapping_id",
+        "cwm.warehouse_id",
+        "cwm.customer_id",
+        "cwm.status as mapping_status",
+        "cwm.created_at as mapped_at",
+        "cwm.is_active",
+        "cwm.valid_from",
+        "cwm.valid_to",
+        "wbi.warehouse_name1 as warehouse_name",
+        "wbi.warehouse_type",
+        "wbi.warehouse_id as warehouse_code",
+        "wbi.status as warehouse_status"
       );
 
     // Apply filters
     if (search) {
-      query = query.where(function() {
-        this.where('wbi.warehouse_name', 'like', `%${search}%`)
-          .orWhere('wbi.warehouse_id', 'like', `%${search}%`)
-          .orWhere('wbi.city', 'like', `%${search}%`);
+      query = query.where(function () {
+        this.where("wbi.warehouse_name1", "like", `%${search}%`).orWhere(
+          "wbi.warehouse_id",
+          "like",
+          `%${search}%`
+        );
       });
     }
 
     if (status) {
-      query = query.where('cwm.status', status);
+      query = query.where("cwm.status", status);
     }
 
     if (warehouse_type) {
-      query = query.where('wbi.warehouse_type', warehouse_type);
+      query = query.where("wbi.warehouse_type", warehouse_type);
     }
 
-    // Get total count
-    const countQuery = query.clone().count('* as total').first();
+    // Get total count - clear select before counting to avoid GROUP BY issues
+    const countQuery = query.clone().clearSelect().count("* as total").first();
     const { total } = await countQuery;
 
     // Apply pagination
     const offset = (page - 1) * limit;
     const warehouses = await query
-      .orderBy('cwm.created_at', 'desc')
+      .orderBy("cwm.created_at", "desc")
       .limit(limit)
       .offset(offset);
 
-    console.log(`🏭 Found ${warehouses.length} warehouses for consignor ${customerId}`);
+    console.log(
+      `🏭 Found ${warehouses.length} warehouses for consignor ${customerId}`
+    );
 
     return {
       data: warehouses,
@@ -344,11 +483,11 @@ const getConsignorWarehouses = async (customerId, filters = {}) => {
         total: parseInt(total),
         totalPages: Math.ceil(total / limit),
         hasNextPage: page < Math.ceil(total / limit),
-        hasPrevPage: page > 1
-      }
+        hasPrevPage: page > 1,
+      },
     };
   } catch (error) {
-    console.error('Get consignor warehouses error:', error);
+    console.error("Get consignor warehouses error:", error);
     throw error;
   }
 };
@@ -359,39 +498,41 @@ const getConsignorWarehouses = async (customerId, filters = {}) => {
 const getConsignorById = async (customerId) => {
   try {
     // Get basic information
-    const consignor = await knex('consignor_basic_information')
-      .where('customer_id', customerId)
+    const consignor = await knex("consignor_basic_information")
+      .where("customer_id", customerId)
       .first();
 
     if (!consignor) {
       throw {
-        type: 'NOT_FOUND',
-        message: `Consignor with ID '${customerId}' not found`
+        type: "NOT_FOUND",
+        message: `Consignor with ID '${customerId}' not found`,
       };
     }
 
     // Get contacts with field mapping for frontend
-    const contacts = await knex('contact')
-      .where('customer_id', customerId)
-      .where('status', 'ACTIVE')
+    // Include both ACTIVE and DRAFT status (for draft editing)
+    const contacts = await knex("contact")
+      .where("customer_id", customerId)
+      .whereIn("status", ["ACTIVE", "DRAFT"])
       .select(
-        'contact_id',
-        'contact_designation',
-        'contact_name',
-        'contact_number',
-        'country_code',
-        'email_id',
-        'linkedin_link',
-        'contact_team',
-        'contact_role',
-        'contact_photo',
-        'status'
+        "contact_id",
+        "contact_designation",
+        "contact_name",
+        "contact_number",
+        "country_code",
+        "email_id",
+        "linkedin_link",
+        "contact_team",
+        "contact_role",
+        "contact_photo",
+        "status"
       );
 
     // Get organization with JSON parsed business_area
-    const organization = await knex('consignor_organization')
-      .where('customer_id', customerId)
-      .where('status', 'ACTIVE')
+    // Include both ACTIVE and DRAFT status (for draft editing)
+    const organization = await knex("consignor_organization")
+      .where("customer_id", customerId)
+      .whereIn("status", ["ACTIVE", "DRAFT"])
       .first();
 
     // Parse business_area JSON
@@ -400,47 +541,61 @@ const getConsignorById = async (customerId) => {
       try {
         businessAreaArray = JSON.parse(organization.business_area);
       } catch (error) {
-        console.warn('Failed to parse business_area JSON:', error);
+        console.warn("Failed to parse business_area JSON:", error);
         // Fallback: if it's a string, convert to array
         businessAreaArray = [organization.business_area];
       }
     }
 
     // Get documents with file information and document type name
-    const documents = await knex('consignor_documents as cd')
-      .leftJoin('document_upload as du', 'cd.document_id', 'du.document_id')
-      .leftJoin('doc_type_configuration as dtc', 'cd.document_type_id', 'dtc.document_type_id')
-      .leftJoin('document_name_master as dnm', 'dtc.doc_name_master_id', 'dnm.doc_name_master_id')
-      .where('cd.customer_id', customerId)
-      .where('cd.status', 'ACTIVE')
+    // Include both ACTIVE and DRAFT status (for draft editing)
+    const documents = await knex("consignor_documents as cd")
+      .leftJoin("document_upload as du", "cd.document_id", "du.document_id")
+      .leftJoin(
+        "doc_type_configuration as dtc",
+        "cd.document_type_id",
+        "dtc.document_type_id"
+      )
+      .leftJoin(
+        "document_name_master as dnm",
+        "dtc.doc_name_master_id",
+        "dnm.doc_name_master_id"
+      )
+      .where("cd.customer_id", customerId)
+      .whereIn("cd.status", ["ACTIVE", "DRAFT"])
       .select(
-        'cd.document_unique_id',
-        'cd.document_type_id',
-        'dnm.document_name as document_type',      // Get actual document name from master table
-        'cd.document_number',
-        'cd.valid_from',
-        'cd.valid_to',
-        'du.document_id',
-        'du.file_name',                            // Keep file name
-        'du.file_type'                             // Keep file type
+        "cd.document_unique_id",
+        "cd.document_type_id",
+        "dnm.document_name as document_type", // Get actual document name from master table
+        "cd.document_number",
+        "cd.valid_from",
+        "cd.valid_to",
+        "cd.status", // Add status field
+        "du.document_id",
+        "du.file_name", // Keep file name
+        "du.file_type" // Keep file type
       );
 
-    console.log(`📄 Found ${documents.length} documents for customer ${customerId}`);
+    console.log(
+      `📄 Found ${documents.length} documents for customer ${customerId}`
+    );
     if (documents.length > 0) {
-      console.log('Document details:', JSON.stringify(documents, null, 2));
+      console.log("Document details:", JSON.stringify(documents, null, 2));
     }
 
-    console.log(`📸 Found ${contacts.length} contacts for customer ${customerId}`);
-    
+    console.log(
+      `📸 Found ${contacts.length} contacts for customer ${customerId}`
+    );
+
     // 🔍 DETAILED NDA/MSA DEBUG
-    console.log('\n� ===== NDA/MSA DEBUG =====');
-    console.log('NDA Document ID:', consignor.upload_nda);
-    console.log('NDA Expiry Date:', consignor.nda_expiry_date);
-    console.log('MSA Document ID:', consignor.upload_msa);
-    console.log('MSA Expiry Date:', consignor.msa_expiry_date);
-    console.log('Type of upload_nda:', typeof consignor.upload_nda);
-    console.log('Type of upload_msa:', typeof consignor.upload_msa);
-    console.log('===========================\n');
+    console.log("\n� ===== NDA/MSA DEBUG =====");
+    console.log("NDA Document ID:", consignor.upload_nda);
+    console.log("NDA Expiry Date:", consignor.nda_expiry_date);
+    console.log("MSA Document ID:", consignor.upload_msa);
+    console.log("MSA Expiry Date:", consignor.msa_expiry_date);
+    console.log("Type of upload_nda:", typeof consignor.upload_nda);
+    console.log("Type of upload_msa:", typeof consignor.upload_msa);
+    console.log("===========================\n");
 
     // Get user approval status if exists
     let userApprovalStatus = null;
@@ -480,7 +635,10 @@ const getConsignorById = async (customerId) => {
         }
       }
     } catch (approvalError) {
-      console.warn('⚠️  Could not fetch approval status:', approvalError.message);
+      console.warn(
+        "⚠️  Could not fetch approval status:",
+        approvalError.message
+      );
       // Don't fail the whole request if approval status fetch fails
     }
 
@@ -498,12 +656,13 @@ const getConsignorById = async (customerId) => {
         name_on_po: consignor.name_on_po,
         approved_by: consignor.approved_by,
         approved_date: consignor.approved_date,
-        upload_nda: consignor.upload_nda,          // NDA document ID
-        upload_msa: consignor.upload_msa,          // MSA document ID
-        status: consignor.status
+        upload_nda: consignor.upload_nda, // NDA document ID
+        upload_msa: consignor.upload_msa, // MSA document ID
+        status: consignor.status,
+        userApprovalStatus: userApprovalStatus, // Add user approval status to general section
       },
       // Map database column names to frontend field names
-      contacts: contacts.map(c => ({
+      contacts: contacts.map((c) => ({
         contact_id: c.contact_id,
         designation: c.contact_designation,
         name: c.contact_name,
@@ -513,30 +672,34 @@ const getConsignorById = async (customerId) => {
         linkedin_link: c.linkedin_link,
         team: c.contact_team,
         role: c.contact_role,
-        contact_photo: c.contact_photo,            // Keep as contact_photo for API endpoint
-        status: c.status
+        contact_photo: c.contact_photo, // Keep as contact_photo for API endpoint
+        status: c.status,
       })),
-      organization: organization ? {
-        company_code: organization.company_code,
-        business_area: businessAreaArray,  // Return as parsed array
-        status: organization.status
-      } : null,
-      documents: documents.map(d => ({
-        document_unique_id: d.document_unique_id,
-        document_type_id: d.document_type_id,
-        document_type: d.document_type,            // Document name from master table
-        document_number: d.document_number,
-        valid_from: d.valid_from,
-        valid_to: d.valid_to,
-        document_id: d.document_id,                // Document upload ID for download
-        file_name: d.file_name,                    // Original file name
-        file_type: d.file_type,                    // MIME type
-        status: 'ACTIVE'                           // Add status for frontend
+      organization: organization
+        ? {
+            company_code: organization.company_code,
+            business_area: businessAreaArray, // Return as parsed array
+            status: organization.status,
+          }
+        : null,
+      documents: documents.map((d) => ({
+        documentUniqueId: d.document_unique_id, // Keep unique ID for reference
+        documentType: d.document_type_id, // Frontend expects "documentType" with ID
+        documentTypeName: d.document_type, // Document name from master table
+        documentNumber: d.document_number,
+        referenceNumber: "", // Not stored in database, return empty
+        country: "", // Not stored in database, return empty
+        validFrom: d.valid_from,
+        validTo: d.valid_to,
+        documentId: d.document_id, // Document upload ID for download
+        fileName: d.file_name || "", // Original file name
+        fileType: d.file_type || "", // MIME type
+        fileData: "", // Not returned for security (use download endpoint)
+        status: d.status === "ACTIVE", // Convert to boolean for frontend
       })),
-      userApprovalStatus // Add approval status to response
     };
   } catch (error) {
-    console.error('Get consignor by ID error:', error);
+    console.error("Get consignor by ID error:", error);
     throw error;
   }
 };
@@ -550,36 +713,36 @@ const createConsignor = async (payload, files, userId) => {
   try {
     // Validate payload
     const { error, value } = consignorCreateSchema.validate(payload, {
-      abortEarly: false
+      abortEarly: false,
     });
 
     if (error) {
       throw {
-        type: 'VALIDATION_ERROR',
+        type: "VALIDATION_ERROR",
         details: error.details,
-        message: 'Validation failed'
+        message: "Validation failed",
       };
     }
 
     const { general, contacts, organization, documents } = value;
 
     // Auto-generate customer_id if not provided
-    if (!general.customer_id || general.customer_id.trim() === '') {
+    if (!general.customer_id || general.customer_id.trim() === "") {
       // Generate customer ID in format: CON0001, CON0002, etc.
-      const lastConsignor = await knex('consignor_basic_information')
-        .select('customer_id')
-        .where('customer_id', 'like', 'CON%')
-        .orderBy('customer_id', 'desc')
+      const lastConsignor = await knex("consignor_basic_information")
+        .select("customer_id")
+        .where("customer_id", "like", "CON%")
+        .orderBy("customer_id", "desc")
         .first();
-      
+
       if (lastConsignor && lastConsignor.customer_id) {
         const lastNumber = parseInt(lastConsignor.customer_id.substring(3));
         const nextNumber = lastNumber + 1;
-        general.customer_id = `CON${String(nextNumber).padStart(4, '0')}`;
+        general.customer_id = `CON${String(nextNumber).padStart(4, "0")}`;
       } else {
-        general.customer_id = 'CON0001';
+        general.customer_id = "CON0001";
       }
-      
+
       console.log(`🆔 Auto-generated customer_id: ${general.customer_id}`);
     }
 
@@ -587,59 +750,67 @@ const createConsignor = async (payload, files, userId) => {
     const isUnique = await isCustomerIdUnique(general.customer_id);
     if (!isUnique) {
       throw {
-        type: 'VALIDATION_ERROR',
+        type: "VALIDATION_ERROR",
         details: [
           {
-            field: 'general.customer_id',
-            message: 'Customer ID already exists. Please use a different ID.'
-          }
+            field: "general.customer_id",
+            message: "Customer ID already exists. Please use a different ID.",
+          },
         ],
-        message: 'Duplicate customer ID'
+        message: "Duplicate customer ID",
       };
     }
 
     // Check if company_code is unique
     if (organization) {
-      const isCompanyUnique = await isCompanyCodeUnique(organization.company_code);
+      const isCompanyUnique = await isCompanyCodeUnique(
+        organization.company_code
+      );
       if (!isCompanyUnique) {
         throw {
-          type: 'VALIDATION_ERROR',
+          type: "VALIDATION_ERROR",
           details: [
             {
-              field: 'organization.company_code',
-              message: 'Company code already exists. Please use a different code.'
-            }
+              field: "organization.company_code",
+              message:
+                "Company code already exists. Please use a different code.",
+            },
           ],
-          message: 'Duplicate company code'
+          message: "Duplicate company code",
         };
       }
     }
 
     // 1. Insert basic information
-    const [consignorUniqueId] = await trx('consignor_basic_information').insert({
-      customer_id: general.customer_id,
-      customer_name: general.customer_name,
-      search_term: general.search_term,
-      industry_type: general.industry_type,
-      currency_type: general.currency_type || null,
-      payment_term: general.payment_term,
-      remark: general.remark || null,
-      website_url: general.website_url || null,
-      name_on_po: general.name_on_po || null,
-      approved_by: general.approved_by || null,
-      approved_date: general.approved_date || null,
-      status: general.status || 'ACTIVE',
-      created_by: userId,
-      updated_by: userId,
-      created_at: knex.fn.now(),
-      updated_at: knex.fn.now()
-    });
+    const [consignorUniqueId] = await trx("consignor_basic_information").insert(
+      {
+        customer_id: general.customer_id,
+        customer_name: general.customer_name,
+        search_term: general.search_term,
+        industry_type: general.industry_type,
+        currency_type: general.currency_type || null,
+        payment_term: general.payment_term,
+        remark: general.remark || null,
+        website_url: general.website_url || null,
+        name_on_po: general.name_on_po || null,
+        approved_by: general.approved_by || null,
+        approved_date: general.approved_date || null,
+        status: general.status || "ACTIVE",
+        created_by: userId,
+        updated_by: userId,
+        created_at: knex.fn.now(),
+        updated_at: knex.fn.now(),
+      }
+    );
 
     // 2. Insert contacts (photo upload handled separately in step 6)
     if (contacts && contacts.length > 0) {
       const contactInserts = contacts.map((contact) => {
-        const contactId = `CON${Math.random().toString(36).substr(2, 9).toUpperCase()}`; // Temp ID, will be replaced
-        
+        const contactId = `CON${Math.random()
+          .toString(36)
+          .substr(2, 9)
+          .toUpperCase()}`; // Temp ID, will be replaced
+
         return {
           contact_id: contactId,
           customer_id: general.customer_id,
@@ -652,12 +823,12 @@ const createConsignor = async (payload, files, userId) => {
           linkedin_link: contact.linkedin_link || null,
           contact_team: contact.team || null,
           contact_role: contact.role,
-          contact_photo: null,  // Will be updated in step 6 if photo exists
-          status: contact.status || 'ACTIVE',
+          contact_photo: null, // Will be updated in step 6 if photo exists
+          status: contact.status || "ACTIVE",
           created_by: userId,
           updated_by: userId,
           created_at: knex.fn.now(),
-          updated_at: knex.fn.now()
+          updated_at: knex.fn.now(),
         };
       });
 
@@ -667,7 +838,7 @@ const createConsignor = async (payload, files, userId) => {
         contacts[i].contact_id = contactInserts[i].contact_id; // Store for later use
       }
 
-      await trx('contact').insert(contactInserts);
+      await trx("contact").insert(contactInserts);
     }
 
     // 3. Insert organization with JSON array for business_area
@@ -675,50 +846,56 @@ const createConsignor = async (payload, files, userId) => {
       // Ensure business_area is JSON string array
       const businessAreaJson = JSON.stringify(organization.business_area);
 
-      await trx('consignor_organization').insert({
+      await trx("consignor_organization").insert({
         customer_id: general.customer_id,
         company_code: organization.company_code,
-        business_area: businessAreaJson,  // Store as JSON string
-        status: organization.status || 'ACTIVE',
+        business_area: businessAreaJson, // Store as JSON string
+        status: organization.status || "ACTIVE",
         created_by: userId,
         updated_by: userId,
         created_at: knex.fn.now(),
-        updated_at: knex.fn.now()
+        updated_at: knex.fn.now(),
       });
     }
 
     // 4. Handle document uploads
     if (documents && documents.length > 0) {
       console.log(`📄 Processing ${documents.length} documents with files...`);
-      
+
       for (let i = 0; i < documents.length; i++) {
         const doc = documents[i];
-        console.log(`  Document ${i}: fileKey=${doc.fileKey}, has file=${!!files[doc.fileKey]}`);
-        
+        console.log(
+          `  Document ${i}: fileKey=${doc.fileKey}, has file=${!!files[
+            doc.fileKey
+          ]}`
+        );
+
         // Find corresponding file if fileKey is specified
         if (doc.fileKey && files[doc.fileKey]) {
           const file = files[doc.fileKey];
-          console.log(`  Uploading file: ${file.originalname}, size: ${file.size}, type: ${file.mimetype}`);
-          
+          console.log(
+            `  Uploading file: ${file.originalname}, size: ${file.size}, type: ${file.mimetype}`
+          );
+
           // Convert file buffer to base64
-          const base64Data = file.buffer.toString('base64');
+          const base64Data = file.buffer.toString("base64");
 
           // Insert into document_upload table with base64 data
           const documentUploadId = await generateDocumentUploadId(trx);
-          await trx('document_upload').insert({
+          await trx("document_upload").insert({
             document_id: documentUploadId,
-            file_name: file.originalname,                    // Original filename
-            file_type: file.mimetype,                        // MIME type
-            file_xstring_value: base64Data,                  // Base64 encoded file data
+            file_name: file.originalname, // Original filename
+            file_type: file.mimetype, // MIME type
+            file_xstring_value: base64Data, // Base64 encoded file data
             created_by: userId,
             updated_by: userId,
             created_at: knex.fn.now(),
-            updated_at: knex.fn.now()
+            updated_at: knex.fn.now(),
           });
 
           // Insert into consignor_documents table
           const documentUniqueId = await generateDocumentId(trx);
-          await trx('consignor_documents').insert({
+          await trx("consignor_documents").insert({
             document_unique_id: documentUniqueId,
             document_id: documentUploadId,
             customer_id: general.customer_id,
@@ -726,14 +903,16 @@ const createConsignor = async (payload, files, userId) => {
             document_number: doc.document_number || null,
             valid_from: doc.valid_from,
             valid_to: doc.valid_to || null,
-            status: 'ACTIVE',
+            status: "ACTIVE",
             created_by: userId,
             updated_by: userId,
             created_at: knex.fn.now(),
-            updated_at: knex.fn.now()
+            updated_at: knex.fn.now(),
           });
-          
-          console.log(`  ✅ Document saved: ${documentUniqueId} -> ${documentUploadId}`);
+
+          console.log(
+            `  ✅ Document saved: ${documentUniqueId} -> ${documentUploadId}`
+          );
         } else {
           console.log(`  ⚠️  No file provided for document ${i}`);
         }
@@ -743,14 +922,14 @@ const createConsignor = async (payload, files, userId) => {
     // 5. Handle NDA/MSA uploads
     if (general) {
       // Handle NDA upload
-      if (files['general_nda']) {
-        const ndaFile = files['general_nda'];
+      if (files["general_nda"]) {
+        const ndaFile = files["general_nda"];
         console.log(`📄 Uploading NDA: ${ndaFile.originalname}`);
-        
-        const ndaBase64 = ndaFile.buffer.toString('base64');
+
+        const ndaBase64 = ndaFile.buffer.toString("base64");
         const ndaDocId = await generateDocumentUploadId(trx);
-        
-        await trx('document_upload').insert({
+
+        await trx("document_upload").insert({
           document_id: ndaDocId,
           file_name: ndaFile.originalname,
           file_type: ndaFile.mimetype,
@@ -758,30 +937,30 @@ const createConsignor = async (payload, files, userId) => {
           created_by: userId,
           updated_by: userId,
           created_at: knex.fn.now(),
-          updated_at: knex.fn.now()
+          updated_at: knex.fn.now(),
         });
-        
+
         // Update consignor_basic_information with NDA document ID
-        await trx('consignor_basic_information')
-          .where('customer_id', general.customer_id)
+        await trx("consignor_basic_information")
+          .where("customer_id", general.customer_id)
           .update({
             upload_nda: ndaDocId,
             updated_by: userId,
-            updated_at: knex.fn.now()
+            updated_at: knex.fn.now(),
           });
-          
+
         console.log(`  ✅ NDA saved: ${ndaDocId}`);
       }
-      
+
       // Handle MSA upload
-      if (files['general_msa']) {
-        const msaFile = files['general_msa'];
+      if (files["general_msa"]) {
+        const msaFile = files["general_msa"];
         console.log(`📄 Uploading MSA: ${msaFile.originalname}`);
-        
-        const msaBase64 = msaFile.buffer.toString('base64');
+
+        const msaBase64 = msaFile.buffer.toString("base64");
         const msaDocId = await generateDocumentUploadId(trx);
-        
-        await trx('document_upload').insert({
+
+        await trx("document_upload").insert({
           document_id: msaDocId,
           file_name: msaFile.originalname,
           file_type: msaFile.mimetype,
@@ -789,18 +968,18 @@ const createConsignor = async (payload, files, userId) => {
           created_by: userId,
           updated_by: userId,
           created_at: knex.fn.now(),
-          updated_at: knex.fn.now()
+          updated_at: knex.fn.now(),
         });
-        
+
         // Update consignor_basic_information with MSA document ID
-        await trx('consignor_basic_information')
-          .where('customer_id', general.customer_id)
+        await trx("consignor_basic_information")
+          .where("customer_id", general.customer_id)
           .update({
             upload_msa: msaDocId,
             updated_by: userId,
-            updated_at: knex.fn.now()
+            updated_at: knex.fn.now(),
           });
-          
+
         console.log(`  ✅ MSA saved: ${msaDocId}`);
       }
     }
@@ -809,15 +988,17 @@ const createConsignor = async (payload, files, userId) => {
     if (contacts && contacts.length > 0) {
       for (let i = 0; i < contacts.length; i++) {
         const photoFileKey = `contact_${i}_photo`;
-        
+
         if (files[photoFileKey]) {
           const photoFile = files[photoFileKey];
-          console.log(`📸 Uploading contact photo ${i}: ${photoFile.originalname}`);
-          
-          const photoBase64 = photoFile.buffer.toString('base64');
+          console.log(
+            `📸 Uploading contact photo ${i}: ${photoFile.originalname}`
+          );
+
+          const photoBase64 = photoFile.buffer.toString("base64");
           const photoDocId = await generateDocumentUploadId(trx);
-          
-          await trx('document_upload').insert({
+
+          await trx("document_upload").insert({
             document_id: photoDocId,
             file_name: photoFile.originalname,
             file_type: photoFile.mimetype,
@@ -825,21 +1006,21 @@ const createConsignor = async (payload, files, userId) => {
             created_by: userId,
             updated_by: userId,
             created_at: knex.fn.now(),
-            updated_at: knex.fn.now()
+            updated_at: knex.fn.now(),
           });
-          
+
           // Update contact with photo document ID
           const contactId = contacts[i].contact_id || contacts[i].contactId;
           if (contactId) {
-            await trx('contact')
-              .where('customer_id', general.customer_id)
-              .where('contact_id', contactId)
+            await trx("contact")
+              .where("customer_id", general.customer_id)
+              .where("contact_id", contactId)
               .update({
                 contact_photo: photoDocId,
                 updated_by: userId,
-                updated_at: knex.fn.now()
+                updated_at: knex.fn.now(),
               });
-              
+
             console.log(`  ✅ Contact photo saved: ${photoDocId}`);
           }
         }
@@ -858,20 +1039,25 @@ const createConsignor = async (payload, files, userId) => {
 
     // Get creator details from user context
     const creatorUserId = userId;
-    
+
     // Get creator name from database
     const creator = await trx("user_master").where("user_id", userId).first();
     const creatorName = creator?.user_full_name || "System";
 
     // Generate initial password (based on customer name + random number)
-    const customerNameClean = general.customer_name.replace(/[^a-zA-Z0-9]/g, "");
+    const customerNameClean = general.customer_name.replace(
+      /[^a-zA-Z0-9]/g,
+      ""
+    );
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     const initialPassword = `${customerNameClean}@${randomNum}`;
     const hashedPassword = await bcrypt.hash(initialPassword, 10);
 
     // Extract contact details from first contact
     const primaryContact = contacts && contacts.length > 0 ? contacts[0] : null;
-    const userEmail = primaryContact?.email || `${general.customer_id.toLowerCase()}@consignor.com`;
+    const userEmail =
+      primaryContact?.email ||
+      `${general.customer_id.toLowerCase()}@consignor.com`;
     const userMobile = primaryContact?.number || "0000000000";
 
     // Create user in user_master with Pending for Approval status
@@ -893,7 +1079,9 @@ const createConsignor = async (payload, files, userId) => {
       updated_at: knex.fn.now(),
     });
 
-    console.log(`  ✅ Created user: ${consignorAdminUserId} (Pending for Approval)`);
+    console.log(
+      `  ✅ Created user: ${consignorAdminUserId} (Pending for Approval)`
+    );
 
     // Get approval configuration for Consignor Admin (Level 1 only)
     const approvalConfig = await trx("approval_configuration")
@@ -905,7 +1093,9 @@ const createConsignor = async (payload, files, userId) => {
       .first();
 
     if (!approvalConfig) {
-      throw new Error("Approval configuration not found for Consignor Admin. Please run migration to add AC0002.");
+      throw new Error(
+        "Approval configuration not found for Consignor Admin. Please run migration to add AC0002."
+      );
     }
 
     // Determine pending approver (Product Owner who did NOT create this)
@@ -953,14 +1143,16 @@ const createConsignor = async (payload, files, userId) => {
 
     console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
     console.log(`  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`);
-    console.log(`  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`);
+    console.log(
+      `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
+    );
 
     // Commit transaction
     await trx.commit();
 
     // Fetch and return complete consignor data with approval info
     const createdConsignor = await getConsignorById(general.customer_id);
-    
+
     // Add approval info to response
     return {
       ...createdConsignor,
@@ -971,12 +1163,12 @@ const createConsignor = async (payload, files, userId) => {
         approvalStatus: "Pending for Approval",
         pendingWith: pendingWithName,
         pendingWithUserId: pendingWithUserId,
-      }
+      },
     };
   } catch (error) {
     // Rollback transaction on error
     await trx.rollback();
-    console.error('Create consignor error:', error);
+    console.error("Create consignor error:", error);
     throw error;
   }
 };
@@ -989,27 +1181,27 @@ const updateConsignor = async (customerId, payload, files, userId) => {
 
   try {
     // Check if consignor exists
-    const existing = await trx('consignor_basic_information')
-      .where('customer_id', customerId)
+    const existing = await trx("consignor_basic_information")
+      .where("customer_id", customerId)
       .first();
 
     if (!existing) {
       throw {
-        type: 'NOT_FOUND',
-        message: `Consignor with ID '${customerId}' not found`
+        type: "NOT_FOUND",
+        message: `Consignor with ID '${customerId}' not found`,
       };
     }
 
     // Validate payload
     const { error, value } = consignorUpdateSchema.validate(payload, {
-      abortEarly: false
+      abortEarly: false,
     });
 
     if (error) {
       throw {
-        type: 'VALIDATION_ERROR',
+        type: "VALIDATION_ERROR",
         details: error.details,
-        message: 'Validation failed'
+        message: "Validation failed",
       };
     }
 
@@ -1025,54 +1217,63 @@ const updateConsignor = async (customerId, payload, files, userId) => {
         );
         if (!isUnique) {
           throw {
-            type: 'VALIDATION_ERROR',
+            type: "VALIDATION_ERROR",
             details: [
               {
-                field: 'general.customer_id',
-                message: 'Customer ID already exists'
-              }
+                field: "general.customer_id",
+                message: "Customer ID already exists",
+              },
             ],
-            message: 'Duplicate customer ID'
+            message: "Duplicate customer ID",
           };
         }
       }
 
-      await trx('consignor_basic_information')
-        .where('customer_id', customerId)
+      await trx("consignor_basic_information")
+        .where("customer_id", customerId)
         .update({
           ...general,
           updated_by: userId,
-          updated_at: knex.fn.now()
+          updated_at: knex.fn.now(),
         });
     }
 
     // 2. Update contacts if provided with photo upload handling
     if (contacts) {
       // Soft delete existing contacts
-      await trx('contact')
-        .where('customer_id', customerId)
-        .update({ status: 'INACTIVE', updated_at: knex.fn.now() });
+      await trx("contact").where("customer_id", customerId).update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
 
       // Insert new contacts with frontend field mapping and photo uploads
       if (contacts.length > 0) {
         const contactInserts = await Promise.all(
           contacts.map(async (contact, index) => {
-            const contactId = contact.contact_id || (await generateContactId(trx));
-            
+            const contactId =
+              contact.contact_id || (await generateContactId(trx));
+
             // Handle photo upload if file exists
             let photoUrl = contact.photo || null;
             const photoFileKey = `contact_${index}_photo`;
-            
+
             if (files && files[photoFileKey]) {
               try {
-                const uploadResult = await uploadFile(files[photoFileKey], 'consignor/contacts');
-                photoUrl = uploadResult.fileUrl;  // Store the URL path
+                const uploadResult = await uploadFile(
+                  files[photoFileKey],
+                  "consignor/contacts"
+                );
+                photoUrl = uploadResult.fileUrl; // Store the URL path
               } catch (uploadError) {
-                console.error(`Error uploading photo for contact ${index}:`, uploadError);
+                console.error(
+                  `Error uploading photo for contact ${index}:`,
+                  uploadError
+                );
                 // Keep existing photo URL if upload fails
               }
             }
-            
+
             return {
               contact_id: contactId,
               customer_id: customerId,
@@ -1085,17 +1286,17 @@ const updateConsignor = async (customerId, payload, files, userId) => {
               linkedin_link: contact.linkedin_link || null,
               contact_team: contact.team || null,
               contact_role: contact.role,
-              contact_photo: photoUrl,  // Store uploaded file URL
-              status: contact.status || 'ACTIVE',
+              contact_photo: photoUrl, // Store uploaded file URL
+              status: contact.status || "ACTIVE",
               created_by: userId,
               updated_by: userId,
               created_at: knex.fn.now(),
-              updated_at: knex.fn.now()
+              updated_at: knex.fn.now(),
             };
           })
         );
 
-        await trx('contact').insert(contactInserts);
+        await trx("contact").insert(contactInserts);
       }
     }
 
@@ -1105,30 +1306,30 @@ const updateConsignor = async (customerId, payload, files, userId) => {
       const businessAreaJson = JSON.stringify(organization.business_area);
 
       // Check if organization record exists
-      const existingOrg = await trx('consignor_organization')
-        .where('customer_id', customerId)
+      const existingOrg = await trx("consignor_organization")
+        .where("customer_id", customerId)
         .first();
 
       if (existingOrg) {
-        await trx('consignor_organization')
-          .where('customer_id', customerId)
+        await trx("consignor_organization")
+          .where("customer_id", customerId)
           .update({
             company_code: organization.company_code,
             business_area: businessAreaJson,
-            status: organization.status || 'ACTIVE',
+            status: organization.status || "ACTIVE",
             updated_by: userId,
-            updated_at: knex.fn.now()
+            updated_at: knex.fn.now(),
           });
       } else {
-        await trx('consignor_organization').insert({
+        await trx("consignor_organization").insert({
           customer_id: customerId,
           company_code: organization.company_code,
           business_area: businessAreaJson,
-          status: organization.status || 'ACTIVE',
+          status: organization.status || "ACTIVE",
           created_by: userId,
           updated_by: userId,
           created_at: knex.fn.now(),
-          updated_at: knex.fn.now()
+          updated_at: knex.fn.now(),
         });
       }
     }
@@ -1137,24 +1338,24 @@ const updateConsignor = async (customerId, payload, files, userId) => {
     if (documents && files) {
       for (const doc of documents) {
         const file = files[doc.fileKey];
-        
+
         if (file) {
-          const uploadResult = await uploadFile(file, 'consignor/documents');
+          const uploadResult = await uploadFile(file, "consignor/documents");
 
           const documentUploadId = await generateDocumentUploadId(trx);
-          await trx('document_upload').insert({
+          await trx("document_upload").insert({
             document_id: documentUploadId,
-            file_name: uploadResult.filePath,        // Actual column is file_name (not document_path)
-            file_type: uploadResult.mimeType,        // Actual column is file_type (not mime_type)
-            file_xstring_value: null,                // Optional metadata field
+            file_name: uploadResult.filePath, // Actual column is file_name (not document_path)
+            file_type: uploadResult.mimeType, // Actual column is file_type (not mime_type)
+            file_xstring_value: null, // Optional metadata field
             created_by: userId,
             updated_by: userId,
             created_at: knex.fn.now(),
-            updated_at: knex.fn.now()
+            updated_at: knex.fn.now(),
           });
 
           const documentUniqueId = await generateDocumentId(trx);
-          await trx('consignor_documents').insert({
+          await trx("consignor_documents").insert({
             document_unique_id: documentUniqueId,
             document_id: documentUploadId,
             customer_id: customerId,
@@ -1162,11 +1363,11 @@ const updateConsignor = async (customerId, payload, files, userId) => {
             document_number: doc.document_number || doc.documentNumber || null,
             valid_from: doc.valid_from || doc.validFrom,
             valid_to: doc.valid_to || doc.validTo || null,
-            status: 'ACTIVE',
+            status: "ACTIVE",
             created_by: userId,
             updated_by: userId,
             created_at: knex.fn.now(),
-            updated_at: knex.fn.now()
+            updated_at: knex.fn.now(),
           });
         }
       }
@@ -1180,7 +1381,7 @@ const updateConsignor = async (customerId, payload, files, userId) => {
     return updatedConsignor;
   } catch (error) {
     await trx.rollback();
-    console.error('Update consignor error:', error);
+    console.error("Update consignor error:", error);
     throw error;
   }
 };
@@ -1191,29 +1392,29 @@ const updateConsignor = async (customerId, payload, files, userId) => {
 const deleteConsignor = async (customerId, userId) => {
   try {
     // Check if consignor exists
-    const existing = await knex('consignor_basic_information')
-      .where('customer_id', customerId)
+    const existing = await knex("consignor_basic_information")
+      .where("customer_id", customerId)
       .first();
 
     if (!existing) {
       throw {
-        type: 'NOT_FOUND',
-        message: `Consignor with ID '${customerId}' not found`
+        type: "NOT_FOUND",
+        message: `Consignor with ID '${customerId}' not found`,
       };
     }
 
     // Soft delete (set status to INACTIVE)
-    await knex('consignor_basic_information')
-      .where('customer_id', customerId)
+    await knex("consignor_basic_information")
+      .where("customer_id", customerId)
       .update({
-        status: 'INACTIVE',
+        status: "INACTIVE",
         updated_by: userId,
-        updated_at: knex.fn.now()
+        updated_at: knex.fn.now(),
       });
 
-    return { success: true, message: 'Consignor deleted successfully' };
+    return { success: true, message: "Consignor deleted successfully" };
   } catch (error) {
-    console.error('Delete consignor error:', error);
+    console.error("Delete consignor error:", error);
     throw error;
   }
 };
@@ -1224,38 +1425,46 @@ const deleteConsignor = async (customerId, userId) => {
 const getMasterData = async () => {
   try {
     // Get industry types from master table or enum
-    const industries = await knex('master_industry_type')
-      .select('industry_type_id as id', 'industry_type_name as label')
-      .where('status', 'ACTIVE')
-      .orderBy('industry_type_name');
+    const industries = await knex("master_industry_type")
+      .select("industry_type_id as id", "industry_type_name as label")
+      .where("status", "ACTIVE")
+      .orderBy("industry_type_name");
 
     // Get currency types
-    const currencies = await knex('master_currency_type')
-      .select('currency_type_id as id', 'currency_type_name as label', 'currency_code as code')
-      .where('status', 'ACTIVE')
-      .orderBy('currency_type_name');
+    const currencies = await knex("master_currency_type")
+      .select(
+        "currency_type_id as id",
+        "currency_type_name as label",
+        "currency_code as code"
+      )
+      .where("status", "ACTIVE")
+      .orderBy("currency_type_name");
 
     // Get document types for CONSIGNOR with proper names
-    const documentTypes = await knex('doc_type_configuration as dtc')
-      .leftJoin('document_name_master as dnm', 'dtc.doc_name_master_id', 'dnm.doc_name_master_id')
-      .select(
-        'dtc.document_type_id as value',
-        'dnm.document_name as label',
-        'dtc.is_mandatory',
-        'dtc.is_expiry_required',
-        'dtc.is_verification_required'
+    const documentTypes = await knex("doc_type_configuration as dtc")
+      .leftJoin(
+        "document_name_master as dnm",
+        "dtc.doc_name_master_id",
+        "dnm.doc_name_master_id"
       )
-      .where('dtc.user_type', 'CONSIGNOR')
-      .where('dtc.status', 'ACTIVE')
-      .orderBy('dnm.document_name');
+      .select(
+        "dtc.document_type_id as value",
+        "dnm.document_name as label",
+        "dtc.is_mandatory",
+        "dtc.is_expiry_required",
+        "dtc.is_verification_required"
+      )
+      .where("dtc.user_type", "CONSIGNOR")
+      .where("dtc.status", "ACTIVE")
+      .orderBy("dnm.document_name");
 
     return {
       industries,
       currencies,
-      documentTypes
+      documentTypes,
     };
   } catch (error) {
-    console.error('Get master data error:', error);
+    console.error("Get master data error:", error);
     throw error;
   }
 };
@@ -1265,38 +1474,38 @@ const getMasterData = async () => {
  */
 const getDocumentFile = async (customerId, documentId) => {
   try {
-    console.log(`📄 Fetching document: ${documentId} for customer: ${customerId}`);
+    console.log(
+      `📄 Fetching document: ${documentId} for customer: ${customerId}`
+    );
 
     // Get document metadata and file data
-    const document = await knex('consignor_documents as cd')
-      .join('document_upload as du', 'cd.document_id', 'du.document_id')
-      .where('cd.customer_id', customerId)
-      .where('cd.document_unique_id', documentId)
-      .where('cd.status', 'ACTIVE')
-      .select(
-        'du.file_name',
-        'du.file_type',
-        'du.file_xstring_value'
-      )
+    const document = await knex("consignor_documents as cd")
+      .join("document_upload as du", "cd.document_id", "du.document_id")
+      .where("cd.customer_id", customerId)
+      .where("cd.document_unique_id", documentId)
+      .where("cd.status", "ACTIVE")
+      .select("du.file_name", "du.file_type", "du.file_xstring_value")
       .first();
 
     if (!document) {
-      console.log('❌ Document not found in database');
+      console.log("❌ Document not found in database");
       return null;
     }
 
     // Convert base64 to buffer
-    const buffer = Buffer.from(document.file_xstring_value, 'base64');
+    const buffer = Buffer.from(document.file_xstring_value, "base64");
 
-    console.log(`✅ Document found: ${document.file_name} (${buffer.length} bytes)`);
+    console.log(
+      `✅ Document found: ${document.file_name} (${buffer.length} bytes)`
+    );
 
     return {
       fileName: document.file_name,
       mimeType: document.file_type,
-      buffer
+      buffer,
     };
   } catch (error) {
-    console.error('❌ Get document file error:', error);
+    console.error("❌ Get document file error:", error);
     throw error;
   }
 };
@@ -1309,39 +1518,39 @@ const getContactPhoto = async (customerId, contactId) => {
     console.log(`📸 Fetching photo for contact: ${contactId}`);
 
     // Get contact with photo reference
-    const contact = await knex('contact')
-      .where('customer_id', customerId)
-      .where('contact_id', contactId)
-      .where('status', 'ACTIVE')
+    const contact = await knex("contact")
+      .where("customer_id", customerId)
+      .where("contact_id", contactId)
+      .where("status", "ACTIVE")
       .first();
 
     if (!contact || !contact.contact_photo) {
-      console.log('❌ Contact or photo not found');
+      console.log("❌ Contact or photo not found");
       return null;
     }
 
     // Get photo file data from document_upload table
-    const photo = await knex('document_upload')
-      .where('document_id', contact.contact_photo)
+    const photo = await knex("document_upload")
+      .where("document_id", contact.contact_photo)
       .first();
 
     if (!photo) {
-      console.log('❌ Photo file not found in document_upload');
+      console.log("❌ Photo file not found in document_upload");
       return null;
     }
 
     // Convert base64 to buffer
-    const buffer = Buffer.from(photo.file_xstring_value, 'base64');
+    const buffer = Buffer.from(photo.file_xstring_value, "base64");
 
     console.log(`✅ Photo found: ${photo.file_name} (${buffer.length} bytes)`);
 
     return {
       fileName: photo.file_name,
       mimeType: photo.file_type,
-      buffer
+      buffer,
     };
   } catch (error) {
-    console.error('❌ Get contact photo error:', error);
+    console.error("❌ Get contact photo error:", error);
     throw error;
   }
 };
@@ -1351,39 +1560,50 @@ const getContactPhoto = async (customerId, contactId) => {
  */
 const getGeneralDocument = async (customerId, fileType) => {
   try {
-    console.log(`📄 Fetching ${fileType.toUpperCase()} for customer: ${customerId}`);
+    console.log(
+      `📄 Fetching ${fileType.toUpperCase()} for customer: ${customerId}`
+    );
 
-    const fieldName = fileType.toLowerCase() === 'nda' ? 'upload_nda' : 'upload_msa';
+    const fieldName =
+      fileType.toLowerCase() === "nda" ? "upload_nda" : "upload_msa";
 
     // Get consignor basic info with document reference
-    const consignor = await knex('consignor_basic_information')
-      .where('customer_id', customerId)
+    const consignor = await knex("consignor_basic_information")
+      .where("customer_id", customerId)
       .first();
 
     if (!consignor || !consignor[fieldName]) {
-      console.log(`❌ ${fileType.toUpperCase()} document not found for consignor`);
+      console.log(
+        `❌ ${fileType.toUpperCase()} document not found for consignor`
+      );
       return null;
     }
 
     // Get file from document_upload table
-    const file = await knex('document_upload')
-      .where('document_id', consignor[fieldName])
+    const file = await knex("document_upload")
+      .where("document_id", consignor[fieldName])
       .first();
 
     if (!file) {
-      console.log(`❌ ${fileType.toUpperCase()} file not found in document_upload`);
+      console.log(
+        `❌ ${fileType.toUpperCase()} file not found in document_upload`
+      );
       return null;
     }
 
     // Convert base64 to buffer
-    const buffer = Buffer.from(file.file_xstring_value, 'base64');
+    const buffer = Buffer.from(file.file_xstring_value, "base64");
 
-    console.log(`✅ ${fileType.toUpperCase()} found: ${file.file_name} (${buffer.length} bytes)`);
+    console.log(
+      `✅ ${fileType.toUpperCase()} found: ${file.file_name} (${
+        buffer.length
+      } bytes)`
+    );
 
     return {
       fileName: file.file_name,
       mimeType: file.file_type,
-      buffer
+      buffer,
     };
   } catch (error) {
     console.error(`❌ Get ${fileType} document error:`, error);
@@ -1401,5 +1621,5 @@ module.exports = {
   getDocumentFile,
   getContactPhoto,
   getGeneralDocument,
-  getConsignorWarehouses
+  getConsignorWarehouses,
 };

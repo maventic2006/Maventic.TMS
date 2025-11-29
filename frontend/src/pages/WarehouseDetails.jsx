@@ -6,6 +6,8 @@ import { getPageTheme } from "../theme.config";
 import {
   fetchWarehouseById,
   updateWarehouse,
+  updateWarehouseDraft,
+  submitWarehouseFromDraft,
   fetchMasterData,
   clearError,
 } from "../redux/slices/warehouseSlice";
@@ -25,6 +27,7 @@ import {
   Calendar,
   Hash,
   Map,
+  Send,
 } from "lucide-react";
 
 import { getComponentTheme } from "../utils/theme";
@@ -104,13 +107,14 @@ const WarehouseDetails = () => {
         vehicleCapacity: warehouseData.vehicle_capacity || 0,
         speedLimit: warehouseData.speed_limit || 20,
         virtualYardIn: warehouseData.virtual_yard_in || false,
-        radiusVirtualYardIn: warehouseData.radius_virtual_yard_in || 0,
-      },
-      facilities: {
-        weighBridge: warehouseData.weigh_bridge || false,
-        geoFencing: warehouseData.geo_fencing || false,
-        gatePass: warehouseData.gate_pass || false,
-        fuelFilling: warehouseData.fuel_filling || false,
+        radiusVirtualYardIn: warehouseData.radius_for_virtual_yard_in || 0,
+        weighBridge: warehouseData.weigh_bridge_availability || false,
+        gatepassSystem: warehouseData.gatepass_system_available || false,
+        fuelAvailability: warehouseData.fuel_availability || false,
+        stagingArea: warehouseData.staging_area_for_goods_organization || false,
+        driverWaitingArea: warehouseData.driver_waiting_area || false,
+        gateInChecklistAuth: warehouseData.gate_in_checklist_auth || false,
+        gateOutChecklistAuth: warehouseData.gate_out_checklist_auth || false,
       },
       address: {
         addressType: address.address_type_id || "",
@@ -143,11 +147,19 @@ const WarehouseDetails = () => {
       vehicle_capacity: editData.generalDetails?.vehicleCapacity || 0,
       speed_limit: editData.generalDetails?.speedLimit || 20,
       virtual_yard_in: editData.generalDetails?.virtualYardIn || false,
-      radius_virtual_yard_in: editData.generalDetails?.radiusVirtualYardIn || 0,
-      weigh_bridge: editData.facilities?.weighBridge || false,
-      geo_fencing: editData.facilities?.geoFencing || false,
-      gate_pass: editData.facilities?.gatePass || false,
-      fuel_filling: editData.facilities?.fuelFilling || false,
+      radius_for_virtual_yard_in:
+        editData.generalDetails?.radiusVirtualYardIn || 0,
+      weigh_bridge_availability: editData.generalDetails?.weighBridge || false,
+      fuel_availability: editData.generalDetails?.fuelAvailability || false,
+      staging_area_for_goods_organization:
+        editData.generalDetails?.stagingArea || false,
+      driver_waiting_area: editData.generalDetails?.driverWaitingArea || false,
+      gate_in_checklist_auth:
+        editData.generalDetails?.gateInChecklistAuth || false,
+      gate_out_checklist_auth:
+        editData.generalDetails?.gateOutChecklistAuth || false,
+      gatepass_system_available:
+        editData.generalDetails?.gatepassSystem || false,
       consignor_id: currentWarehouse?.consignor_id || user?.consignor_id || "",
       address: editData.address
         ? {
@@ -315,72 +327,81 @@ const WarehouseDetails = () => {
         3: false,
       });
 
-      // Validate all sections
-      const errors = validateAllSections(editFormData);
+      // Check if this is a draft
+      const isDraft = currentWarehouse?.status === "SAVE_AS_DRAFT";
 
-      if (Object.keys(errors).length > 0) {
-        setValidationErrors(errors);
+      // For drafts: NO validation, just update
+      // For non-drafts: Full validation required
+      if (!isDraft) {
+        // Validate all sections for non-draft warehouses
+        const errors = validateAllSections(editFormData);
 
-        // Update tab errors to show which tabs have issues
-        const newTabErrors = {
-          0: errors.general && Object.keys(errors.general).length > 0,
-          1: errors.facilities && Object.keys(errors.facilities).length > 0,
-          2: errors.address && Object.keys(errors.address).length > 0,
-          3: errors.documents && Object.keys(errors.documents).length > 0,
-        };
-        setTabErrors(newTabErrors);
+        if (Object.keys(errors).length > 0) {
+          setValidationErrors(errors);
 
-        // Collect all error messages for user-friendly display
-        const errorMessages = [];
-        if (errors.general) {
-          Object.values(errors.general).forEach((msg) =>
-            errorMessages.push(msg)
+          // Update tab errors to show which tabs have issues
+          const newTabErrors = {
+            0: errors.general && Object.keys(errors.general).length > 0,
+            1: errors.facilities && Object.keys(errors.facilities).length > 0,
+            2: errors.address && Object.keys(errors.address).length > 0,
+            3: errors.documents && Object.keys(errors.documents).length > 0,
+          };
+          setTabErrors(newTabErrors);
+
+          // Collect all error messages for user-friendly display
+          const errorMessages = [];
+          if (errors.general) {
+            Object.values(errors.general).forEach((msg) =>
+              errorMessages.push(msg)
+            );
+          }
+          if (errors.facilities) {
+            Object.values(errors.facilities).forEach((msg) =>
+              errorMessages.push(msg)
+            );
+          }
+          if (errors.address) {
+            Object.values(errors.address).forEach((msg) =>
+              errorMessages.push(msg)
+            );
+          }
+          if (errors.documents) {
+            Object.values(errors.documents).forEach((msg) =>
+              errorMessages.push(msg)
+            );
+          }
+
+          // Find the first tab with errors and switch to it
+          if (newTabErrors[0]) {
+            setActiveTab(0);
+          } else if (newTabErrors[1]) {
+            setActiveTab(1);
+          } else if (newTabErrors[2]) {
+            setActiveTab(2);
+          } else if (newTabErrors[3]) {
+            setActiveTab(3);
+          }
+
+          // Show specific error message or first few errors
+          const errorMessage =
+            errorMessages.length === 1
+              ? errorMessages[0]
+              : errorMessages.length <= 3
+              ? errorMessages.join(", ")
+              : `${errorMessages.length} validation errors found: ${
+                  errorMessages[0]
+                }, ${errorMessages[1]}, and ${
+                  errorMessages.length - 2
+                } more...`;
+
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.ERROR,
+              message: errorMessage,
+            })
           );
+          return;
         }
-        if (errors.facilities) {
-          Object.values(errors.facilities).forEach((msg) =>
-            errorMessages.push(msg)
-          );
-        }
-        if (errors.address) {
-          Object.values(errors.address).forEach((msg) =>
-            errorMessages.push(msg)
-          );
-        }
-        if (errors.documents) {
-          Object.values(errors.documents).forEach((msg) =>
-            errorMessages.push(msg)
-          );
-        }
-
-        // Find the first tab with errors and switch to it
-        if (newTabErrors[0]) {
-          setActiveTab(0);
-        } else if (newTabErrors[1]) {
-          setActiveTab(1);
-        } else if (newTabErrors[2]) {
-          setActiveTab(2);
-        } else if (newTabErrors[3]) {
-          setActiveTab(3);
-        }
-
-        // Show specific error message or first few errors
-        const errorMessage =
-          errorMessages.length === 1
-            ? errorMessages[0]
-            : errorMessages.length <= 3
-            ? errorMessages.join(", ")
-            : `${errorMessages.length} validation errors found: ${
-                errorMessages[0]
-              }, ${errorMessages[1]}, and ${errorMessages.length - 2} more...`;
-
-        dispatch(
-          addToast({
-            type: TOAST_TYPES.ERROR,
-            message: errorMessage,
-          })
-        );
-        return;
       }
 
       // Clear any previous errors
@@ -396,19 +417,33 @@ const WarehouseDetails = () => {
       // Transform nested frontend structure to flat backend structure
       const backendData = transformToBackendFormat(editFormData);
 
-      // Call the update API
-      const result = await dispatch(
-        updateWarehouse({
-          id: id,
-          data: backendData,
-        })
-      ).unwrap();
+      // Call appropriate update API based on status
+      let result;
+      if (isDraft) {
+        // Update draft (no validation)
+        result = await dispatch(
+          updateWarehouseDraft({
+            warehouseId: id,
+            warehouseData: backendData,
+          })
+        ).unwrap();
+      } else {
+        // Update regular warehouse (full validation)
+        result = await dispatch(
+          updateWarehouse({
+            id: id,
+            data: backendData,
+          })
+        ).unwrap();
+      }
 
       // Success - show toast notification
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: "Warehouse updated successfully!",
+          message: isDraft
+            ? "Warehouse draft updated successfully!"
+            : "Warehouse updated successfully!",
         })
       );
 
@@ -505,6 +540,96 @@ const WarehouseDetails = () => {
           type: TOAST_TYPES.ERROR,
           message:
             err.message || "Failed to update warehouse. Please try again.",
+        })
+      );
+    }
+  };
+
+  // Submit warehouse draft for approval
+  const handleSubmitForApproval = async () => {
+    try {
+      // Confirm submission
+      // const confirmed = window.confirm(
+      //   "Are you sure you want to submit this warehouse for approval? Full validation will be applied."
+      // );
+
+      // if (!confirmed) {
+      //   return;
+      // }
+
+      // Clear previous errors
+      dispatch(clearError());
+
+      // Transform nested frontend structure to flat backend structure
+      const backendData = transformToBackendFormat(editFormData);
+
+      // Submit for approval (will perform full validation)
+      const result = await dispatch(
+        submitWarehouseFromDraft({
+          warehouseId: id,
+          warehouseData: backendData,
+        })
+      ).unwrap();
+
+      // Success
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Warehouse submitted for approval successfully!",
+        })
+      );
+
+      // Refresh the warehouse data
+      await dispatch(fetchWarehouseById(id));
+
+      // Switch to view mode
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
+    } catch (err) {
+      console.error("Error submitting warehouse for approval:", err);
+
+      // Clear Redux error state
+      dispatch(clearError());
+
+      // Check if it's a validation error
+      if (
+        err.code === "VALIDATION_ERROR" ||
+        err.message?.includes("required") ||
+        err.message?.includes("validation")
+      ) {
+        // Build user-friendly error message
+        let errorMessage = err.message || "Validation failed";
+
+        // If there's a field specified, make it more specific
+        if (err.field) {
+          errorMessage = `${err.message}`;
+
+          // If there's expected format info, add it
+          if (err.expectedFormat) {
+            errorMessage += ` (Expected format: ${err.expectedFormat})`;
+          }
+        }
+
+        // Show validation error
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: errorMessage,
+          })
+        );
+
+        // Stay in edit mode to allow user to fix errors
+        return;
+      }
+
+      // Other errors
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message:
+            err.message ||
+            "Failed to submit warehouse for approval. Please try again.",
         })
       );
     }
@@ -656,10 +781,14 @@ const WarehouseDetails = () => {
                       ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
                       : currentWarehouse.status === "PENDING"
                       ? "bg-amber-500/20 text-amber-300 border border-amber-400/30"
+                      : currentWarehouse.status === "SAVE_AS_DRAFT"
+                      ? "bg-blue-500/20 text-blue-300 border border-blue-400/30"
                       : "bg-red-500/20 text-red-300 border border-red-400/30"
                   }`}
                 >
-                  {currentWarehouse.status || "Unknown"}
+                  {currentWarehouse.status === "SAVE_AS_DRAFT"
+                    ? "Draft"
+                    : currentWarehouse.status || "Unknown"}
                 </span>
               </div>
               <div className="flex items-center gap-4 text-blue-100/80 text-xs">
@@ -703,6 +832,27 @@ const WarehouseDetails = () => {
                   Cancel
                 </button>
 
+                {/* Show "Submit for Approval" button for drafts in edit mode */}
+                {currentWarehouse?.status === "SAVE_AS_DRAFT" && (
+                  <button
+                    onClick={handleSubmitForApproval}
+                    disabled={loading}
+                    className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white rounded-xl font-medium text-sm hover:from-[#2563EB] hover:to-[#3B82F6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                        Submit for Approval
+                      </>
+                    )}
+                  </button>
+                )}
+
                 <button
                   onClick={handleSaveChanges}
                   disabled={loading}
@@ -716,7 +866,9 @@ const WarehouseDetails = () => {
                   ) : (
                     <>
                       <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                      Save Changes
+                      {currentWarehouse?.status === "SAVE_AS_DRAFT"
+                        ? "Save Draft"
+                        : "Save Changes"}
                     </>
                   )}
                 </button>
@@ -727,7 +879,9 @@ const WarehouseDetails = () => {
                 className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
               >
                 <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                Edit Details
+                {currentWarehouse?.status === "SAVE_AS_DRAFT"
+                  ? "Edit Draft"
+                  : "Edit Details"}
               </button>
             )}
           </div>

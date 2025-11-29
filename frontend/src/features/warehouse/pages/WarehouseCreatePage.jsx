@@ -22,6 +22,8 @@ import {
   clearError,
   clearLastCreated,
   openBulkUploadModal,
+  saveWarehouseAsDraft,
+  updateWarehouseDraft,
 } from "../../../redux/slices/warehouseSlice";
 import WarehouseBulkUploadModal from "../components/WarehouseBulkUploadModal";
 import WarehouseBulkUploadHistory from "../components/WarehouseBulkUploadHistory";
@@ -30,6 +32,9 @@ import { validateDocumentNumber } from "../../../utils/documentValidation";
 import { getComponentTheme } from "../../../utils/theme";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../../utils/constants";
 import { addToast } from "../../../redux/slices/uiSlice";
+import { useFormDirtyTracking } from "../../../hooks/useFormDirtyTracking";
+import { useSaveAsDraft } from "../../../hooks/useSaveAsDraft";
+import SaveAsDraftModal from "../../../components/ui/SaveAsDraftModal";
 
 // Import tab components
 import GeneralDetailsTab from "../components/GeneralDetailsTab";
@@ -38,12 +43,68 @@ import AddressTab from "../components/AddressTab";
 import DocumentsTab from "../components/DocumentsTab";
 import GeofencingTab from "../components/GeofencingTab";
 
+// Initial form data constant for dirty tracking
+const getInitialFormData = () => ({
+  generalDetails: {
+    consignorId: "",
+    warehouseName: "",
+    warehouseName2: "",
+    warehouseType: "",
+    materialType: "",
+    language: "EN",
+    vehicleCapacity: 0,
+    virtualYardIn: false,
+    radiusVirtualYardIn: 0,
+    speedLimit: 20,
+    weighBridge: false,
+    gatepassSystem: false,
+    fuelAvailability: false,
+    stagingArea: false,
+    driverWaitingArea: false,
+    gateInChecklistAuth: false,
+    gateOutChecklistAuth: false,
+  },
+  address: {
+    country: "",
+    state: "",
+    city: "",
+    district: "",
+    street1: "",
+    street2: "",
+    postalCode: "",
+    vatNumber: "",
+    tinPan: "",
+    tan: "",
+    addressType: "",
+    isPrimary: true,
+  },
+  documents: [
+    {
+      documentType: "",
+      documentNumber: "",
+      validFrom: "",
+      validTo: "",
+      fileName: "",
+      fileType: "",
+      fileData: "",
+      status: true,
+    },
+  ],
+  subLocations: [],
+});
+
 const WarehouseCreatePage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { isCreating, error, lastCreatedWarehouse, masterData, loading } =
-    useSelector((state) => state.warehouse);
+  const {
+    isCreating,
+    isSavingDraft,
+    error,
+    lastCreatedWarehouse,
+    masterData,
+    loading,
+  } = useSelector((state) => state.warehouse);
 
   const { user, role } = useSelector((state) => state.auth);
 
@@ -52,63 +113,14 @@ const WarehouseCreatePage = () => {
   const theme = getPageTheme("general");
 
   const [activeTab, setActiveTab] = useState(0);
-  const [formData, setFormData] = useState({
-    generalDetails: {
-      warehouseName: "",
-      warehouseName2: "",
-      warehouseType: "",
-      materialType: "",
-      language: "EN",
-      vehicleCapacity: 0,
-      virtualYardIn: false,
-      radiusVirtualYardIn: 0,
-      speedLimit: 20,
-    },
-    facilities: {
-      weighBridge: false,
-      gatepassSystem: false,
-      fuelAvailability: false,
-      stagingArea: false,
-      driverWaitingArea: false,
-      gateInChecklistAuth: false,
-      gateOutChecklistAuth: false,
-    },
-    address: {
-      country: "",
-      state: "",
-      city: "",
-      district: "",
-      street1: "",
-      street2: "",
-      postalCode: "",
-      vatNumber: "",
-      tinPan: "",
-      tan: "",
-      addressType: "",
-      isPrimary: true,
-    },
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        validFrom: "",
-        validTo: "",
-        fileName: "",
-        fileType: "",
-        fileData: "",
-        status: true,
-      },
-    ],
-    subLocations: [],
-  });
+  const [formData, setFormData] = useState(() => getInitialFormData());
 
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
     0: false, // General Details
-    1: false, // Facilities
-    2: false, // Address
-    3: false, // Documents
-    4: false, // Geofencing
+    1: false, // Address
+    2: false, // Documents
+    3: false, // Geofencing
   });
 
   const tabs = [
@@ -137,6 +149,64 @@ const WarehouseCreatePage = () => {
       component: GeofencingTab,
     },
   ];
+
+  // Dirty tracking hook for unsaved changes
+  const initialFormData = getInitialFormData();
+  const { isDirty, currentData, setCurrentData, resetDirty } =
+    useFormDirtyTracking(initialFormData);
+
+  // Sync formData with dirty tracking
+  useEffect(() => {
+    setCurrentData(formData);
+  }, [formData, setCurrentData]);
+
+  // Save as draft hook integration
+  const {
+    showModal: showDraftModal,
+    handleSaveDraft,
+    handleDiscard,
+    handleCancel: handleCancelDraft,
+    isLoading: isDraftLoading,
+    showSaveAsDraftModal,
+  } = useSaveAsDraft(
+    "warehouse",
+    formData,
+    isDirty,
+    null, // No recordId for create page
+    (data) => {
+      console.log("✅ Draft saved successfully:", data);
+      resetDirty(formData);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Warehouse draft saved successfully!",
+          duration: 3000,
+        })
+      );
+    },
+    (error) => {
+      console.error("❌ Error saving draft:", error);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: error?.message || "Failed to save draft",
+          duration: 5000,
+        })
+      );
+    }
+  );
+
+  // Browser navigation blocking (refresh/close)
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   // Check if user has permission (product owner only)
   // useEffect(() => {
@@ -258,53 +328,9 @@ const WarehouseCreatePage = () => {
         "Are you sure you want to clear all data? This action cannot be undone."
       )
     ) {
-      setFormData({
-        generalDetails: {
-          warehouseName: "",
-          warehouseName2: "",
-          warehouseType: "",
-          materialType: "",
-          language: "EN",
-          vehicleCapacity: 0,
-          virtualYardIn: false,
-          radiusVirtualYardIn: 0,
-          speedLimit: 20,
-        },
-        facilities: {
-          weighBridge: false,
-          gatepassSystem: false,
-          fuelAvailability: false,
-          stagingArea: false,
-          driverWaitingArea: false,
-          gateInChecklistAuth: false,
-          gateOutChecklistAuth: false,
-        },
-        address: {
-          country: "",
-          state: "",
-          city: "",
-          district: "",
-          street1: "",
-          street2: "",
-          postalCode: "",
-          vatNumber: "",
-          addressType: "",
-          isPrimary: true,
-        },
-        documents: [
-          {
-            documentType: "",
-            documentNumber: "",
-            validFrom: "",
-            validTo: "",
-            fileName: "",
-            fileType: "",
-            fileData: "",
-            status: true,
-          },
-        ],
-        subLocations: [],
-      });
+      const clearedData = getInitialFormData();
+      setFormData(clearedData);
+      resetDirty(clearedData);
       setValidationErrors({});
       setTabErrors({
         0: false,
@@ -314,6 +340,54 @@ const WarehouseCreatePage = () => {
         4: false,
       });
       setActiveTab(0);
+    }
+  };
+
+  // Back button handler with dirty check
+  const handleBackClick = () => {
+    if (isDirty) {
+      showSaveAsDraftModal("/warehouse");
+    } else {
+      navigate("/warehouse");
+    }
+  };
+
+  // Manual save as draft button handler
+  const handleSaveAsDraftClick = async () => {
+    if (!isDirty) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "No changes to save",
+        })
+      );
+      return;
+    }
+
+    try {
+      // ✅ Backend will get consignorId from req.user.consignor_id (JWT token)
+      // No need to pass it from frontend
+      const result = await dispatch(saveWarehouseAsDraft(formData)).unwrap();
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Warehouse draft saved successfully!",
+        })
+      );
+      resetDirty(formData);
+
+      // Navigate to warehouse list after 1 second
+      setTimeout(() => {
+        navigate("/warehouse");
+      }, 1000);
+    } catch (error) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: error?.message || "Failed to save draft",
+        })
+      );
     }
   };
 
@@ -465,6 +539,7 @@ const WarehouseCreatePage = () => {
     // Transform form data to match backend API expectations
     const apiPayload = {
       generalDetails: {
+        consignorId: formData.generalDetails.consignorId,
         warehouseName: formData.generalDetails.warehouseName,
         warehouseName2: formData.generalDetails.warehouseName2,
         warehouseType: formData.generalDetails.warehouseType,
@@ -508,7 +583,7 @@ const WarehouseCreatePage = () => {
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBackClick}
               className="group p-2 bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-all duration-300 hover:scale-105 border border-white/20"
             >
               <ArrowLeft className="w-5 h-5 text-white group-hover:text-white transition-colors" />
@@ -528,7 +603,7 @@ const WarehouseCreatePage = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={handleClear}
-              disabled={isCreating}
+              disabled={isCreating || isSavingDraft}
               className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
@@ -536,8 +611,26 @@ const WarehouseCreatePage = () => {
             </button>
 
             <button
+              onClick={handleSaveAsDraftClick}
+              disabled={isCreating || isSavingDraft || !isDirty}
+              className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {isSavingDraft ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  Save as Draft
+                </>
+              )}
+            </button>
+
+            <button
               onClick={handleBulkUpload}
-              disabled={isCreating}
+              disabled={isCreating || isSavingDraft}
               className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <Upload className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
@@ -546,7 +639,7 @@ const WarehouseCreatePage = () => {
 
             <button
               onClick={handleSubmit}
-              disabled={isCreating}
+              disabled={isCreating || isSavingDraft}
               className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isCreating ? (
@@ -561,15 +654,6 @@ const WarehouseCreatePage = () => {
                 </>
               )}
             </button>
-
-            {/* <button
-              onClick={handleExport}
-              disabled={isCreating}
-              className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              <Share className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-              Export
-            </button> */}
           </div>
         </div>
       </div>
@@ -710,6 +794,16 @@ const WarehouseCreatePage = () => {
       {/* Bulk Upload Modal and History */}
       <WarehouseBulkUploadModal />
       <WarehouseBulkUploadHistory />
+
+      {/* Save as Draft Modal */}
+      <SaveAsDraftModal
+        isOpen={showDraftModal}
+        onSaveDraft={handleSaveDraft}
+        onDiscard={handleDiscard}
+        onCancel={handleCancelDraft}
+        isLoading={isDraftLoading || isSavingDraft}
+        isUpdate={false}
+      />
     </div>
   );
 };

@@ -91,29 +91,37 @@ api.interceptors.response.use(
     if (error.response?.status === 403 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      const errorMessage = error.response?.data?.error?.details || error.response?.data?.message || '';
-      
+      const errorMessage =
+        error.response?.data?.error?.details ||
+        error.response?.data?.message ||
+        "";
+
       // Check if it's a JWT error (malformed, expired, invalid)
-      if (errorMessage.includes('jwt') || errorMessage.includes('token')) {
+      if (errorMessage.includes("jwt") || errorMessage.includes("token")) {
         console.warn("⚠️ JWT Token Error detected:", errorMessage);
         console.log("🔄 Attempting to refresh authentication token...");
-        
+
         try {
           // Try to refresh the token
           const refreshResponse = await api.post("/auth/refresh");
-          
+
           if (refreshResponse.data.success) {
-            console.log("✅ Token refreshed successfully, retrying original request");
-            
+            console.log(
+              "✅ Token refreshed successfully, retrying original request"
+            );
+
             // Retry the original request with the new token (cookie auto-included)
             return api(originalRequest);
           } else {
             throw new Error("Token refresh failed");
           }
         } catch (refreshError) {
-          console.error("❌ Token refresh failed:", refreshError.response?.data || refreshError.message);
+          console.error(
+            "❌ Token refresh failed:",
+            refreshError.response?.data || refreshError.message
+          );
           console.log("🔒 Redirecting to login due to authentication failure");
-          
+
           // Clear any corrupted auth state and redirect to login
           if (!window.location.pathname.includes("/login")) {
             window.location.href = "/login";
@@ -121,7 +129,7 @@ api.interceptors.response.use(
           return Promise.reject(refreshError);
         }
       }
-      
+
       // If not a token error, just log and reject
       console.error("🚫 Access denied (403):", error.response.data.message);
       return Promise.reject(error);
@@ -131,13 +139,17 @@ api.interceptors.response.use(
     if (error.response?.status >= 500) {
       // Server error
       console.error("🔴 Server error:", error.response.data.message);
-    } else if (error.code === "ECONNABORTED" || error.message?.includes('timeout')) {
+    } else if (
+      error.code === "ECONNABORTED" ||
+      error.message?.includes("timeout")
+    ) {
       // Timeout error - provide helpful message
       console.error("⏱️ Request timeout error:", {
         url: error.config?.url,
-        timeout: error.config?.timeout || 'default (30s)',
+        timeout: error.config?.timeout || "default (30s)",
         message: error.message,
-        suggestion: 'The request took too long. For file uploads, this may indicate a large file or slow network.'
+        suggestion:
+          "The request took too long. For file uploads, this may indicate a large file or slow network.",
       });
     } else if (!error.response) {
       // Network error
@@ -188,29 +200,30 @@ export const transporterAPI = {
   // Get all transporters with filtering and pagination
   getTransporters: (params = {}) => {
     const queryParams = new URLSearchParams();
-    
+
     // Add parameters if they exist
-    if (params.page) queryParams.append('page', params.page);
-    if (params.limit) queryParams.append('limit', params.limit);
-    if (params.search) queryParams.append('search', params.search);
-    if (params.transporterId) queryParams.append('transporterId', params.transporterId);
-    if (params.status) queryParams.append('status', params.status);
+    if (params.page) queryParams.append("page", params.page);
+    if (params.limit) queryParams.append("limit", params.limit);
+    if (params.search) queryParams.append("search", params.search);
+    if (params.transporterId)
+      queryParams.append("transporterId", params.transporterId);
+    if (params.status) queryParams.append("status", params.status);
     if (params.transportMode) {
       if (Array.isArray(params.transportMode)) {
-        queryParams.append('transportMode', params.transportMode.join(','));
+        queryParams.append("transportMode", params.transportMode.join(","));
       } else {
-        queryParams.append('transportMode', params.transportMode);
+        queryParams.append("transportMode", params.transportMode);
       }
     }
-    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
-    
+    if (params.sortBy) queryParams.append("sortBy", params.sortBy);
+    if (params.sortOrder) queryParams.append("sortOrder", params.sortOrder);
+
     const queryString = queryParams.toString();
-    const url = `/transporters${queryString ? `?${queryString}` : ''}`;
-    
+    const url = `/transporters${queryString ? `?${queryString}` : ""}`;
+
     return api.get(url);
   },
-  
+
   // Get single transporter by ID
   getTransporterById: (id) => {
     return api.get(`/transporters/${id}`);
@@ -219,7 +232,7 @@ export const transporterAPI = {
   // Alias for getTransporterById (used in TransporterDetails component)
   getTransporter: (id) => {
     return api.get(`/transporters/${id}`);
-  }
+  },
 };
 
 // Vehicle API functions
@@ -227,40 +240,48 @@ export const vehicleAPI = {
   // Get all vehicles with filtering and pagination
   getVehicles: (params = {}) => {
     const queryParams = new URLSearchParams();
-    
+
     // Add parameters if they exist
-    if (params.page) queryParams.append('page', params.page);
-    if (params.limit) queryParams.append('limit', params.limit);
-    if (params.search) queryParams.append('search', params.search);
-    
+    if (params.page) queryParams.append("page", params.page);
+    if (params.limit) queryParams.append("limit", params.limit);
+    if (params.search) queryParams.append("search", params.search);
+
     // Basic filters
-    if (params.registrationNumber) queryParams.append('registrationNumber', params.registrationNumber);
-    if (params.vehicleType) queryParams.append('vehicleType', params.vehicleType);
-    if (params.make) queryParams.append('make', params.make);
-    if (params.model) queryParams.append('model', params.model);
-    if (params.yearFrom) queryParams.append('yearFrom', params.yearFrom);
-    if (params.yearTo) queryParams.append('yearTo', params.yearTo);
-    if (params.status) queryParams.append('status', params.status);
-    if (params.registrationState) queryParams.append('registrationState', params.registrationState);
-    if (params.fuelType) queryParams.append('fuelType', params.fuelType);
-    if (params.leasingFlag) queryParams.append('leasingFlag', params.leasingFlag);
-    if (params.gpsEnabled) queryParams.append('gpsEnabled', params.gpsEnabled);
-    if (params.ownership) queryParams.append('ownership', params.ownership);
-    if (params.vehicleCondition) queryParams.append('vehicleCondition', params.vehicleCondition);
-    if (params.engineType) queryParams.append('engineType', params.engineType);
-    if (params.emissionStandard) queryParams.append('emissionStandard', params.emissionStandard);
-    if (params.bodyType) queryParams.append('bodyType', params.bodyType);
-    if (params.towingCapacityMin) queryParams.append('towingCapacityMin', params.towingCapacityMin);
-    if (params.towingCapacityMax) queryParams.append('towingCapacityMax', params.towingCapacityMax);
-    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
-    
+    if (params.registrationNumber)
+      queryParams.append("registrationNumber", params.registrationNumber);
+    if (params.vehicleType)
+      queryParams.append("vehicleType", params.vehicleType);
+    if (params.make) queryParams.append("make", params.make);
+    if (params.model) queryParams.append("model", params.model);
+    if (params.yearFrom) queryParams.append("yearFrom", params.yearFrom);
+    if (params.yearTo) queryParams.append("yearTo", params.yearTo);
+    if (params.status) queryParams.append("status", params.status);
+    if (params.registrationState)
+      queryParams.append("registrationState", params.registrationState);
+    if (params.fuelType) queryParams.append("fuelType", params.fuelType);
+    if (params.leasingFlag)
+      queryParams.append("leasingFlag", params.leasingFlag);
+    if (params.gpsEnabled) queryParams.append("gpsEnabled", params.gpsEnabled);
+    if (params.ownership) queryParams.append("ownership", params.ownership);
+    if (params.vehicleCondition)
+      queryParams.append("vehicleCondition", params.vehicleCondition);
+    if (params.engineType) queryParams.append("engineType", params.engineType);
+    if (params.emissionStandard)
+      queryParams.append("emissionStandard", params.emissionStandard);
+    if (params.bodyType) queryParams.append("bodyType", params.bodyType);
+    if (params.towingCapacityMin)
+      queryParams.append("towingCapacityMin", params.towingCapacityMin);
+    if (params.towingCapacityMax)
+      queryParams.append("towingCapacityMax", params.towingCapacityMax);
+    if (params.sortBy) queryParams.append("sortBy", params.sortBy);
+    if (params.sortOrder) queryParams.append("sortOrder", params.sortOrder);
+
     const queryString = queryParams.toString();
-    const url = `/vehicles${queryString ? `?${queryString}` : ''}`;
-    
+    const url = `/vehicles${queryString ? `?${queryString}` : ""}`;
+
     return api.get(url);
   },
-  
+
   // Get single vehicle by ID
   getVehicleById: (id) => {
     return api.get(`/vehicles/${id}`);
@@ -268,7 +289,7 @@ export const vehicleAPI = {
 
   // Create new vehicle
   createVehicle: (vehicleData) => {
-    return api.post('/vehicles', vehicleData);
+    return api.post("/vehicles", vehicleData);
   },
 
   // Update existing vehicle
@@ -283,13 +304,35 @@ export const vehicleAPI = {
 
   // Get master data for dropdowns
   getMasterData: () => {
-    return api.get('/vehicles/master-data');
+    return api.get("/vehicles/master-data");
   },
 
   // RC Lookup API - Get vehicle details by registration number
   lookupVehicleByRC: (registrationNumber) => {
     return api.get(`/vehicles/rc-lookup/${encodeURIComponent(registrationNumber)}`);
-  }
+  },
+
+  // ==================== DRAFT WORKFLOW ENDPOINTS ====================
+
+  // Save vehicle as draft (minimal validation)
+  saveVehicleAsDraft: (vehicleData) => {
+    return api.post("/vehicles/save-draft", vehicleData);
+  },
+
+  // Update existing vehicle draft (no validation)
+  updateVehicleDraft: (id, vehicleData) => {
+    return api.put(`/vehicles/${id}/update-draft`, vehicleData);
+  },
+
+  // Submit vehicle draft for approval (full validation, DRAFT → PENDING)
+  submitVehicleDraft: (id, vehicleData) => {
+    return api.put(`/vehicles/${id}/submit-draft`, vehicleData);
+  },
+
+  // Delete vehicle draft (hard delete)
+  deleteVehicleDraft: (id) => {
+    return api.delete(`/vehicles/${id}/delete-draft`);
+  },
 };
 
 export default api;

@@ -475,6 +475,7 @@ const BasicInfoTab = ({
                         <td className="px-3">
                           <input
                             type="text"
+                            maxLength={6}
                             value={address.postalCode || ""}
                             onChange={(e) =>
                               handleAddressChange(

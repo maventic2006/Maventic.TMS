@@ -1,4 +1,4 @@
-﻿exports.up = function(knex) {
+exports.up = function(knex) {
   return knex.schema.createTable('currency_master', function(table) {
     // Primary key
     table.string('currency_id', 10).primary().notNullable().comment('Primary key for currency');

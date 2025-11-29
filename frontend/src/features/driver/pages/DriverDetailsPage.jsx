@@ -571,16 +571,22 @@ import {
   AlertCircle,
   Eye,
   LayoutDashboard,
+  Hash,
+  Calendar,
 } from "lucide-react";
 import {
   fetchDriverById,
   updateDriver,
   fetchMasterData,
   clearError,
+  updateDriverDraft,
+  submitDriverFromDraft,
+  deleteDriverDraft,
 } from "../../../redux/slices/driverSlice";
 import { addToast } from "../../../redux/slices/uiSlice";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
+import SubmitDraftModal from "../../../components/ui/SubmitDraftModal";
 import { getPageTheme, getComponentTheme } from "../../../theme.config";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../../utils/constants";
 import {
@@ -594,7 +600,7 @@ import {
 import ApprovalActionBar from "../../../components/approval/ApprovalActionBar";
 
 // Import view tab components
-import DriverDashboardViewTab from "../components/DriverDashboardViewTab";
+// import DriverDashboardViewTab from "../components/DriverDashboardViewTab";
 import BasicInfoViewTab from "../components/BasicInfoViewTab";
 import DocumentsViewTab from "../components/DocumentsViewTab";
 import HistoryViewTab from "../components/HistoryViewTab";
@@ -666,76 +672,86 @@ const DriverDetailsPage = () => {
     },
   };
 
-  const { selectedDriver, isFetchingDetails, isUpdating, error, masterData } =
-    useSelector((state) => state.driver);
+  const { user, role } = useSelector((state) => state.auth);
+  const {
+    selectedDriver,
+    isFetchingDetails,
+    isUpdating,
+    isUpdatingDraft,
+    isSubmittingDraft,
+    error,
+    masterData,
+  } = useSelector((state) => state.driver);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [editFormData, setEditFormData] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
-    0: false, // Dashboard (view-only)
-    1: false, // Basic Info
-    2: false, // Documents
-    3: false, // History
-    4: false, // Accident & Violation
-    5: false, // Transporter Mapping
-    6: false, // Vehicle Mapping
-    7: false, // Blacklist Mapping
+    // 0: false, // Dashboard (view-only)
+    0: false, // Basic Info
+    1: false, // Documents
+    2: false, // History
+    3: false, // Accident & Violation
+    4: false, // Transporter Mapping
+    5: false, // Vehicle Mapping
+    6: false, // Blacklist Mapping
   });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   const tabs = [
+    // {
+    //   id: 0,
+    //   name: "Dashboard",
+    //   icon: LayoutDashboard,
+    //   viewComponent: DriverDashboardViewTab,
+    //   editComponent: null, // View-only tab
+    // },
     {
       id: 0,
-      name: "Dashboard",
-      icon: LayoutDashboard,
-      viewComponent: DriverDashboardViewTab,
-      editComponent: null, // View-only tab
-    },
-    {
-      id: 1,
       name: "Basic Information",
       icon: User,
       viewComponent: BasicInfoViewTab,
       editComponent: BasicInfoTab,
     },
     {
-      id: 2,
+      id: 1,
       name: "Documents",
       icon: FileText,
       viewComponent: DocumentsViewTab,
       editComponent: DocumentsTab,
     },
     {
-      id: 3,
+      id: 2,
       name: "History Information",
       icon: Briefcase,
       viewComponent: HistoryViewTab,
       editComponent: HistoryTab,
     },
     {
-      id: 4,
+      id: 3,
       name: "Accident & Violation",
       icon: AlertTriangle,
       viewComponent: AccidentViolationViewTab,
       editComponent: AccidentViolationTab,
     },
     {
-      id: 5,
+      id: 4,
       name: "Transporter/Owner Mapping",
       icon: Users,
       viewComponent: TransporterMappingViewTab,
       editComponent: TransporterMappingTab,
     },
     {
-      id: 6,
+      id: 5,
       name: "Vehicle Mapping",
       icon: Car,
       viewComponent: VehicleMappingViewTab,
       editComponent: VehicleMappingTab,
     },
     {
-      id: 7,
+      id: 6,
       name: "Blacklist Mapping",
       icon: Ban,
       viewComponent: BlacklistMappingViewTab,
@@ -752,11 +768,11 @@ const DriverDetailsPage = () => {
   }, [id, dispatch]);
 
   // Refresh data function for approval actions
-  const handleRefreshData = () => {
-    if (id) {
-      dispatch(fetchDriverById(id));
-    }
-  };
+  // const handleRefreshData = () => {
+  //   if (id) {
+  //     dispatch(fetchDriverById(id));
+  //   }
+  // };
 
   // Initialize edit form data when driver loads
   useEffect(() => {
@@ -857,6 +873,38 @@ const DriverDetailsPage = () => {
     }
   }, [error, isUpdating, dispatch]);
 
+  // Refresh data function for approval actions
+  const handleRefreshData = () => {
+    if (id) {
+      dispatch(fetchDriverById(id));
+    }
+  };
+
+  // Check if driver is a draft
+  const isDraftDriver =
+    selectedDriver?.status === "SAVE_AS_DRAFT" ||
+    selectedDriver?.status === "DRAFT";
+
+  // Check if current user is the creator of this driver
+  const isCreator = selectedDriver?.createdBy === user?.user_id;
+
+  // Determine if user can edit (creator-only for drafts, any product owner for non-drafts)
+  const canEdit = isDraftDriver ? isCreator : true;
+
+  // Track unsaved changes
+  useEffect(() => {
+    if (editFormData && selectedDriver && isEditMode) {
+      setHasUnsavedChanges(true);
+    }
+  }, [editFormData, selectedDriver, isEditMode]);
+
+  // Clear errors when switching tabs
+  useEffect(() => {
+    if (activeTab !== null) {
+      dispatch(clearError());
+    }
+  }, [activeTab, isEditMode]);
+
   const handleBack = () => {
     navigate("/drivers");
   };
@@ -867,14 +915,13 @@ const DriverDetailsPage = () => {
       setEditFormData(null);
       setValidationErrors({});
       setTabErrors({
-        0: false, // Dashboard
-        1: false, // Basic Info
-        2: false, // Documents
-        3: false, // History
-        4: false, // Accident & Violation
-        5: false, // Transporter Mapping
-        6: false, // Vehicle Mapping
-        7: false, // Blacklist Mapping
+        0: false, // Basic Info
+        1: false, // Documents
+        2: false, // History
+        3: false, // Accident & Violation
+        4: false, // Transporter Mapping
+        5: false, // Vehicle Mapping
+        6: false, // Blacklist Mapping
       });
     }
     setIsEditMode(!isEditMode);
@@ -898,7 +945,193 @@ const DriverDetailsPage = () => {
     }));
   };
 
-  const handleSave = async () => {
+  const handleSaveChanges = async () => {
+    // If this is a draft driver, show the submit modal
+    if (isDraftDriver) {
+      setShowSubmitModal(true);
+      return;
+    }
+
+    // For non-draft drivers, proceed with normal update
+    await handleNormalUpdate();
+  };
+
+  // Handle update draft (minimal validation)
+  const handleUpdateDraft = async () => {
+    setShowSubmitModal(false);
+
+    try {
+      // Minimal validation - only full name and date of birth required
+      if (
+        !editFormData?.basicInfo?.fullName ||
+        editFormData.basicInfo.fullName.trim().length < 2
+      ) {
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "Full name is required (minimum 2 characters)",
+          })
+        );
+        return;
+      }
+
+      if (!editFormData?.basicInfo?.dateOfBirth) {
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "Date of birth is required",
+          })
+        );
+        return;
+      }
+
+      // Clear any previous errors
+      setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+        4: false,
+        5: false,
+        6: false,
+      });
+      dispatch(clearError());
+
+      // Call the update draft API
+      const result = await dispatch(
+        updateDriverDraft({
+          driverId: id,
+          driverData: {
+            basicInfo: editFormData.basicInfo,
+            addresses: editFormData.addresses,
+            documents: editFormData.documents,
+            employmentHistory: editFormData.history,
+            accidentsViolations: editFormData.accidents,
+          },
+        })
+      ).unwrap();
+
+      // Success - show toast notification
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Draft updated successfully!",
+        })
+      );
+
+      // Refresh the driver data
+      await dispatch(fetchDriverById(id));
+
+      // Switch to view mode
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
+    } catch (err) {
+      console.error("Error updating draft:", err);
+      dispatch(clearError());
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: err.message || "Failed to update draft. Please try again.",
+        })
+      );
+    }
+  };
+
+  // Handle submit for approval (full validation)
+  const handleSubmitForApproval = async () => {
+    setShowSubmitModal(false);
+
+    try {
+      // Clear previous errors
+      setValidationErrors({});
+      setTabErrors({
+        0: false,
+        1: false,
+        2: false,
+        3: false,
+        4: false,
+        5: false,
+        6: false,
+      });
+      dispatch(clearError());
+
+      // Call the submit draft API (backend will handle all validations)
+      const result = await dispatch(
+        submitDriverFromDraft({
+          driverId: id,
+          driverData: {
+            basicInfo: editFormData.basicInfo,
+            addresses: editFormData.addresses,
+            documents: editFormData.documents,
+            employmentHistory: editFormData.history,
+            accidentsViolations: editFormData.accidents,
+          },
+        })
+      ).unwrap();
+
+      // Success - show toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message:
+            "Driver submitted for approval successfully! Status changed to PENDING.",
+        })
+      );
+
+      // Navigate to driver list page after 1 second
+      setTimeout(() => {
+        navigate("/drivers");
+      }, 1000);
+    } catch (err) {
+      console.error("Error submitting draft:", err);
+
+      // Parse and display validation errors
+      let errorMessage = "Failed to submit driver for approval";
+      let errorDetails = [];
+
+      if (err && typeof err === "object") {
+        if (err.message) {
+          errorMessage = err.message;
+        }
+
+        // Handle validation error with field information
+        if (err.code === "VALIDATION_ERROR" && err.field) {
+          const fieldPath = err.field
+            .replace(/\[(\d+)\]/g, " $1")
+            .replace(/\./g, " - ");
+          errorDetails.push(`${fieldPath}: ${err.message}`);
+        }
+
+        // Handle duplicate errors
+        if (
+          (err.code === "DUPLICATE_PHONE" ||
+            err.code === "DUPLICATE_EMAIL" ||
+            err.code === "DUPLICATE_DOCUMENT") &&
+          err.field
+        ) {
+          const fieldPath = err.field
+            .replace(/\[(\d+)\]/g, " $1")
+            .replace(/\./g, " - ");
+          errorDetails.push(`${fieldPath}: ${err.message}`);
+        }
+      }
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: errorMessage,
+          details: errorDetails.length > 0 ? errorDetails : null,
+          duration: 8000,
+        })
+      );
+    }
+  };
+
+  // Handle normal update (for non-draft drivers)
+  const handleNormalUpdate = async () => {
     // Validate form data
     const errors = {};
     const newTabErrors = { ...tabErrors };
@@ -1129,7 +1362,6 @@ const DriverDetailsPage = () => {
         4: false,
         5: false,
         6: false,
-        7: false,
       });
 
       // Reload driver data to reflect changes in UI
@@ -1145,131 +1377,129 @@ const DriverDetailsPage = () => {
     }
   };
 
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "pending":
+      case "pending_approval":
+        return "bg-yellow-100 text-yellow-800";
+      case "inactive":
+        return "bg-gray-100 text-gray-800";
+      case "save_as_draft":
+      case "draft":
+        return "bg-blue-100 text-blue-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
   const ActiveTabComponent = isEditMode
     ? tabs[activeTab].editComponent
     : tabs[activeTab].viewComponent;
 
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        background: `linear-gradient(to bottom right, ${safeTheme.colors.primary.background}, #f0f4f8, #e6f0ff)`,
-      }}
-    >
-      <TMSHeader theme={safeTheme} />
-      <div className="px-4 lg:px-4 py-2">
-        <div className="max-w-7xl mx-auto space-y-2">
-          {/* Header */}
-          <Card
-            className="overflow-hidden border shadow-md"
-            style={{
-              backgroundColor: safeTheme.colors.card.background,
-              borderColor: safeTheme.colors.card.border,
-            }}
-          >
-            <div className="p-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <Button
-                    onClick={handleBack}
-                    style={{
-                      backgroundColor:
-                        safeActionButtonTheme.secondary.background,
-                      color: safeActionButtonTheme.secondary.text,
-                      borderColor: safeActionButtonTheme.secondary.border,
-                    }}
-                    className="flex items-center space-x-2 border hover:opacity-90 transition-opacity"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    {/* <span>Back</span> */}
-                  </Button>
-                  <div className="flex items-center space-x-3">
-                    <User
-                      className="h-8 w-8"
-                      style={{
-                        color: safeActionButtonTheme.primary.background,
-                      }}
-                    />
-                    <div>
-                      <h1
-                        className="text-2xl font-bold"
-                        style={{ color: safeTheme.colors.text.primary }}
-                      >
-                        Driver Details
-                      </h1>
-                      <p
-                        className="text-sm"
-                        style={{ color: safeTheme.colors.text.secondary }}
-                      >
-                        {id ? `Driver ID: ${id}` : "Loading..."}
-                      </p>
-                    </div>
-                  </div>
+    <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] via-[#F8FAFC] to-[#F1F5F9]">
+      <TMSHeader theme={theme} />
+
+      {/* Modern Header Bar with glassmorphism */}
+      <div className="bg-gradient-to-r from-[#0D1A33] via-[#1A2B47] to-[#0D1A33] px-6 py-4 shadow-xl relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-transparent to-blue-800/10"></div>
+        <div className="absolute -top-4 -right-4 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-full blur-2xl"></div>
+        <div className="absolute -bottom-4 -left-4 w-40 h-40 bg-gradient-to-tr from-blue-400/10 to-transparent rounded-full blur-2xl"></div>
+
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="group p-2 bg-white/10 backdrop-blur-sm rounded-xl hover:bg-white/20 transition-all duration-300 hover:scale-105 border border-white/20"
+            >
+              <ArrowLeft className="w-5 h-5 text-white group-hover:text-white transition-colors" />
+            </button>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-white tracking-tight">
+                  {selectedDriver?.fullName || "Driver Details"}
+                </h1>
+                <span
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                    selectedDriver?.status
+                  )}`}
+                >
+                  {selectedDriver?.status || "UNKNOWN"}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-blue-100/80 text-xs">
+                <div className="flex items-center gap-2">
+                  <Hash className="w-3 h-3" />
+                  <span>ID: {selectedDriver?.driverId || id}</span>
                 </div>
-
-                <div className="flex items-center space-x-3">
-                  {/* Driver Approval Action Bar */}
-                  {selectedDriver?.userApprovalStatus && (
-                    <ApprovalActionBar
-                      userApprovalStatus={selectedDriver.userApprovalStatus}
-                      entityId={id}
-                      onRefreshData={handleRefreshData}
-                    />
-                  )}
-
-                  {isEditMode ? (
-                    <>
-                      <Button
-                        onClick={handleEditToggle}
-                        disabled={isUpdating}
-                        style={{
-                          backgroundColor:
-                            safeActionButtonTheme.secondary.background,
-                          color: safeActionButtonTheme.secondary.text,
-                          borderColor: safeActionButtonTheme.secondary.border,
-                        }}
-                        className="flex items-center space-x-2 border hover:opacity-90 transition-opacity"
-                      >
-                        <X className="h-4 w-4" />
-                        <span>Cancel</span>
-                      </Button>
-                      <Button
-                        onClick={handleSave}
-                        disabled={isUpdating}
-                        style={{
-                          backgroundColor:
-                            safeActionButtonTheme.primary.background,
-                          color: safeActionButtonTheme.primary.text,
-                          opacity: isUpdating ? 0.5 : 1,
-                        }}
-                        className="flex items-center space-x-2 hover:opacity-90 transition-opacity"
-                      >
-                        <Save className="h-4 w-4" />
-                        <span>{isUpdating ? "Saving..." : "Save Changes"}</span>
-                      </Button>
-                    </>
-                  ) : (
-                    // Only show Edit button if not on Dashboard tab (Dashboard is view-only)
-                    activeTab !== 0 && (
-                      <Button
-                        onClick={handleEditToggle}
-                        style={{
-                          backgroundColor:
-                            safeActionButtonTheme.primary.background,
-                          color: safeActionButtonTheme.primary.text,
-                        }}
-                        className="flex items-center space-x-2 hover:opacity-90 transition-opacity"
-                      >
-                        <Edit className="h-4 w-4" />
-                        <span>Edit</span>
-                      </Button>
-                    )
-                  )}
+                <div className="flex items-center gap-2">
+                  <User className="w-3 h-3" />
+                  <span>
+                    Created by: {selectedDriver?.createdBy || "Unknown"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-3 h-3" />
+                  <span>Created: {selectedDriver?.createdOn || "N/A"}</span>
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
 
+          <div className="flex items-center gap-2">
+            {/* Edit/Save/Cancel Buttons */}
+            {isEditMode ? (
+              <>
+                <button
+                  onClick={handleEditToggle}
+                  className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={isUpdating || isUpdatingDraft || isSubmittingDraft}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isUpdating || isUpdatingDraft || isSubmittingDraft ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {isDraftDriver ? "Processing..." : "Saving..."}
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                      {isDraftDriver ? "Submit Changes" : "Save Changes"}
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              canEdit && (
+                <button
+                  onClick={handleEditToggle}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
+                >
+                  <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  {isDraftDriver ? "Edit Draft" : "Edit Details"}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Container */}
+      <div className="px-6 py-4">
+        <div className="space-y-4">
           {/* Loading State */}
           {isFetchingDetails && (
             <Card
@@ -1349,10 +1579,10 @@ const DriverDetailsPage = () => {
                         key={tab.id}
                         onClick={() => {
                           setActiveTab(tab.id);
-                          // Disable edit mode when switching to Dashboard tab (view-only)
-                          if (tab.id === 0) {
-                            setIsEditMode(false);
-                          }
+                          // // Disable edit mode when switching to Dashboard tab (view-only)
+                          // if (tab.id === 0) {
+                          //   setIsEditMode(false);
+                          // }
                         }}
                         className={`text-nowrap group relative px-6 py-4 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-3 ${
                           isActive
@@ -1424,6 +1654,15 @@ const DriverDetailsPage = () => {
           )}
         </div>
       </div>
+
+      {/* Submit Draft Modal */}
+      <SubmitDraftModal
+        isOpen={showSubmitModal}
+        onUpdateDraft={handleUpdateDraft}
+        onSubmitForApproval={handleSubmitForApproval}
+        onCancel={() => setShowSubmitModal(false)}
+        isLoading={isUpdatingDraft || isSubmittingDraft}
+      />
     </div>
   );
 };

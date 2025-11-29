@@ -207,10 +207,11 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
             </label>
             <input
               type="text"
+              max={6}
               value={address.postalCode || ""}
               onChange={(e) => handleChange("postalCode", e.target.value)}
               placeholder="Enter postal code"
-              maxLength={10}
+              maxLength={6}
               className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
                 errors?.["address.postalCode"]
                   ? "border-red-500 focus:border-red-500"

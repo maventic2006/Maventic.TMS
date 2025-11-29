@@ -1,9 +1,5 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { getPageTheme } from "../../../theme.config";
+import React from "react";
 import {
-  ChevronDown,
-  ChevronUp,
   FileText,
   Calendar,
   CheckCircle,
@@ -14,16 +10,6 @@ import {
 } from "lucide-react";
 
 const DocumentsViewTab = ({ consignor }) => {
-  const theme = getPageTheme("tab");
-  const [expandedDocuments, setExpandedDocuments] = useState({});
-
-  const toggleDocument = (index) => {
-    setExpandedDocuments((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
-  };
-
   const documents = consignor?.documents || [];
 
   // Check if document is expired
@@ -56,78 +42,45 @@ const DocumentsViewTab = ({ consignor }) => {
     if (isExpired(document.valid_to)) {
       return {
         label: "Expired",
-        color: theme.colors.status.error,
-        backgroundColor: theme.colors.status.error + "20",
+        className: "bg-red-100 text-red-700",
         icon: XCircle,
       };
     } else if (isExpiringSoon(document.valid_to)) {
       return {
         label: "Expiring Soon",
-        color: theme.colors.status.warning,
-        backgroundColor: theme.colors.status.warning + "20",
+        className: "bg-yellow-100 text-yellow-700",
         icon: AlertCircle,
       };
     } else if (document.status === "ACTIVE") {
       return {
         label: "Active",
-        color: theme.colors.status.success,
-        backgroundColor: theme.colors.status.success + "20",
+        className: "bg-green-100 text-green-700",
         icon: CheckCircle,
       };
     } else {
       return {
         label: document.status || "Unknown",
-        color: theme.colors.text.disabled,
-        backgroundColor: theme.colors.text.disabled + "20",
+        className: "bg-gray-100 text-gray-700",
         icon: AlertCircle,
       };
     }
   };
 
   return (
-    <div style={{ padding: "24px" }}>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          marginBottom: "24px",
-        }}
-      >
-        <FileText size={24} style={{ color: theme.colors.primary.background, marginRight: "12px" }} />
-        <h3
-          style={{
-            fontSize: "20px",
-            fontWeight: "600",
-            color: theme.colors.text.primary,
-            margin: 0,
-          }}
-        >
-          Documents ({documents.length})
-        </h3>
-      </div>
-
+    <div className="p-6">
       {/* Documents List */}
       {documents.length === 0 ? (
-        <div
-          style={{
-            backgroundColor: theme.colors.card.background,
-            borderRadius: "12px",
-            padding: "40px",
-            textAlign: "center",
-            border: `1px solid ${theme.colors.card.border}`,
-          }}
-        >
-          <FileText size={48} style={{ color: theme.colors.text.disabled, marginBottom: "16px" }} />
-          <p style={{ fontSize: "16px", color: theme.colors.text.secondary, marginBottom: "8px" }}>
+        <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-2xl p-12 text-center border border-gray-100/50">
+          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-sm font-medium text-gray-600 mb-2">
             No documents found
           </p>
-          <p style={{ fontSize: "14px", color: theme.colors.text.disabled }}>
+          <p className="text-xs text-gray-500">
             Document information will appear here once uploaded
           </p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div className="space-y-6">
           {documents.map((document, index) => {
             const statusBadge = getDocumentStatusBadge(document);
             const StatusIcon = statusBadge.icon;
@@ -135,353 +88,187 @@ const DocumentsViewTab = ({ consignor }) => {
             return (
               <div
                 key={index}
-                style={{
-                  backgroundColor: theme.colors.card.background,
-                  borderRadius: "12px",
-                  border: `1px solid ${theme.colors.card.border}`,
-                  overflow: "hidden",
-                }}
+                className="bg-gradient-to-r from-orange-50/50 to-amber-50/50 rounded-2xl p-6 border border-orange-100/50"
               >
                 {/* Document Header */}
-                <button
-                  onClick={() => toggleDocument(index)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "20px 24px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: 1 }}>
-                    {/* Document Icon */}
-                    <div
-                      style={{
-                        width: "48px",
-                        height: "48px",
-                        borderRadius: "8px",
-                        background: `linear-gradient(to bottom right, ${theme.colors.primary.background}, ${theme.colors.button.primary.background})`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <FileText size={24} style={{ color: "#FFFFFF" }} />
-                    </div>
-
-                    {/* Document Info */}
-                    <div style={{ textAlign: "left", flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
-                        <h4
-                          style={{
-                            fontSize: "16px",
-                            fontWeight: "600",
-                            color: theme.colors.text.primary,
-                            margin: 0,
-                          }}
-                        >
-                          {document.document_type || "Unknown Document"}
-                        </h4>
-                        <span
-                          style={{
-                            padding: "4px 12px",
-                            fontSize: "12px",
-                            fontWeight: "500",
-                            borderRadius: "12px",
-                            backgroundColor: statusBadge.backgroundColor,
-                            color: statusBadge.color,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                          }}
-                        >
-                          <StatusIcon size={14} />
-                          {statusBadge.label}
-                        </span>
-                      </div>
-                      <p
-                        style={{
-                          fontSize: "14px",
-                          color: theme.colors.text.secondary,
-                          margin: 0,
-                        }}
-                      >
-                        {document.document_number || "No document number"}
-                      </p>
-                    </div>
+                <div className="flex items-center gap-4 mb-6">
+                  {/* Document Icon */}
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-white" />
                   </div>
 
-                  {expandedDocuments[index] ? (
-                    <ChevronUp size={20} style={{ color: theme.colors.text.secondary }} />
-                  ) : (
-                    <ChevronDown size={20} style={{ color: theme.colors.text.secondary }} />
-                  )}
-                </button>
-
-                {/* Document Details */}
-                <AnimatePresence>
-                  {expandedDocuments[index] && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div
-                        style={{
-                          padding: "0 24px 24px 24px",
-                          borderTop: `1px solid ${theme.colors.card.border}`,
-                        }}
+                  {/* Document Info */}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h4 className="text-base font-semibold text-gray-800">
+                        {document.document_type || "Unknown Document"}
+                      </h4>
+                      <span
+                        className={`px-3 py-1 text-xs font-medium rounded-full flex items-center gap-1 ${statusBadge.className}`}
                       >
-                        {/* Document Information Grid */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginTop: "20px" }}>
-                          {/* Document ID */}
-                          {document.document_id && (
-                            <div>
-                              <label
-                                style={{
-                                  display: "block",
-                                  fontSize: "12px",
-                                  fontWeight: "500",
-                                  color: theme.colors.text.secondary,
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                Document ID
-                              </label>
-                              <p
-                                style={{
-                                  fontSize: "14px",
-                                  color: theme.colors.text.primary,
-                                  fontWeight: "500",
-                                  margin: 0,
-                                }}
-                              >
-                                {document.document_id}
-                              </p>
-                            </div>
-                          )}
+                        <StatusIcon className="w-3.5 h-3.5" />
+                        {statusBadge.label}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {document.document_number || "No document number"}
+                    </p>
+                  </div>
+                </div>
 
-                          {/* Document Type ID */}
-                          {document.document_type_id && (
-                            <div>
-                              <label
-                                style={{
-                                  display: "block",
-                                  fontSize: "12px",
-                                  fontWeight: "500",
-                                  color: theme.colors.text.secondary,
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                Type ID
-                              </label>
-                              <p
-                                style={{
-                                  fontSize: "14px",
-                                  color: theme.colors.text.primary,
-                                  margin: 0,
-                                }}
-                              >
-                                {document.document_type_id}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Valid From */}
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: theme.colors.text.secondary,
-                                marginBottom: "6px",
-                              }}
-                            >
-                              <Calendar size={14} style={{ display: "inline", marginRight: "4px" }} />
-                              Valid From
-                            </label>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                color: theme.colors.text.primary,
-                                margin: 0,
-                              }}
-                            >
-                              {formatDate(document.valid_from)}
-                            </p>
-                          </div>
-
-                          {/* Valid To */}
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                fontSize: "12px",
-                                fontWeight: "500",
-                                color: theme.colors.text.secondary,
-                                marginBottom: "6px",
-                              }}
-                            >
-                              <Calendar size={14} style={{ display: "inline", marginRight: "4px" }} />
-                              Valid To
-                            </label>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                color: isExpired(document.valid_to)
-                                  ? theme.colors.status.error
-                                  : isExpiringSoon(document.valid_to)
-                                  ? theme.colors.status.warning
-                                  : theme.colors.text.primary,
-                                fontWeight: isExpired(document.valid_to) || isExpiringSoon(document.valid_to) ? "600" : "400",
-                                margin: 0,
-                              }}
-                            >
-                              {formatDate(document.valid_to)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Document Validity Status */}
-                        {document.valid_to && (
-                          <div
-                            style={{
-                              marginTop: "16px",
-                              padding: "12px",
-                              backgroundColor: isExpired(document.valid_to)
-                                ? theme.colors.status.error + "20"
-                                : isExpiringSoon(document.valid_to)
-                                ? theme.colors.status.warning + "20"
-                                : theme.colors.status.success + "20",
-                              borderRadius: "8px",
-                              border: `1px solid ${
-                                isExpired(document.valid_to)
-                                  ? theme.colors.status.error
-                                  : isExpiringSoon(document.valid_to)
-                                  ? theme.colors.status.warning
-                                  : theme.colors.status.success
-                              }`,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            {isExpired(document.valid_to) ? (
-                              <>
-                                <XCircle size={18} style={{ color: theme.colors.status.error }} />
-                                <span style={{ fontSize: "14px", color: theme.colors.status.error }}>
-                                  This document has expired on {formatDate(document.valid_to)}
-                                </span>
-                              </>
-                            ) : isExpiringSoon(document.valid_to) ? (
-                              <>
-                                <AlertCircle size={18} style={{ color: theme.colors.status.warning }} />
-                                <span style={{ fontSize: "14px", color: theme.colors.status.warning }}>
-                                  This document will expire on {formatDate(document.valid_to)} (within 30 days)
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle size={18} style={{ color: theme.colors.status.success }} />
-                                <span style={{ fontSize: "14px", color: theme.colors.status.success }}>
-                                  Document is valid until {formatDate(document.valid_to)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Action Buttons */}
-                        <div
-                          style={{
-                            marginTop: "16px",
-                            display: "flex",
-                            gap: "12px",
-                          }}
-                        >
-                          <button
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              padding: "8px 16px",
-                              backgroundColor: theme.colors.button.primary.background,
-                              color: theme.colors.button.primary.text,
-                              border: "none",
-                              borderRadius: "8px",
-                              fontSize: "14px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "all 0.2s",
-                            }}
-                            onClick={async () => {
-                              try {
-                                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-                                const url = `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${document.document_unique_id}/download`;
-                                window.open(url, "_blank");
-                              } catch (error) {
-                                console.error("Error viewing document:", error);
-                                alert("Failed to view document");
-                              }
-                            }}
-                          >
-                            <Eye size={16} style={{ marginRight: "6px" }} />
-                            View Document
-                          </button>
-                          <button
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              padding: "8px 16px",
-                              backgroundColor: "transparent",
-                              color: theme.colors.button.primary.background,
-                              border: `1px solid ${theme.colors.button.primary.background}`,
-                              borderRadius: "8px",
-                              fontSize: "14px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              transition: "all 0.2s",
-                            }}
-                            onClick={async () => {
-                              try {
-                                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-                                const response = await fetch(
-                                  `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${document.document_unique_id}/download`,
-                                  { credentials: 'include' }
-                                );
-
-                                if (!response.ok) {
-                                  throw new Error(`HTTP error! status: ${response.status}`);
-                                }
-
-                                const blob = await response.blob();
-                                const url = window.URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = document.document_number || 'document';
-                                document.body.appendChild(a);
-                                a.click();
-                                document.body.removeChild(a);
-                                window.URL.revokeObjectURL(url);
-                              } catch (error) {
-                                console.error("Error downloading document:", error);
-                                alert("Failed to download document");
-                              }
-                            }}
-                          >
-                            <Download size={16} style={{ marginRight: "6px" }} />
-                            Download
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
+                {/* Document Information Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                  {/* Document ID */}
+                  {document.document_id && (
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                      <label className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide block mb-2">
+                        Document ID
+                      </label>
+                      <p className="text-sm font-medium text-[#0D1A33]">
+                        {document.document_id}
+                      </p>
+                    </div>
                   )}
-                </AnimatePresence>
+
+                  {/* Document Type ID */}
+                  {document.document_type_id && (
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                      <label className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide block mb-2">
+                        Type ID
+                      </label>
+                      <p className="text-sm font-medium text-[#0D1A33]">
+                        {document.document_type_id}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Valid From */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                    <label className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      Valid From
+                    </label>
+                    <p className="text-sm font-medium text-[#0D1A33]">
+                      {formatDate(document.valid_from)}
+                    </p>
+                  </div>
+
+                  {/* Valid To */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                    <label className="text-xs font-semibold text-[#4A5568] uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      Valid To
+                    </label>
+                    <p
+                      className={`text-sm font-medium ${
+                        isExpired(document.valid_to)
+                          ? "text-red-600 font-semibold"
+                          : isExpiringSoon(document.valid_to)
+                          ? "text-yellow-600 font-semibold"
+                          : "text-[#0D1A33]"
+                      }`}
+                    >
+                      {formatDate(document.valid_to)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Document Validity Status */}
+                {document.valid_to && (
+                  <div
+                    className={`p-3 rounded-lg border flex items-center gap-2 mb-4 ${
+                      isExpired(document.valid_to)
+                        ? "bg-red-50 border-red-200"
+                        : isExpiringSoon(document.valid_to)
+                        ? "bg-yellow-50 border-yellow-200"
+                        : "bg-green-50 border-green-200"
+                    }`}
+                  >
+                    {isExpired(document.valid_to) ? (
+                      <>
+                        <XCircle className="w-4.5 h-4.5 text-red-600" />
+                        <span className="text-sm text-red-700">
+                          This document has expired on{" "}
+                          {formatDate(document.valid_to)}
+                        </span>
+                      </>
+                    ) : isExpiringSoon(document.valid_to) ? (
+                      <>
+                        <AlertCircle className="w-4.5 h-4.5 text-yellow-600" />
+                        <span className="text-sm text-yellow-700">
+                          This document will expire on{" "}
+                          {formatDate(document.valid_to)} (within 30 days)
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4.5 h-4.5 text-green-600" />
+                        <span className="text-sm text-green-700">
+                          Document is valid until{" "}
+                          {formatDate(document.valid_to)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                    onClick={async () => {
+                      try {
+                        const apiUrl =
+                          import.meta.env.VITE_API_URL ||
+                          "http://localhost:5000";
+                        const url = `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${document.document_unique_id}/download`;
+                        window.open(url, "_blank");
+                      } catch (error) {
+                        console.error("Error viewing document:", error);
+                        alert("Failed to view document");
+                      }
+                    }}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View Document
+                  </button>
+                  <button
+                    className="flex items-center px-4 py-2 bg-transparent text-blue-600 border border-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50 transition-colors"
+                    onClick={async () => {
+                      try {
+                        const apiUrl =
+                          import.meta.env.VITE_API_URL ||
+                          "http://localhost:5000";
+                        const response = await fetch(
+                          `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${document.document_unique_id}/download`,
+                          { credentials: "include" }
+                        );
+
+                        if (!response.ok) {
+                          throw new Error(
+                            `HTTP error! status: ${response.status}`
+                          );
+                        }
+
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = document.document_number || "document";
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                      } catch (error) {
+                        console.error("Error downloading document:", error);
+                        alert("Failed to download document");
+                      }
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </button>
+                </div>
               </div>
             );
           })}

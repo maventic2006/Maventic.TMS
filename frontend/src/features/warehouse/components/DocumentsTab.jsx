@@ -1,299 +1,161 @@
 ﻿import React from "react";
-import { useDispatch } from "react-redux";
-import { Plus, Trash2, Upload } from "lucide-react";
-import { CustomSelect } from "@/components/ui/Select";
-import { addToast } from "../../../redux/slices/uiSlice";
-import { TOAST_TYPES } from "../../../utils/constants";
+import { FileText } from "lucide-react";
+import { useSelector } from "react-redux";
+import { Country } from "country-state-city";
+import ThemeTable from "../../../components/ui/ThemeTable";
 
-const DocumentsTab = ({ formData, setFormData, errors, masterData }) => {
-  const dispatch = useDispatch();
+const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
+  const { masterData } = useSelector((state) => state.warehouse);
 
-  // Safe navigation - ensure formData has the expected structure
-  const documents = formData?.documents || [];
+  const documents = formData.documents || [];
 
-  const addDocument = () => {
+  // Document type options from master data (backend already returns value/label format)
+  const documentTypes = masterData?.documentNames || [];
+
+  // Get all countries from country-state-city package
+  const allCountries = Country.getAllCountries();
+
+  // Country options from country-state-city package (convert to value/label format)
+  const countryOptions = React.useMemo(() => {
+    return allCountries.map((country) => ({
+      value: country.name,
+      label: country.name,
+    }));
+  }, []);
+
+  // Table column configuration
+  const columns = [
+    {
+      key: "documentType",
+      label: "Document Type",
+      type: "select",
+      options: documentTypes,
+      placeholder: "Select Document Type",
+      searchable: true,
+      width: "min-w-[200px]",
+    },
+    {
+      key: "documentNumber",
+      label: "Document Number",
+      type: "text",
+      placeholder: "Enter document number",
+      width: "min-w-[200px]",
+    },
+    {
+      key: "country",
+      label: "Country",
+      type: "select",
+      options: countryOptions,
+      placeholder: "Select Country",
+      searchable: true,
+      width: "min-w-[200px]",
+    },
+    {
+      key: "validFrom",
+      label: "Valid From",
+      type: "date",
+      width: "min-w-[200px]",
+    },
+    {
+      key: "validTo",
+      label: "Valid To",
+      type: "date",
+      width: "min-w-[200px]",
+    },
+    {
+      key: "fileUpload",
+      label: "Document Upload",
+      type: "file",
+      width: "min-w-[200px]",
+    },
+  ];
+
+  const handleDataChange = (updatedDocuments) => {
     setFormData((prev) => ({
       ...prev,
-      documents: [
-        ...(prev?.documents || []),
-        {
-          documentType: "",
-          documentNumber: "",
-          validFrom: "",
-          validTo: "",
-          fileName: "",
-          fileType: "",
-          fileData: "",
-          status: true,
-        },
-      ],
+      documents: updatedDocuments,
     }));
   };
 
-  const removeDocument = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      documents: (prev?.documents || []).filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleDocumentChange = (index, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      documents: (prev?.documents || []).map((doc, i) =>
-        i === index ? { ...doc, [field]: value } : doc
-      ),
-    }));
-  };
-
-  const handleFileUpload = (index, event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // File validation
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
-
-    if (file.size > maxSize) {
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.ERROR,
-          message: "File size must be less than 5MB",
-          duration: 4000,
-        })
-      );
-      event.target.value = "";
-      return;
-    }
-
-    if (!allowedTypes.includes(file.type)) {
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.ERROR,
-          message: "Only JPEG, PNG, GIF, PDF, DOC, and DOCX files are allowed",
-          duration: 4000,
-        })
-      );
-      event.target.value = "";
-      return;
-    }
-
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData((prev) => ({
-        ...prev,
-        documents: prev.documents.map((doc, i) =>
-          i === index
-            ? {
-                ...doc,
-                fileName: file.name,
-                fileType: file.type,
-                fileData: reader.result.split(",")[1], // Base64 string without data URL prefix
-              }
-            : doc
-        ),
-      }));
-
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.SUCCESS,
-          message: `File "${file.name}" uploaded successfully`,
-          duration: 2000,
-        })
-      );
+  const handleAddDocument = () => {
+    const newDocument = {
+      documentType: "",
+      documentNumber: "",
+      referenceNumber: "",
+      country: "",
+      validFrom: "",
+      validTo: "",
+      status: true,
+      fileName: "",
+      fileType: "",
+      fileData: "",
     };
-    reader.readAsDataURL(file);
+
+    const updatedDocuments = [...documents, newDocument];
+    setFormData((prev) => ({
+      ...prev,
+      documents: updatedDocuments,
+    }));
+  };
+
+  const handleRemoveDocument = (index) => {
+    if (documents.length <= 1) return; // Keep at least one document
+
+    const updatedDocuments = documents.filter((_, i) => i !== index);
+    setFormData((prev) => ({
+      ...prev,
+      documents: updatedDocuments,
+    }));
   };
 
   return (
-    <div className="bg-white rounded-xl p-4">
-      {/* Add Document Button */}
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-semibold text-[#0D1A33]">
-          Document Information
-        </h3>
-        <button
-          type="button"
-          onClick={addDocument}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[#10B981] hover:bg-[#059669] text-white rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add Document
-        </button>
-      </div>
+    <div className="bg-[#F5F7FA]">
+      <ThemeTable
+        title="Warehouse Documents"
+        titleIcon={FileText}
+        data={documents}
+        columns={columns}
+        onDataChange={handleDataChange}
+        onAddRow={handleAddDocument}
+        onRemoveRow={handleRemoveDocument}
+        errors={errors || {}}
+        hasRowSelection={false}
+        canRemoveRows={true}
+        canAddRows={true}
+        className="w-full"
+      />
 
-      {/* Documents Table */}
-      {documents.length === 0 ? (
-        <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <p className="text-gray-600 text-sm">
-            No documents added yet. Click "Add Document" to start.
+      {/* Validation Error Summary */}
+      {errors && typeof errors === "string" && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-xs text-red-700 flex items-center gap-2">
+            {errors}
           </p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[#0D1A33] uppercase tracking-wider">
-                  Document Type <span className="text-red-500">*</span>
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[#0D1A33] uppercase tracking-wider">
-                  Document Number <span className="text-red-500">*</span>
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[#0D1A33] uppercase tracking-wider">
-                  Valid From
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[#0D1A33] uppercase tracking-wider">
-                  Valid To
-                </th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-[#0D1A33] uppercase tracking-wider">
-                  File Name
-                </th>
-                <th className="px-3 py-2 text-center text-xs font-semibold text-[#0D1A33] uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {documents.map((doc, index) => (
-                <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  {/* Document Type */}
-                  <td className="px-3 py-2">
-                    <CustomSelect
-                      value={doc.documentType}
-                      onValueChange={(value) =>
-                        handleDocumentChange(index, "documentType", value)
-                      }
-                      options={masterData?.documentNames || []}
-                      getOptionLabel={(option) => option.label}
-                      getOptionValue={(option) => option.value}
-                      placeholder="Select document type"
-                      error={errors?.[`documents.${index}.documentType`]}
-                      required
-                      searchable
-                    />
-                    {errors?.[`documents.${index}.documentType`] && (
-                      <p className="text-xs text-red-500 mt-1">
-                        {errors[`documents.${index}.documentType`]}
-                      </p>
-                    )}
-                  </td>
-
-                  {/* Document Number */}
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={doc.documentNumber}
-                      onChange={(e) =>
-                        handleDocumentChange(
-                          index,
-                          "documentNumber",
-                          e.target.value.toUpperCase()
-                        )
-                      }
-                      placeholder="Enter number"
-                      className={`w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
-                        errors?.[`documents.${index}.documentNumber`]
-                          ? "border-red-500"
-                          : "border-gray-300"
-                      }`}
-                    />
-                    {errors?.[`documents.${index}.documentNumber`] && (
-                      <p className="text-xs text-red-500 mt-1">
-                        {errors[`documents.${index}.documentNumber`]}
-                      </p>
-                    )}
-                  </td>
-
-                  {/* Valid From */}
-                  <td className="px-3 py-2">
-                    <input
-                      type="date"
-                      value={doc.validFrom || ""}
-                      onChange={(e) =>
-                        handleDocumentChange(index, "validFrom", e.target.value)
-                      }
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors"
-                    />
-                  </td>
-
-                  {/* Valid To */}
-                  <td className="px-3 py-2">
-                    <input
-                      type="date"
-                      value={doc.validTo || ""}
-                      onChange={(e) =>
-                        handleDocumentChange(index, "validTo", e.target.value)
-                      }
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors"
-                    />
-                  </td>
-
-                  {/* File Name */}
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const fileInput = window.document.getElementById(
-                            `file-upload-${index}`
-                          );
-                          if (fileInput) fileInput.click();
-                        }}
-                        className="flex items-center gap-1 px-2 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded transition-colors"
-                      >
-                        <Upload className="w-3 h-3" />
-                        Upload
-                      </button>
-                      <input
-                        id={`file-upload-${index}`}
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                        onChange={(e) => handleFileUpload(index, e)}
-                      />
-                      {doc.fileName && (
-                        <span
-                          className="text-xs text-green-600 font-medium truncate max-w-[150px]"
-                          title={doc.fileName}
-                        >
-                          {doc.fileName}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Actions */}
-                  <td className="px-3 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => removeDocument(index)}
-                      className="inline-flex items-center gap-1 px-2 py-1.5 text-xs text-white bg-red-500 hover:bg-red-600 rounded transition-colors"
-                      title="Remove document"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
 
-      <p className="text-xs text-gray-500 mt-4">
-        <strong>Note:</strong> Supported file formats: PDF, JPG, PNG, DOC, DOCX
-        (Max 5MB)
-      </p>
+      {errors && errors._general && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-xs text-red-700 flex items-center gap-2">
+            {errors._general}
+          </p>
+        </div>
+      )}
+
+      {/* Guidelines */}
+      {/* <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <h4 className="text-sm font-medium text-blue-900 mb-2">
+          Document Guidelines:
+        </h4>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li> Document numbers must be unique within the same document type</li>
+          <li> Valid from date cannot be in the future</li>
+          <li> Valid to date must be after valid from date</li>
+          <li> File uploads are optional but recommended for verification</li>
+          <li> Supported formats: JPEG, PNG, GIF, PDF, DOC, DOCX (max 5MB)</li>
+          <li> Document number format: Only uppercase letters, numbers, hyphens, and forward slashes</li>
+        </ul>
+      </div> */}
     </div>
   );
 };

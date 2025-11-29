@@ -396,6 +396,7 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           <td className="px-3">
                             <input
                               type="text"
+                              maxLength={6}
                               value={address.postalCode || ""}
                               onChange={(e) => {
                                 const value = e.target.value;
@@ -550,15 +551,20 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           </td>
                           <td className="px-3">
                             <input
-                              type="tel"
+                              type="text"
+                              maxLength={10}
                               value={contact.phoneNumber || ""}
-                              onChange={(e) =>
-                                updateContact(
-                                  index,
-                                  "phoneNumber",
-                                  e.target.value
-                                )
-                              }
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Only allow numeric values
+                                if (value === "" || /^\d+$/.test(value)) {
+                                  updateContact(
+                                    index,
+                                    "phoneNumber",
+                                    e.target.value
+                                  );
+                                }
+                              }}
                               placeholder="Enter the phone number"
                               className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[selectedAddressIndex]
@@ -570,15 +576,20 @@ const AddressContactsTab = ({ formData, setFormData, errors = {} }) => {
                           </td>
                           <td className="px-3">
                             <input
-                              type="tel"
+                              type="text"
+                              maxLength={10}
                               value={contact.alternatePhoneNumber || ""}
-                              onChange={(e) =>
-                                updateContact(
-                                  index,
-                                  "alternatePhoneNumber",
-                                  e.target.value
-                                )
-                              }
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Only allow numeric values
+                                if (value === "" || /^\d+$/.test(value)) {
+                                  updateContact(
+                                    index,
+                                    "alternatePhoneNumber",
+                                    e.target.value
+                                  );
+                                }
+                              }}
                               placeholder="Enter the alternate phone"
                               className={`min-w-[200px] px-3 py-2 bg-white border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent text-xs ${
                                 errors.addresses?.[selectedAddressIndex]

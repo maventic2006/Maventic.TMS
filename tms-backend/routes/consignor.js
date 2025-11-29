@@ -3,9 +3,9 @@
  * All routes for consignor CRUD operations, documents, and master data
  */
 
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const multer = require('multer');
+const multer = require("multer");
 const {
   getConsignors,
   getConsignorById,
@@ -16,28 +16,33 @@ const {
   downloadDocument,
   downloadContactPhoto,
   downloadGeneralDocument,
-  getConsignorWarehouses
-} = require('../controllers/consignorController');
-const { authenticateToken } = require('../middleware/auth');
+  getConsignorWarehouses,
+  // Draft workflow functions
+  saveConsignorAsDraft,
+  updateConsignorDraft,
+  submitConsignorFromDraft,
+  deleteConsignorDraft,
+} = require("../controllers/consignorController");
+const { authenticateToken } = require("../middleware/auth");
 
 // Configure multer for file uploads (memory storage for processing)
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB max file size
+    fileSize: 10 * 1024 * 1024, // 10MB max file size
   },
   fileFilter: (req, file, cb) => {
     // Allowed file types
     const allowedMimeTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'image/png',
-      'image/jpeg',
-      'image/jpg'
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
     ];
 
     if (allowedMimeTypes.includes(file.mimetype)) {
@@ -45,12 +50,12 @@ const upload = multer({
     } else {
       cb(
         new Error(
-          'Invalid file type. Only PDF, DOC, DOCX, XLS, XLSX, PNG, JPG files are allowed.'
+          "Invalid file type. Only PDF, DOC, DOCX, XLS, XLSX, PNG, JPG files are allowed."
         ),
         false
       );
     }
-  }
+  },
 });
 
 // Middleware to check if user is product owner (admin/owner role)
@@ -64,15 +69,15 @@ const checkProductOwnerAccess = (req, res, next) => {
   console.log("✅ Required Type: UT001 (Product Owner)");
 
   // UT001 is Owner (product owner)
-  if (userType !== 'UT001') {
+  if (userType !== "UT001") {
     console.log("❌ ACCESS DENIED - User is not a Product Owner");
     console.log("🔒 ===== ACCESS CHECK FAILED =====\n");
     return res.status(403).json({
       success: false,
       error: {
-        code: 'ACCESS_DENIED',
-        message: 'Only product owners can access this resource'
-      }
+        code: "ACCESS_DENIED",
+        message: "Only product owners can access this resource",
+      },
     });
   }
 
@@ -100,25 +105,85 @@ const checkProductOwnerAccess = (req, res, next) => {
 // 1️⃣ Master data route (must be first to avoid /:id conflict)
 // GET /api/consignors/master-data
 router.get(
-  '/master-data',
+  "/master-data",
   authenticateToken,
   checkProductOwnerAccess,
   getMasterData
 );
 
-// 2️⃣ List all consignors route (with pagination, filters, search)
-// GET /api/consignors
-router.get(
-  '/',
+// ============================================================================
+// DRAFT WORKFLOW ROUTES
+// ============================================================================
+// These routes handle the save-as-draft, update-draft, submit-draft, and
+// delete-draft operations for consignors
+// ============================================================================
+
+/**
+ * Save consignor as draft
+ * POST /api/consignors/save-draft
+ * - Minimal validation (business_name only)
+ * - Creates consignor with status: SAVE_AS_DRAFT
+ */
+router.post(
+  "/save-draft",
   authenticateToken,
   checkProductOwnerAccess,
-  getConsignors
+  upload.any(),
+  saveConsignorAsDraft
 );
+
+/**
+ * Update consignor draft
+ * PUT /api/consignors/:id/update-draft
+ * - No validation applied
+ * - Only creator can update
+ * - Status remains: SAVE_AS_DRAFT
+ */
+router.put(
+  "/:id/update-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  upload.any(),
+  updateConsignorDraft
+);
+
+/**
+ * Submit consignor draft for approval
+ * PUT /api/consignors/:id/submit-draft
+ * - Full validation (same as create)
+ * - Only creator can submit
+ * - Status changes: SAVE_AS_DRAFT → PENDING
+ */
+router.put(
+  "/:id/submit-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  upload.any(),
+  submitConsignorFromDraft
+);
+
+/**
+ * Delete consignor draft
+ * DELETE /api/consignors/:id/delete-draft
+ * - Hard delete (permanent removal)
+ * - Only creator can delete
+ * - Deletes all related child records
+ */
+router.delete(
+  "/:id/delete-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  deleteConsignorDraft
+);
+
+// 2️⃣ List all consignors route (with pagination, filters, search)
+// GET /api/consignors
+router.get("/", authenticateToken, checkProductOwnerAccess, getConsignors);
 
 // 3️⃣ CREATE NEW CONSIGNOR (with file upload support)
 // POST /api/consignors
 router.post(
-  '/',
+  "/",
   authenticateToken,
   checkProductOwnerAccess,
   upload.any(), // Accept multiple files with any field names
@@ -128,7 +193,7 @@ router.post(
 // 4️⃣ Get single consignor details by ID (must come after specific routes)
 // GET /api/consignors/:id
 router.get(
-  '/:id',
+  "/:id",
   authenticateToken,
   checkProductOwnerAccess,
   getConsignorById
@@ -137,7 +202,7 @@ router.get(
 // 5️⃣ UPDATE EXISTING CONSIGNOR (with file upload support)
 // PUT /api/consignors/:id
 router.put(
-  '/:id',
+  "/:id",
   authenticateToken,
   checkProductOwnerAccess,
   upload.any(), // Accept multiple files with any field names
@@ -147,7 +212,7 @@ router.put(
 // 6️⃣ SOFT DELETE CONSIGNOR (sets status to INACTIVE)
 // DELETE /api/consignors/:id
 router.delete(
-  '/:id',
+  "/:id",
   authenticateToken,
   checkProductOwnerAccess,
   deleteConsignor
@@ -160,7 +225,7 @@ router.delete(
 // 7️⃣ Download consignor document
 // GET /api/consignors/:customerId/documents/:documentId/download
 router.get(
-  '/:customerId/documents/:documentId/download',
+  "/:customerId/documents/:documentId/download",
   authenticateToken,
   checkProductOwnerAccess,
   downloadDocument
@@ -169,7 +234,7 @@ router.get(
 // 8️⃣ Download contact photo
 // GET /api/consignors/:customerId/contacts/:contactId/photo
 router.get(
-  '/:customerId/contacts/:contactId/photo',
+  "/:customerId/contacts/:contactId/photo",
   authenticateToken,
   checkProductOwnerAccess,
   downloadContactPhoto
@@ -179,7 +244,7 @@ router.get(
 // GET /api/consignors/:customerId/general/:fileType/download
 // fileType: 'nda' | 'msa'
 router.get(
-  '/:customerId/general/:fileType/download',
+  "/:customerId/general/:fileType/download",
   authenticateToken,
   checkProductOwnerAccess,
   downloadGeneralDocument
@@ -188,7 +253,7 @@ router.get(
 // 🔟 Get warehouses mapped to consignor
 // GET /api/consignors/:customerId/warehouses
 router.get(
-  '/:customerId/warehouses',
+  "/:customerId/warehouses",
   authenticateToken,
   checkProductOwnerAccess,
   getConsignorWarehouses
@@ -197,21 +262,21 @@ router.get(
 // Error handling middleware for multer errors
 router.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
+    if (err.code === "LIMIT_FILE_SIZE") {
       return res.status(400).json({
         success: false,
         error: {
-          code: 'FILE_TOO_LARGE',
-          message: 'File size exceeds maximum allowed size of 10MB'
-        }
+          code: "FILE_TOO_LARGE",
+          message: "File size exceeds maximum allowed size of 10MB",
+        },
       });
     }
     return res.status(400).json({
       success: false,
       error: {
-        code: 'UPLOAD_ERROR',
-        message: err.message
-      }
+        code: "UPLOAD_ERROR",
+        message: err.message,
+      },
     });
   }
 
@@ -219,9 +284,9 @@ router.use((err, req, res, next) => {
     return res.status(400).json({
       success: false,
       error: {
-        code: 'BAD_REQUEST',
-        message: err.message
-      }
+        code: "BAD_REQUEST",
+        message: err.message,
+      },
     });
   }
 
@@ -229,4 +294,3 @@ router.use((err, req, res, next) => {
 });
 
 module.exports = router;
-

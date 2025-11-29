@@ -9,6 +9,10 @@ const {
   getTransporters,
   getTransporterById,
   getDocumentFile,
+  saveTransporterAsDraft,
+  updateTransporterDraft,
+  deleteTransporterDraft,
+  submitTransporterFromDraft,
 } = require("../controllers/transporterController");
 const { authenticateToken } = require("../middleware/auth");
 
@@ -32,23 +36,10 @@ const checkProductOwnerAccess = (req, res, next) => {
 };
 
 // Routes - All routes require product owner access
-router.get("/", authenticateToken, checkProductOwnerAccess, getTransporters);
-console.log(
-  "✅ Transporter GET / route registered with authenticateToken middleware"
-);
-router.get(
-  "/:id",
-  authenticateToken,
-  checkProductOwnerAccess,
-  getTransporterById
-);
-router.post("/", authenticateToken, checkProductOwnerAccess, createTransporter);
-router.put(
-  "/:id",
-  authenticateToken,
-  checkProductOwnerAccess,
-  updateTransporter
-);
+// IMPORTANT: Specific routes must come BEFORE parameterized routes
+// Otherwise Express will match specific paths like "/master-data" to "/:id"
+
+// Specific GET routes (must be first)
 router.get(
   "/master-data",
   authenticateToken,
@@ -67,11 +58,62 @@ router.get(
   checkProductOwnerAccess,
   getCitiesByCountryAndState
 );
+
+// List and detail routes
+router.get("/", authenticateToken, checkProductOwnerAccess, getTransporters);
+console.log(
+  "✅ Transporter GET / route registered with authenticateToken middleware"
+);
+router.get(
+  "/:id",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getTransporterById
+);
+
+// Mutation routes
+router.post("/", authenticateToken, checkProductOwnerAccess, createTransporter);
+
+// Save as draft routes
+router.post(
+  "/save-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  saveTransporterAsDraft
+);
+router.put(
+  "/:id/update-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  updateTransporterDraft
+);
+router.put(
+  "/:id/submit-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  submitTransporterFromDraft
+);
+router.delete(
+  "/:id/delete-draft",
+  authenticateToken,
+  checkProductOwnerAccess,
+  deleteTransporterDraft
+);
+
+// Document route (specific path must come before general /:id)
 router.get(
   "/document/:documentId",
   authenticateToken,
   checkProductOwnerAccess,
   getDocumentFile
+);
+
+// General update route (MUST be last to avoid matching specific routes)
+router.put(
+  "/:id",
+  authenticateToken,
+  checkProductOwnerAccess,
+  updateTransporter
 );
 
 module.exports = router;

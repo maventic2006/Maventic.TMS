@@ -35,11 +35,12 @@ export const VEHICLE_STATUS_OPTIONS = [
   { value: "INACTIVE", label: "Inactive" },
   { value: "MAINTENANCE", label: "Under Maintenance" },
   { value: "BLACKLISTED", label: "Blacklisted" },
-  { value: "PENDING_APPROVAL", label: "Pending Approval" },
+  { value: "PENDING", label: "Pending" },
+  { value: "DRAFT", label: "Draft" },
   { value: "DECOMMISSIONED", label: "Decommissioned" },
 ];
 
-// Fuel Types (array format for dropdowns) - matching database  
+// Fuel Types (array format for dropdowns) - matching database
 export const FUEL_TYPES = [
   { value: "FT001", label: "DIESEL" },
   { value: "FT002", label: "CNG" },
@@ -242,26 +243,26 @@ export const VEHICLE_ERROR_MESSAGES = {
   MODEL_REQUIRED: "Model is required",
   YEAR_REQUIRED: "Manufacturing year is required",
   YEAR_INVALID: "Year must be between 1990 and current year",
-  
+
   // Specifications
   ENGINE_NUMBER_REQUIRED: "Engine number is required",
   CHASSIS_NUMBER_REQUIRED: "Chassis number is required",
   FUEL_TYPE_REQUIRED: "Fuel type is required",
-  
+
   // Ownership
   OWNERSHIP_TYPE_REQUIRED: "Ownership type is required",
   OWNER_NAME_REQUIRED: "Owner name is required",
-  
+
   // Documents
   DOCUMENT_TYPE_REQUIRED: "Document type is required",
   DOCUMENT_NUMBER_REQUIRED: "Document number is required",
   EXPIRY_DATE_REQUIRED: "Expiry date is required for this document",
   EXPIRY_DATE_PAST: "Document has expired",
-  
+
   // GPS
   GPS_DEVICE_ID_REQUIRED: "GPS device ID is required",
   GPS_PROVIDER_REQUIRED: "GPS provider is required",
-  
+
   // General
   VALIDATION_ERROR: "Please fix the errors before submitting",
   NETWORK_ERROR: "Network error. Please try again",

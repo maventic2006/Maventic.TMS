@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../../utils/api";
 import { API_ENDPOINTS } from "../../utils/constants";
+import draftService from "../../utils/draftService";
 
 // Async thunks
 export const createTransporter = createAsyncThunk(
@@ -307,6 +308,126 @@ export const fetchTransporterById = createAsyncThunk(
   }
 );
 
+// ============================================
+// DRAFT MANAGEMENT ASYNC THUNKS
+// ============================================
+
+/**
+ * Save transporter as draft
+ * Creates a new draft record with minimal validation
+ */
+export const saveTransporterAsDraft = createAsyncThunk(
+  "transporter/saveAsDraft",
+  async (transporterData, { rejectWithValue }) => {
+    try {
+      const result = await draftService.saveDraft(
+        "transporter",
+        transporterData
+      );
+
+      if (result.success) {
+        return result.data;
+      } else {
+        return rejectWithValue(result.error);
+      }
+    } catch (error) {
+      console.error("Error saving transporter draft:", error);
+      return rejectWithValue({
+        code: "DRAFT_SAVE_ERROR",
+        message: error.message || "Failed to save draft",
+      });
+    }
+  }
+);
+
+/**
+ * Update existing transporter draft
+ * Only allows updating drafts created by current user
+ */
+export const updateTransporterDraft = createAsyncThunk(
+  "transporter/updateDraft",
+  async ({ transporterId, transporterData }, { rejectWithValue }) => {
+    try {
+      const result = await draftService.updateDraft(
+        "transporter",
+        transporterId,
+        transporterData
+      );
+
+      if (result.success) {
+        return result.data;
+      } else {
+        return rejectWithValue(result.error);
+      }
+    } catch (error) {
+      console.error("Error updating transporter draft:", error);
+      return rejectWithValue({
+        code: "DRAFT_UPDATE_ERROR",
+        message: error.message || "Failed to update draft",
+      });
+    }
+  }
+);
+
+/**
+ * Delete transporter draft
+ * Only allows deleting drafts created by current user
+ */
+export const deleteTransporterDraft = createAsyncThunk(
+  "transporter/deleteDraft",
+  async (transporterId, { rejectWithValue }) => {
+    try {
+      const result = await draftService.deleteDraft(
+        "transporter",
+        transporterId
+      );
+
+      if (result.success) {
+        return { transporterId };
+      } else {
+        return rejectWithValue(result.error);
+      }
+    } catch (error) {
+      console.error("Error deleting transporter draft:", error);
+      return rejectWithValue({
+        code: "DRAFT_DELETE_ERROR",
+        message: error.message || "Failed to delete draft",
+      });
+    }
+  }
+);
+
+/**
+ * Submit transporter from draft to PENDING status
+ * Performs full validation and changes status from SAVE_AS_DRAFT to PENDING
+ * Only allows submitting drafts created by current user
+ */
+export const submitTransporterFromDraft = createAsyncThunk(
+  "transporter/submitFromDraft",
+  async ({ transporterId, transporterData }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(
+        `/transporter/${transporterId}/submit-draft`,
+        transporterData
+      );
+
+      if (response.data.success) {
+        return response.data;
+      } else {
+        return rejectWithValue(response.data.error);
+      }
+    } catch (error) {
+      console.error("Error submitting draft for approval:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "SUBMIT_DRAFT_ERROR",
+          message: error.message || "Failed to submit draft for approval",
+        }
+      );
+    }
+  }
+);
+
 const initialState = {
   // Master data
   masterData: {
@@ -335,6 +456,14 @@ const initialState = {
   isFetching: false,
   isFetchingDetails: false,
   error: null,
+
+  // Draft state
+  isSavingDraft: false,
+  isUpdatingDraft: false,
+  isDeletingDraft: false,
+  isSubmittingDraft: false,
+  draftError: null,
+  lastDraftAction: null, // 'saved', 'updated', 'deleted', 'submitted'
 
   // Success state
   lastCreatedTransporter: null,
@@ -519,6 +648,101 @@ const transporterSlice = createSlice({
       .addCase(fetchTransporterById.rejected, (state, action) => {
         state.isFetchingDetails = false;
         state.error = action.payload;
+      })
+
+      // ============================================
+      // DRAFT ASYNC THUNK REDUCERS
+      // ============================================
+
+      // Save Draft
+      .addCase(saveTransporterAsDraft.pending, (state) => {
+        state.isSavingDraft = true;
+        state.draftError = null;
+        state.lastDraftAction = null;
+      })
+      .addCase(saveTransporterAsDraft.fulfilled, (state, action) => {
+        state.isSavingDraft = false;
+        state.draftError = null;
+        state.lastDraftAction = "saved";
+        state.lastCreatedTransporter = action.payload;
+      })
+      .addCase(saveTransporterAsDraft.rejected, (state, action) => {
+        state.isSavingDraft = false;
+        state.draftError = action.payload;
+        state.lastDraftAction = null;
+      })
+
+      // Update Draft
+      .addCase(updateTransporterDraft.pending, (state) => {
+        state.isUpdatingDraft = true;
+        state.draftError = null;
+        state.lastDraftAction = null;
+      })
+      .addCase(updateTransporterDraft.fulfilled, (state, action) => {
+        state.isUpdatingDraft = false;
+        state.draftError = null;
+        state.lastDraftAction = "updated";
+      })
+      .addCase(updateTransporterDraft.rejected, (state, action) => {
+        state.isUpdatingDraft = false;
+        state.draftError = action.payload;
+        state.lastDraftAction = null;
+      })
+
+      // Delete Draft
+      .addCase(deleteTransporterDraft.pending, (state) => {
+        state.isDeletingDraft = true;
+        state.draftError = null;
+        state.lastDraftAction = null;
+      })
+      .addCase(deleteTransporterDraft.fulfilled, (state, action) => {
+        state.isDeletingDraft = false;
+        state.draftError = null;
+        state.lastDraftAction = "deleted";
+        // Remove deleted draft from transporters list
+        state.transporters = state.transporters.filter(
+          (t) => t.transporter_id !== action.payload.transporterId
+        );
+      })
+      .addCase(deleteTransporterDraft.rejected, (state, action) => {
+        state.isDeletingDraft = false;
+        state.draftError = action.payload;
+        state.lastDraftAction = null;
+      })
+
+      // Submit Draft for Approval
+      .addCase(submitTransporterFromDraft.pending, (state) => {
+        state.isSubmittingDraft = true;
+        state.draftError = null;
+        state.error = null;
+        state.lastDraftAction = null;
+      })
+      .addCase(submitTransporterFromDraft.fulfilled, (state, action) => {
+        state.isSubmittingDraft = false;
+        state.draftError = null;
+        state.error = null;
+        state.lastDraftAction = "submitted";
+        // Update the transporter status in the list if present
+        const transporterIndex = state.transporters.findIndex(
+          (t) => t.transporter_id === action.payload.data.transporterId
+        );
+        if (transporterIndex !== -1) {
+          state.transporters[transporterIndex].status = "PENDING";
+        }
+        // Update selected transporter if it's the same one
+        if (
+          state.selectedTransporter &&
+          state.selectedTransporter.transporterId ===
+            action.payload.data.transporterId
+        ) {
+          state.selectedTransporter.generalDetails.status = "PENDING";
+        }
+      })
+      .addCase(submitTransporterFromDraft.rejected, (state, action) => {
+        state.isSubmittingDraft = false;
+        state.draftError = action.payload;
+        state.error = action.payload;
+        state.lastDraftAction = null;
       });
   },
 });

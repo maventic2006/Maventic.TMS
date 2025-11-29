@@ -4,7 +4,7 @@
  * Integrated with backend API
  */
 
-import api from '../utils/api';
+import api from "../utils/api";
 
 /**
  * Get all consignors with pagination and filters
@@ -18,22 +18,24 @@ export const getConsignors = async (page = 1, limit = 25, filters = {}) => {
     const params = {
       page,
       limit,
-      ...filters
+      ...filters,
     };
 
-    const response = await api.get('/consignors', { params });
-    
+    const response = await api.get("/consignors", { params });
+
     // Backend returns: { success: true, data: [...], meta: {...} }
     if (response.data.success) {
       return {
         data: response.data.data,
-        ...response.data.meta
+        ...response.data.meta,
       };
     }
-    
-    throw new Error(response.data.error?.message || 'Failed to fetch consignors');
+
+    throw new Error(
+      response.data.error?.message || "Failed to fetch consignors"
+    );
   } catch (error) {
-    console.error('getConsignors error:', error);
+    console.error("getConsignors error:", error);
     throw error.response?.data || error;
   }
 };
@@ -45,16 +47,18 @@ export const getConsignors = async (page = 1, limit = 25, filters = {}) => {
  */
 export const getConsignorById = async (customerId) => {
   try {
-    const response = await api.get('/consignors/' + customerId);
-    
+    const response = await api.get("/consignors/" + customerId);
+
     // Backend returns: { success: true, data: { general: {...}, contacts: [...], organization: {...}, documents: [...] } }
     if (response.data.success) {
       return response.data.data;
     }
-    
-    throw new Error(response.data.error?.message || 'Failed to fetch consignor');
+
+    throw new Error(
+      response.data.error?.message || "Failed to fetch consignor"
+    );
   } catch (error) {
-    console.error('getConsignorById error:', error);
+    console.error("getConsignorById error:", error);
     throw error.response?.data || error;
   }
 };
@@ -68,10 +72,10 @@ export const getConsignorById = async (customerId) => {
 export const createConsignor = async (consignorData, files = {}) => {
   try {
     const formData = new FormData();
-    
+
     // Add JSON payload
-    formData.append('payload', JSON.stringify(consignorData));
-    
+    formData.append("payload", JSON.stringify(consignorData));
+
     // Add files if provided
     Object.entries(files).forEach(([key, file]) => {
       if (file) {
@@ -79,20 +83,22 @@ export const createConsignor = async (consignorData, files = {}) => {
       }
     });
 
-    const response = await api.post('/consignors', formData, {
+    const response = await api.post("/consignors", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+        "Content-Type": "multipart/form-data",
+      },
     });
-    
+
     // Backend returns: { success: true, data: {...} }
     if (response.data.success) {
       return response.data.data;
     }
-    
-    throw new Error(response.data.error?.message || 'Failed to create consignor');
+
+    throw new Error(
+      response.data.error?.message || "Failed to create consignor"
+    );
   } catch (error) {
-    console.error('createConsignor error:', error);
+    console.error("createConsignor error:", error);
     throw error.response?.data || error;
   }
 };
@@ -107,10 +113,10 @@ export const createConsignor = async (consignorData, files = {}) => {
 export const updateConsignor = async (customerId, data, files = {}) => {
   try {
     const formData = new FormData();
-    
+
     // Add JSON payload
-    formData.append('payload', JSON.stringify(data));
-    
+    formData.append("payload", JSON.stringify(data));
+
     // Add files if provided
     Object.entries(files).forEach(([key, file]) => {
       if (file) {
@@ -118,20 +124,22 @@ export const updateConsignor = async (customerId, data, files = {}) => {
       }
     });
 
-    const response = await api.put('/consignors/' + customerId, formData, {
+    const response = await api.put("/consignors/" + customerId, formData, {
       headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+        "Content-Type": "multipart/form-data",
+      },
     });
-    
+
     // Backend returns: { success: true, data: {...} }
     if (response.data.success) {
       return response.data.data;
     }
-    
-    throw new Error(response.data.error?.message || 'Failed to update consignor');
+
+    throw new Error(
+      response.data.error?.message || "Failed to update consignor"
+    );
   } catch (error) {
-    console.error('updateConsignor error:', error);
+    console.error("updateConsignor error:", error);
     throw error.response?.data || error;
   }
 };
@@ -143,16 +151,18 @@ export const updateConsignor = async (customerId, data, files = {}) => {
  */
 export const deleteConsignor = async (customerId) => {
   try {
-    const response = await api.delete('/consignors/' + customerId);
-    
+    const response = await api.delete("/consignors/" + customerId);
+
     // Backend returns: { success: true, data: {...} }
     if (response.data.success) {
       return response.data.data;
     }
-    
-    throw new Error(response.data.error?.message || 'Failed to delete consignor');
+
+    throw new Error(
+      response.data.error?.message || "Failed to delete consignor"
+    );
   } catch (error) {
-    console.error('deleteConsignor error:', error);
+    console.error("deleteConsignor error:", error);
     throw error.response?.data || error;
   }
 };
@@ -163,62 +173,64 @@ export const deleteConsignor = async (customerId) => {
  */
 export const getMasterData = async () => {
   try {
-    const response = await api.get('/consignors/master-data');
-    
-    console.log('🔍 Raw API response:', response.data);
-    
+    const response = await api.get("/consignors/master-data");
+
+    console.log("🔍 Raw API response:", response.data);
+
     // Backend returns: { success: true, data: { industries: [...], currencies: [...], documentTypes: [...] } }
     if (response.data.success) {
       const backendData = response.data.data;
-      
-      console.log('🔍 Backend data:', backendData);
-      console.log('🔍 Backend documentTypes:', backendData.documentTypes);
-      
+
+      console.log("🔍 Backend data:", backendData);
+      console.log("🔍 Backend documentTypes:", backendData.documentTypes);
+
       // Transform backend format to frontend format
       const transformed = {
-        industryTypes: backendData.industries.map(item => ({
+        industryTypes: backendData.industries.map((item) => ({
           value: item.id,
-          label: item.label
+          label: item.label,
         })),
-        currencyTypes: backendData.currencies.map(item => ({
+        currencyTypes: backendData.currencies.map((item) => ({
           value: item.id,
-          label: item.code + ' - ' + item.label,
-          symbol: item.symbol
+          label: item.code + " - " + item.label,
+          symbol: item.symbol,
         })),
         paymentTerms: [
-          { value: 'NET15', label: 'NET 15 Days' },
-          { value: 'NET30', label: 'NET 30 Days' },
-          { value: 'NET45', label: 'NET 45 Days' },
-          { value: 'NET60', label: 'NET 60 Days' },
-          { value: 'NET90', label: 'NET 90 Days' },
-          { value: 'COD', label: 'Cash on Delivery' },
-          { value: 'ADVANCE', label: 'Advance Payment' },
-          { value: 'LC', label: 'Letter of Credit' }
+          { value: "NET15", label: "NET 15 Days" },
+          { value: "NET30", label: "NET 30 Days" },
+          { value: "NET45", label: "NET 45 Days" },
+          { value: "NET60", label: "NET 60 Days" },
+          { value: "NET90", label: "NET 90 Days" },
+          { value: "COD", label: "Cash on Delivery" },
+          { value: "ADVANCE", label: "Advance Payment" },
+          { value: "LC", label: "Letter of Credit" },
         ],
         documentTypes: backendData.documentTypes || [],
         countries: [
-          { value: 'IN', label: 'India' },
-          { value: 'US', label: 'United States' },
-          { value: 'GB', label: 'United Kingdom' },
-          { value: 'DE', label: 'Germany' },
-          { value: 'FR', label: 'France' },
-          { value: 'CN', label: 'China' },
-          { value: 'JP', label: 'Japan' },
-          { value: 'AU', label: 'Australia' },
-          { value: 'CA', label: 'Canada' },
-          { value: 'SG', label: 'Singapore' }
-        ]
+          { value: "IN", label: "India" },
+          { value: "US", label: "United States" },
+          { value: "GB", label: "United Kingdom" },
+          { value: "DE", label: "Germany" },
+          { value: "FR", label: "France" },
+          { value: "CN", label: "China" },
+          { value: "JP", label: "Japan" },
+          { value: "AU", label: "Australia" },
+          { value: "CA", label: "Canada" },
+          { value: "SG", label: "Singapore" },
+        ],
       };
-      
-      console.log('🔍 Transformed data:', transformed);
-      console.log('🔍 Transformed documentTypes:', transformed.documentTypes);
-      
+
+      console.log("🔍 Transformed data:", transformed);
+      console.log("🔍 Transformed documentTypes:", transformed.documentTypes);
+
       return transformed;
     }
-    
-    throw new Error(response.data.error?.message || 'Failed to fetch master data');
+
+    throw new Error(
+      response.data.error?.message || "Failed to fetch master data"
+    );
   } catch (error) {
-    console.error('getMasterData error:', error);
+    console.error("getMasterData error:", error);
     throw error.response?.data || error;
   }
 };
@@ -233,11 +245,11 @@ export const getMasterData = async () => {
 export const uploadDocument = async (customerId, formData, onProgress) => {
   try {
     const response = await api.post(
-      '/consignors/' + customerId + '/documents',
+      "/consignors/" + customerId + "/documents",
       formData,
       {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          "Content-Type": "multipart/form-data",
         },
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
@@ -246,17 +258,169 @@ export const uploadDocument = async (customerId, formData, onProgress) => {
             );
             onProgress(percentCompleted);
           }
-        }
+        },
       }
     );
-    
+
     if (response.data.success) {
       return response.data.data;
     }
-    
-    throw new Error(response.data.error?.message || 'Failed to upload document');
+
+    throw new Error(
+      response.data.error?.message || "Failed to upload document"
+    );
   } catch (error) {
-    console.error('uploadDocument error:', error);
+    console.error("uploadDocument error:", error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Save consignor as draft
+ * Creates a draft consignor with minimal validation
+ * @param {object} consignorData - Consignor data
+ * @param {object} files - Files to upload (optional)
+ * @returns {Promise} - Created draft
+ */
+export const saveConsignorAsDraft = async (consignorData, files = {}) => {
+  try {
+    const formData = new FormData();
+
+    // Add JSON payload
+    formData.append("payload", JSON.stringify(consignorData));
+
+    // Add files if provided
+    Object.entries(files).forEach(([key, file]) => {
+      if (file) {
+        formData.append(key, file);
+      }
+    });
+
+    const response = await api.post("/consignors/save-draft", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (response.data.success) {
+      return response.data.data;
+    }
+
+    throw new Error(
+      response.data.error?.message || "Failed to save consignor as draft"
+    );
+  } catch (error) {
+    console.error("saveConsignorAsDraft error:", error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Update existing consignor draft
+ * @param {string} customerId - Customer ID
+ * @param {object} data - Updated data
+ * @param {object} files - Files to upload (optional)
+ * @returns {Promise} - Updated draft
+ */
+export const updateConsignorDraft = async (customerId, data, files = {}) => {
+  try {
+    const formData = new FormData();
+
+    // Add JSON payload
+    formData.append("payload", JSON.stringify(data));
+
+    // Add files if provided
+    Object.entries(files).forEach(([key, file]) => {
+      if (file) {
+        formData.append(key, file);
+      }
+    });
+
+    const response = await api.put(
+      `/consignors/${customerId}/update-draft`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    if (response.data.success) {
+      return response.data.data;
+    }
+
+    throw new Error(
+      response.data.error?.message || "Failed to update consignor draft"
+    );
+  } catch (error) {
+    console.error("updateConsignorDraft error:", error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Submit consignor draft for approval
+ * @param {string} customerId - Customer ID
+ * @param {object} data - Final data for submission
+ * @param {object} files - Files to upload (optional)
+ * @returns {Promise} - Submitted consignor
+ */
+export const submitConsignorDraft = async (customerId, data, files = {}) => {
+  try {
+    const formData = new FormData();
+
+    // Add JSON payload
+    formData.append("payload", JSON.stringify(data));
+
+    // Add files if provided
+    Object.entries(files).forEach(([key, file]) => {
+      if (file) {
+        formData.append(key, file);
+      }
+    });
+
+    const response = await api.put(
+      `/consignors/${customerId}/submit-draft`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    if (response.data.success) {
+      return response.data.data;
+    }
+
+    throw new Error(
+      response.data.error?.message || "Failed to submit consignor draft"
+    );
+  } catch (error) {
+    console.error("submitConsignorDraft error:", error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
+ * Delete consignor draft
+ * @param {string} customerId - Customer ID
+ * @returns {Promise} - Deletion result
+ */
+export const deleteConsignorDraft = async (customerId) => {
+  try {
+    const response = await api.delete(`/consignors/${customerId}/delete-draft`);
+
+    if (response.data.success) {
+      return response.data.data;
+    }
+
+    throw new Error(
+      response.data.error?.message || "Failed to delete consignor draft"
+    );
+  } catch (error) {
+    console.error("deleteConsignorDraft error:", error);
     throw error.response?.data || error;
   }
 };
@@ -268,5 +432,9 @@ export default {
   updateConsignor,
   deleteConsignor,
   getMasterData,
-  uploadDocument
+  uploadDocument,
+  saveConsignorAsDraft,
+  updateConsignorDraft,
+  submitConsignorDraft,
+  deleteConsignorDraft,
 };

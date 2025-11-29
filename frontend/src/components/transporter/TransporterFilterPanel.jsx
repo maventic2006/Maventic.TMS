@@ -25,6 +25,7 @@ const TransporterFilterPanel = ({
     { value: "Active", label: "Active" },
     { value: "Approved", label: "Approved" },
     { value: "Pending", label: "Pending" },
+    { value: "SAVE_AS_DRAFT", label: "Draft" },
     { value: "Inactive", label: "Inactive" },
     { value: "Rejected", label: "Rejected" },
   ];
@@ -117,6 +118,46 @@ const TransporterFilterPanel = ({
                     placeholder="Enter VAT/GST"
                     className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 transition-all duration-200 rounded-lg h-10"
                     style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
+                  />
+                </div>
+
+                <div className="space-y-2 group">
+                  <Label
+                    htmlFor="createdOnStart"
+                    className="text-sm text-[#0D1A33] font-semibold"
+                  >
+                    Created On (Start):
+                  </Label>
+                  <Input
+                    id="createdOnStart"
+                    type="date"
+                    value={filters.createdOnStart}
+                    onChange={(e) =>
+                      onFilterChange("createdOnStart", e.target.value)
+                    }
+                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+      focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
+      transition-all duration-200 rounded-lg h-10"
+                  />
+                </div>
+
+                <div className="space-y-2 group">
+                  <Label
+                    htmlFor="createdOnEnd"
+                    className="text-sm text-[#0D1A33] font-semibold"
+                  >
+                    Created On (End):
+                  </Label>
+                  <Input
+                    id="createdOnEnd"
+                    type="date"
+                    value={filters.createdOnEnd}
+                    onChange={(e) =>
+                      onFilterChange("createdOnEnd", e.target.value)
+                    }
+                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+      focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
+      transition-all duration-200 rounded-lg h-10"
                   />
                 </div>
               </div>

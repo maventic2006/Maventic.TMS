@@ -272,7 +272,6 @@ const GeneralDetailsViewTab = ({ warehouseData }) => {
               Fuel Availability
             </label>
             <div className="flex items-center gap-2">
-              <Fuel className="h-4 w-4 text-gray-400" />
               {displayBoolean(warehouseData?.fuel_availability)}
             </div>
           </div>
@@ -296,7 +295,6 @@ const GeneralDetailsViewTab = ({ warehouseData }) => {
               Gate In Checklist Auth
             </label>
             <div className="flex items-center gap-2">
-              <ClipboardCheck className="h-4 w-4 text-gray-400" />
               {displayBoolean(warehouseData?.gate_in_checklist_auth)}
             </div>
           </div>
@@ -306,7 +304,6 @@ const GeneralDetailsViewTab = ({ warehouseData }) => {
               Gate Out Checklist Auth
             </label>
             <div className="flex items-center gap-2">
-              <ClipboardCheck className="h-4 w-4 text-gray-400" />
               {displayBoolean(warehouseData?.gate_out_checklist_auth)}
             </div>
           </div>

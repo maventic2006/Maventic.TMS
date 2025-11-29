@@ -1,12 +1,15 @@
 ﻿import React from "react";
 import { Key, CreditCard, Calendar, Phone, Mail, MapPin } from "lucide-react";
 import CollapsibleSection from "../../../components/ui/CollapsibleSection";
+import { formatDate } from "../../../utils/helpers";
 
 const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
   if (isEditMode) {
     return (
       <div className="text-center py-12">
-        <p className="text-[#4A5568]">Edit mode for Ownership Details coming soon...</p>
+        <p className="text-[#4A5568]">
+          Edit mode for Ownership Details coming soon...
+        </p>
       </div>
     );
   }
@@ -41,7 +44,8 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">
-                      {ownership.ownershipName || `Ownership Record ${index + 1}`}
+                      {ownership.ownershipName ||
+                        `Ownership Record ${index + 1}`}
                     </h3>
                     <p className="text-sm text-gray-600">
                       {ownership.registrationNumber || "No Registration Number"}
@@ -67,7 +71,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   Ownership Name
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800">{ownership.ownershipName || "N/A"}</p>
+                  <p className="text-gray-800">
+                    {ownership.ownershipName || "N/A"}
+                  </p>
                 </div>
               </div>
 
@@ -77,7 +83,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">{ownership.validFrom || "N/A"}</p>
+                  <p className="text-gray-800">
+                    {formatDate(ownership.validFrom)}
+                  </p>
                 </div>
               </div>
 
@@ -87,7 +95,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">{ownership.validTo || "N/A"}</p>
+                  <p className="text-gray-800">
+                    {formatDate(ownership.validTo)}
+                  </p>
                 </div>
               </div>
 
@@ -96,7 +106,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   Registration Number
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800 font-semibold">{ownership.registrationNumber || "N/A"}</p>
+                  <p className="text-gray-800 font-semibold">
+                    {ownership.registrationNumber || "N/A"}
+                  </p>
                 </div>
               </div>
 
@@ -106,7 +118,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">{ownership.registrationDate || "N/A"}</p>
+                  <p className="text-gray-800">
+                    {formatDate(ownership.registrationDate)}
+                  </p>
                 </div>
               </div>
 
@@ -116,7 +130,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">{ownership.registrationUpto || "N/A"}</p>
+                  <p className="text-gray-800">
+                    {formatDate(ownership.registrationUpto)}
+                  </p>
                 </div>
               </div>
 
@@ -126,7 +142,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">{ownership.purchaseDate || "N/A"}</p>
+                  <p className="text-gray-800">
+                    {formatDate(ownership.purchaseDate)}
+                  </p>
                 </div>
               </div>
 
@@ -135,7 +153,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   Owner Sr Number
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800">{ownership.ownerSrNumber || "N/A"}</p>
+                  <p className="text-gray-800">
+                    {ownership.ownerSrNumber || "N/A"}
+                  </p>
                 </div>
               </div>
 
@@ -144,7 +164,9 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   State Code
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800">{ownership.stateCode || "N/A"}</p>
+                  <p className="text-gray-800">
+                    {ownership.stateCode || "N/A"}
+                  </p>
                 </div>
               </div>
 
@@ -208,8 +230,6 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
           </CollapsibleSection>
         ))
       )}
-
-
     </div>
   );
 };

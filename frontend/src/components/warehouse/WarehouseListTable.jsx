@@ -12,6 +12,7 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Trash2, // ✅ Add Trash2 icon for delete button
 } from "lucide-react";
 import {
   Table,
@@ -40,7 +41,7 @@ const displayValue = (value) => {
 
 // Helper function to display boolean as Yes/No with icons
 const displayBoolean = (value) => {
-  if (value === true) {
+  if (value === true || value === 1) {
     return (
       <div className="flex items-center justify-center gap-1 text-green-600">
         <CheckCircle2 className="h-4 w-4" />
@@ -58,6 +59,7 @@ const WarehouseListTable = ({
   warehouses,
   loading,
   onWarehouseClick,
+  onDeleteDraft, // ✅ Add onDeleteDraft prop
   // Pagination props
   currentPage,
   totalPages,
@@ -192,7 +194,22 @@ const WarehouseListTable = ({
                     {warehouse.warehouse_id}
                   </span>
                 </div>
-                <StatusPill status={warehouse.status} />
+                {/* ✅ Status with delete draft button */}
+                <div className="flex items-center gap-2">
+                  <StatusPill status={warehouse.status} />
+                  {warehouse.status === "SAVE_AS_DRAFT" && onDeleteDraft && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteDraft(warehouse.warehouse_id);
+                      }}
+                      className="p-1 hover:bg-red-50 rounded-md transition-colors duration-200 group"
+                      title="Delete draft"
+                    >
+                      <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600 transition-colors duration-200" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Warehouse Name */}
@@ -473,14 +490,14 @@ const WarehouseListTable = ({
                 <TableHead className="text-white text-nowrap w-24 text-sm font-semibold h-14">
                   Created On
                 </TableHead>
+                <TableHead className="text-white text-nowrap w-20 text-sm font-semibold h-14">
+                  Status
+                </TableHead>
                 <TableHead className="text-white text-nowrap w-24 text-sm font-semibold h-14">
                   Approver
                 </TableHead>
                 <TableHead className="text-white text-nowrap w-24 text-sm font-semibold h-14">
                   Approved On
-                </TableHead>
-                <TableHead className="text-white text-nowrap w-20 text-sm font-semibold h-14">
-                  Status
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -569,11 +586,30 @@ const WarehouseListTable = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(
-                        warehouse.created_at
-                          ? new Date(warehouse.created_at).toLocaleDateString()
+                        warehouse.created_on
+                          ? warehouse.created_on.split("T")[0]
                           : null
                       )}
                     </span>
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
+                    {/* ✅ Status with delete draft button (matching transporter pattern) */}
+                    <div className="flex items-center justify-center gap-2">
+                      <StatusPill status={warehouse.status} />
+                      {warehouse.status === "SAVE_AS_DRAFT" &&
+                        onDeleteDraft && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteDraft(warehouse.warehouse_id);
+                            }}
+                            className="p-1 hover:bg-red-50 rounded-md transition-colors duration-200 group"
+                            title="Delete draft"
+                          >
+                            <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600 transition-colors duration-200" />
+                          </button>
+                        )}
+                    </div>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
@@ -588,9 +624,6 @@ const WarehouseListTable = ({
                           : null
                       )}
                     </span>
-                  </TableCell>
-                  <TableCell className="px-4 py-3">
-                    <StatusPill status={warehouse.status} />
                   </TableCell>
                 </TableRow>
               ))}

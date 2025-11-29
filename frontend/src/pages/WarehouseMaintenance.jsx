@@ -3,7 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import TMSHeader from "../components/layout/TMSHeader";
 import { getPageTheme } from "../theme.config";
-import { fetchWarehouses } from "../redux/slices/warehouseSlice";
+import {
+  fetchWarehouses,
+  deleteWarehouseDraft,
+} from "../redux/slices/warehouseSlice"; // ✅ Add deleteWarehouseDraft
+import { addToast } from "../redux/slices/uiSlice"; // ✅ Add toast for feedback
+import { TOAST_TYPES } from "../utils/constants"; // ✅ Add toast constants
 import TopActionBar from "../components/warehouse/TopActionBar";
 import WarehouseFilterPanel from "../components/warehouse/WarehouseFilterPanel";
 import WarehouseListTable from "../components/warehouse/WarehouseListTable";
@@ -58,18 +63,24 @@ const WarehouseMaintenance = () => {
     warehouseId: "",
     warehouseName: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
     weighBridge: null,
     virtualYardIn: null,
     fuelAvailability: null,
+    geoFencing: null,
   });
 
   const [appliedFilters, setAppliedFilters] = useState({
     warehouseId: "",
     warehouseName: "",
     status: "",
+    createdOnStart: "",
+    createdOnEnd: "",
     weighBridge: null,
     virtualYardIn: null,
     fuelAvailability: null,
+    geoFencing: null,
   });
 
   // Fetch warehouses when component mounts or when appliedFilters change (not on every keystroke)
@@ -96,8 +107,17 @@ const WarehouseMaintenance = () => {
       if (appliedFilters.virtualYardIn !== null) {
         params.virtualYardIn = appliedFilters.virtualYardIn;
       }
+      if (appliedFilters.geoFencing !== null) {
+        params.geoFencing = appliedFilters.geoFencing;
+      }
       if (appliedFilters.fuelAvailability !== null) {
         params.fuelAvailability = appliedFilters.fuelAvailability;
+      }
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
       }
 
       dispatch(fetchWarehouses(params));
@@ -126,9 +146,12 @@ const WarehouseMaintenance = () => {
       warehouseId: "",
       warehouseName: "",
       status: "",
+      createdOnStart: "",
+      createdOnEnd: "",
       weighBridge: null,
       virtualYardIn: null,
       fuelAvailability: null,
+      geoFencing: null,
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
@@ -184,6 +207,15 @@ const WarehouseMaintenance = () => {
       if (appliedFilters.fuelAvailability !== null) {
         params.fuelAvailability = appliedFilters.fuelAvailability;
       }
+      if (appliedFilters.geoFencing !== null) {
+        params.geoFencing = appliedFilters.geoFencing;
+      }
+      if (appliedFilters.createdOnStart) {
+        params.createdOnStart = appliedFilters.createdOnStart;
+      }
+      if (appliedFilters.createdOnEnd) {
+        params.createdOnEnd = appliedFilters.createdOnEnd;
+      }
 
       dispatch(fetchWarehouses(params));
     },
@@ -193,6 +225,74 @@ const WarehouseMaintenance = () => {
   const handleToggleFilters = useCallback(() => {
     setShowFilters(!showFilters);
   }, [showFilters]);
+
+  // ✅ Delete draft handler (matching transporter pattern)
+  const handleDeleteDraft = useCallback(
+    async (warehouseId) => {
+      if (
+        window.confirm(
+          "Are you sure you want to delete this draft? This action cannot be undone."
+        )
+      ) {
+        try {
+          await dispatch(deleteWarehouseDraft(warehouseId)).unwrap();
+
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.SUCCESS,
+              message: "Draft deleted successfully",
+              duration: 3000,
+            })
+          );
+
+          // Rebuild filter params and refresh list
+          const filterParams = {
+            page: pagination.page,
+            limit: pagination.limit,
+          };
+
+          if (appliedFilters.warehouseId) {
+            filterParams.warehouseId = appliedFilters.warehouseId;
+          }
+          if (appliedFilters.warehouseName) {
+            filterParams.warehouseName = appliedFilters.warehouseName;
+          }
+          if (appliedFilters.status) {
+            filterParams.status = appliedFilters.status;
+          }
+          if (appliedFilters.weighBridge !== null) {
+            filterParams.weighBridge = appliedFilters.weighBridge;
+          }
+          if (appliedFilters.virtualYardIn !== null) {
+            filterParams.virtualYardIn = appliedFilters.virtualYardIn;
+          }
+          if (appliedFilters.fuelAvailability !== null) {
+            filterParams.fuelAvailability = appliedFilters.fuelAvailability;
+          }
+          if (appliedFilters.geoFencing !== null) {
+            filterParams.geoFencing = appliedFilters.geoFencing;
+          }
+          if (appliedFilters.createdOnStart) {
+            filterParams.createdOnStart = appliedFilters.createdOnStart;
+          }
+          if (appliedFilters.createdOnEnd) {
+            filterParams.createdOnEnd = appliedFilters.createdOnEnd;
+          }
+
+          dispatch(fetchWarehouses(filterParams));
+        } catch (error) {
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.ERROR,
+              message: error?.message || "Failed to delete draft",
+              duration: 5000,
+            })
+          );
+        }
+      }
+    },
+    [dispatch, pagination.page, pagination.limit, appliedFilters]
+  );
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
@@ -221,6 +321,7 @@ const WarehouseMaintenance = () => {
             warehouses={filteredWarehouses}
             loading={loading}
             onWarehouseClick={handleWarehouseClick}
+            onDeleteDraft={handleDeleteDraft} // ✅ Add delete draft handler
             currentPage={pagination.page || 1}
             totalPages={pagination.totalPages || 1}
             totalItems={pagination.total || 0}

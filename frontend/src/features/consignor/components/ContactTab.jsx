@@ -2,13 +2,10 @@ import React from "react";
 import { Users } from "lucide-react";
 import { getPageTheme } from "../../../theme.config";
 import ThemeTable from "../../../components/ui/ThemeTable";
+import { maxLength } from "zod";
 
-const ContactTab = ({
-  formData,
-  setFormData,
-  errors = {},
-}) => {
-  const theme = getPageTheme('general');
+const ContactTab = ({ formData, setFormData, errors = {} }) => {
+  const theme = getPageTheme("general");
   const contacts = formData.contacts || [];
 
   // Table column configuration
@@ -44,6 +41,7 @@ const ContactTab = ({
       placeholder: "+1 234 567 8900",
       width: "min-w-[180px]",
       required: true,
+      maxLength: 10,
     },
     {
       key: "email",

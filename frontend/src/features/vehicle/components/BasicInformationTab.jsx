@@ -281,53 +281,66 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
   // Helper function to handle numeric inputs with leading zeros
   const handleNumericChange = (field, value) => {
     // Allow empty string
-    if (value === '') {
-      handleChange(field, '');
+    if (value === "") {
+      handleChange(field, "");
       return;
     }
-    
+
     // Remove leading zeros but keep single zero
-    const cleanedValue = value.replace(/^0+(?=\d)/, '') || '0';
+    const cleanedValue = value.replace(/^0+(?=\d)/, "") || "0";
     handleChange(field, cleanedValue);
   };
 
   const data = formData.basicInformation || {};
-  
+
   // Get current year for month/year picker
   const currentYear = new Date().getFullYear();
 
   // ✅ USE MASTER DATA FROM API - NOT HARDCODED CONSTANTS
   const vehicleTypes = masterData?.vehicleTypes || [
-    { value: 'VT001', label: 'HCV - Heavy Commercial Vehicle' },
-    { value: 'VT002', label: 'MCV - Medium Commercial Vehicle' },
-    { value: 'VT003', label: 'LCV - Light Commercial Vehicle' }
+    { value: "VT001", label: "HCV - Heavy Commercial Vehicle" },
+    { value: "VT002", label: "MCV - Medium Commercial Vehicle" },
+    { value: "VT003", label: "LCV - Light Commercial Vehicle" },
   ];
 
   // ✅ USE MASTER DATA FROM API - NOT HARDCODED CONSTANTS
   const usageTypes = masterData?.usageTypes || [
-    { value: 'UT001', label: 'COMMERCIAL' },
-    { value: 'UT002', label: 'PRIVATE' },
-    { value: 'UT003', label: 'RENTAL' },
-    { value: 'UT004', label: 'LEASE' }
+    { value: "UT001", label: "COMMERCIAL" },
+    { value: "UT002", label: "PRIVATE" },
+    { value: "UT003", label: "RENTAL" },
+    { value: "UT004", label: "LEASE" },
   ];
 
   // Country and state options for registration location
-  const countryOptions = Country.getAllCountries().map(country => ({
+  const countryOptions = Country.getAllCountries().map((country) => ({
     value: country.isoCode,
-    label: country.name
+    label: country.name,
   }));
 
-  const stateOptions = data.vehicleRegisteredAtCountry ? 
-    State.getStatesOfCountry(data.vehicleRegisteredAtCountry).map(state => ({
-      value: state.isoCode, 
-      label: state.name
-    })) : [];
+  const stateOptions = data.vehicleRegisteredAtCountry
+    ? State.getStatesOfCountry(data.vehicleRegisteredAtCountry).map(
+        (state) => ({
+          value: state.isoCode,
+          label: state.name,
+        })
+      )
+    : [];
 
   const handleCountryChange = (countryCode) => {
+    console.log("🌍 Country selected:", countryCode);
     handleChange("vehicleRegisteredAtCountry", countryCode);
     // Clear state when country changes
     handleChange("vehicleRegisteredAtState", "");
   };
+
+  // Debug log for formData
+  console.log(
+    "📋 BasicInformationTab - Current formData.basicInformation:",
+    data
+  );
+  console.log("🌍 Selected Country:", data.vehicleRegisteredAtCountry);
+  console.log("🏙️ Selected State:", data.vehicleRegisteredAtState);
+  console.log("📍 State Options Count:", stateOptions.length);
 
   return (
     <div className="space-y-5">
@@ -408,7 +421,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
               errors.make ? "border-red-500" : "border-gray-300"
             } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
           />
-          {errors.make && <p className="mt-1 text-xs text-red-600">{errors.make}</p>}
+          {errors.make && (
+            <p className="mt-1 text-xs text-red-600">{errors.make}</p>
+          )}
         </div>
 
         {/* Maker Model */}
@@ -441,13 +456,16 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
               errors.year ? "border-red-500" : "border-gray-300"
             } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
           />
-          {errors.year && <p className="mt-1 text-xs text-red-600">{errors.year}</p>}
+          {errors.year && (
+            <p className="mt-1 text-xs text-red-600">{errors.year}</p>
+          )}
         </div>
 
         {/* VIN (Vehicle Identification Number) */}
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-            VIN (Vehicle Identification Number) <span className="text-red-500">*</span>
+            VIN (Vehicle Identification Number){" "}
+            <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -459,7 +477,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
               errors.vin ? "border-red-500" : "border-gray-300"
             } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
           />
-          {errors.vin && <p className="mt-1 text-xs text-red-600">{errors.vin}</p>}
+          {errors.vin && (
+            <p className="mt-1 text-xs text-red-600">{errors.vin}</p>
+          )}
         </div>
 
         {/* Vehicle Type */}
@@ -475,7 +495,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
             error={errors.vehicleType}
             className="w-full"
           />
-          {errors.vehicleType && <p className="mt-1 text-xs text-red-600">{errors.vehicleType}</p>}
+          {errors.vehicleType && (
+            <p className="mt-1 text-xs text-red-600">{errors.vehicleType}</p>
+          )}
         </div>
 
         {/* Vehicle Category */}
@@ -500,14 +522,20 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="month"
             value={data.manufacturingMonthYear || ""}
-            onChange={(e) => handleChange("manufacturingMonthYear", e.target.value)}
+            onChange={(e) =>
+              handleChange("manufacturingMonthYear", e.target.value)
+            }
             max={`${currentYear}-12`}
             className={`w-full px-3 py-2 text-sm border ${
-              errors.manufacturingMonthYear ? "border-red-500" : "border-gray-300"
+              errors.manufacturingMonthYear
+                ? "border-red-500"
+                : "border-gray-300"
             } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
           />
           {errors.manufacturingMonthYear && (
-            <p className="mt-1 text-xs text-red-600">{errors.manufacturingMonthYear}</p>
+            <p className="mt-1 text-xs text-red-600">
+              {errors.manufacturingMonthYear}
+            </p>
           )}
         </div>
 
@@ -526,7 +554,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
               errors.gpsIMEI ? "border-red-500" : "border-gray-300"
             } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
           />
-          {errors.gpsIMEI && <p className="mt-1 text-xs text-red-600">{errors.gpsIMEI}</p>}
+          {errors.gpsIMEI && (
+            <p className="mt-1 text-xs text-red-600">{errors.gpsIMEI}</p>
+          )}
         </div>
 
         {/* GPS Tracker Active Flag */}
@@ -567,7 +597,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="number"
             value={data.avgRunningSpeed || ""}
-            onChange={(e) => handleNumericChange("avgRunningSpeed", e.target.value)}
+            onChange={(e) =>
+              handleNumericChange("avgRunningSpeed", e.target.value)
+            }
             min="0"
             step="0.1"
             placeholder="60"
@@ -583,7 +615,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="number"
             value={data.maxRunningSpeed || ""}
-            onChange={(e) => handleNumericChange("maxRunningSpeed", e.target.value)}
+            onChange={(e) =>
+              handleNumericChange("maxRunningSpeed", e.target.value)
+            }
             min="0"
             step="0.1"
             placeholder="100"
@@ -604,7 +638,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
             error={errors.usageType}
             className="w-full"
           />
-          {errors.usageType && <p className="mt-1 text-xs text-red-600">{errors.usageType}</p>}
+          {errors.usageType && (
+            <p className="mt-1 text-xs text-red-600">{errors.usageType}</p>
+          )}
         </div>
 
         {/* Vehicle Registered at Country */}
@@ -617,10 +653,15 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
             onChange={handleCountryChange}
             options={countryOptions}
             placeholder="Select Country"
+            searchable
             error={errors.vehicleRegisteredAtCountry}
             className="w-full"
           />
-          {errors.vehicleRegisteredAtCountry && <p className="mt-1 text-xs text-red-600">{errors.vehicleRegisteredAtCountry}</p>}
+          {errors.vehicleRegisteredAtCountry && (
+            <p className="mt-1 text-xs text-red-600">
+              {errors.vehicleRegisteredAtCountry}
+            </p>
+          )}
         </div>
 
         {/* Vehicle Registered at State */}
@@ -630,14 +671,21 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           </label>
           <CustomSelect
             value={data.vehicleRegisteredAtState || ""}
-            onChange={(value) => handleChange("vehicleRegisteredAtState", value)}
+            onChange={(value) =>
+              handleChange("vehicleRegisteredAtState", value)
+            }
             options={stateOptions}
+            searchable
             placeholder="Select State"
             error={errors.vehicleRegisteredAtState}
             className="w-full"
             disabled={!data.vehicleRegisteredAtCountry}
           />
-          {errors.vehicleRegisteredAtState && <p className="mt-1 text-xs text-red-600">{errors.vehicleRegisteredAtState}</p>}
+          {errors.vehicleRegisteredAtState && (
+            <p className="mt-1 text-xs text-red-600">
+              {errors.vehicleRegisteredAtState}
+            </p>
+          )}
         </div>
 
         {/* Safety Inspection Date */}
@@ -648,7 +696,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="date"
             value={data.safetyInspectionDate || ""}
-            onChange={(e) => handleChange("safetyInspectionDate", e.target.value)}
+            onChange={(e) =>
+              handleChange("safetyInspectionDate", e.target.value)
+            }
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent"
           />
         </div>
@@ -661,7 +711,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
           <input
             type="number"
             value={data.taxesAndFees || ""}
-            onChange={(e) => handleNumericChange("taxesAndFees", e.target.value)}
+            onChange={(e) =>
+              handleNumericChange("taxesAndFees", e.target.value)
+            }
             min="0"
             step="0.01"
             placeholder="50000"
@@ -675,7 +727,11 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
         <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
         <div className="text-xs text-blue-800">
           <p className="font-semibold mb-0.5">Basic Vehicle Information</p>
-          <p className="text-blue-700">Fields marked with * are mandatory. Ensure Make/Brand, VIN, and Manufacturing details are accurate for proper vehicle identification.</p>
+          <p className="text-blue-700">
+            Fields marked with * are mandatory. Ensure Make/Brand, VIN, and
+            Manufacturing details are accurate for proper vehicle
+            identification.
+          </p>
         </div>
       </div>
 
