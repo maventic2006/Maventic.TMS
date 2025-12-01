@@ -1133,7 +1133,7 @@ const createWarehouse = async (req, res) => {
     // ========================================
     // PHASE 2: DATABASE OPERATIONS
     // ========================================
-
+    // testing comment
     trx = await knex.transaction();
 
     // Generate unique warehouse ID
