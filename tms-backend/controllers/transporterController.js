@@ -788,7 +788,7 @@ const createTransporter = async (req, res) => {
         updated_at: currentTimestamp,
         created_on: currentTimestamp,
         updated_on: currentTimestamp,
-        status: "ACTIVE",
+        status: "PENDING", // Set to PENDING when transporter is created (awaiting approval)
       });
 
       // 2. Create addresses and contacts
@@ -967,9 +967,13 @@ const createTransporter = async (req, res) => {
         "📝 Creating Transporter Admin user for approval workflow..."
       );
 
-      // Generate user ID for Transporter Admin
-      const transporterAdminUserId = await generateTransporterAdminUserId(trx);
-      console.log(`  Generated user ID: ${transporterAdminUserId}`);
+      // FIXED: Generate user ID based on transporter ID pattern (T001 -> TA0001)
+      // This ensures consistent derivation in getTransporterById
+      const transporterNumber = transporterId.substring(1); // Remove 'T' prefix
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`;
+      console.log(
+        `  Generated user ID: ${transporterAdminUserId} (derived from ${transporterId})`
+      );
 
       // Get creator details from request (current logged-in Product Owner)
       const creatorUserId = req.user?.user_id || "SYSTEM";
@@ -1085,6 +1089,20 @@ const createTransporter = async (req, res) => {
       console.log(
         `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
       );
+      console.log(`  📋 Approval Flow Details:`);
+      console.log(`     - Approval Flow ID: ${approvalFlowId}`);
+      console.log(`     - Config ID: ${approvalConfig.approval_config_id}`);
+      console.log(`     - Approval Type: AT001 (Transporter Admin)`);
+      console.log(
+        `     - User Reference ID (TA User): ${transporterAdminUserId}`
+      );
+      console.log(`     - Status: PENDING`);
+      console.log(`     - Approver Level: 1`);
+      console.log(`     - Pending With Role: RL001 (Product Owner)`);
+      console.log(
+        `     - Pending With User: ${pendingWithName} (${pendingWithUserId})`
+      );
+      console.log(`     - Created By: ${creatorName} (${creatorUserId})`);
 
       // Commit the transaction
       await trx.commit();
@@ -2665,41 +2683,57 @@ const getTransporterById = async (req, res) => {
     };
 
     // NEW: Get user approval status for this transporter
-    // Find the associated Transporter Admin user by checking user_master
-    // Assumption: User records will have a reference or we query by creation timing
-    // For now, we'll query approval_flow_trans for any user created around same time as transporter
-
+    // Derive the Transporter Admin user ID from transporter ID
+    // Pattern: T001 -> TA0001, T002 -> TA0002, etc.
     let userApprovalStatus = null;
     let approvalHistory = [];
 
     try {
-      // Try to find user created for this transporter
-      // We can identify by checking approval_flow_trans for users created by same creator
-      // OR by finding user_master entries created around the same time
+      // Derive TA user ID from transporter ID
+      // T001 -> TA0001, T123 -> TA0123
+      const transporterNumber = id.substring(1); // Remove 'T' prefix
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`;
 
-      // Better approach: Find TA#### user that was created closest in time to this transporter
-      const transporterCreatedAt = transporter.created_on;
+      console.log(
+        `🔍 Looking up approval status for TA user: ${transporterAdminUserId} (derived from ${id})`
+      );
 
-      // Get all Transporter Admin users created around the same time (within 1 minute)
-      const potentialUsers = await knex("user_master")
-        .where("user_type_id", "UT002")
-        .where("user_id", "like", "TA%")
-        .whereBetween("created_at", [
-          knex.raw("DATE_SUB(?, INTERVAL 1 MINUTE)", [transporterCreatedAt]),
-          knex.raw("DATE_ADD(?, INTERVAL 1 MINUTE)", [transporterCreatedAt]),
-        ])
-        .select(
-          "user_id",
-          "email_id",
-          "mobile_number",
-          "status",
-          "is_active",
-          "created_at"
+      // Get user record - Try derived ID first
+      let associatedUser = await knex("user_master")
+        .where("user_id", transporterAdminUserId)
+        .first();
+
+      // BACKWARD COMPATIBILITY: If not found with derived ID, search by business name pattern
+      // This handles old records created before the ID pattern fix
+      if (!associatedUser) {
+        console.log(
+          `⚠️ No user found with derived ID ${transporterAdminUserId}, searching by business name...`
         );
 
-      if (potentialUsers.length > 0) {
-        // Take the first user (most likely to be the associated one)
-        const associatedUser = potentialUsers[0];
+        // Get the transporter's business name
+        const businessName = transporter.business_name;
+        const expectedUserName = `${businessName} - Admin`;
+
+        // Look for TA user with matching name pattern
+        associatedUser = await knex("user_master")
+          .where("user_type_id", "UT002") // Transporter Admin
+          .where("user_full_name", expectedUserName)
+          .where("user_id", "like", "TA%")
+          .first();
+
+        if (associatedUser) {
+          console.log(
+            `  ✅ Found associated user via business name match: ${associatedUser.user_id}`
+          );
+        } else {
+          console.warn(
+            `  ⚠️ No TA user found for business name: ${expectedUserName}`
+          );
+        }
+      }
+
+      if (associatedUser) {
+        console.log(`✅ Found associated user: ${associatedUser.user_id}`);
 
         // Get approval flow for this user
         const approvalFlows = await knex("approval_flow_trans as aft")
@@ -2716,22 +2750,35 @@ const getTransporterById = async (req, res) => {
           )
           .orderBy("aft.created_at", "desc");
 
-        userApprovalStatus = {
-          approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id || null,
-          userId: associatedUser.user_id,
-          userEmail: associatedUser.email_id,
-          userMobile: associatedUser.mobile_number,
-          userStatus: associatedUser.status,
-          isActive: associatedUser.is_active,
-          currentApprovalStatus:
-            approvalFlows[0]?.s_status || associatedUser.status,
-          pendingWith: approvalFlows[0]?.pending_with_name || null,
-          pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
-          createdByUserId: approvalFlows[0]?.created_by_user_id || null,
-          createdByName: approvalFlows[0]?.created_by_name || null,
-        };
+        console.log(
+          `✅ Found ${approvalFlows.length} approval flow records for ${associatedUser.user_id}`
+        );
 
-        approvalHistory = approvalFlows;
+        if (approvalFlows.length > 0) {
+          userApprovalStatus = {
+            approvalFlowTransId:
+              approvalFlows[0]?.approval_flow_trans_id || null,
+            userId: associatedUser.user_id,
+            userEmail: associatedUser.email_id,
+            userMobile: associatedUser.mobile_number,
+            userStatus: associatedUser.status,
+            isActive: associatedUser.is_active,
+            currentApprovalStatus:
+              approvalFlows[0]?.s_status || associatedUser.status,
+            pendingWith: approvalFlows[0]?.pending_with_name || null,
+            pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
+            createdByUserId: approvalFlows[0]?.created_by_user_id || null,
+            createdByName: approvalFlows[0]?.created_by_name || null,
+          };
+
+          approvalHistory = approvalFlows;
+        } else {
+          console.warn(
+            `⚠️ No approval flow found for user: ${transporterAdminUserId}`
+          );
+        }
+      } else {
+        console.warn(`⚠️ No TA user found with ID: ${transporterAdminUserId}`);
       }
     } catch (approvalError) {
       console.error("Error fetching user approval status:", approvalError);
@@ -2742,6 +2789,35 @@ const getTransporterById = async (req, res) => {
     if (userApprovalStatus) {
       response.userApprovalStatus = userApprovalStatus;
       response.approvalHistory = approvalHistory;
+      console.log(
+        "✅ userApprovalStatus added to response:",
+        JSON.stringify(userApprovalStatus, null, 2)
+      );
+    } else {
+      console.warn(
+        "⚠️ No userApprovalStatus found - approval details will not show in frontend"
+      );
+    }
+
+    console.log("📤 Final response being sent to frontend:");
+    console.log("  - Transporter ID:", response.transporterId);
+    console.log("  - Status:", response.generalDetails?.status);
+    console.log("  - Has userApprovalStatus:", !!response.userApprovalStatus);
+    if (response.userApprovalStatus) {
+      console.log(
+        "  - Approval Status:",
+        response.userApprovalStatus.currentApprovalStatus
+      );
+      console.log("  - Pending With:", response.userApprovalStatus.pendingWith);
+      console.log(
+        "  - Pending With User ID:",
+        response.userApprovalStatus.pendingWithUserId
+      );
+      console.log("  - Created By:", response.userApprovalStatus.createdByName);
+      console.log(
+        "  - Created By User ID:",
+        response.userApprovalStatus.createdByUserId
+      );
     }
 
     res.json({
@@ -2884,10 +2960,16 @@ const saveTransporterAsDraft = async (req, res) => {
       // Generate transporter ID
       const transporterId = await generateTransporterId();
 
-      // Generate user_id for user_master
-      const userMasterId = `UM${transporterId.slice(1)}`; // UM001, UM002, etc.
+      // Generate Transporter Admin user ID (must match createTransporter pattern)
+      // T001 -> TA0001, T002 -> TA0002, etc.
+      const transporterNumber = transporterId.substring(1); // Remove 'T' prefix
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`;
 
-      console.log("🆔 Generated IDs:", { transporterId, userMasterId, userId });
+      console.log("🆔 Generated IDs:", {
+        transporterId,
+        transporterAdminUserId,
+        userId,
+      });
 
       // Insert into transporter_general_info with SAVE_AS_DRAFT status
       await trx("transporter_general_info").insert({
@@ -2918,8 +3000,8 @@ const saveTransporterAsDraft = async (req, res) => {
 
       // Insert into user_master with SAVE_AS_DRAFT status
       await trx("user_master").insert({
-        user_id: userMasterId,
-        user_type_id: "UT002", // Transporter user type (using user_type_id not user_type)
+        user_id: transporterAdminUserId,
+        user_type_id: "UT002", // Transporter Admin user type
         user_full_name: generalDetails.businessName || "Draft Transporter",
         email_id: addresses?.[0]?.contacts?.[0]?.email || null,
         mobile_number:
@@ -3107,7 +3189,7 @@ const saveTransporterAsDraft = async (req, res) => {
         message: "Transporter saved as draft successfully",
         data: {
           transporterId,
-          userMasterId,
+          transporterAdminUserId,
           status: "SAVE_AS_DRAFT",
         },
       });
@@ -3940,8 +4022,15 @@ const submitTransporterFromDraft = async (req, res) => {
         });
 
       // Update user_master to PENDING status
-      const userMasterId = `UM${id.slice(1)}`;
-      await trx("user_master").where("user_id", userMasterId).update({
+      // Derive TA user ID from transporter ID (T001 -> TA0001)
+      const transporterNumber = id.substring(1); // Remove 'T' prefix
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`;
+
+      console.log(
+        `🔄 Updating TA user: ${transporterAdminUserId} to PENDING status`
+      );
+
+      await trx("user_master").where("user_id", transporterAdminUserId).update({
         user_full_name: generalDetails.businessName,
         status: "PENDING",
         updated_by: userId,
@@ -4112,6 +4201,80 @@ const submitTransporterFromDraft = async (req, res) => {
         }
       }
 
+      // ========================================
+      // CREATE APPROVAL FLOW FOR SUBMITTED DRAFT
+      // ========================================
+
+      console.log("📋 Creating approval flow for submitted draft...");
+
+      // Get user details for approval flow
+      const creator = await trx("user_master").where("user_id", userId).first();
+      const creatorName = creator?.user_full_name || "Unknown User";
+
+      // Get approval configuration for Transporter Admin (Level 1 only)
+      const approvalConfig = await trx("approval_configuration")
+        .where({
+          approval_type_id: "AT001", // Transporter Admin
+          approver_level: 1,
+          status: "ACTIVE",
+        })
+        .first();
+
+      if (!approvalConfig) {
+        throw new Error(
+          "Approval configuration not found for Transporter Admin"
+        );
+      }
+
+      // Determine pending approver (Product Owner who did NOT create this)
+      let pendingWithUserId = null;
+      let pendingWithName = null;
+
+      if (userId === "PO001") {
+        const po2 = await trx("user_master").where("user_id", "PO002").first();
+        pendingWithUserId = "PO002";
+        pendingWithName = po2?.user_full_name || "Product Owner 2";
+      } else if (userId === "PO002") {
+        const po1 = await trx("user_master").where("user_id", "PO001").first();
+        pendingWithUserId = "PO001";
+        pendingWithName = po1?.user_full_name || "Product Owner 1";
+      } else {
+        // If creator is neither PO1 nor PO2, default to PO001
+        const po1 = await trx("user_master").where("user_id", "PO001").first();
+        pendingWithUserId = "PO001";
+        pendingWithName = po1?.user_full_name || "Product Owner 1";
+      }
+
+      // Generate approval flow trans ID
+      const approvalFlowId = await generateApprovalFlowId(trx);
+
+      // Create approval flow transaction entry
+      await trx("approval_flow_trans").insert({
+        approval_flow_trans_id: approvalFlowId,
+        approval_config_id: approvalConfig.approval_config_id,
+        approval_type_id: "AT001", // Transporter Admin
+        user_id_reference_id: transporterAdminUserId, // Use the TA user ID (matches createTransporter pattern)
+        s_status: "PENDING",
+        approver_level: 1,
+        pending_with_role_id: "RL001", // Product Owner role
+        pending_with_user_id: pendingWithUserId,
+        pending_with_name: pendingWithName,
+        created_by_user_id: userId,
+        created_by_name: creatorName,
+        created_by: userId,
+        updated_by: userId,
+        created_at: currentTimestamp,
+        updated_at: currentTimestamp,
+        created_on: currentTimestamp,
+        updated_on: currentTimestamp,
+        status: "ACTIVE",
+      });
+
+      console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+      console.log(
+        `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
+      );
+
       await trx.commit();
 
       console.log("✅ Draft submitted for approval successfully:", id);
@@ -4215,9 +4378,12 @@ const deleteTransporterDraft = async (req, res) => {
         .where("document_unique_id", "like", `${id}_%`)
         .del();
 
-      // Delete from user_master
-      const userMasterId = `UM${id.slice(1)}`;
-      await trx("user_master").where("user_id", userMasterId).del();
+      // Delete from user_master (derive TA user ID from transporter ID)
+      const transporterNumber = id.substring(1); // Remove 'T' prefix
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`;
+
+      console.log(`🗑️ Deleting TA user: ${transporterAdminUserId}`);
+      await trx("user_master").where("user_id", transporterAdminUserId).del();
 
       // Delete transporter record
       await trx("transporter_general_info").where("transporter_id", id).del();

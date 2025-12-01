@@ -497,6 +497,8 @@ const getConsignorWarehouses = async (customerId, filters = {}) => {
  */
 const getConsignorById = async (customerId) => {
   try {
+    console.log(`🔍 Fetching consignor by ID: ${customerId}`);
+
     // Get basic information
     const consignor = await knex("consignor_basic_information")
       .where("customer_id", customerId)
@@ -508,6 +510,10 @@ const getConsignorById = async (customerId) => {
         message: `Consignor with ID '${customerId}' not found`,
       };
     }
+
+    console.log(
+      `📊 Consignor ${customerId} status from database: ${consignor.status}`
+    );
 
     // Get contacts with field mapping for frontend
     // Include both ACTIVE and DRAFT status (for draft editing)
@@ -621,16 +627,24 @@ const getConsignorById = async (customerId) => {
             userMobile: consignorUser.mobile_number,
             userStatus: consignorUser.status,
             isActive: consignorUser.is_active || false,
+            approvalFlowTransId: approvalFlow.approval_flow_trans_id, // ✅ CRITICAL: Include for approval API
             currentApprovalStatus: approvalFlow.s_status,
             pendingWith: approvalFlow.pending_with_name,
             pendingWithUserId: approvalFlow.pending_with_user_id,
             createdByUserId: approvalFlow.created_by_user_id,
             createdByName: approvalFlow.created_by_name,
           };
-          
-          console.log(`👤 Found user approval status for ${consignorUser.user_id}: ${approvalFlow.s_status}`);
+
+          console.log(
+            `👤 Found user approval status for ${consignorUser.user_id}: ${approvalFlow.s_status}`
+          );
+          console.log(
+            `📋 Approval Flow Trans ID: ${approvalFlow.approval_flow_trans_id}`
+          );
         } else {
-          console.log(`⚠️  User ${consignorUser.user_id} has no approval flow record - legacy consignor`);
+          console.log(
+            `⚠️  User ${consignorUser.user_id} has no approval flow record - legacy consignor`
+          );
           // Don't set userApprovalStatus for legacy records without approval flow
         }
       }
@@ -643,7 +657,7 @@ const getConsignorById = async (customerId) => {
     }
 
     // Construct response with frontend field names
-    return {
+    const response = {
       general: {
         customer_id: consignor.customer_id,
         customer_name: consignor.customer_name,
@@ -659,7 +673,6 @@ const getConsignorById = async (customerId) => {
         upload_nda: consignor.upload_nda, // NDA document ID
         upload_msa: consignor.upload_msa, // MSA document ID
         status: consignor.status,
-        userApprovalStatus: userApprovalStatus, // Add user approval status to general section
       },
       // Map database column names to frontend field names
       contacts: contacts.map((c) => ({
@@ -697,7 +710,14 @@ const getConsignorById = async (customerId) => {
         fileData: "", // Not returned for security (use download endpoint)
         status: d.status === "ACTIVE", // Convert to boolean for frontend
       })),
+      userApprovalStatus: userApprovalStatus, // Add at top level for Redux to destructure
     };
+
+    console.log(
+      `📤 Returning consignor ${customerId} with status: ${response.general.status}`
+    );
+
+    return response;
   } catch (error) {
     console.error("Get consignor by ID error:", error);
     throw error;
@@ -795,12 +815,16 @@ const createConsignor = async (payload, files, userId) => {
         name_on_po: general.name_on_po || null,
         approved_by: general.approved_by || null,
         approved_date: general.approved_date || null,
-        status: general.status || "ACTIVE",
+        status: "PENDING", // Set to PENDING when consignor is created (awaiting approval)
         created_by: userId,
         updated_by: userId,
         created_at: knex.fn.now(),
         updated_at: knex.fn.now(),
       }
+    );
+
+    console.log(
+      `✅ Consignor basic information inserted: ${general.customer_id} (status: PENDING)`
     );
 
     // 2. Insert contacts (photo upload handled separately in step 6)

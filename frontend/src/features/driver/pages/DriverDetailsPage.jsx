@@ -880,6 +880,14 @@ const DriverDetailsPage = () => {
     }
   };
 
+  // Debug logging for approval status
+  useEffect(() => {
+    if (selectedDriver) {
+      console.log("🔍 DriverDetailsPage - selectedDriver:", selectedDriver);
+      console.log("🔍 userApprovalStatus:", selectedDriver.userApprovalStatus);
+    }
+  }, [selectedDriver]);
+
   // Check if driver is a draft
   const isDraftDriver =
     selectedDriver?.status === "SAVE_AS_DRAFT" ||
@@ -1453,6 +1461,15 @@ const DriverDetailsPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Approval Action Bar - shows approval status and actions */}
+            {selectedDriver?.userApprovalStatus && (
+              <ApprovalActionBar
+                userApprovalStatus={selectedDriver.userApprovalStatus}
+                entityId={selectedDriver.driverId}
+                onRefreshData={handleRefreshData}
+              />
+            )}
+
             {/* Edit/Save/Cancel Buttons */}
             {isEditMode ? (
               <>

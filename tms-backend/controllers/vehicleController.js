@@ -736,7 +736,7 @@ const createVehicle = async (req, res) => {
       max_running_speed: vehicleData.max_running_speed || 0,
       created_by: req.user?.user_id || "SYSTEM",
       updated_by: req.user?.user_id || "SYSTEM",
-      status: "ACTIVE",
+      status: "PENDING", // Vehicle remains PENDING until Vehicle Owner user is approved
     });
 
     // Insert ownership details if provided

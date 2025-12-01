@@ -609,10 +609,24 @@ const warehouseSlice = createSlice({
       })
       .addCase(fetchWarehouseById.fulfilled, (state, action) => {
         state.loading = false;
-        state.currentWarehouse = action.payload.warehouse || action.payload;
-        // Store approval status if available
-        state.userApprovalStatus = action.payload.userApprovalStatus || null;
+
+        // Flatten warehouse data and include userApprovalStatus at top level (match consignor pattern)
+        const warehouseData = action.payload.warehouse || action.payload;
+        const userApprovalStatus = action.payload.userApprovalStatus || null;
+
+        state.currentWarehouse = {
+          ...warehouseData,
+          userApprovalStatus, // Include approval status at top level for ApprovalActionBar
+        };
+
+        // Store approval status separately for backward compatibility
+        state.userApprovalStatus = userApprovalStatus;
         state.approvalHistory = action.payload.approvalHistory || [];
+
+        console.log(
+          "📊 Warehouse loaded with approval status:",
+          userApprovalStatus?.currentApprovalStatus
+        );
       })
       .addCase(fetchWarehouseById.rejected, (state, action) => {
         state.loading = false;

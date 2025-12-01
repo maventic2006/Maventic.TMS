@@ -479,76 +479,49 @@ const ConsignorCreatePage = () => {
       }
     }
 
-    // Submit valid data with files
-    try {
-      const formDataPayload = new FormData();
-      formDataPayload.append("payload", JSON.stringify(cleanFormData));
+    // Submit valid data with files using Redux action
+    console.log("\n🔍 ===== FRONTEND FILE DEBUG =====");
+    console.log("Total files to upload:", Object.keys(files).length);
+    Object.entries(files).forEach(([key, file]) => {
+      console.log(`  Appending file: ${key}`);
+      console.log(`    - name: ${file.name}`);
+      console.log(`    - type: ${file.type}`);
+      console.log(`    - size: ${file.size} bytes`);
+    });
+    console.log("===========================\n");
 
-      // Append all photo and document files
-      console.log("\n🔍 ===== FRONTEND FILE DEBUG =====");
-      console.log("Total files to upload:", Object.keys(files).length);
-      Object.entries(files).forEach(([key, file]) => {
-        console.log(`  Appending file: ${key}`);
-        console.log(`    - name: ${file.name}`);
-        console.log(`    - type: ${file.type}`);
-        console.log(`    - size: ${file.size} bytes`);
-        formDataPayload.append(key, file);
+    // Dispatch Redux action to create consignor
+    // This will set isCreating to true, disabling the submit button
+    dispatch(createConsignor({ consignorData: cleanFormData, files }))
+      .unwrap()
+      .then((result) => {
+        console.log("✅ Consignor created successfully:", result);
+
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.SUCCESS,
+            message: "Consignor created successfully",
+            duration: 3000,
+          })
+        );
+
+        // Reset dirty tracking
+        resetDirty();
+
+        // Navigate to list page
+        navigate("/consignor");
+      })
+      .catch((error) => {
+        console.error("❌ Failed to create consignor:", error);
+
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: error.message || "Failed to create consignor",
+            duration: 5000,
+          })
+        );
       });
-
-      // Log FormData contents
-      console.log("\n📦 FormData contents:");
-      for (let [key, value] of formDataPayload.entries()) {
-        if (value instanceof File) {
-          console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
-        } else {
-          console.log(
-            `  ${key}: ${
-              typeof value === "string" && value.length > 100
-                ? value.substring(0, 100) + "..."
-                : value
-            }`
-          );
-        }
-      }
-      console.log("===========================\n");
-
-      // Get API URL
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-      // Use fetch with credentials to send HTTP-only cookie
-      // NOTE: Token is in HTTP-only cookie (authToken), NOT in localStorage
-      const response = await fetch(`${apiUrl}/api/consignors`, {
-        method: "POST",
-        credentials: "include", // ✅ CRITICAL: Send HTTP-only cookie with request
-        body: formDataPayload,
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || "Failed to create consignor");
-      }
-
-      const result = await response.json();
-
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.SUCCESS,
-          message: "Consignor created successfully",
-          duration: 3000,
-        })
-      );
-
-      // Navigate to list page
-      navigate("/consignor");
-    } catch (error) {
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.ERROR,
-          message: error.message || "Failed to create consignor",
-          duration: 5000,
-        })
-      );
-    }
   };
 
   // Back button handler with dirty check

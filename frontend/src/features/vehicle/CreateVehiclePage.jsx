@@ -180,6 +180,324 @@ const CreateVehiclePage = () => {
     setCurrentData(formData);
   }, [formData, setCurrentData]);
 
+  const validateFuelTypeId = useCallback(
+    (fuelType) => {
+      try {
+        if (!fuelType) return "";
+
+        // If it's already a valid ID format (FT001-FT999), return as-is
+        if (/^FT\d{3}$/.test(fuelType)) {
+          return fuelType;
+        }
+
+        // If it's a label, map it to ID (fallback protection)
+        const fuelMapping = {
+          DIESEL: "FT001",
+          CNG: "FT002",
+          ELECTRIC: "FT003",
+          PETROL: "FT004",
+          GASOLINE: "FT004",
+        };
+
+        const mappedId = fuelMapping[fuelType.toUpperCase()];
+        if (mappedId) {
+          console.warn("⚠️  AUTO-CORRECTED: Converted fuel type label to ID:", {
+            label: fuelType,
+            id: mappedId,
+          });
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.WARNING,
+              message: `Fuel type auto-corrected from "${fuelType}" to proper ID "${mappedId}"`,
+              duration: 3000,
+            })
+          );
+          return mappedId;
+        }
+
+        console.error("❌ INVALID fuel type:", fuelType);
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: `Invalid fuel type: "${fuelType}". Please select a valid option.`,
+            duration: 5000,
+          })
+        );
+        return "";
+      } catch (error) {
+        console.error("❌ Error in fuel type validation:", error);
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message:
+              "Error validating fuel type. Please refresh and try again.",
+            duration: 5000,
+          })
+        );
+        return "";
+      }
+    },
+    [dispatch]
+  );
+
+  const transformFormDataForBackend = useCallback(
+    (frontendData) => {
+      try {
+        // Validate fuel type using the component-level function
+        // Helper function to format date to YYYY-MM-DD
+        const validatedFuelType = validateFuelTypeId(
+          frontendData.specifications?.fuelType
+        );
+        const formatDate = (dateStr) => {
+          if (!dateStr) return undefined;
+          if (dateStr instanceof Date)
+            return dateStr.toISOString().split("T")[0];
+          return dateStr;
+        };
+
+        // Helper function to convert year to YYYY-MM format
+        const convertYearToMonthYear = (year) => {
+          if (!year) return undefined;
+          return `${year}-01`; // Default to January
+        };
+
+        // Helper function to ensure we get the vehicle type ID, not description
+        const getVehicleTypeId = (data) => {
+          // Priority order: vehicleTypeIdSafe > vehicleTypeId > map from description > vehicleType
+          if (data.vehicleTypeIdSafe && data.vehicleTypeIdSafe.length <= 10) {
+            return data.vehicleTypeIdSafe;
+          }
+          if (data.vehicleTypeId && data.vehicleTypeId.length <= 10) {
+            return data.vehicleTypeId;
+          }
+          // If we have a description, try to map it back to ID
+          if (data.vehicleType) {
+            const descToIdMap = {
+              "HCV - Heavy Commercial Vehicle": "VT001",
+              "MCV - Medium Commercial Vehicle": "VT002",
+              "LCV - Light Commercial Vehicle": "VT003",
+              "TRAILER - Trailer": "VT004",
+              "CONTAINER - Container": "VT005",
+              "TANKER - Tanker": "VT006",
+              "REFRIGERATED - Refrigerated Vehicle": "VT007",
+              "FLATBED - Flatbed": "VT008",
+            };
+            const mappedId = descToIdMap[data.vehicleType];
+            if (mappedId) {
+              return mappedId;
+            }
+            // If it's already a short ID, use it
+            if (data.vehicleType.length <= 10) {
+              return data.vehicleType;
+            }
+          }
+          return "";
+        };
+
+        return {
+          basicInformation: {
+            vehicle_registration_number:
+              frontendData.basicInformation.registrationNumber || "",
+            maker_brand_description: frontendData.basicInformation.make || "",
+            maker_model: frontendData.basicInformation.model || "",
+            vin_chassis_no: frontendData.basicInformation.vin || "",
+            vehicle_type_id: getVehicleTypeId(frontendData.basicInformation),
+            vehicle_category:
+              frontendData.basicInformation.vehicleCategory || "",
+            manufacturing_month_year:
+              frontendData.basicInformation.manufacturingMonthYear ||
+              convertYearToMonthYear(frontendData.basicInformation.year),
+            vehicle_colour: frontendData.basicInformation.color || "",
+            gps_tracker_imei_number:
+              frontendData.basicInformation.gpsIMEI || "",
+            gps_tracker_active_flag:
+              frontendData.basicInformation.gpsEnabled || false,
+            gps_provider: frontendData.basicInformation.gpsProvider || "",
+            usage_type_id: frontendData.basicInformation.usageType || "UT001", // Default to Commercial Transport (UT001)
+            safety_inspection_date: formatDate(
+              frontendData.basicInformation.safetyInspectionDate
+            ),
+            taxes_and_fees: frontendData.basicInformation.taxesAndFees || 0,
+            mileage: frontendData.basicInformation.mileage || 0,
+            current_driver: frontendData.basicInformation.currentDriver || "",
+            transporter_id: frontendData.basicInformation.transporterId || "",
+            transporter_name:
+              frontendData.basicInformation.transporterName || "",
+            leasing_flag: frontendData.basicInformation.leasingFlag || false,
+            leased_from: frontendData.basicInformation.leasedFrom || "",
+            lease_start_date: formatDate(
+              frontendData.basicInformation.leaseStartDate
+            ),
+            lease_end_date: formatDate(
+              frontendData.basicInformation.leaseEndDate
+            ),
+            vehicle_registered_at_country:
+              frontendData.basicInformation.vehicleRegisteredAtCountry || "",
+            vehicle_registered_at_state:
+              frontendData.basicInformation.vehicleRegisteredAtState || "",
+            avg_running_speed:
+              frontendData.basicInformation.avgRunningSpeed || 0,
+            max_running_speed:
+              frontendData.basicInformation.maxRunningSpeed || 0,
+          },
+          specifications: {
+            engine_type_id: frontendData.specifications.engineType || "",
+            engine_number: frontendData.specifications.engineNumber || "",
+            fuel_type_id: validatedFuelType,
+            fuel_tank_capacity:
+              frontendData.specifications.fuelTankCapacity || 0,
+            transmission_type: frontendData.specifications.transmission || "",
+            financer: frontendData.specifications.financer || "",
+            suspension_type: frontendData.specifications.suspensionType || "",
+            emission_standard:
+              frontendData.specifications.emissionStandard || "",
+            wheelbase: frontendData.specifications.wheelbase || 0,
+            no_of_axles: frontendData.specifications.noOfAxles || 0,
+          },
+          capacityDetails: {
+            unloading_weight:
+              frontendData.capacityDetails.unladenWeight ||
+              frontendData.capacityDetails.unloadingWeight ||
+              0,
+            gross_vehicle_weight_kg:
+              frontendData.capacityDetails.gvw ||
+              frontendData.capacityDetails.grossVehicleWeight ||
+              0,
+            volume_capacity_cubic_meter:
+              frontendData.capacityDetails.loadingCapacityVolume ||
+              frontendData.capacityDetails.volumeCapacity ||
+              0,
+            towing_capacity: frontendData.capacityDetails.towingCapacity || 0,
+            tire_load_rating:
+              frontendData.capacityDetails.tireLoadRating || null,
+            vehicle_condition:
+              frontendData.capacityDetails.vehicleCondition || "GOOD",
+            fuel_tank_capacity:
+              frontendData.specifications.fuelTankCapacity ||
+              frontendData.capacityDetails.fuelTankCapacity ||
+              0,
+            seating_capacity: frontendData.capacityDetails.seatingCapacity || 0,
+            cargo_dimensions_length:
+              frontendData.capacityDetails.cargoLength || 0,
+            cargo_dimensions_width:
+              frontendData.capacityDetails.cargoWidth || 0,
+            cargo_dimensions_height:
+              frontendData.capacityDetails.cargoHeight || 0,
+          },
+          ownershipDetails: (() => {
+            // Handle both array and object formats
+            const ownership = Array.isArray(frontendData.ownershipDetails)
+              ? frontendData.ownershipDetails[0] || {}
+              : frontendData.ownershipDetails || {};
+
+            return {
+              ownershipName:
+                ownership.ownershipName || ownership.ownerName || "",
+              registrationNumber:
+                ownership.registrationNumber ||
+                frontendData.basicInformation?.registrationNumber ||
+                "",
+              registrationDate: formatDate(ownership.registrationDate),
+              registrationUpto: formatDate(ownership.registrationUpto),
+              validFrom: formatDate(ownership.validFrom),
+              validTo: formatDate(ownership.validTo),
+              purchaseDate: formatDate(ownership.purchaseDate),
+              saleAmount: ownership.saleAmount || ownership.purchasePrice || 0,
+              stateCode: ownership.stateCode || "",
+              rtoCode: ownership.rtoCode || "",
+              contactNumber: ownership.contactNumber || "",
+              email: ownership.email || "",
+            };
+          })(),
+          maintenanceHistory: (() => {
+            // Handle both array and object formats
+            const maintenance = Array.isArray(frontendData.maintenanceHistory)
+              ? frontendData.maintenanceHistory[0] || {}
+              : frontendData.maintenanceHistory || {};
+
+            return {
+              serviceDate:
+                formatDate(
+                  maintenance.serviceDate || maintenance.lastServiceDate
+                ) || new Date().toISOString().split("T")[0],
+              upcomingServiceDate:
+                formatDate(
+                  maintenance.upcomingServiceDate || maintenance.nextServiceDue
+                ) ||
+                new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
+                  .toISOString()
+                  .split("T")[0],
+              typeOfService: maintenance.typeOfService || "",
+              serviceExpense:
+                maintenance.serviceExpense ||
+                maintenance.totalServiceExpense ||
+                0,
+              serviceRemark:
+                maintenance.serviceRemark || maintenance.maintenanceNotes || "",
+              lastInspectionDate: formatDate(maintenance.lastInspectionDate),
+            };
+          })(),
+          serviceFrequency: (() => {
+            // Handle both array and object formats
+            const serviceFreq = Array.isArray(frontendData.serviceFrequency)
+              ? frontendData.serviceFrequency[0] || {}
+              : frontendData.serviceFrequency || {};
+
+            return {
+              timePeriod: serviceFreq.timePeriod
+                ? serviceFreq.timePeriod
+                : serviceFreq.serviceIntervalMonths
+                ? `${serviceFreq.serviceIntervalMonths} months`
+                : "6 months",
+              kmDrove:
+                serviceFreq.kmDrove || serviceFreq.serviceIntervalKM || 0,
+            };
+          })(),
+          documents: (frontendData.documents || [])
+            .map((doc) => ({
+              documentType: doc.documentType || "",
+              referenceNumber: doc.documentNumber || doc.referenceNumber || "",
+              vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
+              permitCategory: doc.permitCategory || "",
+              permitCode: doc.permitCode || "",
+              documentProvider: doc.documentProvider || "",
+              coverageType: doc.coverageType || "",
+              premiumAmount: doc.premiumAmount || 0,
+              validFrom: formatDate(doc.issueDate || doc.validFrom),
+              validTo: formatDate(doc.expiryDate || doc.validTo),
+              remarks: doc.remarks || "Document uploaded",
+              // ✅ File upload data (base64 encoded from DocumentUploadModal)
+              fileName: doc.fileName || "",
+              fileType: doc.fileType || "",
+              fileData: doc.fileData || "", // Base64 encoded file string
+            }))
+            .filter((doc) => doc.documentType), // Only include documents with type
+        };
+      } catch (error) {
+        console.error("❌ Error transforming form data:", error);
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message:
+              "Error processing form data. Please check your inputs and try again.",
+            duration: 5000,
+          })
+        );
+        // Return a minimal valid structure to prevent complete failure
+        return {
+          basicInformation: {},
+          specifications: { fuel_type_id: "" },
+          capacityDetails: {},
+          ownershipDetails: {},
+          maintenanceHistory: {},
+          serviceFrequency: {},
+          documents: [],
+        };
+      }
+    },
+    [validateFuelTypeId]
+  );
+
   // Save as draft hook integration - transform data before passing to hook
   const transformedFormData = useMemo(() => {
     if (!formData) return {};
@@ -438,288 +756,11 @@ const CreateVehiclePage = () => {
    * Validate and convert fuel type to ensure proper ID format
    * Returns the validated fuel type ID or shows error toast
    */
-  const validateFuelTypeId = useCallback((fuelType) => {
-    try {
-      if (!fuelType) return '';
-      
-      // If it's already a valid ID format (FT001-FT999), return as-is
-      if (/^FT\d{3}$/.test(fuelType)) {
-        return fuelType;
-      }
-      
-      // If it's a label, map it to ID (fallback protection)
-      const fuelMapping = {
-        'DIESEL': 'FT001',
-        'CNG': 'FT002', 
-        'ELECTRIC': 'FT003',
-        'PETROL': 'FT004',
-        'GASOLINE': 'FT004'
-      };
-      
-      const mappedId = fuelMapping[fuelType.toUpperCase()];
-      if (mappedId) {
-        console.warn("⚠️  AUTO-CORRECTED: Converted fuel type label to ID:", { label: fuelType, id: mappedId });
-        dispatch(addToast({
-          type: TOAST_TYPES.WARNING,
-          message: `Fuel type auto-corrected from "${fuelType}" to proper ID "${mappedId}"`,
-          duration: 3000
-        }));
-        return mappedId;
-      }
-      
-      console.error("❌ INVALID fuel type:", fuelType);
-      dispatch(addToast({
-        type: TOAST_TYPES.ERROR,
-        message: `Invalid fuel type: "${fuelType}". Please select a valid option.`,
-        duration: 5000
-      }));
-      return '';
-    } catch (error) {
-      console.error("❌ Error in fuel type validation:", error);
-      dispatch(addToast({
-        type: TOAST_TYPES.ERROR,
-        message: "Error validating fuel type. Please refresh and try again.",
-        duration: 5000
-      }));
-      return '';
-    }
-  }, [dispatch]);
 
   /**
    * Transform frontend formData to backend-compatible format
    * Maps camelCase frontend fields to backend expected structure
-  */
- const transformFormDataForBackend = useCallback((frontendData) => {
-   try {
-     // Validate fuel type using the component-level function
-     // Helper function to format date to YYYY-MM-DD
-     const validatedFuelType = validateFuelTypeId(frontendData.specifications?.fuelType);
-    const formatDate = (dateStr) => {
-      if (!dateStr) return undefined;
-      if (dateStr instanceof Date) return dateStr.toISOString().split("T")[0];
-      return dateStr;
-    };
-
-    // Helper function to convert year to YYYY-MM format
-    const convertYearToMonthYear = (year) => {
-      if (!year) return undefined;
-      return `${year}-01`; // Default to January
-    };
-
-    // Helper function to ensure we get the vehicle type ID, not description
-    const getVehicleTypeId = (data) => {
-      // Priority order: vehicleTypeIdSafe > vehicleTypeId > map from description > vehicleType
-      if (data.vehicleTypeIdSafe && data.vehicleTypeIdSafe.length <= 10) {
-        return data.vehicleTypeIdSafe;
-      }
-      if (data.vehicleTypeId && data.vehicleTypeId.length <= 10) {
-        return data.vehicleTypeId;
-      }
-      // If we have a description, try to map it back to ID
-      if (data.vehicleType) {
-        const descToIdMap = {
-          "HCV - Heavy Commercial Vehicle": "VT001",
-          "MCV - Medium Commercial Vehicle": "VT002",
-          "LCV - Light Commercial Vehicle": "VT003",
-          "TRAILER - Trailer": "VT004",
-          "CONTAINER - Container": "VT005",
-          "TANKER - Tanker": "VT006",
-          "REFRIGERATED - Refrigerated Vehicle": "VT007",
-          "FLATBED - Flatbed": "VT008",
-        };
-        const mappedId = descToIdMap[data.vehicleType];
-        if (mappedId) {
-          return mappedId;
-        }
-        // If it's already a short ID, use it
-        if (data.vehicleType.length <= 10) {
-          return data.vehicleType;
-        }
-      }
-      return "";
-    };
-
-    return {
-      basicInformation: {
-        vehicle_registration_number:
-          frontendData.basicInformation.registrationNumber || "",
-        maker_brand_description: frontendData.basicInformation.make || "",
-        maker_model: frontendData.basicInformation.model || "",
-        vin_chassis_no: frontendData.basicInformation.vin || "",
-        vehicle_type_id: getVehicleTypeId(frontendData.basicInformation),
-        vehicle_category: frontendData.basicInformation.vehicleCategory || "",
-        manufacturing_month_year:
-          frontendData.basicInformation.manufacturingMonthYear ||
-          convertYearToMonthYear(frontendData.basicInformation.year),
-        vehicle_colour: frontendData.basicInformation.color || "",
-        gps_tracker_imei_number: frontendData.basicInformation.gpsIMEI || "",
-        gps_tracker_active_flag:
-          frontendData.basicInformation.gpsEnabled || false,
-        gps_provider: frontendData.basicInformation.gpsProvider || "",
-        usage_type_id: frontendData.basicInformation.usageType || "UT001", // Default to Commercial Transport (UT001)
-        safety_inspection_date: formatDate(
-          frontendData.basicInformation.safetyInspectionDate
-        ),
-        taxes_and_fees: frontendData.basicInformation.taxesAndFees || 0,
-        mileage: frontendData.basicInformation.mileage || 0,
-        current_driver: frontendData.basicInformation.currentDriver || "",
-        transporter_id: frontendData.basicInformation.transporterId || "",
-        transporter_name: frontendData.basicInformation.transporterName || "",
-        leasing_flag: frontendData.basicInformation.leasingFlag || false,
-        leased_from: frontendData.basicInformation.leasedFrom || "",
-        lease_start_date: formatDate(
-          frontendData.basicInformation.leaseStartDate
-        ),
-        lease_end_date: formatDate(frontendData.basicInformation.leaseEndDate),
-        vehicle_registered_at_country:
-          frontendData.basicInformation.vehicleRegisteredAtCountry || "",
-        vehicle_registered_at_state:
-          frontendData.basicInformation.vehicleRegisteredAtState || "",
-        avg_running_speed: frontendData.basicInformation.avgRunningSpeed || 0,
-        max_running_speed: frontendData.basicInformation.maxRunningSpeed || 0,
-      },
-      specifications: {
-        engine_type_id: frontendData.specifications.engineType || "",
-        engine_number: frontendData.specifications.engineNumber || "",
-        fuel_type_id: validatedFuelType,
-        fuel_tank_capacity: frontendData.specifications.fuelTankCapacity || 0,
-        transmission_type: frontendData.specifications.transmission || "",
-        financer: frontendData.specifications.financer || "",
-        suspension_type: frontendData.specifications.suspensionType || "",
-        emission_standard: frontendData.specifications.emissionStandard || "",
-        wheelbase: frontendData.specifications.wheelbase || 0,
-        no_of_axles: frontendData.specifications.noOfAxles || 0,
-      },
-      capacityDetails: {
-        unloading_weight:
-          frontendData.capacityDetails.unladenWeight ||
-          frontendData.capacityDetails.unloadingWeight ||
-          0,
-        gross_vehicle_weight_kg:
-          frontendData.capacityDetails.gvw ||
-          frontendData.capacityDetails.grossVehicleWeight ||
-          0,
-        volume_capacity_cubic_meter:
-          frontendData.capacityDetails.loadingCapacityVolume ||
-          frontendData.capacityDetails.volumeCapacity ||
-          0,
-        towing_capacity: frontendData.capacityDetails.towingCapacity || 0,
-        tire_load_rating: frontendData.capacityDetails.tireLoadRating || null,
-        vehicle_condition:
-          frontendData.capacityDetails.vehicleCondition || "GOOD",
-        fuel_tank_capacity:
-          frontendData.specifications.fuelTankCapacity ||
-          frontendData.capacityDetails.fuelTankCapacity ||
-          0,
-        seating_capacity: frontendData.capacityDetails.seatingCapacity || 0,
-        cargo_dimensions_length: frontendData.capacityDetails.cargoLength || 0,
-        cargo_dimensions_width: frontendData.capacityDetails.cargoWidth || 0,
-        cargo_dimensions_height: frontendData.capacityDetails.cargoHeight || 0,
-      },
-      ownershipDetails: (() => {
-        // Handle both array and object formats
-        const ownership = Array.isArray(frontendData.ownershipDetails)
-          ? frontendData.ownershipDetails[0] || {}
-          : frontendData.ownershipDetails || {};
-
-        return {
-          ownershipName: ownership.ownershipName || ownership.ownerName || "",
-          registrationNumber:
-            ownership.registrationNumber ||
-            frontendData.basicInformation?.registrationNumber ||
-            "",
-          registrationDate: formatDate(ownership.registrationDate),
-          registrationUpto: formatDate(ownership.registrationUpto),
-          validFrom: formatDate(ownership.validFrom),
-          validTo: formatDate(ownership.validTo),
-          purchaseDate: formatDate(ownership.purchaseDate),
-          saleAmount: ownership.saleAmount || ownership.purchasePrice || 0,
-          stateCode: ownership.stateCode || "",
-          rtoCode: ownership.rtoCode || "",
-          contactNumber: ownership.contactNumber || "",
-          email: ownership.email || "",
-        };
-      })(),
-      maintenanceHistory: (() => {
-        // Handle both array and object formats
-        const maintenance = Array.isArray(frontendData.maintenanceHistory)
-          ? frontendData.maintenanceHistory[0] || {}
-          : frontendData.maintenanceHistory || {};
-
-        return {
-          serviceDate:
-            formatDate(
-              maintenance.serviceDate || maintenance.lastServiceDate
-            ) || new Date().toISOString().split("T")[0],
-          upcomingServiceDate:
-            formatDate(
-              maintenance.upcomingServiceDate || maintenance.nextServiceDue
-            ) ||
-            new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)
-              .toISOString()
-              .split("T")[0],
-          typeOfService: maintenance.typeOfService || "",
-          serviceExpense:
-            maintenance.serviceExpense || maintenance.totalServiceExpense || 0,
-          serviceRemark:
-            maintenance.serviceRemark || maintenance.maintenanceNotes || "",
-          lastInspectionDate: formatDate(maintenance.lastInspectionDate),
-        };
-      })(),
-      serviceFrequency: (() => {
-        // Handle both array and object formats
-        const serviceFreq = Array.isArray(frontendData.serviceFrequency)
-          ? frontendData.serviceFrequency[0] || {}
-          : frontendData.serviceFrequency || {};
-
-        return {
-          timePeriod: serviceFreq.timePeriod
-            ? serviceFreq.timePeriod
-            : serviceFreq.serviceIntervalMonths
-            ? `${serviceFreq.serviceIntervalMonths} months`
-            : "6 months",
-          kmDrove: serviceFreq.kmDrove || serviceFreq.serviceIntervalKM || 0,
-        };
-      })(),
-      documents: (frontendData.documents || [])
-        .map((doc) => ({
-          documentType: doc.documentType || "",
-          referenceNumber: doc.documentNumber || doc.referenceNumber || "",
-          vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
-          permitCategory: doc.permitCategory || "",
-          permitCode: doc.permitCode || "",
-          documentProvider: doc.documentProvider || "",
-          coverageType: doc.coverageType || "",
-          premiumAmount: doc.premiumAmount || 0,
-          validFrom: formatDate(doc.issueDate || doc.validFrom),
-          validTo: formatDate(doc.expiryDate || doc.validTo),
-          remarks: doc.remarks || "Document uploaded",
-          // ✅ File upload data (base64 encoded from DocumentUploadModal)
-          fileName: doc.fileName || "",
-          fileType: doc.fileType || "",
-          fileData: doc.fileData || "", // Base64 encoded file string
-        }))
-        .filter((doc) => doc.documentType), // Only include documents with type
-    };
-    } catch (error) {
-      console.error("❌ Error transforming form data:", error);
-      dispatch(addToast({
-        type: TOAST_TYPES.ERROR,
-        message: "Error processing form data. Please check your inputs and try again.",
-        duration: 5000
-      }));
-      // Return a minimal valid structure to prevent complete failure
-      return {
-        basicInformation: {},
-        specifications: { fuel_type_id: '' },
-        capacityDetails: {},
-        ownershipDetails: {},
-        maintenanceHistory: {},
-        serviceFrequency: {},
-        documents: []
-      };
-    }
-  }, [validateFuelTypeId]);
+   */
 
   const handleSubmit = async () => {
     // Clear previous errors

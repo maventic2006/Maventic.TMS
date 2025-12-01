@@ -25,6 +25,7 @@ import ConsignorCreatePage from "../features/consignor/pages/ConsignorCreatePage
 import SuperAdminApprovalList from "../pages/SuperAdminApprovalList";
 import ConfigurationPage from "../pages/ConfigurationPage";
 import ConfigurationListPage from "../pages/ConfigurationListPage";
+import TransporterVehicleConfigPage from "../features/transporterVehicleConfig";
 
 // Protected Route component
 import ProtectedRoute from "./ProtectedRoute";
@@ -241,6 +242,16 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute roles={["product_owner"]}>
             <ConfigurationPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Transporter Vehicle Configuration */}
+      <Route
+        path="/configuration/transporter-vehicle-config"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <TransporterVehicleConfigPage />
           </ProtectedRoute>
         }
       />

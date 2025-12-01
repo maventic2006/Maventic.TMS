@@ -163,9 +163,8 @@ export const subLocationSchema = z.object({
 // Complete Warehouse Create Schema
 export const createWarehouseSchema = z.object({
   generalDetails: generalDetailsSchema,
-  facilities: facilitiesSchema,
   address: addressSchema,
-  documents: z.array(documentSchema).min(1, ERROR_MESSAGES.DOCUMENT_REQUIRED),
+  documents: z.array(documentSchema).optional().default([]),
   subLocations: z.array(subLocationSchema).optional(),
 });
 
@@ -173,7 +172,6 @@ export const createWarehouseSchema = z.object({
 export const validateFormSection = (sectionName, data) => {
   const schemas = {
     generalDetails: generalDetailsSchema,
-    facilities: facilitiesSchema,
     address: addressSchema,
     documents: z.array(documentSchema),
     subLocations: z.array(subLocationSchema),

@@ -337,7 +337,6 @@ const WarehouseCreatePage = () => {
         1: false,
         2: false,
         3: false,
-        4: false,
       });
       setActiveTab(0);
     }
@@ -399,7 +398,6 @@ const WarehouseCreatePage = () => {
       1: false,
       2: false,
       3: false,
-      4: false,
     });
 
     // Validate entire form
@@ -456,10 +454,9 @@ const WarehouseCreatePage = () => {
       // Determine which tabs have errors
       const newTabErrors = {
         0: !!nestedErrors.generalDetails,
-        1: !!nestedErrors.facilities,
-        2: !!nestedErrors.address,
-        3: !!nestedErrors.documents,
-        4: !!nestedErrors.subLocations,
+        1: !!nestedErrors.address,
+        2: !!nestedErrors.documents,
+        3: !!nestedErrors.subLocations,
       };
       setTabErrors(newTabErrors);
 
@@ -469,7 +466,6 @@ const WarehouseCreatePage = () => {
       if (newTabErrors[1]) tabsWithErrors.push(1);
       if (newTabErrors[2]) tabsWithErrors.push(2);
       if (newTabErrors[3]) tabsWithErrors.push(3);
-      if (newTabErrors[4]) tabsWithErrors.push(4);
 
       if (tabsWithErrors.length > 0) {
         setActiveTab(tabsWithErrors[0]);
@@ -515,7 +511,7 @@ const WarehouseCreatePage = () => {
                 ),
               });
 
-              // Switch to documents tab
+              // Switch to documents tab (tab index 2)
               setActiveTab(2);
               setTabErrors({ ...tabErrors, 2: true });
 
@@ -551,7 +547,17 @@ const WarehouseCreatePage = () => {
           parseFloat(formData.generalDetails.radiusVirtualYardIn) || 0,
         speedLimit: parseInt(formData.generalDetails.speedLimit) || 20,
       },
-      facilities: formData.facilities,
+      facilities: {
+        weighBridge: formData.generalDetails.weighBridge || false,
+        gatepassSystem: formData.generalDetails.gatepassSystem || false,
+        fuelAvailability: formData.generalDetails.fuelAvailability || false,
+        stagingArea: formData.generalDetails.stagingArea || false,
+        driverWaitingArea: formData.generalDetails.driverWaitingArea || false,
+        gateInChecklistAuth:
+          formData.generalDetails.gateInChecklistAuth || false,
+        gateOutChecklistAuth:
+          formData.generalDetails.gateOutChecklistAuth || false,
+      },
       address: formData.address,
       documents: formData.documents.filter(
         (doc) => doc.documentType && doc.documentNumber

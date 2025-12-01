@@ -925,9 +925,9 @@ const updateConsignorDraft = async (req, res) => {
           if (doc.documentType && doc.documentNumber && doc.validFrom) {
             const documentUniqueId = await generateDocumentId();
 
-            await trx("consignor_documents").insert({
+            // Build insert object conditionally
+            const insertData = {
               document_unique_id: documentUniqueId,
-              document_id: doc.documentId || null, // Preserve existing document upload ID if present
               customer_id: id,
               document_type_id: doc.documentType, // Frontend sends "documentType"
               document_number: doc.documentNumber,
@@ -941,7 +941,14 @@ const updateConsignorDraft = async (req, res) => {
               created_at: new Date(),
               updated_by: req.user.user_id,
               updated_at: new Date(),
-            });
+            };
+
+            // Only include document_id if it exists (file was uploaded)
+            if (doc.documentId) {
+              insertData.document_id = doc.documentId;
+            }
+
+            await trx("consignor_documents").insert(insertData);
 
             console.log(
               `  ✅ Document saved: ${documentUniqueId} (${doc.documentType} - ${doc.documentNumber})`

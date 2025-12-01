@@ -175,8 +175,17 @@ const ConsignorDetailsPage = () => {
 
   // Refresh data function for approval actions
   const handleRefreshData = () => {
+    console.log("🔄 Refreshing consignor data...", id);
     if (id) {
-      dispatch(fetchConsignorById(id));
+      dispatch(fetchConsignorById(id))
+        .unwrap()
+        .then((data) => {
+          console.log("✅ Consignor data refreshed:", data);
+          console.log("📊 Current status:", data?.general?.status);
+        })
+        .catch((error) => {
+          console.error("❌ Failed to refresh consignor data:", error);
+        });
     }
   };
 
@@ -302,9 +311,99 @@ const ConsignorDetailsPage = () => {
       });
       dispatch(clearError());
 
+      // Extract file objects from editFormData
+      const files = {};
+      const cleanFormData = { ...editFormData };
+
+      // Process contacts to extract photo files
+      if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
+        cleanFormData.contacts = cleanFormData.contacts.map(
+          (contact, index) => {
+            const cleanContact = { ...contact };
+
+            // Extract photo file if it exists
+            if (cleanContact.photo instanceof File) {
+              files[`contact_${index}_photo`] = cleanContact.photo;
+              cleanContact.photo = null;
+            } else if (typeof cleanContact.photo === "string") {
+              cleanContact.photo = null;
+            }
+
+            // Remove preview URL (not needed for backend)
+            delete cleanContact.photo_preview;
+
+            return cleanContact;
+          }
+        );
+      }
+
+      // Process documents to extract file uploads
+      if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
+        cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
+          const cleanDoc = { ...doc };
+
+          // Extract document file if it exists
+          // Check for File instance OR File-like object (has name, size, type properties)
+          const isFileOrFileLike =
+            cleanDoc.fileUpload &&
+            (cleanDoc.fileUpload instanceof File ||
+              cleanDoc.fileUpload instanceof Blob ||
+              (typeof cleanDoc.fileUpload === "object" &&
+                "name" in cleanDoc.fileUpload &&
+                "size" in cleanDoc.fileUpload &&
+                "type" in cleanDoc.fileUpload));
+
+          if (isFileOrFileLike) {
+            const fileKey = `document_${index}_file`;
+            files[fileKey] = cleanDoc.fileUpload;
+            // Add fileKey reference for backend
+            cleanDoc.fileKey = fileKey;
+          } else {
+            // If no file uploaded, set fileKey to null
+            cleanDoc.fileKey = null;
+          }
+
+          // Remove preview URL (not needed for backend)
+          delete cleanDoc.fileUpload_preview;
+          // Remove fileUpload from payload (already extracted)
+          delete cleanDoc.fileUpload;
+
+          return cleanDoc;
+        });
+      }
+
+      // Process general section to extract NDA/MSA files
+      if (cleanFormData.general) {
+        // Handle NDA upload
+        if (cleanFormData.general.upload_nda instanceof File) {
+          files["general_nda"] = cleanFormData.general.upload_nda;
+          cleanFormData.general.upload_nda = null;
+        } else if (typeof cleanFormData.general.upload_nda === "string") {
+          cleanFormData.general.upload_nda = null;
+        }
+
+        // Handle MSA upload
+        if (cleanFormData.general.upload_msa instanceof File) {
+          files["general_msa"] = cleanFormData.general.upload_msa;
+          cleanFormData.general.upload_msa = null;
+        } else if (typeof cleanFormData.general.upload_msa === "string") {
+          cleanFormData.general.upload_msa = null;
+        }
+      }
+
       // Prepare data for backend API (needs nested structure)
-      // Extract general fields from editFormData
-      const { general, contacts, organization, documents } = editFormData;
+      // Extract general fields from cleanFormData
+      const { general, contacts, organization, documents } = cleanFormData;
+
+      console.log("\n🔍 ===== UPDATE CONSIGNOR FILE DEBUG =====");
+      console.log("Total files to upload:", Object.keys(files).length);
+      Object.entries(files).forEach(([key, file]) => {
+        console.log(`  File: ${key}`);
+        console.log(`    - name: ${file.name}`);
+        console.log(`    - type: ${file.type}`);
+        console.log(`    - size: ${file.size} bytes`);
+      });
+      console.log("===========================\n");
 
       // Call the update API
       const result = await dispatch(
@@ -316,6 +415,7 @@ const ConsignorDetailsPage = () => {
             organization,
             documents,
           },
+          files,
         })
       ).unwrap();
 
@@ -429,8 +529,134 @@ const ConsignorDetailsPage = () => {
   // Handle update draft (for SAVE_AS_DRAFT status only)
   const handleUpdateDraft = async () => {
     try {
+      // Extract file objects from editFormData
+      const files = {};
+      const cleanFormData = { ...editFormData };
+
+      console.log("\n🔍 ===== EDIT FORM DATA INSPECTION =====");
+      console.log("editFormData.documents:", editFormData.documents);
+      if (editFormData.documents && Array.isArray(editFormData.documents)) {
+        editFormData.documents.forEach((doc, index) => {
+          console.log(`Document ${index}:`, {
+            documentType: doc.documentType,
+            documentNumber: doc.documentNumber,
+            hasFileUpload: !!doc.fileUpload,
+            fileUploadType: typeof doc.fileUpload,
+            isFileObject: doc.fileUpload instanceof File,
+            fileUploadKeys: doc.fileUpload
+              ? Object.keys(doc.fileUpload)
+              : "null",
+            fileUploadValue: doc.fileUpload,
+          });
+        });
+      }
+      console.log("===========================\n");
+
+      // Process contacts to extract photo files
+      if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
+        cleanFormData.contacts = cleanFormData.contacts.map(
+          (contact, index) => {
+            const cleanContact = { ...contact };
+
+            // Extract photo file if it exists
+            if (cleanContact.photo instanceof File) {
+              files[`contact_${index}_photo`] = cleanContact.photo;
+              cleanContact.photo = null;
+            } else if (typeof cleanContact.photo === "string") {
+              cleanContact.photo = null;
+            }
+
+            // Remove preview URL (not needed for backend)
+            delete cleanContact.photo_preview;
+
+            return cleanContact;
+          }
+        );
+      }
+
+      // Process documents to extract file uploads
+      if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
+        cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
+          const cleanDoc = { ...doc };
+
+          console.log(`\n🔍 Processing document ${index}:`, {
+            hasFileUpload: !!cleanDoc.fileUpload,
+            fileUploadType: typeof cleanDoc.fileUpload,
+            isFileObject: cleanDoc.fileUpload instanceof File,
+            isBlobObject: cleanDoc.fileUpload instanceof Blob,
+            fileName: cleanDoc.fileUpload?.name || "N/A",
+            constructor: cleanDoc.fileUpload?.constructor?.name || "N/A",
+            hasNameProp: cleanDoc.fileUpload && "name" in cleanDoc.fileUpload,
+            hasSizeProp: cleanDoc.fileUpload && "size" in cleanDoc.fileUpload,
+          });
+
+          // Extract document file if it exists
+          // Check for File instance OR File-like object (has name, size, type properties)
+          const isFileOrFileLike =
+            cleanDoc.fileUpload &&
+            (cleanDoc.fileUpload instanceof File ||
+              cleanDoc.fileUpload instanceof Blob ||
+              (typeof cleanDoc.fileUpload === "object" &&
+                "name" in cleanDoc.fileUpload &&
+                "size" in cleanDoc.fileUpload &&
+                "type" in cleanDoc.fileUpload));
+
+          if (isFileOrFileLike) {
+            const fileKey = `document_${index}_file`;
+            files[fileKey] = cleanDoc.fileUpload;
+            // Add fileKey reference for backend
+            cleanDoc.fileKey = fileKey;
+            console.log(
+              `✅ File extracted: ${fileKey} -> ${cleanDoc.fileUpload.name} (${cleanDoc.fileUpload.constructor.name})`
+            );
+          } else {
+            // If no file uploaded, set fileKey to null
+            cleanDoc.fileKey = null;
+            console.log(
+              `⚠️  No file to extract (fileUpload is ${typeof cleanDoc.fileUpload})`
+            );
+          }
+
+          // Remove preview URL (not needed for backend)
+          delete cleanDoc.fileUpload_preview;
+          // Remove fileUpload from payload (already extracted)
+          delete cleanDoc.fileUpload;
+
+          return cleanDoc;
+        });
+      }
+
+      // Process general section to extract NDA/MSA files
+      if (cleanFormData.general) {
+        // Handle NDA upload
+        if (cleanFormData.general.upload_nda instanceof File) {
+          files["general_nda"] = cleanFormData.general.upload_nda;
+          cleanFormData.general.upload_nda = null;
+        } else if (typeof cleanFormData.general.upload_nda === "string") {
+          cleanFormData.general.upload_nda = null;
+        }
+
+        // Handle MSA upload
+        if (cleanFormData.general.upload_msa instanceof File) {
+          files["general_msa"] = cleanFormData.general.upload_msa;
+          cleanFormData.general.upload_msa = null;
+        } else if (typeof cleanFormData.general.upload_msa === "string") {
+          cleanFormData.general.upload_msa = null;
+        }
+      }
+
       // Prepare data for backend API (needs nested structure)
-      const { general, contacts, organization, documents } = editFormData;
+      const { general, contacts, organization, documents } = cleanFormData;
+
+      console.log("\n🔍 ===== UPDATE DRAFT FILE DEBUG =====");
+      console.log("Total files to upload:", Object.keys(files).length);
+      Object.entries(files).forEach(([key, file]) => {
+        console.log(`  File: ${key}`);
+        console.log(`    - name: ${file.name}`);
+        console.log(`    - type: ${file.type}`);
+        console.log(`    - size: ${file.size} bytes`);
+      });
+      console.log("===========================\n");
 
       await dispatch(
         updateConsignorDraft({
@@ -441,6 +667,7 @@ const ConsignorDetailsPage = () => {
             organization,
             documents,
           },
+          files,
         })
       ).unwrap();
 
@@ -470,8 +697,98 @@ const ConsignorDetailsPage = () => {
   // Handle submit draft for approval (SAVE_AS_DRAFT → PENDING)
   const handleSubmitForApproval = async () => {
     try {
+      // Extract file objects from editFormData
+      const files = {};
+      const cleanFormData = { ...editFormData };
+
+      // Process contacts to extract photo files
+      if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
+        cleanFormData.contacts = cleanFormData.contacts.map(
+          (contact, index) => {
+            const cleanContact = { ...contact };
+
+            // Extract photo file if it exists
+            if (cleanContact.photo instanceof File) {
+              files[`contact_${index}_photo`] = cleanContact.photo;
+              cleanContact.photo = null;
+            } else if (typeof cleanContact.photo === "string") {
+              cleanContact.photo = null;
+            }
+
+            // Remove preview URL (not needed for backend)
+            delete cleanContact.photo_preview;
+
+            return cleanContact;
+          }
+        );
+      }
+
+      // Process documents to extract file uploads
+      if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
+        cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
+          const cleanDoc = { ...doc };
+
+          // Extract document file if it exists
+          // Check for File instance OR File-like object (has name, size, type properties)
+          const isFileOrFileLike =
+            cleanDoc.fileUpload &&
+            (cleanDoc.fileUpload instanceof File ||
+              cleanDoc.fileUpload instanceof Blob ||
+              (typeof cleanDoc.fileUpload === "object" &&
+                "name" in cleanDoc.fileUpload &&
+                "size" in cleanDoc.fileUpload &&
+                "type" in cleanDoc.fileUpload));
+
+          if (isFileOrFileLike) {
+            const fileKey = `document_${index}_file`;
+            files[fileKey] = cleanDoc.fileUpload;
+            // Add fileKey reference for backend
+            cleanDoc.fileKey = fileKey;
+          } else {
+            // If no file uploaded, set fileKey to null
+            cleanDoc.fileKey = null;
+          }
+
+          // Remove preview URL (not needed for backend)
+          delete cleanDoc.fileUpload_preview;
+          // Remove fileUpload from payload (already extracted)
+          delete cleanDoc.fileUpload;
+
+          return cleanDoc;
+        });
+      }
+
+      // Process general section to extract NDA/MSA files
+      if (cleanFormData.general) {
+        // Handle NDA upload
+        if (cleanFormData.general.upload_nda instanceof File) {
+          files["general_nda"] = cleanFormData.general.upload_nda;
+          cleanFormData.general.upload_nda = null;
+        } else if (typeof cleanFormData.general.upload_nda === "string") {
+          cleanFormData.general.upload_nda = null;
+        }
+
+        // Handle MSA upload
+        if (cleanFormData.general.upload_msa instanceof File) {
+          files["general_msa"] = cleanFormData.general.upload_msa;
+          cleanFormData.general.upload_msa = null;
+        } else if (typeof cleanFormData.general.upload_msa === "string") {
+          cleanFormData.general.upload_msa = null;
+        }
+      }
+
       // Prepare data for backend API (needs nested structure)
-      const { general, contacts, organization, documents } = editFormData;
+      const { general, contacts, organization, documents } = cleanFormData;
+
+      console.log("\n🔍 ===== SUBMIT DRAFT FILE DEBUG =====");
+      console.log("Total files to upload:", Object.keys(files).length);
+      Object.entries(files).forEach(([key, file]) => {
+        console.log(`  File: ${key}`);
+        console.log(`    - name: ${file.name}`);
+        console.log(`    - type: ${file.type}`);
+        console.log(`    - size: ${file.size} bytes`);
+      });
+      console.log("===========================\n");
 
       await dispatch(
         submitConsignorFromDraft({
@@ -482,6 +799,7 @@ const ConsignorDetailsPage = () => {
             organization,
             documents,
           },
+          files,
         })
       ).unwrap();
 
@@ -673,24 +991,25 @@ const ConsignorDetailsPage = () => {
 
           <div className="flex items-center gap-2">
             {/* Approval Action Bar - Only show for records with actual approval flow */}
-            {currentConsignor.userApprovalStatus && 
-             currentConsignor.userApprovalStatus.currentApprovalStatus !== "Not in Approval Flow" && (
-              <>
-                {console.log(
-                  "🎯 ConsignorDetailsPage - Passing userApprovalStatus:",
-                  currentConsignor.userApprovalStatus
-                )}
-                {console.log(
-                  "🎯 ConsignorDetailsPage - Current user from Redux:",
-                  user
-                )}
-                <ConsignorApprovalActionBar
-                  userApprovalStatus={currentConsignor.userApprovalStatus}
-                  entityId={id}
-                  onRefreshData={handleRefreshData}
-                />
-              </>
-            )}
+            {currentConsignor.userApprovalStatus &&
+              currentConsignor.userApprovalStatus.currentApprovalStatus !==
+                "Not in Approval Flow" && (
+                <>
+                  {console.log(
+                    "🎯 ConsignorDetailsPage - Passing userApprovalStatus:",
+                    currentConsignor.userApprovalStatus
+                  )}
+                  {console.log(
+                    "🎯 ConsignorDetailsPage - Current user from Redux:",
+                    user
+                  )}
+                  <ApprovalActionBar
+                    userApprovalStatus={currentConsignor.userApprovalStatus}
+                    entityId={id}
+                    onRefreshData={handleRefreshData}
+                  />
+                </>
+              )}
 
             {isEditMode ? (
               <>

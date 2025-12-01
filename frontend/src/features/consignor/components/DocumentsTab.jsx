@@ -11,11 +11,11 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
 
   // Document type options from master data (backend already returns value/label format)
   const documentTypes = masterData?.documentTypes || [];
-  
+
   // Debug logging
-  console.log('📋 DocumentsTab - masterData:', masterData);
-  console.log('📋 DocumentsTab - documentTypes:', documentTypes);
-  console.log('📋 DocumentsTab - documentTypes length:', documentTypes.length);
+  console.log("📋 DocumentsTab - masterData:", masterData);
+  console.log("📋 DocumentsTab - documentTypes:", documentTypes);
+  console.log("📋 DocumentsTab - documentTypes length:", documentTypes.length);
 
   // Get all countries from country-state-city package
   const allCountries = Country.getAllCountries();
@@ -76,6 +76,32 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   ];
 
   const handleDataChange = (updatedDocuments) => {
+    console.log("📋 DocumentsTab - handleDataChange called:", {
+      documentCount: updatedDocuments.length,
+      documentsWithFiles: updatedDocuments.filter(
+        (d) => d.fileUpload instanceof File
+      ).length,
+      documents: updatedDocuments.map((d, i) => ({
+        index: i,
+        hasFile: d.fileUpload instanceof File,
+        fileName: d.fileUpload?.name || "No file",
+        fileType: d.fileUpload?.type || "N/A",
+        fileUploadConstructor: d.fileUpload?.constructor?.name || "N/A",
+      })),
+    });
+
+    console.log("📋 Raw fileUpload objects:");
+    updatedDocuments.forEach((d, i) => {
+      if (d.fileUpload) {
+        console.log(`  Document ${i} fileUpload:`, d.fileUpload);
+        console.log(`  Is File?`, d.fileUpload instanceof File);
+        console.log(`  Is Blob?`, d.fileUpload instanceof Blob);
+        console.log(`  Constructor:`, d.fileUpload.constructor.name);
+        console.log(`  Has name property?`, "name" in d.fileUpload);
+        console.log(`  Has size property?`, "size" in d.fileUpload);
+      }
+    });
+
     setFormData((prev) => ({
       ...prev,
       documents: updatedDocuments,

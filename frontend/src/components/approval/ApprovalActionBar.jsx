@@ -2,7 +2,12 @@ import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, Clock, MessageSquare, X } from "lucide-react";
-import { approveUser, rejectUser, approveApprovalFlow, rejectApprovalFlow } from "../../redux/slices/approvalSlice";
+import {
+  approveUser,
+  rejectUser,
+  approveApprovalFlow,
+  rejectApprovalFlow,
+} from "../../redux/slices/approvalSlice";
 import { addToast } from "../../redux/slices/uiSlice";
 import { TOAST_TYPES } from "../../utils/constants";
 
@@ -36,13 +41,13 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
   } = userApprovalStatus;
 
   // Debug logging for approval system
-  console.log('🔍 ApprovalActionBar Debug:');
-  console.log('Current user:', user);
-  console.log('Current user ID:', user?.user_id);
-  console.log('Pending with user ID:', pendingWithUserId);
-  console.log('Current approval status:', currentApprovalStatus);
-  console.log('Created by user ID:', createdByUserId);
-  console.log('User approval status object:', userApprovalStatus);
+  console.log("🔍 ApprovalActionBar Debug:");
+  console.log("Current user:", user);
+  console.log("Current user ID:", user?.user_id);
+  console.log("Pending with user ID:", pendingWithUserId);
+  console.log("Current approval status:", currentApprovalStatus);
+  console.log("Created by user ID:", createdByUserId);
+  console.log("User approval status object:", userApprovalStatus);
 
   // Check if current user is the assigned approver
   const isAssignedApprover = user?.user_id === pendingWithUserId;
@@ -51,19 +56,20 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
   const isCreator = user?.user_id === createdByUserId;
 
   // Enhanced Product Owner Detection
-  const isProductOwner = 
-    user?.role === 'Product Owner' || 
-    user?.user_type_id === 'UT001' || 
-    user?.user_id?.startsWith('PO') ||
-    user?.user_id?.startsWith('UT001') ||
-    user?.role?.toLowerCase().includes('product owner');
+  const isProductOwner =
+    user?.role === "Product Owner" ||
+    user?.user_type_id === "UT001" ||
+    user?.user_id?.startsWith("PO") ||
+    user?.user_id?.startsWith("UT001") ||
+    user?.role?.toLowerCase().includes("product owner");
 
   // FIXED LOGIC: Show approval buttons ONLY when:
   // 1. Status is pending AND
   // 2. User is specifically assigned as approver AND
   // 3. User is NOT the creator (creators cannot approve their own entities)
   const showApprovalActions =
-    (currentApprovalStatus === "PENDING" || currentApprovalStatus === "Pending for Approval") &&
+    (currentApprovalStatus === "PENDING" ||
+      currentApprovalStatus === "Pending for Approval") &&
     isAssignedApprover &&
     !isCreator; // CRITICAL: Hide buttons if user is the creator
 
@@ -109,13 +115,13 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
   const handleApprove = async () => {
     try {
       let result;
-      
+
       // Check if we have an approval flow trans ID (new approval system)
       if (userApprovalStatus.approvalFlowTransId) {
         result = await dispatch(
-          approveApprovalFlow({ 
-            approvalFlowTransId: userApprovalStatus.approvalFlowTransId, 
-            remarks: "Approved by Product Owner" 
+          approveApprovalFlow({
+            approvalFlowTransId: userApprovalStatus.approvalFlowTransId,
+            remarks: "Approved by Product Owner",
           })
         ).unwrap();
       } else {
@@ -133,8 +139,12 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
       );
 
       // Refresh data to show updated status (instead of page reload)
+      // Add small delay to ensure database transaction is committed
       if (onRefreshData) {
-        onRefreshData();
+        console.log("🔄 Refreshing data after approval...");
+        setTimeout(() => {
+          onRefreshData();
+        }, 500); // 500ms delay to ensure DB commit
       }
     } catch (error) {
       dispatch(
@@ -160,13 +170,13 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
 
     try {
       let result;
-      
+
       // Check if we have an approval flow trans ID (new approval system)
       if (userApprovalStatus.approvalFlowTransId) {
         result = await dispatch(
-          rejectApprovalFlow({ 
-            approvalFlowTransId: userApprovalStatus.approvalFlowTransId, 
-            remarks: rejectRemarks 
+          rejectApprovalFlow({
+            approvalFlowTransId: userApprovalStatus.approvalFlowTransId,
+            remarks: rejectRemarks,
           })
         ).unwrap();
       } else {
@@ -187,8 +197,12 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
       setRejectRemarks("");
 
       // Refresh data to show updated status (instead of page reload)
+      // Add small delay to ensure database transaction is committed
       if (onRefreshData) {
-        onRefreshData();
+        console.log("🔄 Refreshing data after rejection...");
+        setTimeout(() => {
+          onRefreshData();
+        }, 500); // 500ms delay to ensure DB commit
       }
     } catch (error) {
       dispatch(
@@ -229,18 +243,20 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
                 // Show to creator - who cannot approve their own entity
                 <>
                   Pending approval from:{" "}
-                  <span className="font-semibold text-white">{pendingWith}</span>
+                  <span className="font-semibold text-white">
+                    {pendingWith}
+                  </span>
                 </>
               ) : isAssignedApprover ? (
                 // Show to assigned approver - who can take action
-                <>
-                  Assigned to you for approval
-                </>
+                <>Assigned to you for approval</>
               ) : (
                 // Show to other users
                 <>
                   Pending with:{" "}
-                  <span className="font-semibold text-white">{pendingWith}</span>
+                  <span className="font-semibold text-white">
+                    {pendingWith}
+                  </span>
                 </>
               )}
             </motion.div>

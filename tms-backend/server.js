@@ -49,9 +49,11 @@ const PORT = process.env.PORT || 5000;
 app.set("io", io);
 
 // Middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" } // Allow images to be loaded from different origins
-}));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow images to be loaded from different origins
+  })
+);
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -81,7 +83,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Import routes
 const warehouseRoutes = require("./routes/warehouse");
@@ -116,6 +118,7 @@ driverBulkUploadQueue.process(async (job) => {
 });
 const driverRoutes = require("./routes/driver");
 const configurationRoutes = require("./routes/configuration");
+const transporterVehicleConfigRoutes = require("./routes/transporter-vehicle-config");
 
 // Routes
 app.use("/api/warehouse", warehouseRoutes);
@@ -134,6 +137,7 @@ app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
 app.use("/api/approvals", approvalRoutes);
 app.use("/api/configuration", configurationRoutes);
+app.use("/api/transporter-vehicle-config", transporterVehicleConfigRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
@@ -176,27 +180,27 @@ io.on("connection", (socket) => {
 const startServer = async () => {
   try {
     // Check database connection before starting
-    console.log('\n🚀 ===== STARTING TMS BACKEND SERVER =====\n');
-    
+    console.log("\n🚀 ===== STARTING TMS BACKEND SERVER =====\n");
+
     const healthCheck = await comprehensiveHealthCheck();
-    
+
     if (!healthCheck.success) {
-      console.error('\n❌ Failed to connect to database. Server cannot start.');
-      console.error('   Please fix the database connection and try again.\n');
+      console.error("\n❌ Failed to connect to database. Server cannot start.");
+      console.error("   Please fix the database connection and try again.\n");
       process.exit(1);
     }
-    
+
     // Start HTTP server
     server.listen(PORT, () => {
-      console.log('✅ ========================================');
+      console.log("✅ ========================================");
       console.log(`✅ Server running on port ${PORT}`);
-      console.log(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`✅ Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(`✅ Frontend URL: http://localhost:5173`);
       console.log(`✅ Backend URL: http://localhost:${PORT}`);
-      console.log('✅ ========================================\n');
+      console.log("✅ ========================================\n");
     });
   } catch (error) {
-    console.error('\n❌ Server startup error:', error.message);
+    console.error("\n❌ Server startup error:", error.message);
     process.exit(1);
   }
 };

@@ -45,12 +45,16 @@ const TMSLandingPage = () => {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading } = useSelector((state) => state.auth);
+  const { user, isAuthenticated, isLoading } = useSelector(
+    (state) => state.auth
+  );
 
   // Authentication guard - redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      console.log("TMSLandingPage: User not authenticated, redirecting to login");
+      console.log(
+        "TMSLandingPage: User not authenticated, redirecting to login"
+      );
       navigate("/login", { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate]);
@@ -362,6 +366,9 @@ const TMSLandingPage = () => {
       } else if (item.title === "Super Admin Approval List") {
         console.log("Navigating to /approvals/super-admin");
         navigate("/approvals/super-admin");
+      } else if (item.title === "Transporter Vehicle Configured Data") {
+        console.log("Navigating to /configuration/transporter-vehicle-config");
+        navigate("/configuration/transporter-vehicle-config");
       }
       // Add more navigation handlers for other menu items as needed
     } catch (error) {

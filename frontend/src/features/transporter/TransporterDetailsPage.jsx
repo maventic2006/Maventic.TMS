@@ -157,6 +157,21 @@ const TransporterDetailsPage = () => {
     }
   }, [selectedTransporter, editFormData]);
 
+  // Debug logging for approval data
+  useEffect(() => {
+    if (selectedTransporter) {
+      console.log("🔍 TransporterDetailsPage - Transporter Data Loaded:");
+      console.log("  Transporter ID:", selectedTransporter.transporterId);
+      console.log("  Status:", selectedTransporter.generalDetails?.status);
+      console.log(
+        "  User Approval Status:",
+        selectedTransporter.userApprovalStatus
+      );
+      console.log("  Current User:", user);
+      console.log("  Full selectedTransporter object:", selectedTransporter);
+    }
+  }, [selectedTransporter, user]);
+
   // Refresh data function for approval actions
   const handleRefreshData = () => {
     if (id) {
