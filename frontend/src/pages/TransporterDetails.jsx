@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { ArrowLeft, Building, MapPin, FileText, Users, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Card } from '../components/ui/Card';
@@ -10,10 +11,12 @@ import ServiceAreaTab from '../components/transporter/details/ServiceAreaTab';
 import DocumentsTab from '../components/transporter/details/DocumentsTab';
 import ApprovalActionBar from '../components/approval/ApprovalActionBar';
 import { transporterAPI } from '../utils/api';
+import { clearSelectedTransporter } from '../redux/slices/transporterSlice';
 
 const TransporterDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState('general');
   const [transporter, setTransporter] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,13 @@ const TransporterDetails = () => {
       component: DocumentsTab
     }
   ];
+
+  // Cleanup when navigating away to prevent stale state
+  useEffect(() => {
+    return () => {
+      dispatch(clearSelectedTransporter());
+    };
+  }, [dispatch]);
 
   // Fetch transporter data
   useEffect(() => {

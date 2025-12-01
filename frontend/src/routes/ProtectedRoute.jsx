@@ -17,6 +17,20 @@ const ProtectedRoute = ({ children, roles = [] }) => {
     timestamp: new Date().toISOString()
   });
 
+  // Special logging for PO001 user
+  const { user } = useSelector((state) => state.auth);
+  if (user?.user_id === 'PO001') {
+    console.log("👤 PO001 Debug - Auth Details:", {
+      userId: user.user_id,
+      userTypeId: user.user_type_id,
+      role: role,
+      requiredRoles: roles,
+      hasRequiredRole: roles.length === 0 || roles.includes(role),
+      isAuthenticated: isAuthenticated,
+      currentPath: location.pathname
+    });
+  }
+
   // Show loading while verifying token
   if (isLoading) {
     console.log("⏳ ProtectedRoute - Showing loading state");

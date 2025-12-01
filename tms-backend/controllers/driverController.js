@@ -5,6 +5,7 @@ const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
 const axios = require("axios");
 const https = require("https");
+// const bcrypt = require("bcrypt");
 
 // Helper function to generate unique IDs
 const generateDriverId = async () => {
@@ -159,9 +160,7 @@ const generateDriverAdminUserId = async (trx = knex) => {
     attempts++;
   }
 
-  throw new Error(
-    "Failed to generate unique Driver Admin user ID after 100 attempts"
-  );
+  throw new Error("Failed to generate unique Driver Admin user ID after 100 attempts");
 };
 
 // Generate Approval Flow Transaction ID (format: AF0001, AF0002, etc.)
@@ -170,7 +169,9 @@ const generateApprovalFlowId = async (trx = knex) => {
   const maxAttempts = 100;
 
   while (attempts < maxAttempts) {
-    const result = await trx("approval_flow_trans").count("* as count").first();
+    const result = await trx("approval_flow_trans")
+      .count("* as count")
+      .first();
     const count = parseInt(result.count) + 1 + attempts;
     const newId = `AF${count.toString().padStart(4, "0")}`;
 
@@ -184,9 +185,7 @@ const generateApprovalFlowId = async (trx = knex) => {
     attempts++;
   }
 
-  throw new Error(
-    "Failed to generate unique approval flow ID after 100 attempts"
-  );
+  throw new Error("Failed to generate unique approval flow ID after 100 attempts");
 };
 
 // Validation functions
@@ -1157,8 +1156,7 @@ const createDriver = async (req, res) => {
     const hashedPassword = await bcrypt.hash(initialPassword, 10);
 
     // Use driver details for user account
-    const userEmail =
-      basicInfo.emailId || `${driverId.toLowerCase()}@driver.com`;
+    const userEmail = basicInfo.emailId || `${driverId.toLowerCase()}@driver.com`;
     const userMobile = basicInfo.phoneNumber || "0000000000";
 
     // Create user in user_master with PENDING status
@@ -1245,9 +1243,7 @@ const createDriver = async (req, res) => {
 
     console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
     console.log(`  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`);
-    console.log(
-      `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
-    );
+    console.log(`  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`);
 
     await trx.commit();
 
@@ -3141,73 +3137,63 @@ const getDriverById = async (req, res) => {
     // ========================================================================
     // FETCH USER APPROVAL STATUS FOR DRIVER USERS
     // ========================================================================
-
+    
     let userApprovalStatus = null;
     let approvalHistory = [];
-
+    
     try {
       // Find Driver User associated with this driver
       // IMPORTANT: For drivers, the approval flow stores the ENTITY ID (DRV####) not user ID (DA####)
       // But we need to find the user account (DA####) that was created for this driver entity
-
+      
       // Method 1: Find approval flows for Driver User Creation type
       // Since we don't know which user was created for this driver, we'll search differently
       // We need to find the user that was created for this specific driver entity
-
+      
       // First, check if there's a user account created for this driver by name pattern
       // This is not ideal, but it's how the current system works
-      const potentialUsers = await knex("user_master")
-        .where("user_type_id", "UT004") // Driver user type
-        .where("user_full_name", "like", `%${driver.full_name}%`) // Match by driver's name
-        .select("*");
-
+      const potentialUsers = await knex('user_master')
+        .where('user_type_id', 'UT004') // Driver user type
+        .where('user_full_name', 'like', `%${driver.full_name}%`) // Match by driver's name
+        .select('*');
+        
       let approvalFlows = [];
-
+      
       if (potentialUsers.length > 0) {
         // Found potential user(s), now find their approval flows
-        const userIds = potentialUsers.map((user) => user.user_id);
-
-        approvalFlows = await knex("approval_flow_trans as aft")
-          .leftJoin(
-            "approval_type_master as atm",
-            "aft.approval_type_id",
-            "atm.approval_type_id"
-          )
-          .where("aft.approval_type_id", "AT003") // Driver User Creation
-          .whereIn("aft.user_id_reference_id", userIds) // Check for any of the potential users
+        const userIds = potentialUsers.map(user => user.user_id);
+        
+        approvalFlows = await knex('approval_flow_trans as aft')
+          .leftJoin('approval_type_master as atm', 'aft.approval_type_id', 'atm.approval_type_id')
+          .where('aft.approval_type_id', 'AT003') // Driver User Creation
+          .whereIn('aft.user_id_reference_id', userIds) // Check for any of the potential users
           .select(
-            "aft.*",
-            "atm.approval_type as approval_category",
-            "atm.approval_name"
+            'aft.*',
+            'atm.approval_type as approval_category',
+            'atm.approval_name'
           )
-          .orderBy("aft.created_at", "desc");
+          .orderBy('aft.created_at', 'desc');
       }
 
       let associatedUser = null;
-
+      
       if (approvalFlows.length > 0) {
         // Found approval flows, get the associated user from the approval flow
         const userIdFromApproval = approvalFlows[0].user_id_reference_id;
-
-        associatedUser = await knex("user_master")
-          .where("user_id", userIdFromApproval)
-          .where("user_type_id", "UT004") // Driver user type
+        
+        associatedUser = await knex('user_master')
+          .where('user_id', userIdFromApproval)
+          .where('user_type_id', 'UT004') // Driver user type
           .first();
-
-        console.log(
-          `✅ Found approval flow for driver ${id}, associated user: ${userIdFromApproval}`
-        );
+          
+        console.log(`✅ Found approval flow for driver ${id}, associated user: ${userIdFromApproval}`);
       } else {
         // No approval flow found - this might be a legacy driver
-        console.log(
-          `⚠️  No approval flow found for driver ${id} (legacy driver)`
-        );
+        console.log(`⚠️  No approval flow found for driver ${id} (legacy driver)`);
       }
 
       if (associatedUser) {
-        console.log(
-          `✅ Found associated Driver user: ${associatedUser.user_id} for driver ${id}`
-        );
+        console.log(`✅ Found associated Driver user: ${associatedUser.user_id} for driver ${id}`);
 
         userApprovalStatus = {
           approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id || null,
@@ -3216,8 +3202,7 @@ const getDriverById = async (req, res) => {
           userMobile: associatedUser.mobile_number,
           userStatus: associatedUser.status,
           isActive: associatedUser.is_active,
-          currentApprovalStatus:
-            approvalFlows[0]?.s_status || associatedUser.status,
+          currentApprovalStatus: approvalFlows[0]?.s_status || associatedUser.status,
           pendingWith: approvalFlows[0]?.pending_with_name || null,
           pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
           createdByUserId: approvalFlows[0]?.created_by_user_id || null,
@@ -3226,19 +3211,13 @@ const getDriverById = async (req, res) => {
 
         // Use the approval flows we already fetched
         approvalHistory = approvalFlows;
-
-        console.log(
-          `✅ Found approval status for driver ${id}:`,
-          userApprovalStatus
-        );
+        
+        console.log(`✅ Found approval status for driver ${id}:`, userApprovalStatus);
       } else {
         console.log(`⚠️  No Driver user found for driver ${id}`);
       }
     } catch (approvalError) {
-      console.error(
-        "❌ Error fetching driver approval status:",
-        approvalError.message
-      );
+      console.error('❌ Error fetching driver approval status:', approvalError.message);
     }
 
     // Format response

@@ -15,6 +15,7 @@ import warehouseSlice from "./slices/warehouseSlice";
 import approvalSlice from "./slices/approvalSlice";
 import consignorSlice from "./slices/consignorSlice";
 import configurationSlice from "./slices/configurationSlice";
+import consignorConfigurationSlice from "./slices/consignorConfigurationSlice";
 
 export const store = configureStore({
   reducer: {
@@ -34,6 +35,7 @@ export const store = configureStore({
     approval: approvalSlice,
     consignor: consignorSlice,
     configuration: configurationSlice,
+    consignorConfiguration: consignorConfigurationSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

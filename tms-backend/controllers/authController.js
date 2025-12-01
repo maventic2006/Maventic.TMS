@@ -67,16 +67,22 @@ console.log("Length:", user.password?.length);
     }
 
     // Determine user role based on user_id or user_type
-    let userRole = "admin"; // Default to admin for development/testing
-    if (
-      user.user_id === "admin" ||
-      user.user_id.toLowerCase().includes("admin")
-    ) {
-      userRole = "admin";
+    let userRole = "product_owner"; // Default to product_owner for development/testing
+    
+    // Role mapping for different user types
+    if (user.user_id === "PO001" || user.user_id.toLowerCase().startsWith("po")) {
+      userRole = "product_owner"; // Product owner users
+    } else if (user.user_id === "admin" || user.user_id.toLowerCase().includes("admin")) {
+      userRole = "product_owner"; // Give admins product_owner access
+    } else if (user.user_type_id === "UT001") {
+      userRole = "product_owner"; // UT001 users are product owners
     } else if (user.user_type_id === "UT002") {
-      userRole = "manager";
+      userRole = "manager"; // Manager role
     } else if (user.user_id.toLowerCase().includes("test")) {
-      userRole = "admin"; // Give test users admin access for development
+      userRole = "product_owner"; // Give test users product_owner access for development
+    } else {
+      // Default product_owner for development - in production this should be more restrictive
+      userRole = "product_owner";
     }
 
     // Generate JWT token

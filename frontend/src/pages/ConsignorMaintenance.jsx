@@ -46,13 +46,11 @@ const ConsignorMaintenance = () => {
     createdOnEnd: "",
   });
 
-  // Fetch consignors on component mount
+  // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
-    dispatch(fetchConsignors({ page: 1, limit: 25 }));
-  }, [dispatch]);
-
-  // Fetch consignors when APPLIED filters or pagination change
-  useEffect(() => {
+    // Prevent multiple simultaneous calls
+    if (isFetching) return;
+    
     // Build filter object with mapped parameter names
     const filterParams = {};
 

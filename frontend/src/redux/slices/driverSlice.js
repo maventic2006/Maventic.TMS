@@ -554,6 +554,11 @@ const driverSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    clearSelectedDriver: (state) => {
+      state.selectedDriver = null;
+      state.isFetchingDetails = false;
+      state.error = null;
+    },
     clearLastCreated: (state) => {
       state.lastCreated = null;
     },
@@ -797,7 +802,7 @@ const driverSlice = createSlice({
   },
 });
 
-export const { clearError, clearLastCreated, resetDriverState } =
+export const { clearError, clearSelectedDriver, clearLastCreated, resetDriverState } =
   driverSlice.actions;
 
 export default driverSlice.reducer;

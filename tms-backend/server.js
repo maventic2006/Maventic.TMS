@@ -116,6 +116,7 @@ driverBulkUploadQueue.process(async (job) => {
 });
 const driverRoutes = require("./routes/driver");
 const configurationRoutes = require("./routes/configuration");
+const consignorConfigurationRoutes = require("./routes/consignorConfiguration");
 
 // Routes
 app.use("/api/warehouse", warehouseRoutes);
@@ -134,6 +135,7 @@ app.use("/api/driver", driverRoutes);
 app.use("/api/drivers", driverRoutes);
 app.use("/api/approvals", approvalRoutes);
 app.use("/api/configuration", configurationRoutes);
+app.use("/api/consignor-configuration", consignorConfigurationRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

@@ -83,8 +83,11 @@ const TransporterMaintenance = () => {
     transportMode: [],
   });
 
-  // Fetch transporters when component mounts or when appliedFilters change (not on every keystroke)
+  // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
+    // Prevent multiple simultaneous calls
+    if (isFetching) return;
+    
     const fetchData = () => {
       const params = {
         page: pagination.page,
@@ -122,11 +125,6 @@ const TransporterMaintenance = () => {
 
     fetchData();
   }, [dispatch, appliedFilters, pagination.page]);
-
-  // Initial load
-  useEffect(() => {
-    dispatch(fetchTransporters({ page: 1, limit: 25 }));
-  }, [dispatch]);
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({

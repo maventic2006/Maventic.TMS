@@ -83,11 +83,14 @@ const WarehouseMaintenance = () => {
     geoFencing: null,
   });
 
-  // Fetch warehouses when component mounts or when appliedFilters change (not on every keystroke)
+  // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
+    // Prevent multiple simultaneous calls
+    if (loading) return;
+    
     const fetchData = () => {
       const params = {
-        page: 1, // ✅ FIX: Always start from page 1 when filters change
+        page: pagination.page || 1,
         limit: pagination.limit || 25,
       };
 
@@ -124,7 +127,7 @@ const WarehouseMaintenance = () => {
     };
 
     fetchData();
-  }, [dispatch, appliedFilters, pagination.limit]); // ✅ FIX: Removed pagination.page dependency
+  }, [dispatch, appliedFilters, pagination.page, pagination.limit]);
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({
