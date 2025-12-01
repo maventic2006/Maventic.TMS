@@ -5,6 +5,7 @@ const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
 const axios = require("axios");
 const https = require("https");
+// const bcrypt = require("bcrypt");
 
 // Helper function to generate unique IDs
 const generateDriverId = async () => {

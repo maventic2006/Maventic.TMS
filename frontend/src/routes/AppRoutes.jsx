@@ -25,6 +25,9 @@ import ConsignorCreatePage from "../features/consignor/pages/ConsignorCreatePage
 import SuperAdminApprovalList from "../pages/SuperAdminApprovalList";
 import ConfigurationPage from "../pages/ConfigurationPage";
 import ConfigurationListPage from "../pages/ConfigurationListPage";
+import ConsignorConfigurationPage from "../pages/ConsignorConfigurationPage";
+import ConsignorConfigurationListPage from "../pages/ConsignorConfigurationListPage";
+import UnauthorizedPage from "../pages/UnauthorizedPage";
 import TransporterVehicleConfigPage from "../features/transporterVehicleConfig";
 
 // Protected Route component
@@ -245,6 +248,28 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* Consignor Configuration Management */}
+      <Route
+        path="/consignor-configurations"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConsignorConfigurationListPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/consignor-configuration/:configName"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <ConsignorConfigurationPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Unauthorized Access Page */}
+      <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
       {/* Transporter Vehicle Configuration */}
       <Route

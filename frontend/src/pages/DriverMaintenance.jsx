@@ -105,8 +105,11 @@ const DriverMaintenance = () => {
     createdOnEnd: "",
   });
 
-  // Fetch drivers when component mounts or when appliedFilters change
+  // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
+    // Prevent multiple simultaneous calls
+    if (isFetching) return;
+    
     const fetchData = () => {
       const params = {
         page: pagination.page || 1,
@@ -140,11 +143,6 @@ const DriverMaintenance = () => {
 
     fetchData();
   }, [dispatch, appliedFilters, pagination.page]);
-
-  // Initial load
-  useEffect(() => {
-    dispatch(fetchDrivers({ page: 1, limit: 25 }));
-  }, [dispatch]);
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({

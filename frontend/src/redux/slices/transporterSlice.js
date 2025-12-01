@@ -479,6 +479,11 @@ const transporterSlice = createSlice({
     clearLastCreated: (state) => {
       state.lastCreatedTransporter = null;
     },
+    clearSelectedTransporter: (state) => {
+      state.selectedTransporter = null;
+      state.isFetchingDetails = false;
+      state.error = null;
+    },
     resetTransporterState: (state) => {
       return initialState;
     },

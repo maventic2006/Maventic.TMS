@@ -296,6 +296,17 @@ const TMSHeader = ({ theme }) => {
       currentPath: window.location.pathname,
     });
 
+    // Special debug logging for PO001
+    const currentUser = user;
+    if (currentUser?.user_id === "PO001") {
+      console.log("👤 PO001 Navigation Debug:", {
+        userId: currentUser.user_id,
+        menuItem: item.title,
+        currentPath: window.location.pathname,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // Close dropdown after selecting an item
     setActiveDropdown(null);
 
@@ -446,6 +457,94 @@ const TMSHeader = ({ theme }) => {
     } else if (item.title === "Rate Type Mapping") {
       const targetPath = "/configuration/rate-type";
       console.log("🔧 Global Master Config - Rate Type Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Drop Down Maintenance") {
+      const targetPath = "/configuration/dropdown";
+      console.log("🔧 Global Master Config - Drop Down Maintenance");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    }
+
+    // Consignor Configuration navigation - Enhanced with debugging
+    else if (item.title === "Consignor General Config Master") {
+      const targetPath =
+        "/consignor-configuration/consignor_general_config_master";
+      console.log("🏢 Consignor Config - General Config Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "E-bidding Config") {
+      const targetPath = "/consignor-configuration/e_bidding_config";
+      console.log("🏢 Consignor Config - E-bidding Config");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Consignor Approval Hierarchy Configuration") {
+      const targetPath =
+        "/consignor-configuration/consignor_approval_hierarchy_configuration";
+      console.log("🏢 Consignor Config - Approval Hierarchy Configuration");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Consignor Material Master Information") {
+      const targetPath =
+        "/consignor-configuration/consignor_material_master_information";
+      console.log("🏢 Consignor Config - Material Master Information");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "E-bidding Auction Slot") {
+      const targetPath = "/consignor-configuration/ebidding_auction_slot";
+      console.log("🏢 Consignor Config - E-bidding Auction Slot");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Checklist Configuration") {
+      const targetPath = "/consignor-configuration/checklist_configuration";
+      console.log("🏢 Consignor Config - Checklist Configuration");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Consignor Material State Config") {
+      const targetPath =
+        "/consignor-configuration/consignor_material_state_config";
+      console.log("🏢 Consignor Config - Material State Config");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Changeable Field Info") {
+      const targetPath = "/consignor-configuration/changeable_field_info";
+      console.log("🏢 Consignor Config - Changeable Field Info");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Milestone Invoice Requirement") {
+      const targetPath =
+        "/consignor-configuration/milestone_invoice_requirement";
+      console.log("🏢 Consignor Config - Milestone Invoice Requirement");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    }
+
+    // Transporter Config navigation
+    else if (item.title === "Transporter Vehicle Configured Data") {
+      const targetPath = "/transporter-configuration/vehicle-config";
+      console.log("🚚 Transporter Config - Vehicle Configured Data");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    }
+
+    // User Maintenance navigation
+    else if (
+      item.title === "Role and Auth Control - User Create/Access Maintenance"
+    ) {
+      const targetPath = "/user-maintenance/role-auth-control";
+      console.log("👥 User Maintenance - Role and Auth Control");
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);

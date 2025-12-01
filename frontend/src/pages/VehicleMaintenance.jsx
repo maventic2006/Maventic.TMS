@@ -125,13 +125,11 @@ const VehicleMaintenance = () => {
     createdOnEnd: "",
   });
 
-  // Initial load
+  // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
-    dispatch(fetchVehicles({ page: 1, limit: 25 }));
-  }, [dispatch]);
-
-  // Fetch when appliedFilters or page changes
-  useEffect(() => {
+    // Prevent multiple simultaneous calls
+    if (isFetching) return;
+    
     const fetchData = () => {
       const params = {
         page: pagination.page || 1,
@@ -198,6 +196,7 @@ const VehicleMaintenance = () => {
       if (appliedFilters.createdOnEnd) {
         params.createdOnEnd = appliedFilters.createdOnEnd;
       }
+
       dispatch(fetchVehicles(params));
     };
 

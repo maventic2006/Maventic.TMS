@@ -1,0 +1,1897 @@
+{
+  "consignor_general_config_master": {
+    "name": "Consignor General Config Master",
+    "table": "consignor_general_config_master",
+    "primaryKey": "g_config_id",
+    "displayField": "g_config_id",
+    "description": "Manage consignor general config master",
+    "isConsignorConfig": true,
+    "fields": {
+      "g_config_id": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "G Config Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "warehouse_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Warehouse Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "parameter_name_key": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Parameter Name Key",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "parameter_value": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Parameter Value",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "description": {
+        "type": "text",
+        "maxLength": null,
+        "required": false,
+        "label": "Description",
+        "inputType": "textarea",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "active": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Active",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Y",
+            "label": "Yes"
+          },
+          {
+            "value": "N",
+            "label": "No"
+          }
+        ],
+        "defaultValue": "1"
+      },
+      "valid_from": {
+        "type": "timestamp",
+        "maxLength": null,
+        "required": false,
+        "label": "Valid From",
+        "inputType": "time",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "valid_to": {
+        "type": "timestamp",
+        "maxLength": null,
+        "required": false,
+        "label": "Valid To",
+        "inputType": "time",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "created_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_on": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "updated_on": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ],
+        "defaultValue": "ACTIVE"
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  },
+  "e_bidding_config": {
+    "name": "E-bidding Config",
+    "table": "e_bidding_config",
+    "primaryKey": "e_bidding_config_id",
+    "displayField": "e_bidding_config_id",
+    "description": "Manage e-bidding config",
+    "isConsignorConfig": true,
+    "fields": {
+      "e_bidding_config_id": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "E Bidding Config Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "warehouse_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Warehouse Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "vehicle_type": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Vehicle Type",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "max_rate": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Max Rate",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "min_rate": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Min Rate",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "freight_unit_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Freight Unit Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "e_bidding_tolerance_value": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "E Bidding Tolerance Value",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "created_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_on": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "updated_on": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ],
+        "defaultValue": "ACTIVE"
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  },
+  "consignor_approval_hierarchy_configuration": {
+    "name": "Consignor Approval Hierarchy Configuration",
+    "table": "consignor_approval_hierarchy_configuration",
+    "primaryKey": "approval_hierarchy_id",
+    "displayField": "approval_hierarchy_id",
+    "description": "Manage consignor approval hierarchy configuration",
+    "isConsignorConfig": true,
+    "fields": {
+      "approval_hierarchy_id": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Approval Hierarchy Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "transporter_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Transporter Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "approval_type": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Approval Type",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "approval_level": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Approval Level",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "approval_control": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Approval Control",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "role_of": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Role Of",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "role": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Role",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "user_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "User Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "created_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_on": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "updated_on": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ],
+        "defaultValue": "ACTIVE"
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  },
+  "consignor_material_master_information": {
+    "name": "Consignor Material Master Information",
+    "table": "consignor_material_master_information",
+    "primaryKey": "c_material_master_id",
+    "displayField": "c_material_master_id",
+    "description": "Manage consignor material master information",
+    "isConsignorConfig": true,
+    "fields": {
+      "c_material_master_id": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "C Material Master Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "material_master_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Material Master Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "volumetric_weight_per_unit": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Volumetric Weight Per Unit",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "net_weight_per_unit": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Net Weight Per Unit",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "dimension_l": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Dimension L",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "dimension_b": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Dimension B",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "dimension_h": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Dimension H",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "avg_packaging_time_in_minutes": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Avg Packaging Time In Minutes",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "avg_loading_time_in_minutes": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Avg Loading Time In Minutes",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "avg_unloading_time_in_minutes": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Avg Unloading Time In Minutes",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "packing_type": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Packing Type",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "material_description": {
+        "type": "text",
+        "maxLength": null,
+        "required": false,
+        "label": "Material Description",
+        "inputType": "textarea",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "created_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_on": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "updated_on": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ],
+        "defaultValue": "ACTIVE"
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  },
+  "ebidding_auction_slot": {
+    "name": "eBidding Auction Slot",
+    "table": "ebidding_auction_slot",
+    "primaryKey": "auction_slot_unique_id",
+    "displayField": "auction_slot_unique_id",
+    "description": "Manage ebidding auction slot",
+    "isConsignorConfig": true,
+    "fields": {
+      "auction_slot_unique_id": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Auction Slot Unique Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "ebidding_auction_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Ebidding Auction Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "ebidding_slot_number": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Ebidding Slot Number",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "warehouse_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Warehouse Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "auction_start_date": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Auction Start Date",
+        "inputType": "date",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "auction_start_time": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Auction Start Time",
+        "inputType": "time",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "auction_end_date": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Auction End Date",
+        "inputType": "date",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "auction_end_time": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Auction End Time",
+        "inputType": "time",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "auction_duration": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Auction Duration",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ]
+      },
+      "created_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "status_audit": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status Audit",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  },
+  "checklist_configuration": {
+    "name": "Checklist Configuration",
+    "table": "checklist_configuration",
+    "primaryKey": "checklist_config_id",
+    "displayField": "checklist_config_id",
+    "description": "Manage checklist configuration",
+    "isConsignorConfig": true,
+    "fields": {
+      "checklist_config_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Checklist Config Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "warehouse_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Warehouse Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "checking_point": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Checking Point",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "status_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Status Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "valid_from": {
+        "type": "date",
+        "maxLength": null,
+        "required": true,
+        "label": "Valid From",
+        "inputType": "date",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "valid_to": {
+        "type": "date",
+        "maxLength": null,
+        "required": true,
+        "label": "Valid To",
+        "inputType": "date",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "created_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "created_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "date",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "date",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ]
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  },
+  "consignor_material_state_config": {
+    "name": "Consignor Material State Config",
+    "table": "consignor_material_state_config",
+    "primaryKey": "material_state_config_id",
+    "displayField": "material_state_config_id",
+    "description": "Manage consignor material state config",
+    "isConsignorConfig": true,
+    "fields": {
+      "material_state_config_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Material State Config Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "material_state_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Material State Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "is_active": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Is Active",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Y",
+            "label": "Yes"
+          },
+          {
+            "value": "N",
+            "label": "No"
+          }
+        ],
+        "defaultValue": "Y"
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ]
+      },
+      "created_at": {
+        "type": "timestamp",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  },
+  "changeable_field_info": {
+    "name": "Changeable Field Info",
+    "table": "changeable_field_info",
+    "primaryKey": "changeable_field_id",
+    "displayField": "changeable_field_id",
+    "description": "Manage changeable field info",
+    "isConsignorConfig": true,
+    "fields": {
+      "changeable_field_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Changeable Field Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "module_name": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Module Name",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "field_name": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Field Name",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "field_display_name": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Field Display Name",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "is_changeable": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Is Changeable",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Y",
+            "label": "Yes"
+          },
+          {
+            "value": "N",
+            "label": "No"
+          }
+        ],
+        "defaultValue": "1"
+      },
+      "change_reason": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Change Reason",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "created_at": {
+        "type": "timestamp",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ],
+        "defaultValue": "Active"
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  },
+  "milestone_invoice_requirement": {
+    "name": "Milestone Invoice Requirement",
+    "table": "milestone_invoice_requirement",
+    "primaryKey": "milestone_invoice_id",
+    "displayField": "milestone_invoice_id",
+    "description": "Manage milestone invoice requirement",
+    "isConsignorConfig": true,
+    "fields": {
+      "milestone_invoice_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Milestone Invoice Id",
+        "inputType": "text",
+        "editable": false,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "consignor_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Consignor Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "milestone_id": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Milestone Id",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "invoice_type": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": true,
+        "label": "Invoice Type",
+        "inputType": "text",
+        "editable": true,
+        "filterable": true,
+        "validation": "required",
+        "autoGenerate": false
+      },
+      "is_required": {
+        "type": "int",
+        "maxLength": null,
+        "required": false,
+        "label": "Is Required",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Y",
+            "label": "Yes"
+          },
+          {
+            "value": "N",
+            "label": "No"
+          }
+        ],
+        "defaultValue": "1"
+      },
+      "requirement_description": {
+        "type": "text",
+        "maxLength": null,
+        "required": false,
+        "label": "Requirement Description",
+        "inputType": "textarea",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "minimum_amount": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Minimum Amount",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "maximum_amount": {
+        "type": "decimal",
+        "maxLength": null,
+        "required": false,
+        "label": "Maximum Amount",
+        "inputType": "number",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false
+      },
+      "created_at": {
+        "type": "timestamp",
+        "maxLength": null,
+        "required": false,
+        "label": "Created At",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true,
+        "defaultValue": "CURRENT_TIMESTAMP"
+      },
+      "created_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Created On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "created_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Created By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_at": {
+        "type": "timestamp",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated At",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_on": {
+        "type": "time",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated On",
+        "inputType": "time",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "updated_by": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Updated By",
+        "inputType": "text",
+        "editable": false,
+        "filterable": false,
+        "validation": "",
+        "autoGenerate": true
+      },
+      "status": {
+        "type": "varchar",
+        "maxLength": null,
+        "required": false,
+        "label": "Status",
+        "inputType": "select",
+        "editable": true,
+        "filterable": true,
+        "validation": "",
+        "autoGenerate": false,
+        "options": [
+          {
+            "value": "Active",
+            "label": "Active"
+          },
+          {
+            "value": "Inactive",
+            "label": "Inactive"
+          }
+        ],
+        "defaultValue": "Active"
+      }
+    },
+    "uiConfig": {
+      "showSearchbar": true,
+      "showAddButton": true,
+      "pagination": true,
+      "pageSize": 10,
+      "popupEditing": true
+    },
+    "softDelete": {
+      "enabled": true,
+      "fieldName": "status",
+      "activeValue": "Active",
+      "inactiveValue": "Inactive"
+    }
+  }
+}

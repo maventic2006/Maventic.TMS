@@ -336,44 +336,268 @@ const TMSLandingPage = () => {
   };
 
   const handleMenuItemClick = (item) => {
-    console.log("Menu item clicked:", item.title);
+    console.log("🖱️ Menu item clicked:", item.title);
+    console.log("🧭 Navigation details:", {
+      itemTitle: item.title,
+      timestamp: new Date().toISOString(),
+      currentPath: window.location.pathname,
+    });
 
-    try {
-      // Close dropdown first
-      setHoveredDropdown(null);
-
-      if (item.title === "Transporter Maintenance") {
-        console.log("Navigating to /transporters");
-        // TEMPORARILY DISABLED: Skip authentication check for development
-        // if (user) {
-        navigate("/transporters");
-        // } else {
-        //   // Redirect to login if not authenticated
-        //   navigate('/login', { state: { from: '/transporters' } });
-        // }
-      } else if (item.title === "Vehicle Maintenance") {
-        console.log("Navigating to /vehicles");
-        navigate("/vehicles");
-      } else if (item.title === "Driver Maintenance") {
-        console.log("Navigating to /drivers");
-        navigate("/drivers");
-      } else if (item.title === "Consignor WH Maintenance") {
-        console.log("Navigating to /warehouse");
-        navigate("/warehouse");
-      } else if (item.title === "Consignor Maintenance") {
-        console.log("Navigating to /consignor");
-        navigate("/consignor");
-      } else if (item.title === "Super Admin Approval List") {
-        console.log("Navigating to /approvals/super-admin");
-        navigate("/approvals/super-admin");
-      } else if (item.title === "Transporter Vehicle Configured Data") {
-        console.log("Navigating to /configuration/transporter-vehicle-config");
-        navigate("/configuration/transporter-vehicle-config");
-      }
-      // Add more navigation handlers for other menu items as needed
-    } catch (error) {
-      console.error("Navigation error:", error);
+    // Special debug logging for PO001
+    const currentUser = user;
+    if (currentUser?.user_id === "PO001") {
+      console.log("👤 PO001 Navigation Debug:", {
+        userId: currentUser.user_id,
+        menuItem: item.title,
+        currentPath: window.location.pathname,
+        timestamp: new Date().toISOString(),
+      });
     }
+
+    // Close dropdown after selecting an item
+    setHoveredDropdown(null);
+
+    // Master Data Maintenance navigation
+    if (item.title === "Transporter Maintenance") {
+      console.log("➡️ Navigating to /transporters");
+      navigate("/transporters");
+    } else if (item.title === "Vehicle Maintenance") {
+      console.log("➡️ Navigating to /vehicles");
+      navigate("/vehicles");
+    } else if (item.title === "Driver Maintenance") {
+      console.log("➡️ Navigating to /drivers");
+      navigate("/drivers");
+    } else if (item.title === "Consignor Maintenance") {
+      console.log("➡️ Navigating to /consignor");
+      navigate("/consignor");
+    } else if (item.title === "Consignor WH Maintenance") {
+      console.log("➡️ Navigating to /warehouse");
+      navigate("/warehouse");
+    }
+
+    // My Approval navigation
+    else if (item.title === "Super Admin Approval List") {
+      console.log("➡️ Navigating to /approvals/super-admin");
+      navigate("/approvals/super-admin");
+    }
+
+    // Global Master Config navigation - Enhanced with debugging
+    else if (item.title === "Consignor General Config Parameter Name") {
+      const targetPath = "/configuration/consignor-general-parameter";
+      console.log("🔧 Global Master Config - Consignor General Config");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Transporter Vehicle Configure Parameter Name") {
+      const targetPath = "/configuration/transporter-vehicle-config";
+      console.log("🔧 Global Master Config - Vehicle Configure");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Master - Vehicle Type for Indent") {
+      const targetPath = "/configuration/vehicle-type";
+      console.log("🔧 Global Master Config - Vehicle Type for Indent");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Document Name Master") {
+      const targetPath = "/configuration/document-name";
+      console.log("🔧 Global Master Config - Document Name Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Doc Type Configuration") {
+      const targetPath = "/configuration/document-type";
+      console.log("🔧 Global Master Config - Doc Type Configuration");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Material Master Information") {
+      const targetPath = "/configuration/material-master";
+      console.log("🔧 Global Master Config - Material Master Information");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Approval Configuration") {
+      const targetPath = "/configuration/approval-configuration";
+      console.log("🔧 Global Master Config - Approval Configuration");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "General Config") {
+      const targetPath = "/configuration/general-config";
+      console.log("🔧 Global Master Config - General Config");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Message Master") {
+      const targetPath = "/configuration/message-master";
+      console.log("🔧 Global Master Config - Message Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Payment Term Master") {
+      const targetPath = "/configuration/payment-term";
+      console.log("🔧 Global Master Config - Payment Term Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Currency Master") {
+      const targetPath = "/configuration/currency-master";
+      console.log("🔧 Global Master Config - Currency Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Status Master") {
+      const targetPath = "/configuration/status";
+      console.log("🔧 Global Master Config - Status Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Vehicle IMEI Mapping") {
+      const targetPath = "/configuration/vehicle-imei-mapping";
+      console.log("🔧 Global Master Config - Vehicle IMEI Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Vehicle Type/Container Type/ULD Type Master") {
+      const targetPath = "/configuration/vehicle-type";
+      console.log(
+        "🔧 Global Master Config - Vehicle Type/Container Type/ULD Type Master"
+      );
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Milestone Master") {
+      const targetPath = "/configuration/milestone";
+      console.log("🔧 Global Master Config - Milestone Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "SLA Master") {
+      const targetPath = "/configuration/sla-master";
+      console.log("🔧 Global Master Config - SLA Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "SLA to SLA Area Mapping") {
+      const targetPath = "/configuration/sla-area-mapping";
+      console.log("🔧 Global Master Config - SLA to SLA Area Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "SLA & Measurement Method Mapping") {
+      const targetPath = "/configuration/sla-measurement-method-mapping";
+      console.log("🔧 Global Master Config - SLA & Measurement Method Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Rate Type Mapping") {
+      const targetPath = "/configuration/rate-type";
+      console.log("🔧 Global Master Config - Rate Type Mapping");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Drop Down Maintenance") {
+      const targetPath = "/configuration/dropdown";
+      console.log("🔧 Global Master Config - Drop Down Maintenance");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    }
+
+    // Consignor Configuration navigation - Enhanced with debugging
+    else if (item.title === "Consignor General Config Master") {
+      const targetPath =
+        "/consignor-configuration/consignor_general_config_master";
+      console.log("🏢 Consignor Config - General Config Master");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "E-bidding Config") {
+      const targetPath = "/consignor-configuration/e_bidding_config";
+      console.log("🏢 Consignor Config - E-bidding Config");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Consignor Approval Hierarchy Configuration") {
+      const targetPath =
+        "/consignor-configuration/consignor_approval_hierarchy_configuration";
+      console.log("🏢 Consignor Config - Approval Hierarchy Configuration");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Consignor Material Master Information") {
+      const targetPath =
+        "/consignor-configuration/consignor_material_master_information";
+      console.log("🏢 Consignor Config - Material Master Information");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "E-bidding Auction Slot") {
+      const targetPath = "/consignor-configuration/ebidding_auction_slot";
+      console.log("🏢 Consignor Config - E-bidding Auction Slot");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Checklist Configuration") {
+      const targetPath = "/consignor-configuration/checklist_configuration";
+      console.log("🏢 Consignor Config - Checklist Configuration");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Consignor Material State Config") {
+      const targetPath =
+        "/consignor-configuration/consignor_material_state_config";
+      console.log("🏢 Consignor Config - Material State Config");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Changeable Field Info") {
+      const targetPath = "/consignor-configuration/changeable_field_info";
+      console.log("🏢 Consignor Config - Changeable Field Info");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else if (item.title === "Milestone Invoice Requirement") {
+      const targetPath =
+        "/consignor-configuration/milestone_invoice_requirement";
+      console.log("🏢 Consignor Config - Milestone Invoice Requirement");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    }
+
+    // Transporter Config navigation
+    else if (item.title === "Transporter Vehicle Configured Data") {
+      const targetPath = "/transporter-configuration/vehicle-config";
+      console.log("🚚 Transporter Config - Vehicle Configured Data");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    }
+
+    // User Maintenance navigation
+    else if (
+      item.title === "Role and Auth Control - User Create/Access Maintenance"
+    ) {
+      const targetPath = "/user-maintenance/role-auth-control";
+      console.log("👥 User Maintenance - Role and Auth Control");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    } else {
+      console.warn("⚠️ Unknown menu item clicked:", item.title);
+      console.warn("❓ No navigation rule defined for this menu item");
+    }
+
+    // Log final state after navigation attempt
+    setTimeout(() => {
+      console.log("🔍 Post-navigation state:", {
+        currentPath: window.location.pathname,
+        timestamp: new Date().toISOString(),
+      });
+    }, 100);
   };
 
   const Card = ({ children, className = "", onClick, ...props }) => (
