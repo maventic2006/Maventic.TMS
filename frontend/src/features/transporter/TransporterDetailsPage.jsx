@@ -807,7 +807,9 @@ const TransporterDetailsPage = () => {
                     selectedTransporter.generalDetails.status
                   )}`}
                 >
-                  {selectedTransporter.generalDetails.status}
+                  {selectedTransporter.generalDetails.status == "SAVE_AS_DRAFT"
+                    ? "Draft"
+                    : selectedTransporter.generalDetails.status}
                 </span>
               </div>
               <div className="flex items-center gap-4 text-blue-100/80 text-xs">

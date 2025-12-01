@@ -3148,112 +3148,123 @@ const getDriverById = async (req, res) => {
     // ========================================================================
     // FETCH USER APPROVAL STATUS FOR DRIVER USERS
     // ========================================================================
+    // Only fetch approval status for drivers that are not in DRAFT status
+    // DRAFT drivers should not have approval flows until they are submitted
 
     let userApprovalStatus = null;
     let approvalHistory = [];
 
-    try {
-      // Find Driver User associated with this driver
-      // IMPORTANT: Use pattern-based ID derivation (DRV001 → DA0001, DRV109 → DA0109)
-      const driverNumber = id.substring(3); // Remove 'DRV' prefix
-      const driverAdminUserId = `DA${driverNumber.padStart(4, "0")}`;
+    // Check if driver is in DRAFT status (including both "DRAFT" and "SAVE_AS_DRAFT")
+    const isDraftStatus =
+      driver.status === "DRAFT" || driver.status === "SAVE_AS_DRAFT";
 
-      console.log(
-        `🔍 Looking for Driver user with derived ID: ${driverAdminUserId} (from driver ${id})`
-      );
+    if (!isDraftStatus) {
+      // Only proceed with approval flow lookup for non-draft drivers
+      try {
+        // Find Driver User associated with this driver
+        // IMPORTANT: Use pattern-based ID derivation (DRV001 → DA0001, DRV109 → DA0109)
+        const driverNumber = id.substring(3); // Remove 'DRV' prefix
+        const driverAdminUserId = `DA${driverNumber.padStart(4, "0")}`;
 
-      // Get user record - Try derived ID first
-      let associatedUser = await knex("user_master")
-        .where("user_id", driverAdminUserId)
-        .first();
-
-      // BACKWARD COMPATIBILITY: If not found with derived ID, search by full name pattern
-      // This handles old records created before the ID pattern fix
-      if (!associatedUser) {
         console.log(
-          `⚠️ No user found with derived ID ${driverAdminUserId}, searching by name pattern...`
+          `🔍 Looking for Driver user with derived ID: ${driverAdminUserId} (from driver ${id})`
         );
 
-        // Get the driver's full name
-        const driverFullName = driver.full_name;
-        const expectedUserName = driverFullName; // Driver user has same name as driver
-
-        // Look for DA user with matching name pattern
-        associatedUser = await knex("user_master")
-          .where("user_type_id", "UT004") // Driver user type
-          .where("user_full_name", expectedUserName)
-          .where("user_id", "like", "DA%")
+        // Get user record - Try derived ID first
+        let associatedUser = await knex("user_master")
+          .where("user_id", driverAdminUserId)
           .first();
 
+        // BACKWARD COMPATIBILITY: If not found with derived ID, search by full name pattern
+        // This handles old records created before the ID pattern fix
+        if (!associatedUser) {
+          console.log(
+            `⚠️ No user found with derived ID ${driverAdminUserId}, searching by name pattern...`
+          );
+
+          // Get the driver's full name
+          const driverFullName = driver.full_name;
+          const expectedUserName = driverFullName; // Driver user has same name as driver
+
+          // Look for DA user with matching name pattern
+          associatedUser = await knex("user_master")
+            .where("user_type_id", "UT004") // Driver user type
+            .where("user_full_name", expectedUserName)
+            .where("user_id", "like", "DA%")
+            .first();
+
+          if (associatedUser) {
+            console.log(
+              `  ✅ Found associated user via name match: ${associatedUser.user_id}`
+            );
+          } else {
+            console.warn(
+              `  ⚠️ No DA user found for driver name: ${expectedUserName}`
+            );
+          }
+        }
+
         if (associatedUser) {
+          console.log(`✅ Found associated user: ${associatedUser.user_id}`);
+
+          // Get approval flow for this user
+          const approvalFlows = await knex("approval_flow_trans as aft")
+            .leftJoin(
+              "approval_type_master as atm",
+              "aft.approval_type_id",
+              "atm.approval_type_id"
+            )
+            .where("aft.user_id_reference_id", associatedUser.user_id)
+            .select(
+              "aft.*",
+              "atm.approval_type as approval_category",
+              "atm.approval_name"
+            )
+            .orderBy("aft.created_at", "desc");
+
           console.log(
-            `  ✅ Found associated user via name match: ${associatedUser.user_id}`
+            `✅ Found ${approvalFlows.length} approval flow records for ${associatedUser.user_id}`
           );
+
+          if (approvalFlows.length > 0) {
+            userApprovalStatus = {
+              approvalFlowTransId:
+                approvalFlows[0]?.approval_flow_trans_id || null,
+              userId: associatedUser.user_id,
+              userEmail: associatedUser.email_id,
+              userMobile: associatedUser.mobile_number,
+              userStatus: associatedUser.status,
+              isActive: associatedUser.is_active,
+              currentApprovalStatus:
+                approvalFlows[0]?.s_status || associatedUser.status,
+              pendingWith: approvalFlows[0]?.pending_with_name || null,
+              pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
+              createdByUserId: approvalFlows[0]?.created_by_user_id || null,
+              createdByName: approvalFlows[0]?.created_by_name || null,
+            };
+
+            approvalHistory = approvalFlows;
+
+            console.log(
+              `✅ Found approval status for driver ${id}:`,
+              userApprovalStatus
+            );
+          } else {
+            console.warn(
+              `⚠️ No approval flow found for user: ${driverAdminUserId}`
+            );
+          }
         } else {
-          console.warn(
-            `  ⚠️ No DA user found for driver name: ${expectedUserName}`
-          );
+          console.warn(`⚠️ No DA user found with ID: ${driverAdminUserId}`);
         }
-      }
-
-      if (associatedUser) {
-        console.log(`✅ Found associated user: ${associatedUser.user_id}`);
-
-        // Get approval flow for this user
-        const approvalFlows = await knex("approval_flow_trans as aft")
-          .leftJoin(
-            "approval_type_master as atm",
-            "aft.approval_type_id",
-            "atm.approval_type_id"
-          )
-          .where("aft.user_id_reference_id", associatedUser.user_id)
-          .select(
-            "aft.*",
-            "atm.approval_type as approval_category",
-            "atm.approval_name"
-          )
-          .orderBy("aft.created_at", "desc");
-
-        console.log(
-          `✅ Found ${approvalFlows.length} approval flow records for ${associatedUser.user_id}`
+      } catch (approvalError) {
+        console.error(
+          "❌ Error fetching driver approval status:",
+          approvalError.message
         );
-
-        if (approvalFlows.length > 0) {
-          userApprovalStatus = {
-            approvalFlowTransId:
-              approvalFlows[0]?.approval_flow_trans_id || null,
-            userId: associatedUser.user_id,
-            userEmail: associatedUser.email_id,
-            userMobile: associatedUser.mobile_number,
-            userStatus: associatedUser.status,
-            isActive: associatedUser.is_active,
-            currentApprovalStatus:
-              approvalFlows[0]?.s_status || associatedUser.status,
-            pendingWith: approvalFlows[0]?.pending_with_name || null,
-            pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
-            createdByUserId: approvalFlows[0]?.created_by_user_id || null,
-            createdByName: approvalFlows[0]?.created_by_name || null,
-          };
-
-          approvalHistory = approvalFlows;
-
-          console.log(
-            `✅ Found approval status for driver ${id}:`,
-            userApprovalStatus
-          );
-        } else {
-          console.warn(
-            `⚠️ No approval flow found for user: ${driverAdminUserId}`
-          );
-        }
-      } else {
-        console.warn(`⚠️ No DA user found with ID: ${driverAdminUserId}`);
       }
-    } catch (approvalError) {
-      console.error(
-        "❌ Error fetching driver approval status:",
-        approvalError.message
-      );
+    } else {
+      console.log(`📝 Skipping approval flow lookup for DRAFT driver: ${id}`);
     }
 
     // Format response
@@ -3988,43 +3999,10 @@ const saveDriverAsDraft = async (req, res) => {
     const driverId = await generateDriverId(trx);
 
     // ===========================================================
-    // 1.1️⃣ Generate user_id for user_master
+    // 2️⃣ INSERT DRIVER BASIC INFO  (driver_basic_information)
     // ===========================================================
-    const userMasterId = `UM${driverId.replace("DR", "")}`; // Example: DR001 → UM001
-
-    // TEMP PASSWORD for DRAFT drivers
-    const tempPassword = await bcrypt.hash("TempDriver@123", 10);
-
-    // ===========================================================
-    // 2️⃣ INSERT USER MASTER FOR DRIVER
-    // ===========================================================
-    await trx("user_master").insert({
-      user_id: userMasterId,
-      user_type_id: "UT004", // ⚡ CHANGE if your driver user_type_id differs
-      user_full_name: basicInfo?.fullName || "Draft Driver",
-      email_id: basicInfo?.emailId || null,
-      mobile_number: basicInfo?.phoneNumber || null,
-
-      from_date: knex.raw("CURDATE()"),
-      to_date: null,
-
-      password: tempPassword,
-      password_type: "initial",
-
-      status: "DRAFT", // Same pattern as transporter
-      is_active: false,
-
-      created_by: user,
-      updated_by: user,
-      created_by_user_id: user,
-      created_at: timestamp,
-      updated_at: timestamp,
-      created_on: timestamp,
-      updated_on: timestamp,
-    });
-
-    // ===========================================================
-    // 3️⃣ INSERT DRIVER BASIC INFO  (driver_basic_information)
+    // NOTE: For DRAFT drivers, we only create the core driver record
+    // User accounts and approval flows are created later when the draft is submitted
     // ===========================================================
     await trx("driver_basic_information").insert({
       driver_id: driverId,
@@ -4091,13 +4069,21 @@ const saveDriverAsDraft = async (req, res) => {
 
         const documentId = await generateDocumentId(trx);
 
+        const documentUniqueId = `${driverId}_${documentId}`;
+
         await trx("driver_documents").insert({
+          document_unique_id: documentUniqueId,
           document_id: documentId,
           driver_id: driverId,
 
-          document_type_id: doc.documentType || null,
+          document_type_id: doc.documentTypeId || doc.documentType || null, // Fixed: Use documentTypeId first
           document_number: doc.documentNumber || null,
-          document_file: doc.documentFile || null,
+          issuing_country: doc.issuingCountry || null,
+          issuing_state: doc.issuingState || null,
+          valid_from: doc.validFrom || null,
+          valid_to: doc.validTo || null,
+          active_flag: doc.status !== false,
+          remarks: doc.remarks || null,
 
           status: "ACTIVE",
 
@@ -4114,9 +4100,10 @@ const saveDriverAsDraft = async (req, res) => {
     await trx.commit();
     return res.status(201).json({
       success: true,
-      message: "Driver saved as draft successfully",
+      message:
+        "Driver saved as draft successfully. User account will be created when submitted for approval.",
       driver_id: driverId,
-      user_master_id: userMasterId,
+      status: "DRAFT",
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
@@ -4245,18 +4232,17 @@ const updateDriverDraft = async (req, res) => {
       await trx("tms_address").where("user_reference_id", id).del();
 
       // Delete document_upload entries referencing this driver's document_unique_id pattern
+      // Handle both underscore and hyphen patterns for backward compatibility
       await trx("document_upload")
         .whereIn("system_reference_id", function () {
           this.select("document_unique_id")
             .from("driver_documents")
-            .where("document_unique_id", "like", `${id}-%`);
+            .where("driver_id", id); // Delete all documents for this driver regardless of pattern
         })
         .del();
 
-      // Delete driver_documents for this driver
-      await trx("driver_documents")
-        .where("document_unique_id", "like", `${id}-%`)
-        .del();
+      // Delete ALL driver_documents for this driver (handles both patterns)
+      await trx("driver_documents").where("driver_id", id).del();
 
       // Delete history entries
       await trx("driver_history_information").where("driver_id", id).del();
@@ -4306,13 +4292,13 @@ const updateDriverDraft = async (req, res) => {
           // Only insert if any meaningful doc data present
           if (doc.documentNumber || doc.documentType) {
             const docId = await generateDocumentId(trx);
-            const documentUniqueId = `${id}-${docId}`;
+            const documentUniqueId = `${id}_${docId}`;
 
             await trx("driver_documents").insert({
               document_unique_id: documentUniqueId,
               document_id: docId,
               driver_id: id,
-              document_type_id: doc.documentType || null,
+              document_type_id: doc.documentTypeId || doc.documentType || null, // Fixed: Use documentTypeId first
               document_number: doc.documentNumber || null,
               issuing_country: doc.issuingCountry || null,
               issuing_state: doc.issuingState || null,
@@ -4829,12 +4815,10 @@ const submitDriverFromDraft = async (req, res) => {
         .whereIn("system_reference_id", function () {
           this.select("document_unique_id")
             .from("driver_documents")
-            .where("document_unique_id", "like", `${id}_%`);
+            .where("driver_id", id); // Delete all documents for this driver regardless of pattern
         })
         .del();
-      await trx("driver_documents")
-        .where("document_unique_id", "like", `${id}_%`)
-        .del();
+      await trx("driver_documents").where("driver_id", id).del();
       await trx("driver_history_information").where("driver_id", id).del();
       await trx("driver_accident_violation").where("driver_id", id).del();
 
@@ -4959,6 +4943,233 @@ const submitDriverFromDraft = async (req, res) => {
         }
       }
 
+      // ========================================
+      // CREATE DRIVER USER ACCOUNT & APPROVAL FLOW
+      // ========================================
+      console.log("🔍 Creating driver user account and approval flow...");
+
+      // Generate user ID based on driver ID pattern (DRV001 -> DA0001)
+      const driverNumber = id.substring(3); // Remove 'DRV' prefix
+      const driverAdminUserId = `DA${driverNumber.padStart(4, "0")}`;
+      console.log(
+        `  Generated user ID: ${driverAdminUserId} (derived from ${id})`
+      );
+
+      // Check if user already exists (in case this is a re-submission)
+      const existingUser = await trx("user_master")
+        .where("user_id", driverAdminUserId)
+        .first();
+
+      if (!existingUser) {
+        // Create new user account for the driver
+        console.log(`  Creating new user account: ${driverAdminUserId}`);
+
+        // Get creator details from request (current logged-in Product Owner)
+        const creatorUserId = userId;
+        const creatorName = req.user?.user_full_name || "Product Owner";
+
+        // Generate initial password (based on full name + random number)
+        const fullNameClean = basicInfo.fullName.replace(/[^a-zA-Z0-9]/g, "");
+        const initialPassword = `${fullNameClean}@123`;
+        const hashedPassword = await bcrypt.hash(initialPassword, 10);
+
+        // Use driver details for user account
+        const userEmail = basicInfo.emailId || `${id.toLowerCase()}@driver.com`;
+        const userMobile = basicInfo.phoneNumber || "0000000000";
+
+        // Create user in user_master with PENDING status
+        await trx("user_master").insert({
+          user_id: driverAdminUserId,
+          user_type_id: "UT004", // Driver user type
+          user_full_name: basicInfo.fullName,
+          email_id: userEmail,
+          mobile_number: userMobile,
+          from_date: currentTimestamp,
+          to_date: null,
+          is_active: false, // Inactive until approved
+          created_by_user_id: creatorUserId,
+          password: hashedPassword,
+          password_type: "initial",
+          status: "PENDING", // VARCHAR(20) limit - use short status
+          created_by: creatorUserId,
+          updated_by: creatorUserId,
+          created_at: currentTimestamp,
+          updated_at: currentTimestamp,
+          created_on: currentTimestamp,
+          updated_on: currentTimestamp,
+        });
+
+        console.log(
+          `  ✅ Created user: ${driverAdminUserId} (PENDING approval)`
+        );
+
+        // Get approval configuration for Driver (Level 1 only)
+        const approvalConfig = await trx("approval_configuration")
+          .where({
+            approval_type_id: "AT003", // Driver User
+            approver_level: 1,
+            status: "ACTIVE",
+          })
+          .first();
+
+        if (!approvalConfig) {
+          throw new Error("Approval configuration not found for Driver User");
+        }
+
+        // Determine pending approver (Product Owner who did NOT create this)
+        let pendingWithUserId = null;
+        let pendingWithName = null;
+
+        if (creatorUserId === "PO001") {
+          const po2 = await trx("user_master")
+            .where("user_id", "PO002")
+            .first();
+          pendingWithUserId = "PO002";
+          pendingWithName = po2?.user_full_name || "Product Owner 2";
+        } else if (creatorUserId === "PO002") {
+          const po1 = await trx("user_master")
+            .where("user_id", "PO001")
+            .first();
+          pendingWithUserId = "PO001";
+          pendingWithName = po1?.user_full_name || "Product Owner 1";
+        } else {
+          // If creator is neither PO1 nor PO2, default to PO001
+          const po1 = await trx("user_master")
+            .where("user_id", "PO001")
+            .first();
+          pendingWithUserId = "PO001";
+          pendingWithName = po1?.user_full_name || "Product Owner 1";
+        }
+
+        // Generate approval flow trans ID
+        const approvalFlowId = await generateApprovalFlowId(trx);
+
+        // Create approval flow transaction entry
+        await trx("approval_flow_trans").insert({
+          approval_flow_trans_id: approvalFlowId,
+          approval_config_id: approvalConfig.approval_config_id,
+          approval_type_id: "AT003", // Driver User
+          user_id_reference_id: driverAdminUserId, // Use Driver Admin user ID
+          s_status: "PENDING",
+          approver_level: 1,
+          pending_with_role_id: "RL001", // Product Owner role
+          pending_with_user_id: pendingWithUserId,
+          pending_with_name: pendingWithName,
+          created_by_user_id: creatorUserId,
+          created_by_name: creatorName,
+          created_by: creatorUserId,
+          updated_by: creatorUserId,
+          created_at: currentTimestamp,
+          updated_at: currentTimestamp,
+          created_on: currentTimestamp,
+          updated_on: currentTimestamp,
+          status: "ACTIVE",
+        });
+
+        console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+        console.log(
+          `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
+        );
+        console.log(
+          `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
+        );
+      } else {
+        console.log(`  ✅ User account already exists: ${driverAdminUserId}`);
+
+        // Update existing user status to PENDING if it's currently DRAFT
+        if (existingUser.status === "DRAFT") {
+          await trx("user_master").where("user_id", driverAdminUserId).update({
+            status: "PENDING",
+            updated_by: userId,
+            updated_at: currentTimestamp,
+            updated_on: currentTimestamp,
+          });
+          console.log(
+            `  ✅ Updated user status to PENDING: ${driverAdminUserId}`
+          );
+        }
+
+        // Check if approval flow already exists
+        const existingApprovalFlow = await trx("approval_flow_trans")
+          .where("user_id_reference_id", driverAdminUserId)
+          .where("s_status", "PENDING")
+          .first();
+
+        if (!existingApprovalFlow) {
+          console.log(`  🔄 Creating missing approval flow for existing user`);
+
+          // Get approval configuration
+          const approvalConfig = await trx("approval_configuration")
+            .where({
+              approval_type_id: "AT003", // Driver User
+              approver_level: 1,
+              status: "ACTIVE",
+            })
+            .first();
+
+          if (approvalConfig) {
+            // Determine pending approver
+            const creatorUserId = userId;
+            const creatorName = req.user?.user_full_name || "Product Owner";
+
+            let pendingWithUserId = null;
+            let pendingWithName = null;
+
+            if (creatorUserId === "PO001") {
+              const po2 = await trx("user_master")
+                .where("user_id", "PO002")
+                .first();
+              pendingWithUserId = "PO002";
+              pendingWithName = po2?.user_full_name || "Product Owner 2";
+            } else if (creatorUserId === "PO002") {
+              const po1 = await trx("user_master")
+                .where("user_id", "PO001")
+                .first();
+              pendingWithUserId = "PO001";
+              pendingWithName = po1?.user_full_name || "Product Owner 1";
+            } else {
+              const po1 = await trx("user_master")
+                .where("user_id", "PO001")
+                .first();
+              pendingWithUserId = "PO001";
+              pendingWithName = po1?.user_full_name || "Product Owner 1";
+            }
+
+            // Generate approval flow trans ID
+            const approvalFlowId = await generateApprovalFlowId(trx);
+
+            // Create approval flow transaction entry
+            await trx("approval_flow_trans").insert({
+              approval_flow_trans_id: approvalFlowId,
+              approval_config_id: approvalConfig.approval_config_id,
+              approval_type_id: "AT003", // Driver User
+              user_id_reference_id: driverAdminUserId,
+              s_status: "PENDING",
+              approver_level: 1,
+              pending_with_role_id: "RL001", // Product Owner role
+              pending_with_user_id: pendingWithUserId,
+              pending_with_name: pendingWithName,
+              created_by_user_id: creatorUserId,
+              created_by_name: creatorName,
+              created_by: creatorUserId,
+              updated_by: creatorUserId,
+              created_at: currentTimestamp,
+              updated_at: currentTimestamp,
+              created_on: currentTimestamp,
+              updated_on: currentTimestamp,
+              status: "ACTIVE",
+            });
+
+            console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+            console.log(
+              `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
+            );
+          }
+        } else {
+          console.log(`  ✅ Approval flow already exists for user`);
+        }
+      }
+
       await trx.commit();
 
       console.log("✅ Driver draft submitted for approval successfully:", id);
@@ -5045,12 +5256,10 @@ const deleteDriverDraft = async (req, res) => {
         .whereIn("system_reference_id", function () {
           this.select("document_unique_id")
             .from("driver_documents")
-            .where("document_unique_id", "like", `${id}_%`);
+            .where("driver_id", id); // Delete all documents for this driver regardless of pattern
         })
         .del();
-      await trx("driver_documents")
-        .where("document_unique_id", "like", `${id}_%`)
-        .del();
+      await trx("driver_documents").where("driver_id", id).del();
       await trx("driver_history_information").where("driver_id", id).del();
       await trx("driver_accident_violation").where("driver_id", id).del();
 

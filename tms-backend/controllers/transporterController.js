@@ -3140,7 +3140,7 @@ const saveTransporterAsDraft = async (req, res) => {
             await trx("transporter_documents").insert({
               document_unique_id: documentUniqueId,
               document_id: docId,
-              document_type_id: doc.documentType || null,
+              document_type_id: doc.documentTypeId || doc.documentType || null, // Fixed: Use documentTypeId first
               document_number: doc.documentNumber || null,
               reference_number: doc.referenceNumber || null,
               country: doc.country || null,
@@ -3435,7 +3435,7 @@ const updateTransporterDraft = async (req, res) => {
             await trx("transporter_documents").insert({
               document_unique_id: documentUniqueId,
               document_id: docId,
-              document_type_id: doc.documentType || null,
+              document_type_id: doc.documentTypeId || doc.documentType || null, // Fixed: Use documentTypeId first
               document_number: doc.documentNumber || null,
               reference_number: doc.referenceNumber || null,
               country: doc.country || null,
@@ -4164,7 +4164,7 @@ const submitTransporterFromDraft = async (req, res) => {
           await trx("transporter_documents").insert({
             document_unique_id: documentUniqueId,
             document_id: docId,
-            document_type_id: doc.documentType,
+            document_type_id: doc.documentTypeId || doc.documentType, // Fixed: Use documentTypeId first
             document_number: doc.documentNumber,
             reference_number: doc.referenceNumber || null,
             country: doc.country || null,
