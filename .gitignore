@@ -1,0 +1,13 @@
+docs/
+node_modules/
+test-data/
+.vscode/
+.DS_Store
+.env/
+dist/
+build/ 
+.history/
+*.md
+*.log
+*.tmp
+*.bak
