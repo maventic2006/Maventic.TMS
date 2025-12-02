@@ -1,0 +1,31 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code (staging)
+        uses: actions/checkout@v3
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          npm ci --production || true
+
+      - name: Deploy with PM2
+        run: |
+          # Ensure pm2 is available and your app is started using ecosystem file or name
+          cd /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS
+          pm2 restart all || pm2 start ecosystem.config.js
