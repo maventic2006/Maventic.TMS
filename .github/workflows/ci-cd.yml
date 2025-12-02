@@ -20,12 +20,22 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - name: Install Frontend Dependencies
         run: |
-          npm ci --production || true
-
+            cd frontend
+            npm ci --production
+  
+      - name: Build Frontend
+        run: |
+            cd frontend
+            npm run build
+  
+      - name: Install Backend Dependencies
+        run: |
+            cd tms-backend
+            npm ci --production
+  
       - name: Deploy with PM2
         run: |
-          # Ensure pm2 is available and your app is started using ecosystem file or name
-          cd /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS
-          pm2 restart all || pm2 start ecosystem.config.js
+            cd /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS
+            pm2 restart all || pm2 start ecosystem.config.jss
