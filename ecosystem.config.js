@@ -1,7 +1,7 @@
 module.exports = {
     apps: [
       {
-        name: "frontend",
+        name: "frontend-server",
         cwd: "/home/tms/actions-runner/Maventic.TMS/Maventic.TMS/frontend",
         script: "npx",
         args: "serve -s dist -l 5174",
@@ -10,7 +10,7 @@ module.exports = {
         }
       },
       {
-        name: "tms-backend",
+        name: "tms-backend-server",
          cwd: "/home/tms/actions-runner/Maventic.TMS/Maventic.TMS/tms-backend",
         script: "npm",
         args: "start",
