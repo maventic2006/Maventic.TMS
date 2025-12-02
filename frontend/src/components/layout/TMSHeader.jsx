@@ -293,20 +293,20 @@ const TMSHeader = ({ theme }) => {
     console.log("🧭 Navigation details:", {
       itemTitle: item.title,
       timestamp: new Date().toISOString(),
-      currentPath: window.location.pathname
+      currentPath: window.location.pathname,
     });
-    
+
     // Special debug logging for PO001
     const currentUser = user;
-    if (currentUser?.user_id === 'PO001') {
+    if (currentUser?.user_id === "PO001") {
       console.log("👤 PO001 Navigation Debug:", {
         userId: currentUser.user_id,
         menuItem: item.title,
         currentPath: window.location.pathname,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
-    
+
     // Close dropdown after selecting an item
     setActiveDropdown(null);
 
@@ -326,14 +326,23 @@ const TMSHeader = ({ theme }) => {
     } else if (item.title === "Consignor WH Maintenance") {
       console.log("➡️ Navigating to /warehouse");
       navigate("/warehouse");
-    } 
-    
+    }
+
     // My Approval navigation
     else if (item.title === "Super Admin Approval List") {
       console.log("➡️ Navigating to /approvals/super-admin");
       navigate("/approvals/super-admin");
     }
-    
+
+    // Transporter Config navigation
+    else if (item.title === "Transporter Vehicle Configured Data") {
+      const targetPath = "/configuration/transporter-vehicle-config";
+      console.log("🚛 Transporter Config - Vehicle Configured Data");
+      console.log("➡️ Navigating to:", targetPath);
+      navigate(targetPath);
+      console.log("✅ Navigation command executed for:", targetPath);
+    }
+
     // Global Master Config navigation - Enhanced with debugging
     else if (item.title === "Consignor General Config Parameter Name") {
       const targetPath = "/configuration/consignor-general-parameter";
@@ -415,7 +424,9 @@ const TMSHeader = ({ theme }) => {
       console.log("✅ Navigation command executed for:", targetPath);
     } else if (item.title === "Vehicle Type/Container Type/ULD Type Master") {
       const targetPath = "/configuration/vehicle-type";
-      console.log("🔧 Global Master Config - Vehicle Type/Container Type/ULD Type Master");
+      console.log(
+        "🔧 Global Master Config - Vehicle Type/Container Type/ULD Type Master"
+      );
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
@@ -456,10 +467,11 @@ const TMSHeader = ({ theme }) => {
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
     }
-    
+
     // Consignor Configuration navigation - Enhanced with debugging
     else if (item.title === "Consignor General Config Master") {
-      const targetPath = "/consignor-configuration/consignor_general_config_master";
+      const targetPath =
+        "/consignor-configuration/consignor_general_config_master";
       console.log("🏢 Consignor Config - General Config Master");
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
@@ -471,13 +483,15 @@ const TMSHeader = ({ theme }) => {
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
     } else if (item.title === "Consignor Approval Hierarchy Configuration") {
-      const targetPath = "/consignor-configuration/consignor_approval_hierarchy_configuration";
+      const targetPath =
+        "/consignor-configuration/consignor_approval_hierarchy_configuration";
       console.log("🏢 Consignor Config - Approval Hierarchy Configuration");
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
     } else if (item.title === "Consignor Material Master Information") {
-      const targetPath = "/consignor-configuration/consignor_material_master_information";
+      const targetPath =
+        "/consignor-configuration/consignor_material_master_information";
       console.log("🏢 Consignor Config - Material Master Information");
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
@@ -495,7 +509,8 @@ const TMSHeader = ({ theme }) => {
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
     } else if (item.title === "Consignor Material State Config") {
-      const targetPath = "/consignor-configuration/consignor_material_state_config";
+      const targetPath =
+        "/consignor-configuration/consignor_material_state_config";
       console.log("🏢 Consignor Config - Material State Config");
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
@@ -507,13 +522,14 @@ const TMSHeader = ({ theme }) => {
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
     } else if (item.title === "Milestone Invoice Requirement") {
-      const targetPath = "/consignor-configuration/milestone_invoice_requirement";
+      const targetPath =
+        "/consignor-configuration/milestone_invoice_requirement";
       console.log("🏢 Consignor Config - Milestone Invoice Requirement");
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
     }
-    
+
     // Transporter Config navigation
     else if (item.title === "Transporter Vehicle Configured Data") {
       const targetPath = "/transporter-configuration/vehicle-config";
@@ -522,26 +538,26 @@ const TMSHeader = ({ theme }) => {
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
     }
-    
+
     // User Maintenance navigation
-    else if (item.title === "Role and Auth Control - User Create/Access Maintenance") {
+    else if (
+      item.title === "Role and Auth Control - User Create/Access Maintenance"
+    ) {
       const targetPath = "/user-maintenance/role-auth-control";
       console.log("👥 User Maintenance - Role and Auth Control");
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
-    }
-    
-    else {
+    } else {
       console.warn("⚠️ Unknown menu item clicked:", item.title);
       console.warn("❓ No navigation rule defined for this menu item");
     }
-    
+
     // Log final state after navigation attempt
     setTimeout(() => {
       console.log("🔍 Post-navigation state:", {
         currentPath: window.location.pathname,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }, 100);
   };
@@ -663,10 +679,7 @@ const TMSHeader = ({ theme }) => {
                 const isActive = activeDropdown === menu.id;
 
                 return (
-                  <div
-                    key={menu.id}
-                    className="relative flex-shrink-0"
-                  >
+                  <div key={menu.id} className="relative flex-shrink-0">
                     <button
                       onClick={() => handleMenuClick(menu.id)}
                       className="flex items-center justify-center space-x-1.5 px-2 py-2 md:px-3 md:py-2.5 lg:px-4 lg:py-2.5 rounded-lg text-xs font-medium transition-all duration-300 transform hover:scale-[1.02] min-w-[140px] lg:min-w-[180px]"

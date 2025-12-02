@@ -253,7 +253,13 @@ const GeneralDetailsViewTab = ({ formData, transporterData }) => {
                     : "bg-red-100 text-red-800"
                 }`}
               >
-                {data?.generalDetails?.status || "Unknown"}
+                {data?.generalDetails?.status == "SAVE_AS_DRAFT"
+                  ? "Draft"
+                  : data?.generalDetails?.status == "ACTIVE"
+                  ? "Active"
+                  : data?.generalDetails?.status == "PENDING"
+                  ? "Pending"
+                  : "Unknown"}
               </span>
             </div>
           </div>

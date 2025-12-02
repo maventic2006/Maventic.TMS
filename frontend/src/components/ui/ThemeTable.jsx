@@ -41,8 +41,8 @@ const ThemeTable = ({
     if (!file) return;
 
     // Find column config to get specific accept types
-    const column = columns.find(col => col.key === columnKey);
-    
+    const column = columns.find((col) => col.key === columnKey);
+
     // File validation
     const maxSize = 5 * 1024 * 1024; // 5MB
     let allowedTypes = [
@@ -56,16 +56,17 @@ const ThemeTable = ({
 
     // If column specifies accept types, use those
     if (column?.accept) {
-      allowedTypes = column.accept.split(',').map(type => {
+      allowedTypes = column.accept.split(",").map((type) => {
         // Convert file extension to MIME type
         const mimeMap = {
-          '.jpg': 'image/jpeg',
-          '.jpeg': 'image/jpeg',
-          '.png': 'image/png',
-          '.gif': 'image/gif',
-          '.pdf': 'application/pdf',
-          '.doc': 'application/msword',
-          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".png": "image/png",
+          ".gif": "image/gif",
+          ".pdf": "application/pdf",
+          ".doc": "application/msword",
+          ".docx":
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         };
         return mimeMap[type] || type;
       });
@@ -78,7 +79,11 @@ const ThemeTable = ({
     }
 
     if (!allowedTypes.includes(file.type)) {
-      alert(`Only ${allowedTypes.map(t => t.split('/')[1].toUpperCase()).join(', ')} files are allowed`);
+      alert(
+        `Only ${allowedTypes
+          .map((t) => t.split("/")[1].toUpperCase())
+          .join(", ")} files are allowed`
+      );
       event.target.value = "";
       return;
     }
@@ -91,13 +96,23 @@ const ThemeTable = ({
         [columnKey]: file, // Store file object directly
         [`${columnKey}_preview`]: URL.createObjectURL(file), // For preview
       };
+
+      console.log(`📎 ThemeTable - File uploaded:`, {
+        rowIndex,
+        columnKey,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        isFileObject: file instanceof File,
+      });
+
       onDataChange(updatedData);
     } catch (error) {
       alert("Error uploading file: " + error.message);
     }
   };
 
-  const removeFile = (rowIndex, columnKey = 'photo') => {
+  const removeFile = (rowIndex, columnKey = "photo") => {
     const updatedData = [...data];
     updatedData[rowIndex] = {
       ...updatedData[rowIndex],
@@ -159,7 +174,10 @@ const ThemeTable = ({
       const fileValue = row[column.key];
       const isFileObject = fileValue instanceof File;
       const previewUrl = row[`${column.key}_preview`];
-      const fileName = isFileObject ? fileValue.name : (row.fileName || (typeof fileValue === 'string' ? fileValue.split('/').pop() : ''));
+      const fileName = isFileObject
+        ? fileValue.name
+        : row.fileName ||
+          (typeof fileValue === "string" ? fileValue.split("/").pop() : "");
       const fileType = isFileObject ? fileValue.type : row.fileType;
       const hasFile = isFileObject || fileName;
 
@@ -176,23 +194,32 @@ const ThemeTable = ({
             <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg flex-1">
               {/* Preview for images */}
               {(fileType?.startsWith("image/") || previewUrl) && (
-                <img 
-                  src={previewUrl || (typeof fileValue === 'string' ? fileValue : '')} 
-                  alt="Preview" 
+                <img
+                  src={
+                    previewUrl ||
+                    (typeof fileValue === "string" ? fileValue : "")
+                  }
+                  alt="Preview"
                   className="w-10 h-10 object-cover rounded"
                 />
               )}
-              {!fileType?.startsWith("image/") && !previewUrl && getFileIcon(fileType)}
+              {!fileType?.startsWith("image/") &&
+                !previewUrl &&
+                getFileIcon(fileType)}
               <span className="text-sm text-gray-700 truncate flex-1">
                 {fileName}
               </span>
-              {(previewUrl || (typeof fileValue === 'string' && fileValue.startsWith('http'))) && (
+              {(previewUrl ||
+                (typeof fileValue === "string" &&
+                  fileValue.startsWith("http"))) && (
                 <button
-                  onClick={() => handlePreviewDocument({ 
-                    fileName, 
-                    fileType, 
-                    fileData: previewUrl || fileValue 
-                  })}
+                  onClick={() =>
+                    handlePreviewDocument({
+                      fileName,
+                      fileType,
+                      fileData: previewUrl || fileValue,
+                    })
+                  }
                   className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
                   title="Preview"
                 >
@@ -214,7 +241,9 @@ const ThemeTable = ({
             >
               <Upload className="w-4 h-4 text-gray-400" />
               <span className="text-sm text-gray-500">
-                {column.accept?.includes('image') ? 'Upload Image' : 'Upload File'}
+                {column.accept?.includes("image")
+                  ? "Upload Image"
+                  : "Upload File"}
               </span>
             </button>
           )}

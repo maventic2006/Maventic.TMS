@@ -768,7 +768,7 @@ const getWarehouseById = async (req, res) => {
       // Get approval flow status for this user
       const approvalFlow = await knex("approval_flow_trans")
         .where("user_id_reference_id", warehouseManagerUser.user_id)
-        .where("approval_type_id", "AT002") // Consignor Admin
+        .where("approval_type_id", "AT005") // Warehouse Manager
         .orderBy("created_at", "desc")
         .first();
 
@@ -779,8 +779,11 @@ const getWarehouseById = async (req, res) => {
           userName: warehouseManagerUser.user_full_name,
           userStatus: warehouseManagerUser.status,
           isActive: warehouseManagerUser.is_active,
+          approvalFlowTransId: approvalFlow.approval_flow_trans_id, // ✅ CRITICAL: Include for approval API
+          currentApprovalStatus: approvalFlow.s_status, // Match consignor pattern
           approvalStatus: approvalFlow.s_status,
           approverLevel: approvalFlow.approver_level,
+          pendingWith: approvalFlow.pending_with_name, // Match consignor pattern
           pendingWithUserId: approvalFlow.pending_with_user_id,
           pendingWithName: approvalFlow.pending_with_name,
           createdByUserId: approvalFlow.created_by_user_id,
@@ -790,6 +793,10 @@ const getWarehouseById = async (req, res) => {
           approvedOn: approvalFlow.approved_on,
           remarks: approvalFlow.remarks,
         };
+
+        console.log(
+          `📋 Approval Flow Trans ID: ${approvalFlow.approval_flow_trans_id}`
+        );
 
         // Get complete approval history for this user
         approvalHistory = await knex("approval_flow_trans as aft")
@@ -1339,10 +1346,10 @@ const createWarehouse = async (req, res) => {
       `  ✅ Created user: ${warehouseManagerUserId} (PENDING approval)`
     );
 
-    // Get approval configuration for Consignor Admin (Level 1 only)
+    // Get approval configuration for Warehouse Manager (Level 1 only)
     const approvalConfig = await trx("approval_configuration")
       .where({
-        approval_type_id: "AT002", // Consignor Admin
+        approval_type_id: "AT005", // Warehouse Manager
         approver_level: 1,
         status: "ACTIVE",
       })
@@ -1379,7 +1386,7 @@ const createWarehouse = async (req, res) => {
     await trx("approval_flow_trans").insert({
       approval_flow_trans_id: approvalFlowId,
       approval_config_id: approvalConfig.approval_config_id,
-      approval_type_id: "AT002", // Consignor Admin (used for warehouse managers)
+      approval_type_id: "AT005", // Warehouse Manager
       user_id_reference_id: warehouseManagerUserId, // FIXED: Use Warehouse Manager user ID, not warehouse ID
       s_status: "PENDING",
       approver_level: 1,
@@ -2833,17 +2840,17 @@ const submitWarehouseFromDraft = async (req, res) => {
     // STEP 5: Create Approval Flow Transaction
     // ========================================
 
-    // Get approval configuration for Consignor Admin
+    // Get approval configuration for Warehouse Manager
     const approvalConfig = await trx("approval_configuration")
       .where({
-        approval_type_id: "AT002", // Consignor Admin
+        approval_type_id: "AT005", // Warehouse Manager
         approver_level: 1,
         status: "ACTIVE",
       })
       .first();
 
     if (!approvalConfig) {
-      throw new Error("Approval configuration not found for Consignor Admin");
+      throw new Error("Approval configuration not found for Warehouse Manager");
     }
 
     // Determine pending approver (Product Owner who did NOT create this)
@@ -2872,7 +2879,7 @@ const submitWarehouseFromDraft = async (req, res) => {
     await trx("approval_flow_trans").insert({
       approval_flow_trans_id: approvalFlowId,
       approval_config_id: approvalConfig.approval_config_id,
-      approval_type_id: "AT002", // Consignor Admin (used for warehouse managers)
+      approval_type_id: "AT005", // Warehouse Manager
       user_id_reference_id: warehouseManagerUserId,
       s_status: "PENDING",
       approver_level: 1,

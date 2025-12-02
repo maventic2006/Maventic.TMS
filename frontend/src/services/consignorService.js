@@ -324,6 +324,20 @@ export const saveConsignorAsDraft = async (consignorData, files = {}) => {
  */
 export const updateConsignorDraft = async (customerId, data, files = {}) => {
   try {
+    console.log("\n📤 ===== UPDATE CONSIGNOR DRAFT SERVICE =====");
+    console.log("Customer ID:", customerId);
+    console.log("Data:", JSON.stringify(data, null, 2));
+    console.log("Files object:", files);
+    console.log("Files count:", Object.keys(files).length);
+    Object.entries(files).forEach(([key, file]) => {
+      console.log(`  File ${key}:`, {
+        name: file?.name,
+        type: file?.type,
+        size: file?.size,
+        isFile: file instanceof File,
+      });
+    });
+
     const formData = new FormData();
 
     // Add JSON payload
@@ -332,9 +346,26 @@ export const updateConsignorDraft = async (customerId, data, files = {}) => {
     // Add files if provided
     Object.entries(files).forEach(([key, file]) => {
       if (file) {
+        console.log(`  ✅ Appending file to FormData: ${key} -> ${file.name}`);
         formData.append(key, file);
+      } else {
+        console.log(`  ⚠️  Skipping null/undefined file: ${key}`);
       }
     });
+
+    console.log("\n📦 FormData entries:");
+    for (let [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
+      } else {
+        const preview =
+          typeof value === "string" && value.length > 100
+            ? value.substring(0, 100) + "..."
+            : value;
+        console.log(`  ${key}:`, preview);
+      }
+    }
+    console.log("==========================================\n");
 
     const response = await api.put(
       `/consignors/${customerId}/update-draft`,

@@ -28,6 +28,7 @@ import ConfigurationListPage from "../pages/ConfigurationListPage";
 import ConsignorConfigurationPage from "../pages/ConsignorConfigurationPage";
 import ConsignorConfigurationListPage from "../pages/ConsignorConfigurationListPage";
 import UnauthorizedPage from "../pages/UnauthorizedPage";
+import TransporterVehicleConfigPage from "../features/transporterVehicleConfig";
 
 // Protected Route component
 import ProtectedRoute from "./ProtectedRoute";
@@ -268,9 +269,16 @@ const AppRoutes = () => {
       />
 
       {/* Unauthorized Access Page */}
+      <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+      {/* Transporter Vehicle Configuration */}
       <Route
-        path="/unauthorized"
-        element={<UnauthorizedPage />}
+        path="/configuration/transporter-vehicle-config"
+        element={
+          <ProtectedRoute roles={["product_owner"]}>
+            <TransporterVehicleConfigPage />
+          </ProtectedRoute>
+        }
       />
 
       {/* Catch all route - redirect to dashboard if authenticated, otherwise to login */}

@@ -36,9 +36,12 @@ export const fetchConsignorById = createAsyncThunk(
 // Create new consignor
 export const createConsignor = createAsyncThunk(
   "consignor/createConsignor",
-  async (consignorData, { rejectWithValue }) => {
+  async ({ consignorData, files = {} }, { rejectWithValue }) => {
     try {
-      const response = await consignorService.createConsignor(consignorData);
+      const response = await consignorService.createConsignor(
+        consignorData,
+        files
+      );
       return response;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -49,9 +52,13 @@ export const createConsignor = createAsyncThunk(
 // Update existing consignor
 export const updateConsignor = createAsyncThunk(
   "consignor/updateConsignor",
-  async ({ customerId, data }, { rejectWithValue }) => {
+  async ({ customerId, data, files = {} }, { rejectWithValue }) => {
     try {
-      const response = await consignorService.updateConsignor(customerId, data);
+      const response = await consignorService.updateConsignor(
+        customerId,
+        data,
+        files
+      );
       return response;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -399,6 +406,8 @@ const consignorSlice = createSlice({
         };
 
         console.log("Flattened data:", flattenedData);
+        console.log("📊 Status from general:", general?.status);
+        console.log("📊 Status in flattenedData:", flattenedData.status);
         console.log(
           "userApprovalStatus included?",
           !!flattenedData.userApprovalStatus

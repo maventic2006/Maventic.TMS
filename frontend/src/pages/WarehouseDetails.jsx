@@ -35,7 +35,7 @@ import { TOAST_TYPES } from "../utils/constants";
 import EmptyState from "../components/ui/EmptyState";
 
 // Import warehouse approval component
-import WarehouseApprovalActionBar from "../components/warehouse/WarehouseApprovalActionBar";
+import ApprovalActionBar from "../components/approval/ApprovalActionBar";
 
 // Import warehouse tab components
 import GeneralDetailsViewTab from "../components/warehouse/tabs/GeneralDetailsViewTab";
@@ -813,7 +813,13 @@ const WarehouseDetails = () => {
 
           <div className="flex items-center gap-2">
             {/* Warehouse Approval Action Bar (only in view mode) */}
-            {!isEditMode && <WarehouseApprovalActionBar warehouseId={id} />}
+            {!isEditMode && currentWarehouse?.userApprovalStatus && (
+              <ApprovalActionBar
+                userApprovalStatus={currentWarehouse.userApprovalStatus}
+                entityId={id}
+                onRefreshData={handleRefreshData}
+              />
+            )}
 
             {hasUnsavedChanges && (
               <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 backdrop-blur-sm text-amber-300 border border-amber-400/30 rounded-xl font-medium text-sm">

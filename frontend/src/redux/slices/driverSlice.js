@@ -201,6 +201,9 @@ export const fetchDriverById = createAsyncThunk(
           transporterMappings: data.transporterMappings || [],
           vehicleMappings: data.vehicleMappings || [],
           blacklistMappings: data.blacklistMappings || [],
+          // CRITICAL: Include approval status for ApprovalActionBar
+          userApprovalStatus: data.userApprovalStatus || null,
+          approvalHistory: data.approvalHistory || [],
         };
 
         return flattenedData;
