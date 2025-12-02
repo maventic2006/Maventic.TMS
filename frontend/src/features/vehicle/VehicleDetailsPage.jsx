@@ -707,30 +707,38 @@ const VehicleDetailsPage = () => {
       } else {
         const errorPayload = resultAction.payload;
 
-        // Handle validation errors
-        if (errorPayload?.errors) {
-          setValidationErrors(errorPayload.errors);
-          dispatch(
-            showToast({
-              message:
-                "Please fix all validation errors before submitting for approval",
-              type: "error",
-            })
-          );
+        // Handle field-specific errors (GPS IMEI, Registration Number, VIN, etc.)
+        let errorMessage =
+          errorPayload?.message ||
+          "Failed to submit vehicle for approval. Please try again.";
+        let errorDetails = [];
 
-          // Stay in edit mode to fix errors
-          return;
+        if (errorPayload?.field) {
+          // Field-specific error (e.g., duplicate GPS IMEI)
+          errorDetails.push(`${errorPayload.field}: ${errorPayload.message}`);
+        } else if (errorPayload?.errors) {
+          // Multiple validation errors
+          errorDetails = errorPayload.errors.map((err) => {
+            if (typeof err === "string") return err;
+            if (err.field && err.message) return `${err.field}: ${err.message}`;
+            return err.message || err;
+          });
+          setValidationErrors(errorPayload.errors);
         }
 
-        // Other errors
         dispatch(
           showToast({
-            message:
-              errorPayload?.message ||
-              "Failed to submit vehicle for approval. Please try again.",
+            message: errorMessage,
             type: "error",
+            details: errorDetails.length > 0 ? errorDetails : undefined,
+            duration: 8000,
           })
         );
+
+        // Stay in edit mode to fix errors if there are validation errors
+        if (errorPayload?.errors || errorPayload?.field) {
+          return;
+        }
       }
     } catch (error) {
       console.error("Error submitting vehicle for approval:", error);

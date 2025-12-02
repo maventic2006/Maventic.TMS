@@ -740,12 +740,21 @@ export const saveVehicleAsDraft = createAsyncThunk(
       };
     } catch (error) {
       console.error("❌ Error saving vehicle draft:", error);
+
+      // Extract field-specific error information for better user feedback
+      const errorResponse = error.response?.data;
+
       return rejectWithValue({
-        code: error.response?.data?.error?.code || "DRAFT_SAVE_ERROR",
+        code:
+          errorResponse?.error?.code ||
+          errorResponse?.code ||
+          "DRAFT_SAVE_ERROR",
         message:
-          error.response?.data?.error?.message ||
+          errorResponse?.message ||
+          errorResponse?.error?.message ||
           "Failed to save vehicle as draft",
-        errors: error.response?.data?.errors || [],
+        field: errorResponse?.field || null, // Include field for UI highlighting
+        errors: errorResponse?.errors || [],
       });
     }
   }
@@ -819,12 +828,21 @@ export const submitVehicleFromDraft = createAsyncThunk(
       };
     } catch (error) {
       console.error("❌ Error submitting vehicle draft:", error);
+
+      // Extract field-specific error information for better user feedback
+      const errorResponse = error.response?.data;
+
       return rejectWithValue({
-        code: error.response?.data?.error?.code || "SUBMIT_DRAFT_ERROR",
+        code:
+          errorResponse?.error?.code ||
+          errorResponse?.code ||
+          "SUBMIT_DRAFT_ERROR",
         message:
-          error.response?.data?.error?.message ||
+          errorResponse?.message ||
+          errorResponse?.error?.message ||
           "Failed to submit vehicle for approval",
-        errors: error.response?.data?.errors || [],
+        field: errorResponse?.field || null, // Include field for UI highlighting
+        errors: errorResponse?.errors || [],
       });
     }
   }

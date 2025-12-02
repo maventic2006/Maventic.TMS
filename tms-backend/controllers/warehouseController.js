@@ -162,6 +162,60 @@ const generateApprovalFlowId = async (trx = knex) => {
   );
 };
 
+// Helper: Generate Sub-Location Header ID (format: SLH0001, SLH0002, etc.)
+const generateSubLocationId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("warehouse_sub_location_header")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `SLH${count.toString().padStart(4, "0")}`;
+
+    const existsInDb = await trx("warehouse_sub_location_header")
+      .where("sub_location_hdr_id", newId)
+      .first();
+    if (!existsInDb) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique sub-location header ID after 100 attempts"
+  );
+};
+
+// Helper: Generate Geo Fence Item ID (format: GFI0001, GFI0002, etc.)
+const generateGeoFenceItemId = async (trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx("warehouse_sub_location_item")
+      .count("* as count")
+      .first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `GFI${count.toString().padStart(4, "0")}`;
+
+    const existsInDb = await trx("warehouse_sub_location_item")
+      .where("geo_fence_item_id", newId)
+      .first();
+    if (!existsInDb) {
+      return newId;
+    }
+
+    attempts++;
+  }
+
+  throw new Error(
+    "Failed to generate unique geo fence item ID after 100 attempts"
+  );
+};
+
 // Helper: Format date to MySQL DATE format (YYYY-MM-DD)
 // Converts ISO date strings or Date objects to MySQL-compatible format
 const formatDateForMySQL = (dateValue) => {
@@ -2156,6 +2210,134 @@ const saveWarehouseAsDraft = async (req, res) => {
         updated_at: new Date(),
       });
 
+      console.log(`  ✅ Warehouse basic information saved`);
+
+      // ========================================
+      // SAVE ADDRESS DATA (if provided)
+      // ========================================
+      if (req.body.address && Object.keys(req.body.address).length > 0) {
+        const addressData = req.body.address;
+        console.log(`  📍 Saving address data...`);
+
+        // Generate address ID
+        const addressId = await generateAddressId(trx);
+
+        await trx("tms_address").insert({
+          address_id: addressId,
+          user_reference_id: warehouseId,
+          user_type: "WH", // Warehouse address type
+          address_type_id: addressData.addressType || "AT001", // Default to primary
+          country: addressData.country || null,
+          state: addressData.state || null,
+          city: addressData.city || null,
+          district: addressData.district || null,
+          street_1: addressData.street1 || null,
+          street_2: addressData.street2 || null,
+          postal_code: addressData.postalCode || null,
+          vat_number: addressData.vatNumber || null,
+          tin_pan: addressData.tinPan || null,
+          tan: addressData.tan || null,
+          is_primary:
+            addressData.isPrimary !== undefined ? addressData.isPrimary : true,
+          status: "ACTIVE",
+          created_by: userId,
+          created_at: new Date(),
+          updated_by: userId,
+          updated_at: new Date(),
+        });
+
+        console.log(`    ✅ Address saved: ${addressId}`);
+      }
+
+      // ========================================
+      // SAVE DOCUMENTS DATA (if provided)
+      // ========================================
+      if (
+        req.body.documents &&
+        Array.isArray(req.body.documents) &&
+        req.body.documents.length > 0
+      ) {
+        console.log(`  📄 Saving ${req.body.documents.length} documents...`);
+
+        for (const doc of req.body.documents) {
+          // Generate document unique ID
+          const documentUniqueId = await generateDocumentId(trx);
+
+          await trx("warehouse_documents").insert({
+            document_unique_id: documentUniqueId,
+            warehouse_id: warehouseId,
+            document_type_id: doc.documentType || null,
+            document_number: doc.documentNumber || null,
+            valid_from: doc.validFrom || null,
+            valid_to: doc.validTo || null,
+            active: doc.status !== undefined ? doc.status : true,
+            status: "ACTIVE",
+            created_by: userId,
+            created_at: new Date(),
+            updated_by: userId,
+            updated_at: new Date(),
+          });
+
+          console.log(`    ✅ Document saved: ${documentUniqueId}`);
+        }
+      }
+
+      // ========================================
+      // SAVE SUB-LOCATIONS/GEOFENCING DATA (if provided)
+      // ========================================
+      if (
+        req.body.subLocations &&
+        Array.isArray(req.body.subLocations) &&
+        req.body.subLocations.length > 0
+      ) {
+        console.log(
+          `  🗺️ Saving ${req.body.subLocations.length} sub-locations...`
+        );
+
+        for (const subLoc of req.body.subLocations) {
+          // Generate sub-location header ID
+          const subLocationHdrId = await generateSubLocationId(trx);
+
+          await trx("warehouse_sub_location_header").insert({
+            sub_location_hdr_id: subLocationHdrId,
+            warehouse_unique_id: warehouseId,
+            sub_location_id: subLoc.subLocationId || null,
+            description: subLoc.description || null,
+            status: "ACTIVE",
+            created_by: userId,
+            created_at: new Date(),
+            updated_by: userId,
+            updated_at: new Date(),
+          });
+
+          // Save coordinates if provided
+          if (
+            subLoc.coordinates &&
+            Array.isArray(subLoc.coordinates) &&
+            subLoc.coordinates.length > 0
+          ) {
+            for (const coord of subLoc.coordinates) {
+              const geoFenceItemId = await generateGeoFenceItemId(trx);
+
+              await trx("warehouse_sub_location_item").insert({
+                geo_fence_item_id: geoFenceItemId,
+                sub_location_hdr_id: subLocationHdrId,
+                latitude: coord.latitude || null,
+                longitude: coord.longitude || null,
+                sequence: coord.sequence || 0,
+                status: "ACTIVE",
+                created_by: userId,
+                created_at: new Date(),
+                updated_by: userId,
+                updated_at: new Date(),
+              });
+            }
+          }
+
+          console.log(`    ✅ Sub-location saved: ${subLocationHdrId}`);
+        }
+      }
+
       return { warehouseId };
     });
 
@@ -2810,7 +2992,7 @@ const submitWarehouseFromDraft = async (req, res) => {
     // Insert Consignor Warehouse Manager user
     await trx("user_master").insert({
       user_id: warehouseManagerUserId,
-      user_type_id: "UT006", // Consignor WH Manager (based on user_type_master table)
+      user_type_id: "UT007", // Consignor WH Manager (fixed to match getWarehouseById and createWarehouse)
       consignor_id: consignor_id,
       user_full_name: warehouse_name1,
       email_id: userEmail,

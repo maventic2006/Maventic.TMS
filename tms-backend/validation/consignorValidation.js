@@ -3,12 +3,12 @@
  * Provides comprehensive field-level validation for all consignor operations
  */
 
-const Joi = require('joi');
+const Joi = require("joi");
 
 // Custom validator for date not in future
 const dateNotInFuture = (value, helpers) => {
   if (new Date(value) > new Date()) {
-    return helpers.error('date.future');
+    return helpers.error("date.future");
   }
   return value;
 };
@@ -17,7 +17,7 @@ const dateNotInFuture = (value, helpers) => {
 const validDateRange = (value, helpers) => {
   const { valid_from, valid_to } = helpers.state.ancestors[0];
   if (valid_to && valid_from && new Date(valid_to) < new Date(valid_from)) {
-    return helpers.error('date.range');
+    return helpers.error("date.range");
   }
   return value;
 };
@@ -30,168 +30,124 @@ const generalSchema = Joi.object({
     .trim()
     .max(10)
     .optional() // Made optional - will be auto-generated if not provided
-    .allow(null, '')
+    .allow(null, "")
     .pattern(/^[A-Z0-9]*$/) // Allow empty string for auto-generation
     .messages({
-      'string.max': 'Customer ID cannot exceed 10 characters',
-      'string.pattern.base': 'Customer ID must contain only uppercase letters and numbers'
+      "string.max": "Customer ID cannot exceed 10 characters",
+      "string.pattern.base":
+        "Customer ID must contain only uppercase letters and numbers",
     }),
-  
-  customer_name: Joi.string()
-    .trim()
-    .min(2)
-    .max(100)
-    .required()
-    .messages({
-      'string.empty': 'Customer name is required',
-      'string.min': 'Customer name must be at least 2 characters long',
-      'string.max': 'Customer name cannot exceed 100 characters',
-      'any.required': 'Customer name is required'
-    }),
-  
-  search_term: Joi.string()
-    .trim()
-    .max(100)
-    .required()
-    .messages({
-      'string.empty': 'Search term is required',
-      'string.max': 'Search term cannot exceed 100 characters',
-      'any.required': 'Search term is required'
-    }),
-  
-  industry_type: Joi.string()
-    .trim()
-    .max(30)
-    .required()
-    .messages({
-      'string.empty': 'Industry type is required',
-      'string.max': 'Industry type cannot exceed 30 characters',
-      'any.required': 'Industry type is required'
-    }),
-  
+
+  customer_name: Joi.string().trim().min(2).max(100).required().messages({
+    "string.empty": "Customer name is required",
+    "string.min": "Customer name must be at least 2 characters long",
+    "string.max": "Customer name cannot exceed 100 characters",
+    "any.required": "Customer name is required",
+  }),
+
+  search_term: Joi.string().trim().max(100).required().messages({
+    "string.empty": "Search term is required",
+    "string.max": "Search term cannot exceed 100 characters",
+    "any.required": "Search term is required",
+  }),
+
+  industry_type: Joi.string().trim().max(30).required().messages({
+    "string.empty": "Industry type is required",
+    "string.max": "Industry type cannot exceed 30 characters",
+    "any.required": "Industry type is required",
+  }),
+
   currency_type: Joi.string()
     .trim()
     .max(30)
     .optional()
-    .allow(null, '')
+    .allow(null, "")
     .messages({
-      'string.max': 'Currency type cannot exceed 30 characters'
+      "string.max": "Currency type cannot exceed 30 characters",
     }),
-  
-  payment_term: Joi.string()
-    .trim()
-    .max(10)
-    .required()
-    .messages({
-      'string.empty': 'Payment term is required',
-      'string.max': 'Payment term cannot exceed 10 characters',
-      'any.required': 'Payment term is required'
-    }),
-  
-  remark: Joi.string()
-    .trim()
-    .max(255)
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.max': 'Remark cannot exceed 255 characters'
-    }),
-  
+
+  payment_term: Joi.string().trim().max(10).required().messages({
+    "string.empty": "Payment term is required",
+    "string.max": "Payment term cannot exceed 10 characters",
+    "any.required": "Payment term is required",
+  }),
+
+  remark: Joi.string().trim().max(255).optional().allow(null, "").messages({
+    "string.max": "Remark cannot exceed 255 characters",
+  }),
+
   website_url: Joi.string()
     .trim()
     .uri()
     .max(200)
     .optional()
-    .allow(null, '')
+    .allow(null, "")
     .messages({
-      'string.uri': 'Please enter a valid website URL',
-      'string.max': 'Website URL cannot exceed 200 characters'
+      "string.uri": "Please enter a valid website URL",
+      "string.max": "Website URL cannot exceed 200 characters",
     }),
-  
-  name_on_po: Joi.string()
-    .trim()
-    .max(30)
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.max': 'Name on PO cannot exceed 30 characters'
-    }),
-  
-  approved_by: Joi.string()
-    .trim()
-    .max(30)
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.max': 'Approved by cannot exceed 30 characters'
-    }),
-  
+
+  name_on_po: Joi.string().trim().max(30).optional().allow(null, "").messages({
+    "string.max": "Name on PO cannot exceed 30 characters",
+  }),
+
+  approved_by: Joi.string().trim().max(30).optional().allow(null, "").messages({
+    "string.max": "Approved by cannot exceed 30 characters",
+  }),
+
   approved_date: Joi.date()
     .iso()
     .custom(dateNotInFuture)
     .optional()
     .allow(null)
     .messages({
-      'date.base': 'Approved date must be a valid date',
-      'date.format': 'Approved date must be in ISO format (YYYY-MM-DD)',
-      'date.future': 'Approved date cannot be in the future'
+      "date.base": "Approved date must be a valid date",
+      "date.format": "Approved date must be in ISO format (YYYY-MM-DD)",
+      "date.future": "Approved date cannot be in the future",
     }),
-  
+
   // NDA/MSA document upload fields (frontend sends these)
   upload_nda: Joi.alternatives()
-    .try(
-      Joi.string().allow(null, ''),
-      Joi.object()
-    )
+    .try(Joi.string().allow(null, ""), Joi.object())
     .optional()
     .messages({
-      'alternatives.types': 'NDA upload must be a string or file object'
+      "alternatives.types": "NDA upload must be a string or file object",
     }),
-  
-  nda_validity: Joi.date()
-    .iso()
-    .optional()
-    .allow(null, '')
-    .messages({
-      'date.base': 'NDA validity must be a valid date',
-      'date.format': 'NDA validity must be in ISO format (YYYY-MM-DD)'
-    }),
-  
+
+  nda_validity: Joi.date().iso().optional().allow(null, "").messages({
+    "date.base": "NDA validity must be a valid date",
+    "date.format": "NDA validity must be in ISO format (YYYY-MM-DD)",
+  }),
+
   upload_msa: Joi.alternatives()
-    .try(
-      Joi.string().allow(null, ''),
-      Joi.object()
-    )
+    .try(Joi.string().allow(null, ""), Joi.object())
     .optional()
     .messages({
-      'alternatives.types': 'MSA upload must be a string or file object'
+      "alternatives.types": "MSA upload must be a string or file object",
     }),
-  
-  msa_validity: Joi.date()
-    .iso()
-    .optional()
-    .allow(null, '')
-    .messages({
-      'date.base': 'MSA validity must be a valid date',
-      'date.format': 'MSA validity must be in ISO format (YYYY-MM-DD)'
-    }),
-  
+
+  msa_validity: Joi.date().iso().optional().allow(null, "").messages({
+    "date.base": "MSA validity must be a valid date",
+    "date.format": "MSA validity must be in ISO format (YYYY-MM-DD)",
+  }),
+
   // Address ID field (frontend uses this for linking)
-  address_id: Joi.string()
-    .trim()
-    .max(10)
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.max': 'Address ID cannot exceed 10 characters'
-    }),
-  
+  address_id: Joi.string().trim().max(10).optional().allow(null, "").messages({
+    "string.max": "Address ID cannot exceed 10 characters",
+  }),
+
   status: Joi.string()
-    .valid('ACTIVE', 'INACTIVE', 'PENDING')
-    .default('ACTIVE')
+    .valid("ACTIVE", "INACTIVE", "PENDING", "SAVE_AS_DRAFT")
+    .default("ACTIVE")
     .messages({
-      'any.only': 'Status must be one of: ACTIVE, INACTIVE, PENDING'
-    })
+      "any.only":
+        "Status must be one of: ACTIVE, INACTIVE, PENDING, SAVE_AS_DRAFT",
+    }),
+
+  // Frontend sends this field for UI state management
+  userApprovalStatus: Joi.any().optional().allow(null).messages({
+    "any.base": "User approval status can be any value",
+  }),
 });
 
 /**
@@ -199,120 +155,112 @@ const generalSchema = Joi.object({
  * Updated to match frontend ContactTab field names
  */
 const contactSchema = Joi.object({
-  contact_id: Joi.string()
-    .trim()
-    .max(10)
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.max': 'Contact ID cannot exceed 10 characters'
-    }),
-  
+  contact_id: Joi.string().trim().max(10).optional().allow(null, "").messages({
+    "string.max": "Contact ID cannot exceed 10 characters",
+  }),
+
   // Frontend uses 'designation' instead of 'contact_designation'
-  designation: Joi.string()
-    .trim()
-    .max(50)
-    .required()
-    .messages({
-      'string.empty': 'Designation is required',
-      'string.max': 'Designation cannot exceed 50 characters',
-      'any.required': 'Designation is required'
-    }),
-  
+  designation: Joi.string().trim().max(50).required().messages({
+    "string.empty": "Designation is required",
+    "string.max": "Designation cannot exceed 50 characters",
+    "any.required": "Designation is required",
+  }),
+
   // Frontend uses 'name' instead of 'contact_name'
-  name: Joi.string()
-    .trim()
-    .min(2)
-    .max(100)
-    .required()
-    .messages({
-      'string.empty': 'Contact name is required',
-      'string.min': 'Contact name must be at least 2 characters long',
-      'string.max': 'Contact name cannot exceed 100 characters',
-      'any.required': 'Contact name is required'
-    }),
-  
+  name: Joi.string().trim().min(2).max(100).required().messages({
+    "string.empty": "Contact name is required",
+    "string.min": "Contact name must be at least 2 characters long",
+    "string.max": "Contact name cannot exceed 100 characters",
+    "any.required": "Contact name is required",
+  }),
+
   // Frontend uses 'number' instead of 'contact_number'
   number: Joi.string()
     .trim()
     .pattern(/^\+?[1-9]\d{6,14}$/)
     .required()
     .messages({
-      'string.empty': 'Phone number is required',
-      'string.pattern.base': 'Please enter a valid phone number with 7-15 digits',
-      'any.required': 'Phone number is required'
+      "string.empty": "Phone number is required",
+      "string.pattern.base":
+        "Please enter a valid phone number with 7-15 digits",
+      "any.required": "Phone number is required",
     }),
-  
+
   country_code: Joi.string()
     .trim()
     .pattern(/^\+[1-9]\d{0,3}$/)
     .optional()
-    .allow(null, '')
+    .allow(null, "")
     .messages({
-      'string.pattern.base': 'Please enter a valid country code (e.g., +1, +91)'
+      "string.pattern.base":
+        "Please enter a valid country code (e.g., +1, +91)",
     }),
-  
+
   // Frontend uses 'email' instead of 'email_id'
   email: Joi.string()
     .trim()
     .email()
     .max(100)
     .optional()
-    .allow(null, '')
+    .allow(null, "")
     .messages({
-      'string.email': 'Please enter a valid email address',
-      'string.max': 'Email cannot exceed 100 characters'
+      "string.email": "Please enter a valid email address",
+      "string.max": "Email cannot exceed 100 characters",
     }),
-  
+
   linkedin_link: Joi.string()
     .trim()
     .uri()
     .max(200)
     .optional()
-    .allow(null, '')
+    .allow(null, "")
     .messages({
-      'string.uri': 'Please enter a valid LinkedIn URL',
-      'string.max': 'LinkedIn URL cannot exceed 200 characters'
+      "string.uri": "Please enter a valid LinkedIn URL",
+      "string.max": "LinkedIn URL cannot exceed 200 characters",
     }),
-  
+
   // Frontend uses 'team' instead of 'contact_team'
-  team: Joi.string()
-    .trim()
-    .max(20)
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.max': 'Team name cannot exceed 20 characters'
-    }),
-  
+  team: Joi.string().trim().max(20).optional().allow(null, "").messages({
+    "string.max": "Team name cannot exceed 20 characters",
+  }),
+
   // Frontend uses 'role' instead of 'contact_role'
-  role: Joi.string()
-    .trim()
-    .max(40)
-    .required()
-    .messages({
-      'string.empty': 'Role is required',
-      'string.max': 'Role cannot exceed 40 characters',
-      'any.required': 'Role is required'
-    }),
-  
+  role: Joi.string().trim().max(40).required().messages({
+    "string.empty": "Role is required",
+    "string.max": "Role cannot exceed 40 characters",
+    "any.required": "Role is required",
+  }),
+
   // Frontend uses 'photo' instead of 'contact_photo'
   photo: Joi.alternatives()
     .try(
-      Joi.string().allow(null, ''),  // URL or base64 string
-      Joi.object()                    // File object
+      Joi.string().allow(null, ""), // URL or base64 string
+      Joi.object() // File object
     )
     .optional()
     .messages({
-      'alternatives.types': 'Photo must be a string (URL/base64) or file object'
+      "alternatives.types":
+        "Photo must be a string (URL/base64) or file object",
     }),
-  
-  status: Joi.string()
-    .valid('ACTIVE', 'INACTIVE')
-    .default('ACTIVE')
+
+  // Backend compatibility - also accept contact_photo
+  contact_photo: Joi.alternatives()
+    .try(
+      Joi.string().allow(null, ""), // URL or base64 string
+      Joi.object() // File object
+    )
+    .optional()
     .messages({
-      'any.only': 'Status must be either ACTIVE or INACTIVE'
-    })
+      "alternatives.types":
+        "Contact photo must be a string (URL/base64) or file object",
+    }),
+
+  status: Joi.string()
+    .valid("ACTIVE", "INACTIVE", "Active", "Inactive")
+    .default("ACTIVE")
+    .messages({
+      "any.only": "Status must be either ACTIVE or INACTIVE",
+    }),
 });
 
 /**
@@ -320,156 +268,181 @@ const contactSchema = Joi.object({
  * Updated to require array of states for business_area
  */
 const organizationSchema = Joi.object({
-  company_code: Joi.string()
-    .trim()
-    .max(20)
-    .required()
-    .messages({
-      'string.empty': 'Company code is required',
-      'string.max': 'Company code cannot exceed 20 characters',
-      'any.required': 'Company code is required'
-    }),
-  
+  company_code: Joi.string().trim().max(20).required().messages({
+    "string.empty": "Company code is required",
+    "string.max": "Company code cannot exceed 20 characters",
+    "any.required": "Company code is required",
+  }),
+
   // Updated: business_area now MUST be an array of state names
   business_area: Joi.array()
     .items(
-      Joi.string()
-        .trim()
-        .min(2)
-        .max(50)
-        .messages({
-          'string.empty': 'State name cannot be empty',
-          'string.min': 'State name must be at least 2 characters',
-          'string.max': 'State name cannot exceed 50 characters'
-        })
+      Joi.string().trim().min(2).max(50).messages({
+        "string.empty": "State name cannot be empty",
+        "string.min": "State name must be at least 2 characters",
+        "string.max": "State name cannot exceed 50 characters",
+      })
     )
     .min(1)
     .required()
     .messages({
-      'array.base': 'Business area must be an array of state names',
-      'array.min': 'At least one state must be selected',
-      'any.required': 'Business area is required'
+      "array.base": "Business area must be an array of state names",
+      "array.min": "At least one state must be selected",
+      "any.required": "Business area is required",
     }),
-  
+
   status: Joi.string()
-    .valid('ACTIVE', 'INACTIVE')
-    .default('ACTIVE')
+    .valid("ACTIVE", "INACTIVE", "Active", "Inactive")
+    .default("ACTIVE")
     .messages({
-      'any.only': 'Status must be either ACTIVE or INACTIVE'
-    })
+      "any.only": "Status must be either ACTIVE or INACTIVE",
+    }),
 });
 
 /**
  * Document Section Validation Schema
+ * Accepts both frontend camelCase and backend snake_case field names
  */
 const documentSchema = Joi.object({
   document_unique_id: Joi.string()
     .trim()
     .max(10)
     .optional()
-    .allow(null, '')
+    .allow(null, "")
     .messages({
-      'string.max': 'Document unique ID cannot exceed 10 characters'
+      "string.max": "Document unique ID cannot exceed 10 characters",
     }),
-  
+
+  // Backend field name
   document_type_id: Joi.string()
     .trim()
     .max(30)
-    .required()
+    .optional()
+    .allow(null, "")
     .messages({
-      'string.empty': 'Document type is required',
-      'string.max': 'Document type ID cannot exceed 30 characters',
-      'any.required': 'Document type is required'
+      "string.empty": "Document type is required",
+      "string.max": "Document type ID cannot exceed 30 characters",
     }),
-  
+
+  // Frontend field name (documentType)
+  documentType: Joi.string()
+    .trim()
+    .max(30)
+    .optional()
+    .allow(null, "")
+    .messages({
+      "string.max": "Document type cannot exceed 30 characters",
+    }),
+
+  // Backend field name
   document_number: Joi.string()
     .trim()
     .max(50)
     .optional()
-    .allow(null, '')
+    .allow(null, "")
     .messages({
-      'string.max': 'Document number cannot exceed 50 characters'
+      "string.max": "Document number cannot exceed 50 characters",
     }),
-  
-  valid_from: Joi.date()
-    .iso()
-    .required()
+
+  // Frontend field name (documentNumber)
+  documentNumber: Joi.string()
+    .trim()
+    .max(50)
+    .optional()
+    .allow(null, "")
     .messages({
-      'date.base': 'Valid from date must be a valid date',
-      'date.format': 'Valid from date must be in ISO format (YYYY-MM-DD)',
-      'any.required': 'Valid from date is required'
+      "string.max": "Document number cannot exceed 50 characters",
     }),
-  
+
+  // Frontend field name (referenceNumber)
+  referenceNumber: Joi.string()
+    .trim()
+    .max(50)
+    .optional()
+    .allow(null, "")
+    .messages({
+      "string.max": "Reference number cannot exceed 50 characters",
+    }),
+
+  // Backend field name
+  valid_from: Joi.date().iso().optional().allow(null, "").messages({
+    "date.base": "Valid from date must be a valid date",
+    "date.format": "Valid from date must be in ISO format (YYYY-MM-DD)",
+  }),
+
+  // Frontend field name (validFrom)
+  validFrom: Joi.string().optional().allow(null, "").messages({
+    "string.base": "Valid from must be a string",
+  }),
+
+  // Backend field name
   valid_to: Joi.date()
     .iso()
     .custom(validDateRange)
     .optional()
     .allow(null)
     .messages({
-      'date.base': 'Valid to date must be a valid date',
-      'date.format': 'Valid to date must be in ISO format (YYYY-MM-DD)',
-      'date.range': 'Valid to date must be after valid from date'
+      "date.base": "Valid to date must be a valid date",
+      "date.format": "Valid to date must be in ISO format (YYYY-MM-DD)",
+      "date.range": "Valid to date must be after valid from date",
     }),
-  
+
+  // Frontend field name (validTo)
+  validTo: Joi.string().optional().allow(null, "").messages({
+    "string.base": "Valid to must be a string",
+  }),
+
   // Frontend sends these additional fields
-  country: Joi.string()
-    .trim()
-    .max(50)
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.max': 'Country cannot exceed 50 characters'
-    }),
-  
-  status: Joi.boolean()
-    .optional()
-    .default(true)
-    .messages({
-      'boolean.base': 'Status must be a boolean value'
-    }),
-  
-  fileKey: Joi.string()
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.base': 'File key must be a string'
-    })
+  country: Joi.string().trim().max(50).optional().allow(null, "").messages({
+    "string.max": "Country cannot exceed 50 characters",
+  }),
+
+  status: Joi.boolean().optional().default(true).messages({
+    "boolean.base": "Status must be a boolean value",
+  }),
+
+  fileKey: Joi.string().optional().allow(null, "").messages({
+    "string.base": "File key must be a string",
+  }),
+
+  // Frontend UI fields
+  fileName: Joi.string().optional().allow(null, "").messages({
+    "string.base": "File name must be a string",
+  }),
+
+  fileType: Joi.string().optional().allow(null, "").messages({
+    "string.base": "File type must be a string",
+  }),
+
+  fileData: Joi.string().optional().allow(null, "").messages({
+    "string.base": "File data must be a string",
+  }),
 });
 
 /**
  * Complete Consignor Creation/Update Validation Schema
  */
 const consignorCreateSchema = Joi.object({
-  consignorId: Joi.string()
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.base': 'Consignor ID must be a string'
-    }),
-  
+  consignorId: Joi.string().optional().allow(null, "").messages({
+    "string.base": "Consignor ID must be a string",
+  }),
+
   general: generalSchema.required().messages({
-    'any.required': 'General information is required'
+    "any.required": "General information is required",
   }),
-  
-  contacts: Joi.array()
-    .items(contactSchema)
-    .min(1)
-    .required()
-    .messages({
-      'array.min': 'At least one contact is required',
-      'any.required': 'Contacts information is required'
-    }),
-  
+
+  contacts: Joi.array().items(contactSchema).min(1).required().messages({
+    "array.min": "At least one contact is required",
+    "any.required": "Contacts information is required",
+  }),
+
   organization: organizationSchema.required().messages({
-    'any.required': 'Organization information is required'
+    "any.required": "Organization information is required",
   }),
-  
-  documents: Joi.array()
-    .items(documentSchema)
-    .optional()
-    .messages({
-      'array.base': 'Documents must be an array'
-    })
+
+  documents: Joi.array().items(documentSchema).optional().messages({
+    "array.base": "Documents must be an array",
+  }),
 });
 
 /**
@@ -479,124 +452,94 @@ const consignorUpdateSchema = Joi.object({
   general: generalSchema.optional(),
   contacts: Joi.array().items(contactSchema).optional(),
   organization: organizationSchema.optional(),
-  documents: Joi.array().items(documentSchema).optional()
-}).min(1).messages({
-  'object.min': 'At least one section must be provided for update'
-});
+  documents: Joi.array().items(documentSchema).optional(),
+})
+  .min(1)
+  .messages({
+    "object.min": "At least one section must be provided for update",
+  });
 
 /**
  * Query Parameter Validation for List Endpoint
  */
 const listQuerySchema = Joi.object({
-  page: Joi.number()
-    .integer()
-    .min(1)
-    .default(1)
-    .messages({
-      'number.base': 'Page must be a number',
-      'number.min': 'Page must be at least 1'
-    }),
-  
-  limit: Joi.number()
-    .integer()
-    .min(1)
-    .max(100)
-    .default(25)
-    .messages({
-      'number.base': 'Limit must be a number',
-      'number.min': 'Limit must be at least 1',
-      'number.max': 'Limit cannot exceed 100'
-    }),
-  
-  search: Joi.string()
-    .trim()
-    .optional()
-    .allow('')
-    .messages({
-      'string.base': 'Search must be a string'
-    }),
-  
-  customer_id: Joi.string()
-    .trim()
-    .optional()
-    .allow('')
-    .messages({
-      'string.base': 'Customer ID must be a string'
-    }),
-  
+  page: Joi.number().integer().min(1).default(1).messages({
+    "number.base": "Page must be a number",
+    "number.min": "Page must be at least 1",
+  }),
+
+  limit: Joi.number().integer().min(1).max(100).default(25).messages({
+    "number.base": "Limit must be a number",
+    "number.min": "Limit must be at least 1",
+    "number.max": "Limit cannot exceed 100",
+  }),
+
+  search: Joi.string().trim().optional().allow("").messages({
+    "string.base": "Search must be a string",
+  }),
+
+  customer_id: Joi.string().trim().optional().allow("").messages({
+    "string.base": "Customer ID must be a string",
+  }),
+
   status: Joi.string()
-    .valid('ACTIVE', 'INACTIVE', 'PENDING')
+    .valid("ACTIVE", "INACTIVE", "PENDING")
     .optional()
     .messages({
-      'any.only': 'Status must be one of: ACTIVE, INACTIVE, PENDING'
+      "any.only": "Status must be one of: ACTIVE, INACTIVE, PENDING",
     }),
-  
-  industry_type: Joi.string()
-    .trim()
-    .optional()
-    .allow('')
-    .messages({
-      'string.base': 'Industry type must be a string'
-    }),
-  
-  currency_type: Joi.string()
-    .trim()
-    .optional()
-    .allow('')
-    .messages({
-      'string.base': 'Currency type must be a string'
-    }),
-  
+
+  industry_type: Joi.string().trim().optional().allow("").messages({
+    "string.base": "Industry type must be a string",
+  }),
+
+  currency_type: Joi.string().trim().optional().allow("").messages({
+    "string.base": "Currency type must be a string",
+  }),
+
   sortBy: Joi.string()
-    .valid('customer_id', 'customer_name', 'industry_type', 'created_at', 'approved_date')
-    .default('created_at')
+    .valid(
+      "customer_id",
+      "customer_name",
+      "industry_type",
+      "created_at",
+      "approved_date"
+    )
+    .default("created_at")
     .messages({
-      'any.only': 'Sort by must be one of: customer_id, customer_name, industry_type, created_at, approved_date'
+      "any.only":
+        "Sort by must be one of: customer_id, customer_name, industry_type, created_at, approved_date",
     }),
-  
+
   sortOrder: Joi.string()
-    .valid('asc', 'desc', 'ASC', 'DESC')
-    .default('desc')
+    .valid("asc", "desc", "ASC", "DESC")
+    .default("desc")
     .messages({
-      'any.only': 'Sort order must be either asc or desc'
-    })
+      "any.only": "Sort order must be either asc or desc",
+    }),
 });
 
 /**
  * Document Upload Validation
  */
 const documentUploadSchema = Joi.object({
-  document_type_id: Joi.string()
-    .trim()
-    .required()
-    .messages({
-      'string.empty': 'Document type is required',
-      'any.required': 'Document type is required'
-    }),
-  
-  document_number: Joi.string()
-    .trim()
-    .optional()
-    .allow(null, '')
-    .messages({
-      'string.base': 'Document number must be a string'
-    }),
-  
-  valid_from: Joi.date()
-    .iso()
-    .required()
-    .messages({
-      'date.base': 'Valid from date must be a valid date',
-      'any.required': 'Valid from date is required'
-    }),
-  
-  valid_to: Joi.date()
-    .iso()
-    .optional()
-    .allow(null)
-    .messages({
-      'date.base': 'Valid to date must be a valid date'
-    })
+  document_type_id: Joi.string().trim().required().messages({
+    "string.empty": "Document type is required",
+    "any.required": "Document type is required",
+  }),
+
+  document_number: Joi.string().trim().optional().allow(null, "").messages({
+    "string.base": "Document number must be a string",
+  }),
+
+  valid_from: Joi.date().iso().required().messages({
+    "date.base": "Valid from date must be a valid date",
+    "any.required": "Valid from date is required",
+  }),
+
+  valid_to: Joi.date().iso().optional().allow(null).messages({
+    "date.base": "Valid to date must be a valid date",
+  }),
 });
 
 module.exports = {
@@ -607,5 +550,5 @@ module.exports = {
   consignorCreateSchema,
   consignorUpdateSchema,
   listQuerySchema,
-  documentUploadSchema
+  documentUploadSchema,
 };

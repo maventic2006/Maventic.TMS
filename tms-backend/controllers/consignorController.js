@@ -1087,6 +1087,197 @@ const submitConsignorFromDraft = async (req, res) => {
       });
     }
 
+    // ========================================
+    // CREATE CONSIGNOR ADMIN USER & APPROVAL WORKFLOW (IF NOT EXISTS)
+    // ========================================
+    console.log(
+      "📝 Checking for Consignor Admin user and approval workflow..."
+    );
+
+    // Check if Consignor Admin user already exists
+    const existingUser = await db("user_master")
+      .where("consignor_id", id)
+      .where("user_type_id", "UT006") // Consignor Admin
+      .first();
+
+    let consignorAdminUserId = null;
+
+    if (!existingUser) {
+      // Generate user ID for Consignor Admin (format: CA0001, CA0002, etc.)
+      const bcrypt = require("bcrypt");
+
+      const lastUser = await db("user_master")
+        .select("user_id")
+        .where("user_id", "like", "CA%")
+        .orderBy("user_id", "desc")
+        .first();
+
+      let userIdNumber = 1;
+      if (lastUser && lastUser.user_id) {
+        const lastNumber = parseInt(lastUser.user_id.substring(2));
+        if (!isNaN(lastNumber)) {
+          userIdNumber = lastNumber + 1;
+        }
+      }
+      consignorAdminUserId = `CA${String(userIdNumber).padStart(4, "0")}`;
+
+      console.log(`  Generated user ID: ${consignorAdminUserId}`);
+
+      // Get creator details
+      const creator = await db("user_master")
+        .where("user_id", req.user.user_id)
+        .first();
+      const creatorName = creator?.user_full_name || "System";
+
+      // Get consignor details for user creation
+      const consignorDetails = await db("consignor_basic_information")
+        .where("customer_id", id)
+        .first();
+
+      // Get primary contact for email/mobile
+      const primaryContact = await db("contact")
+        .where("customer_id", id)
+        .orderBy("created_at", "asc")
+        .first();
+
+      const userEmail =
+        primaryContact?.email_id || `${id.toLowerCase()}@consignor.com`;
+      const userMobile = primaryContact?.contact_number || "0000000000";
+
+      // Generate initial password
+      const customerNameClean = consignorDetails.customer_name.replace(
+        /[^a-zA-Z0-9]/g,
+        ""
+      );
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      const initialPassword = `${customerNameClean}@${randomNum}`;
+      const hashedPassword = await bcrypt.hash(initialPassword, 10);
+
+      // Create user in user_master
+      await db("user_master").insert({
+        user_id: consignorAdminUserId,
+        user_type_id: "UT006", // Consignor Admin
+        user_full_name: `${consignorDetails.customer_name} - Admin`,
+        email_id: userEmail,
+        mobile_number: userMobile,
+        consignor_id: id,
+        is_active: false, // Inactive until approved
+        created_by_user_id: req.user.user_id,
+        password: hashedPassword,
+        password_type: "initial",
+        status: "Pending for Approval",
+        created_by: req.user.user_id,
+        updated_by: req.user.user_id,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      console.log(`  ✅ Created Consignor Admin user: ${consignorAdminUserId}`);
+      console.log(
+        `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
+      );
+    } else {
+      consignorAdminUserId = existingUser.user_id;
+      console.log(
+        `  ℹ️  Consignor Admin user already exists: ${consignorAdminUserId}`
+      );
+    }
+
+    // Check if approval flow already exists
+    const existingApprovalFlow = await db("approval_flow_trans")
+      .where("user_id_reference_id", consignorAdminUserId)
+      .where("approval_type_id", "AT002") // Consignor Admin
+      .first();
+
+    if (!existingApprovalFlow) {
+      // Get approval configuration for Consignor Admin (Level 1)
+      const approvalConfig = await db("approval_configuration")
+        .where({
+          approval_type_id: "AT002", // Consignor Admin
+          approver_level: 1,
+          status: "ACTIVE",
+        })
+        .first();
+
+      if (!approvalConfig) {
+        throw new Error(
+          "Approval configuration not found for Consignor Admin. Please run migration to add AC0002."
+        );
+      }
+
+      // Determine pending approver (Product Owner who did NOT create this)
+      let pendingWithUserId = null;
+      let pendingWithName = null;
+
+      if (req.user.user_id === "PO001") {
+        const po2 = await db("user_master").where("user_id", "PO002").first();
+        pendingWithUserId = "PO002";
+        pendingWithName = po2?.user_full_name || "Product Owner 2";
+      } else if (req.user.user_id === "PO002") {
+        const po1 = await db("user_master").where("user_id", "PO001").first();
+        pendingWithUserId = "PO001";
+        pendingWithName = po1?.user_full_name || "Product Owner 1";
+      } else {
+        // Default to PO001 if creator is neither
+        const po1 = await db("user_master").where("user_id", "PO001").first();
+        pendingWithUserId = "PO001";
+        pendingWithName = po1?.user_full_name || "Product Owner 1";
+      }
+
+      // Generate approval flow trans ID (format: AF0001, AF0002, etc.)
+      const lastApprovalFlow = await db("approval_flow_trans")
+        .select("approval_flow_trans_id")
+        .where("approval_flow_trans_id", "like", "AF%")
+        .orderBy("approval_flow_trans_id", "desc")
+        .first();
+
+      let approvalFlowNumber = 1;
+      if (lastApprovalFlow && lastApprovalFlow.approval_flow_trans_id) {
+        const lastNumber = parseInt(
+          lastApprovalFlow.approval_flow_trans_id.substring(2)
+        );
+        if (!isNaN(lastNumber)) {
+          approvalFlowNumber = lastNumber + 1;
+        }
+      }
+      const approvalFlowId = `AF${String(approvalFlowNumber).padStart(4, "0")}`;
+
+      // Get creator details
+      const creator = await db("user_master")
+        .where("user_id", req.user.user_id)
+        .first();
+      const creatorName = creator?.user_full_name || "System";
+
+      // Create approval flow transaction entry
+      await db("approval_flow_trans").insert({
+        approval_flow_trans_id: approvalFlowId,
+        approval_config_id: approvalConfig.approval_config_id,
+        approval_type_id: "AT002", // Consignor Admin
+        user_id_reference_id: consignorAdminUserId,
+        s_status: "Pending for Approval",
+        approver_level: 1,
+        pending_with_role_id: "RL001", // Product Owner role
+        pending_with_user_id: pendingWithUserId,
+        pending_with_name: pendingWithName,
+        created_by_user_id: req.user.user_id,
+        created_by_name: creatorName,
+        created_by: req.user.user_id,
+        updated_by: req.user.user_id,
+        created_at: new Date(),
+        updated_at: new Date(),
+        status: "ACTIVE",
+      });
+
+      console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+      console.log(
+        `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
+      );
+    } else {
+      console.log(
+        `  ℹ️  Approval flow already exists: ${existingApprovalFlow.approval_flow_trans_id}`
+      );
+    }
+
     console.log("✅ Consignor draft submitted successfully");
     return res.status(200).json({
       success: true,

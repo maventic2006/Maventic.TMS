@@ -1,5 +1,5 @@
 const db = require("../config/database");
-const axios = require('axios');
+const axios = require("axios");
 
 /**
  * Vehicle Controller
@@ -119,11 +119,11 @@ const generateVehicleId = async () => {
 //     const result = await db('vehicle_ownership_details')
 //       .max('vehicle_ownership_id as max_id')
 //       .first();
-    
+
 //     if (!result.max_id) {
 //       return 'OWN0001';
 //     }
-    
+
 //     const numPart = parseInt(result.max_id.substring(3)) + 1;
 //     return 'OWN' + numPart.toString().padStart(4, '0');
 //   } catch (error) {
@@ -273,22 +273,15 @@ const generateSequenceNumber = async (vehicleId) => {
 };
 
 /**
- * Generate unique Vehicle Owner User ID
- * Format: VO0001, VO0002, etc.
+ * Generate unique Vehicle Owner User ID based on vehicle ID
+ * Format: VO0001 (from VEH0001), VO0002 (from VEH0002), etc.
+ * This ensures 1:1 mapping between vehicle and vehicle owner user
  */
-const generateVehicleOwnerUserId = async () => {
+const generateVehicleOwnerUserId = async (vehicleId) => {
   try {
-    const result = await db("user_master")
-      .where("user_id", "like", "VO%")
-      .max("user_id as max_id")
-      .first();
-
-    if (!result.max_id) {
-      return "VO0001";
-    }
-
-    const numPart = parseInt(result.max_id.substring(2)) + 1;
-    return "VO" + numPart.toString().padStart(4, "0");
+    // Extract number from vehicle ID (VEH0001 -> 0001)
+    const vehicleNumber = vehicleId.substring(3);
+    return `VO${vehicleNumber}`;
   } catch (error) {
     console.error("Error generating vehicle owner user ID:", error);
     throw new Error("Failed to generate vehicle owner user ID");
@@ -528,61 +521,68 @@ const validateForeignKeys = async (vehicleData) => {
 
   // Validate fuel_type_id
   if (vehicleData.fuel_type_id) {
-    const fuelType = await db('fuel_type_master')
-      .where('fuel_type_id', vehicleData.fuel_type_id)
-      .where('status', 'ACTIVE')
+    const fuelType = await db("fuel_type_master")
+      .where("fuel_type_id", vehicleData.fuel_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!fuelType) {
       // Log available fuel types for debugging when validation fails
-      const availableFuelTypes = await db('fuel_type_master').where('status', 'ACTIVE').select('fuel_type_id', 'fuel_type');
+      const availableFuelTypes = await db("fuel_type_master")
+        .where("status", "ACTIVE")
+        .select("fuel_type_id", "fuel_type");
       console.log("❌ Invalid fuel_type_id:", vehicleData.fuel_type_id);
-      console.log("✅ Valid fuel types:", availableFuelTypes.map(ft => `${ft.fuel_type_id}:${ft.fuel_type}`).join(', '));
-      
+      console.log(
+        "✅ Valid fuel types:",
+        availableFuelTypes
+          .map((ft) => `${ft.fuel_type_id}:${ft.fuel_type}`)
+          .join(", ")
+      );
+
       errors.push({
-        field: 'specifications.fuelType',
-        message: `Invalid fuel type ID: ${vehicleData.fuel_type_id}. Please select a valid fuel type.`
+        field: "specifications.fuelType",
+        message: `Invalid fuel type ID: ${vehicleData.fuel_type_id}. Please select a valid fuel type.`,
       });
     }
   }
 
   // Validate vehicle_type_id
   if (vehicleData.vehicle_type_id) {
-    const vehicleType = await db('vehicle_type_master')
-      .where('vehicle_type_id', vehicleData.vehicle_type_id)
-      .where('status', 'ACTIVE')
+    const vehicleType = await db("vehicle_type_master")
+      .where("vehicle_type_id", vehicleData.vehicle_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!vehicleType) {
       errors.push({
-        field: 'basicInformation.vehicleType',
-        message: `Invalid vehicle type ID: ${vehicleData.vehicle_type_id}. Please select a valid vehicle type.`
+        field: "basicInformation.vehicleType",
+        message: `Invalid vehicle type ID: ${vehicleData.vehicle_type_id}. Please select a valid vehicle type.`,
       });
     }
   }
 
   // Validate usage_type_id
   if (vehicleData.usage_type_id) {
-    const usageType = await db('usage_type_master')
-      .where('usage_type_id', vehicleData.usage_type_id)
-      .where('status', 'ACTIVE')
+    const usageType = await db("usage_type_master")
+      .where("usage_type_id", vehicleData.usage_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!usageType) {
       errors.push({
-        field: 'basicInformation.usageType',
-        message: `Invalid usage type ID: ${vehicleData.usage_type_id}. Please select a valid usage type.`
+        field: "basicInformation.usageType",
+        message: `Invalid usage type ID: ${vehicleData.usage_type_id}. Please select a valid usage type.`,
       });
     }
   }
 
   // Validate engine_type_id
   if (vehicleData.engine_type_id) {
-    const engineType = await db('engine_type_master')
-      .where('engine_type_id', vehicleData.engine_type_id)
-      .where('status', 'ACTIVE')
+    const engineType = await db("engine_type_master")
+      .where("engine_type_id", vehicleData.engine_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!engineType) {
       errors.push({
-        field: 'specifications.engineType',
-        message: `Invalid engine type ID: ${vehicleData.engine_type_id}. Please select a valid engine type.`
+        field: "specifications.engineType",
+        message: `Invalid engine type ID: ${vehicleData.engine_type_id}. Please select a valid engine type.`,
       });
     }
   }
@@ -623,14 +623,14 @@ const createVehicle = async (req, res) => {
       ...validateBasicInformation(vehicleData),
       ...validateSpecifications(vehicleData),
     ];
-    
+
     // Validate foreign key references
     const foreignKeyErrors = await validateForeignKeys(vehicleData);
     validationErrors.push(...foreignKeyErrors);
-    
+
     if (validationErrors.length > 0) {
       await trx.rollback();
-      console.log('❌ Validation errors found:', validationErrors);
+      console.log("❌ Validation errors found:", validationErrors);
       return res.status(400).json({
         success: false,
         message: "Validation errors",
@@ -854,8 +854,8 @@ const createVehicle = async (req, res) => {
     const creatorUserId = currentUser?.user_id || "SYSTEM";
     const creatorName = currentUser?.name || currentUser?.user_id || "System";
 
-    // Generate vehicle owner user ID
-    const vehicleOwnerUserId = await generateVehicleOwnerUserId();
+    // Generate vehicle owner user ID (pattern-based: VEH0001 -> VO0001)
+    const vehicleOwnerUserId = await generateVehicleOwnerUserId(vehicleId);
 
     // Generate initial password
     const initialPassword = generateVehicleOwnerPassword(
@@ -1346,51 +1346,91 @@ const getVehicleById = async (req, res) => {
 
     let userApprovalStatus = null;
     let approvalHistory = [];
-    
-    try {
-      // Find Vehicle Owner user associated with this vehicle
-      // Vehicle Owner users have names like "Vehicle Owner - VEH0062"
-      const associatedUser = await db('user_master')
-        .where('user_type_id', 'UT005') // Vehicle Owner user type
-        .where('user_full_name', 'like', `%${id}%`) // Match vehicle ID in name
-        .first();
 
-      if (associatedUser) {
-        console.log(`✅ Found associated Vehicle Owner user: ${associatedUser.user_id} for vehicle ${id}`);
-        
-        // Get approval flow for this user
-        const approvalFlows = await db('approval_flow_trans as aft')
-          .leftJoin('approval_type_master as atm', 'aft.approval_type_id', 'atm.approval_type_id')
-          .where('aft.user_id_reference_id', associatedUser.user_id)
-          .select(
-            'aft.*',
-            'atm.approval_type as approval_category',
-            'atm.approval_name'
-          )
-          .orderBy('aft.created_at', 'desc');
+    // Only fetch approval status for vehicles that are not in DRAFT status
+    const isDraftStatus =
+      vehicle.status === "DRAFT" || vehicle.status === "SAVE_AS_DRAFT";
 
-        userApprovalStatus = {
-          approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id || null,
-          userId: associatedUser.user_id,
-          userEmail: associatedUser.email_id,
-          userMobile: associatedUser.mobile_number,
-          userStatus: associatedUser.status,
-          isActive: associatedUser.is_active,
-          currentApprovalStatus: approvalFlows[0]?.s_status || associatedUser.status,
-          pendingWith: approvalFlows[0]?.pending_with_name || null,
-          pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
-          createdByUserId: approvalFlows[0]?.created_by_user_id || null,
-          createdByName: approvalFlows[0]?.created_by_name || null,
-        };
+    if (!isDraftStatus) {
+      try {
+        // Find Vehicle Owner user associated with this vehicle
+        // Vehicle Owner users have pattern: VO0001, VO0002, etc.
+        const vehicleNumber = id.substring(3); // Remove 'VEH' prefix
+        const vehicleOwnerUserId = `VO${vehicleNumber.padStart(4, "0")}`;
 
-        approvalHistory = approvalFlows;
-        
-        console.log(`✅ Found approval status for vehicle ${id}:`, userApprovalStatus);
-      } else {
-        console.log(`⚠️  No Vehicle Owner user found for vehicle ${id}`);
+        console.log(
+          `🔍 Looking for Vehicle Owner user with derived ID: ${vehicleOwnerUserId} (from vehicle ${id})`
+        );
+
+        // Get user record with derived ID
+        const associatedUser = await db("user_master")
+          .where("user_id", vehicleOwnerUserId)
+          .where("user_type_id", "UT003") // Vehicle Owner user type (corrected from UT005)
+          .first();
+
+        if (associatedUser) {
+          console.log(
+            `✅ Found associated Vehicle Owner user: ${associatedUser.user_id} for vehicle ${id}`
+          );
+
+          // Get approval flow for this user
+          const approvalFlows = await db("approval_flow_trans as aft")
+            .leftJoin(
+              "approval_type_master as atm",
+              "aft.approval_type_id",
+              "atm.approval_type_id"
+            )
+            .where("aft.user_id_reference_id", associatedUser.user_id)
+            .select(
+              "aft.*",
+              "atm.approval_type as approval_category",
+              "atm.approval_name"
+            )
+            .orderBy("aft.created_at", "desc");
+
+          console.log(
+            `✅ Found ${approvalFlows.length} approval flow records for ${associatedUser.user_id}`
+          );
+
+          if (approvalFlows.length > 0) {
+            userApprovalStatus = {
+              approvalFlowTransId:
+                approvalFlows[0]?.approval_flow_trans_id || null,
+              userId: associatedUser.user_id,
+              userEmail: associatedUser.email_id,
+              userMobile: associatedUser.mobile_number,
+              userStatus: associatedUser.status,
+              isActive: associatedUser.is_active,
+              currentApprovalStatus:
+                approvalFlows[0]?.s_status || associatedUser.status,
+              pendingWith: approvalFlows[0]?.pending_with_name || null,
+              pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
+              createdByUserId: approvalFlows[0]?.created_by_user_id || null,
+              createdByName: approvalFlows[0]?.created_by_name || null,
+            };
+
+            approvalHistory = approvalFlows;
+
+            console.log(
+              `✅ Found approval status for vehicle ${id}:`,
+              userApprovalStatus
+            );
+          } else {
+            console.warn(
+              `⚠️ No approval flow found for user: ${vehicleOwnerUserId}`
+            );
+          }
+        } else {
+          console.warn(
+            `⚠️ No Vehicle Owner user found with ID: ${vehicleOwnerUserId}`
+          );
+        }
+      } catch (approvalError) {
+        console.error(
+          "❌ Error fetching vehicle approval status:",
+          approvalError.message
+        );
       }
-    } catch (approvalError) {
-      console.error('❌ Error fetching vehicle approval status:', approvalError.message);
     }
 
     // Format response
@@ -1971,7 +2011,6 @@ const deleteVehicle = async (req, res) => {
  * Get master data for vehicle dropdowns
  * @route GET /api/vehicle/master-data
  */
-
 
 const getMasterData = async (req, res) => {
   try {
@@ -3012,6 +3051,209 @@ const submitVehicleFromDraft = async (req, res) => {
         status: "PENDING", // Change to PENDING
       });
 
+    // ==================================================================
+    // CREATE VEHICLE OWNER USER & APPROVAL FLOW (matching driver pattern)
+    // ==================================================================
+
+    const vehicleOwnerUserId = await generateVehicleOwnerUserId(id); // Pass vehicle ID for pattern-based generation
+    const initialPassword = generateVehicleOwnerPassword(
+      vehicleData.vehicle_registration_number
+    );
+    const hashedPassword = await require("bcrypt").hash(initialPassword, 10);
+
+    console.log(
+      `  📝 Creating Vehicle Owner user: ${vehicleOwnerUserId} for vehicle ${id}`
+    );
+
+    // Check if vehicle owner user already exists
+    const existingUser = await trx("user_master")
+      .where("user_id", vehicleOwnerUserId)
+      .first();
+
+    if (!existingUser) {
+      // Create vehicle owner user
+      await trx("user_master").insert({
+        user_id: vehicleOwnerUserId,
+        user_full_name: `Vehicle Owner - ${vehicleData.vehicle_registration_number}`,
+        password: hashedPassword,
+        user_type_id: "UT003", // Vehicle Owner type
+        email_id: `vehicle_${vehicleData.vehicle_registration_number
+          .replace(/\s+/g, "_")
+          .toLowerCase()}@tms.com`,
+        mobile_number: "0000000000", // Placeholder
+        status: "PENDING",
+        created_by: userId,
+        updated_by: userId,
+        created_at: db.fn.now(),
+        updated_at: db.fn.now(),
+        created_on: db.fn.now(),
+        updated_on: db.fn.now(),
+      });
+
+      console.log(`  ✅ Created Vehicle Owner user: ${vehicleOwnerUserId}`);
+      console.log(
+        `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
+      );
+
+      // Get approval configuration for Vehicle Owner (AT004)
+      const approvalConfig = await trx("approval_configuration")
+        .where("approval_type_id", "AT004")
+        .where("status", "ACTIVE")
+        .first();
+
+      if (!approvalConfig) {
+        throw new Error(
+          "Approval configuration not found for Vehicle Owner (AT004)"
+        );
+      }
+
+      // Determine approver based on creator
+      const creator = await trx("user_master").where("user_id", userId).first();
+      const creatorUserId = creator?.user_id || userId;
+      const creatorName = creator?.user_full_name || "System User";
+
+      let pendingWithUserId;
+      let pendingWithName;
+
+      // If creator is PO1, assign to PO2, and vice versa
+      if (creatorUserId === "PO001") {
+        const po2 = await trx("user_master").where("user_id", "PO002").first();
+        pendingWithUserId = "PO002";
+        pendingWithName = po2?.user_full_name || "Product Owner 2";
+      } else if (creatorUserId === "PO002") {
+        const po1 = await trx("user_master").where("user_id", "PO001").first();
+        pendingWithUserId = "PO001";
+        pendingWithName = po1?.user_full_name || "Product Owner 1";
+      } else {
+        // If creator is neither PO1 nor PO2, default to PO001
+        const po1 = await trx("user_master").where("user_id", "PO001").first();
+        pendingWithUserId = "PO001";
+        pendingWithName = po1?.user_full_name || "Product Owner 1";
+      }
+
+      // Generate approval flow trans ID
+      const approvalFlowId = await generateApprovalFlowId();
+
+      // Create approval flow transaction entry
+      await trx("approval_flow_trans").insert({
+        approval_flow_trans_id: approvalFlowId,
+        approval_config_id: approvalConfig.approval_config_id,
+        approval_type_id: "AT004", // Vehicle Owner
+        user_id_reference_id: vehicleOwnerUserId, // Use Vehicle Owner user ID
+        s_status: "PENDING",
+        approver_level: 1,
+        pending_with_role_id: "RL001", // Product Owner role
+        pending_with_user_id: pendingWithUserId,
+        pending_with_name: pendingWithName,
+        created_by_user_id: creatorUserId,
+        created_by_name: creatorName,
+        created_by: creatorUserId,
+        updated_by: creatorUserId,
+        created_at: db.fn.now(),
+        updated_at: db.fn.now(),
+        created_on: db.fn.now(),
+        updated_on: db.fn.now(),
+        status: "ACTIVE",
+      });
+
+      console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+      console.log(
+        `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
+      );
+    } else {
+      console.log(
+        `  ✅ Vehicle Owner user already exists: ${vehicleOwnerUserId}`
+      );
+
+      // Update existing user status to PENDING if it's currently DRAFT
+      if (existingUser.status === "DRAFT") {
+        await trx("user_master").where("user_id", vehicleOwnerUserId).update({
+          status: "PENDING",
+          updated_by: userId,
+          updated_at: db.fn.now(),
+          updated_on: db.fn.now(),
+        });
+        console.log(
+          `  ✅ Updated user status to PENDING: ${vehicleOwnerUserId}`
+        );
+      }
+
+      // Check if approval flow already exists
+      const existingApprovalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", vehicleOwnerUserId)
+        .where("s_status", "PENDING")
+        .first();
+
+      if (!existingApprovalFlow) {
+        console.log(`  🔄 Creating missing approval flow for existing user`);
+
+        const approvalConfig = await trx("approval_configuration")
+          .where("approval_type_id", "AT004")
+          .where("status", "ACTIVE")
+          .first();
+
+        if (approvalConfig) {
+          const creator = await trx("user_master")
+            .where("user_id", userId)
+            .first();
+          const creatorUserId = creator?.user_id || userId;
+          const creatorName = creator?.user_full_name || "System User";
+
+          let pendingWithUserId;
+          let pendingWithName;
+
+          if (creatorUserId === "PO001") {
+            const po2 = await trx("user_master")
+              .where("user_id", "PO002")
+              .first();
+            pendingWithUserId = "PO002";
+            pendingWithName = po2?.user_full_name || "Product Owner 2";
+          } else if (creatorUserId === "PO002") {
+            const po1 = await trx("user_master")
+              .where("user_id", "PO001")
+              .first();
+            pendingWithUserId = "PO001";
+            pendingWithName = po1?.user_full_name || "Product Owner 1";
+          } else {
+            const po1 = await trx("user_master")
+              .where("user_id", "PO001")
+              .first();
+            pendingWithUserId = "PO001";
+            pendingWithName = po1?.user_full_name || "Product Owner 1";
+          }
+
+          const approvalFlowId = await generateApprovalFlowId();
+
+          await trx("approval_flow_trans").insert({
+            approval_flow_trans_id: approvalFlowId,
+            approval_config_id: approvalConfig.approval_config_id,
+            approval_type_id: "AT004",
+            user_id_reference_id: vehicleOwnerUserId,
+            s_status: "PENDING",
+            approver_level: 1,
+            pending_with_role_id: "RL001",
+            pending_with_user_id: pendingWithUserId,
+            pending_with_name: pendingWithName,
+            created_by_user_id: creatorUserId,
+            created_by_name: creatorName,
+            created_by: creatorUserId,
+            updated_by: creatorUserId,
+            created_at: db.fn.now(),
+            updated_at: db.fn.now(),
+            created_on: db.fn.now(),
+            updated_on: db.fn.now(),
+            status: "ACTIVE",
+          });
+
+          console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
+        }
+      }
+    }
+
+    // ==================================================================
+    // Continue with existing logic for ownership, maintenance, etc.
+    // ==================================================================
+
     // Delete existing related data and re-insert with ACTIVE status
     await trx("vehicle_ownership_details").where("vehicle_id_code", id).del();
     await trx("vehicle_maintenance_service_history")
@@ -3267,7 +3509,7 @@ const lookupVehicleByRC = async (req, res) => {
     if (!registrationNumber || registrationNumber.length < 8) {
       return res.status(400).json({
         success: false,
-        message: 'Valid registration number is required (minimum 8 characters)'
+        message: "Valid registration number is required (minimum 8 characters)",
       });
     }
 
@@ -3275,89 +3517,94 @@ const lookupVehicleByRC = async (req, res) => {
     const cleanRegNumber = registrationNumber.trim().toUpperCase();
 
     // Call actual RC API
-    const axios = require('axios');
+    const axios = require("axios");
     const apiUrl = `https://api.maventic.in/mapi/getVehicleDetailsByVehicleNumber`;
 
     try {
       const response = await axios.get(apiUrl, {
         timeout: 30000, // 30 second timeout
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          Authorization: `Bearer ${process.env.VEHICLE_API_KEY}`
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${process.env.VEHICLE_API_KEY}`,
         },
         data: {
-          vehiclenumber: cleanRegNumber
+          vehiclenumber: cleanRegNumber,
         },
         // Add SSL configuration to handle certificate issues
-        httpsAgent: new (require('https')).Agent({
-          rejectUnauthorized: false
-        })
+        httpsAgent: new (require("https").Agent)({
+          rejectUnauthorized: false,
+        }),
       });
 
-      console.log('RC API Response:', response.data);
+      console.log("RC API Response:", response.data);
       // Check if response has data
-      if (response.data && response.data.response && response.data.response.length > 0) {
+      if (
+        response.data &&
+        response.data.response &&
+        response.data.response.length > 0
+      ) {
         const rcResponse = response.data.response[0];
-        
-        if (rcResponse.responseStatus === 'SUCCESS' && rcResponse.jsonResponse?.VehicleDetails) {
+
+        if (
+          rcResponse.responseStatus === "SUCCESS" &&
+          rcResponse.jsonResponse?.VehicleDetails
+        ) {
           // Return successful response
           res.json({
             success: true,
-            message: 'Vehicle details fetched successfully',
-            response: response.data.response
+            message: "Vehicle details fetched successfully",
+            response: response.data.response,
           });
         } else {
           // Vehicle not found
           return res.status(404).json({
             success: false,
-            message: 'Registration number not found in RC database'
+            message: "Registration number not found in RC database",
           });
         }
       } else {
         // No data found
         return res.status(404).json({
           success: false,
-          message: 'Registration number not found in RC database'
+          message: "Registration number not found in RC database",
         });
       }
     } catch (apiError) {
-      console.error('RC API Error:', apiError.message);
-      
+      console.error("RC API Error:", apiError.message);
+
       // Handle different types of API errors
-      if (apiError.code === 'ECONNABORTED') {
+      if (apiError.code === "ECONNABORTED") {
         return res.status(408).json({
           success: false,
-          message: 'Request timeout - RC API is taking too long to respond'
+          message: "Request timeout - RC API is taking too long to respond",
         });
       } else if (apiError.response?.status === 404) {
         return res.status(404).json({
           success: false,
-          message: 'Registration number not found in RC database'
+          message: "Registration number not found in RC database",
         });
       } else if (apiError.response?.status >= 500) {
         return res.status(502).json({
           success: false,
-          message: 'Server error occurred while fetching vehicle details'
+          message: "Server error occurred while fetching vehicle details",
         });
       } else {
         return res.status(502).json({
           success: false,
-          message: 'Error occurred in server while fetching vehicle details'
+          message: "Error occurred in server while fetching vehicle details",
         });
       }
     }
-
   } catch (error) {
-    console.error('Error in RC lookup:', error);
+    console.error("Error in RC lookup:", error);
     res.status(500).json({
       success: false,
-      message: 'Error occurred in server while processing request',
-      error: error.message
+      message: "Error occurred in server while processing request",
+      error: error.message,
     });
   }
 };
-
 
 module.exports = {
   createVehicle,
@@ -3369,7 +3616,6 @@ module.exports = {
   lookupVehicleByRC,
   saveVehicleAsDraft,
   deleteVehicleDraft,
-  submitVehicleFromDraft, 
+  submitVehicleFromDraft,
   updateVehicleDraft,
-  
 };

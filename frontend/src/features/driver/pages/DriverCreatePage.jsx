@@ -916,18 +916,7 @@ const DriverCreatePage = () => {
         addressTypeId: "",
       },
     ],
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        issuingCountry: "",
-        issuingState: "",
-        validFrom: "",
-        validTo: "",
-        status: true,
-        // Note: File uploads will be handled separately via document_upload table
-      },
-    ],
+    documents: [], // Start with empty array - mandatory docs will be added by DocumentsTab
     history: [
       {
         employer: "",

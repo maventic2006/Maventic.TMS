@@ -893,10 +893,30 @@ const CreateVehiclePage = () => {
       // Navigate to vehicle list after successful save (matching transporter pattern)
       navigate("/vehicles");
     } catch (error) {
+      console.error("❌ Save draft error:", error);
+
+      // Handle field-specific errors (GPS IMEI, Registration Number, VIN, etc.)
+      let errorMessage = error?.message || "Failed to save draft";
+      let errorDetails = [];
+
+      if (error.field) {
+        // Field-specific error (e.g., duplicate GPS IMEI)
+        errorDetails.push(`${error.field}: ${error.message}`);
+      } else if (error.errors && Array.isArray(error.errors)) {
+        // Multiple validation errors
+        errorDetails = error.errors.map((err) => {
+          if (typeof err === "string") return err;
+          if (err.field && err.message) return `${err.field}: ${err.message}`;
+          return err.message || err;
+        });
+      }
+
       dispatch(
         addToast({
           type: TOAST_TYPES.ERROR,
-          message: error?.message || "Failed to save draft",
+          message: errorMessage,
+          details: errorDetails.length > 0 ? errorDetails : undefined,
+          duration: 8000,
         })
       );
     }

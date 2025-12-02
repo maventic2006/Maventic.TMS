@@ -621,7 +621,7 @@ async function updateRelatedEntityStatus(
       // First, get the vehicle owner user details
       const vehicleOwnerUser = await trx("user_master")
         .where("user_id", user_id_reference_id)
-        .select("user_full_name", "created_at")
+        .select("user_id", "user_full_name", "created_at")
         .first();
 
       if (!vehicleOwnerUser) {
@@ -645,13 +645,29 @@ async function updateRelatedEntityStatus(
       );
 
       // CRITICAL: Find and update the vehicle associated with this user
-      // Vehicle Owner user names are like "Vehicle Owner - VEH0062"
-      // Extract vehicle ID from the user name
-      const vehicleIdMatch = vehicleOwnerUser.user_full_name.match(/VEH\d+/);
+      // Vehicle Owner user IDs follow pattern: VO0001, VO0062, etc.
+      // Corresponding vehicle IDs: VEH0001, VEH0062, etc.
+      // Extract number from VO ID and create VEH ID
 
-      if (vehicleIdMatch) {
-        const vehicleId = vehicleIdMatch[0];
+      let vehicleId = null;
 
+      // Try pattern-based derivation first (VO0001 → VEH0001)
+      if (user_id_reference_id.startsWith("VO")) {
+        const vehicleNumber = user_id_reference_id.substring(2); // Remove 'VO' prefix
+        vehicleId = `VEH${vehicleNumber}`;
+        console.log(
+          `🔍 Derived vehicle ID from user ID: ${user_id_reference_id} → ${vehicleId}`
+        );
+      } else {
+        // Fallback: Extract from user name (Vehicle Owner - VEH0062)
+        const vehicleIdMatch = vehicleOwnerUser.user_full_name.match(/VEH\d+/);
+        if (vehicleIdMatch) {
+          vehicleId = vehicleIdMatch[0];
+          console.log(`🔍 Extracted vehicle ID from user name: ${vehicleId}`);
+        }
+      }
+
+      if (vehicleId) {
         console.log(
           `🔍 Updating vehicle ${vehicleId} status to ${entityStatus}...`
         );
@@ -662,7 +678,7 @@ async function updateRelatedEntityStatus(
           .update({
             status: entityStatus,
             updated_at: knex.fn.now(),
-            updated_by: actionedByUserId, // Fixed: Use proper user ID instead of CURRENT_TIMESTAMP
+            updated_by: actionedByUserId,
           });
 
         if (vehicleUpdateResult > 0) {
@@ -684,7 +700,7 @@ async function updateRelatedEntityStatus(
         }
       } else {
         console.warn(
-          `⚠️ Could not extract vehicle ID from user name: ${vehicleOwnerUser.user_full_name}`
+          `⚠️ Could not extract vehicle ID from user ${user_id_reference_id} or name: ${vehicleOwnerUser.user_full_name}`
         );
       }
     }
@@ -694,7 +710,7 @@ async function updateRelatedEntityStatus(
       // First, get the warehouse manager user details
       const warehouseUser = await trx("user_master")
         .where("user_id", user_id_reference_id)
-        .select("consignor_id", "created_at")
+        .select("consignor_id", "created_at", "created_by_user_id")
         .first();
 
       if (!warehouseUser) {
@@ -718,21 +734,46 @@ async function updateRelatedEntityStatus(
       );
 
       // CRITICAL: Find and update the warehouse that was created by this user
-      // Look for warehouse with same consignor_id created around the same time as the user
-      const warehouse = await trx("warehouse_basic_information")
+      // Strategy 1: Try time-based matching with wider window (within 10 seconds)
+      let warehouse = await trx("warehouse_basic_information")
         .where("consignor_id", warehouseUser.consignor_id)
         .where(
           "created_at",
           ">=",
-          new Date(new Date(warehouseUser.created_at).getTime() - 1000)
-        ) // Within 1 second before user creation
+          new Date(new Date(warehouseUser.created_at).getTime() - 2000)
+        ) // Within 2 seconds before user creation
         .where(
           "created_at",
           "<=",
-          new Date(new Date(warehouseUser.created_at).getTime() + 5000)
-        ) // Within 5 seconds after user creation
+          new Date(new Date(warehouseUser.created_at).getTime() + 10000)
+        ) // Within 10 seconds after user creation
         .orderBy("created_at", "desc")
         .first();
+
+      // Strategy 2: If time-based fails, find most recent PENDING warehouse for this consignor
+      if (!warehouse) {
+        console.log(
+          `⚠️ Time-based search failed. Searching for most recent PENDING warehouse...`
+        );
+        warehouse = await trx("warehouse_basic_information")
+          .where("consignor_id", warehouseUser.consignor_id)
+          .where("status", "PENDING")
+          .where("created_by", warehouseUser.created_by_user_id) // Match creator
+          .orderBy("created_at", "desc")
+          .first();
+      }
+
+      // Strategy 3: Last resort - find ANY recent PENDING warehouse for this consignor
+      if (!warehouse) {
+        console.log(
+          `⚠️ Creator-based search failed. Searching for any recent PENDING warehouse...`
+        );
+        warehouse = await trx("warehouse_basic_information")
+          .where("consignor_id", warehouseUser.consignor_id)
+          .where("status", "PENDING")
+          .orderBy("created_at", "desc")
+          .first();
+      }
 
       if (!warehouse) {
         console.warn(
@@ -750,6 +791,7 @@ async function updateRelatedEntityStatus(
           .update({
             status: entityStatus, // Use UPPERCASE status for entity table
             updated_at: knex.fn.now(),
+            updated_by: actionedByUserId, // Track who approved/rejected
           });
 
         console.log(

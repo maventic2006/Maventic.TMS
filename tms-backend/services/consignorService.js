@@ -12,6 +12,29 @@ const {
 } = require("../validation/consignorValidation");
 
 /**
+ * Transform frontend field names to backend field names
+ * Handles both camelCase (frontend) and snake_case (backend) field names
+ */
+const transformDocumentFields = (documents) => {
+  if (!documents || !Array.isArray(documents)) {
+    return documents;
+  }
+
+  return documents.map((doc) => ({
+    document_unique_id: doc.document_unique_id,
+    // Accept both frontend (documentType) and backend (document_type_id) field names
+    document_type_id: doc.documentType || doc.document_type_id,
+    document_number: doc.documentNumber || doc.document_number || null,
+    // Accept both validFrom and valid_from
+    valid_from: doc.validFrom || doc.valid_from,
+    valid_to: doc.validTo || doc.valid_to || null,
+    country: doc.country || null,
+    status: doc.status !== undefined ? doc.status : true,
+    fileKey: doc.fileKey || null,
+  }));
+};
+
+/**
  * Generate unique contact ID
  */
 const generateContactId = async (trx = knex) => {
@@ -731,6 +754,11 @@ const createConsignor = async (payload, files, userId) => {
   const trx = await knex.transaction();
 
   try {
+    // Transform document fields from frontend format to backend format
+    if (payload.documents && Array.isArray(payload.documents)) {
+      payload.documents = transformDocumentFields(payload.documents);
+    }
+
     // Validate payload
     const { error, value } = consignorCreateSchema.validate(payload, {
       abortEarly: false,
@@ -1253,10 +1281,13 @@ const updateConsignor = async (customerId, payload, files, userId) => {
         }
       }
 
+      // Filter out frontend-only fields that don't exist in database
+      const { userApprovalStatus, ...generalDbFields } = general;
+
       await trx("consignor_basic_information")
         .where("customer_id", customerId)
         .update({
-          ...general,
+          ...generalDbFields,
           updated_by: userId,
           updated_at: knex.fn.now(),
         });
@@ -1264,19 +1295,17 @@ const updateConsignor = async (customerId, payload, files, userId) => {
 
     // 2. Update contacts if provided with photo upload handling
     if (contacts) {
-      // Soft delete existing contacts
-      await trx("contact").where("customer_id", customerId).update({
-        status: "INACTIVE",
-        updated_by: userId,
-        updated_at: knex.fn.now(),
-      });
+      // Hard delete existing contacts to avoid duplicate key errors
+      // This is safe because we're in a transaction - if anything fails, everything rolls back
+      await trx("contact").where("customer_id", customerId).del();
 
       // Insert new contacts with frontend field mapping and photo uploads
       if (contacts.length > 0) {
         const contactInserts = await Promise.all(
           contacts.map(async (contact, index) => {
-            const contactId =
-              contact.contact_id || (await generateContactId(trx));
+            // Always generate a new contact ID to avoid conflicts
+            // Even if contact has an ID, we deleted all old contacts, so we need fresh IDs
+            const contactId = await generateContactId(trx);
 
             // Handle photo upload if file exists
             let photoUrl = contact.photo || null;

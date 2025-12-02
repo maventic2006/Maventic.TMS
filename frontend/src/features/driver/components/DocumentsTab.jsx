@@ -406,7 +406,7 @@
 
 // export default DocumentsTab;
 
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import { FileText, Plus, X, Calendar, Upload, File, Lock } from "lucide-react";
 import { CustomSelect } from "../../../components/ui/Select";
 import { Country, State } from "country-state-city";
@@ -423,6 +423,9 @@ const DocumentsTab = ({
   const dispatch = useDispatch();
   const { mandatoryDocuments } = useSelector((state) => state.driver);
   const documents = formData?.documents || [];
+
+  // Track if mandatory documents have been initialized to prevent duplicate additions
+  const mandatoryDocsInitialized = useRef(false);
 
   // Normalize document type options so value is always the SHORT ID and label the name.
   const docTypeOptions = useMemo(() => {
@@ -445,61 +448,44 @@ const DocumentsTab = ({
     });
   }, [masterData]);
 
-  // Fetch mandatory documents on mount
+  // Fetch mandatory documents on mount (only once)
   useEffect(() => {
     if (mandatoryDocuments.length === 0) {
+      console.log("🔄 Fetching mandatory documents...");
       dispatch(fetchMandatoryDocuments());
     }
   }, [dispatch, mandatoryDocuments.length]);
 
-  // Pre-populate mandatory documents on first render or when mandatory docs are loaded
+  // Pre-populate mandatory documents with proper initialization tracking
   useEffect(() => {
-    if (mandatoryDocuments.length > 0 && documents.length > 0) {
-      // Check if ALL mandatory document types are already present by matching document type IDs
-      const existingDocTypes = documents
-        .filter((doc) => doc.isMandatory)
-        .map((doc) => doc.documentType);
+    // Skip if already initialized
+    if (mandatoryDocsInitialized.current) {
+      console.log("✅ Mandatory documents already initialized, skipping");
+      return;
+    }
 
-      // Find missing mandatory documents
-      const missingMandatoryDocs = mandatoryDocuments.filter((mandDoc) => {
-        const mandDocTypeId =
-          mandDoc.documentTypeId ||
-          mandDoc.doc_name_master_id ||
-          mandDoc.documentTypeCode ||
-          "";
-        return !existingDocTypes.includes(mandDocTypeId);
-      });
+    // Wait for mandatory documents to be loaded
+    if (mandatoryDocuments.length === 0) {
+      console.log("⏳ Waiting for mandatory documents to load...");
+      return;
+    }
 
-      // Only add missing mandatory documents
-      if (missingMandatoryDocs.length > 0) {
-        const newMandatoryDocs = missingMandatoryDocs.map((mandDoc) => ({
-          // make sure we set the ID (short) into documentType
-          documentType:
-            mandDoc.documentTypeId ||
-            mandDoc.doc_name_master_id ||
-            mandDoc.documentTypeCode ||
-            "", // fallback
-          documentNumber: "",
-          issuingCountry: "",
-          issuingState: "",
-          validFrom: "",
-          validTo: "",
-          status: true,
-          fileName: "",
-          fileType: "",
-          fileData: "",
-          isMandatory: !!mandDoc.isMandatory,
-          documentTypeName:
-            mandDoc.documentTypeName || mandDoc.documentName || "",
-        }));
+    console.log("🔍 Checking document initialization state...");
+    console.log("  - Current documents count:", documents.length);
+    console.log("  - Mandatory documents count:", mandatoryDocuments.length);
 
-        setFormData((prev) => ({
-          ...prev,
-          documents: [...newMandatoryDocs, ...prev.documents],
-        }));
-      }
-    } else if (mandatoryDocuments.length > 0 && documents.length === 0) {
-      // If no documents exist at all, add all mandatory documents
+    // SCENARIO A: CREATE PAGE - Empty or only placeholder documents
+    // Check if documents array is empty OR contains only empty placeholder documents
+    const hasOnlyEmptyDocs = documents.every(
+      (doc) =>
+        !doc.documentType &&
+        !doc.documentNumber &&
+        !doc.fileName &&
+        !doc.documentTypeId
+    );
+
+    if (documents.length === 0 || (documents.length > 0 && hasOnlyEmptyDocs)) {
+      console.log("📝 CREATE MODE: Adding mandatory documents to empty form");
       const mandatoryDocs = mandatoryDocuments.map((mandDoc) => ({
         documentType:
           mandDoc.documentTypeId ||
@@ -524,7 +510,107 @@ const DocumentsTab = ({
         ...prev,
         documents: mandatoryDocs,
       }));
+
+      mandatoryDocsInitialized.current = true;
+      console.log("✅ Mandatory documents initialized for CREATE mode");
+      return;
     }
+
+    // SCENARIO B: EDIT DRAFT PAGE - Documents loaded from database
+    // Check if ALL mandatory document types are already present
+    const existingDocTypes = documents.map(
+      (doc) => doc.documentType || doc.documentTypeId
+    );
+
+    // Find missing mandatory documents
+    const missingMandatoryDocs = mandatoryDocuments.filter((mandDoc) => {
+      const mandDocTypeId =
+        mandDoc.documentTypeId ||
+        mandDoc.doc_name_master_id ||
+        mandDoc.documentTypeCode ||
+        "";
+      return !existingDocTypes.includes(mandDocTypeId);
+    });
+
+    // Add missing mandatory documents if any
+    if (missingMandatoryDocs.length > 0) {
+      console.log(
+        `📝 EDIT MODE: Adding ${missingMandatoryDocs.length} missing mandatory documents`
+      );
+      const newMandatoryDocs = missingMandatoryDocs.map((mandDoc) => ({
+        documentType:
+          mandDoc.documentTypeId ||
+          mandDoc.doc_name_master_id ||
+          mandDoc.documentTypeCode ||
+          "",
+        documentNumber: "",
+        issuingCountry: "",
+        issuingState: "",
+        validFrom: "",
+        validTo: "",
+        status: true,
+        fileName: "",
+        fileType: "",
+        fileData: "",
+        isMandatory: !!mandDoc.isMandatory,
+        documentTypeName:
+          mandDoc.documentTypeName || mandDoc.documentName || "",
+      }));
+
+      setFormData((prev) => ({
+        ...prev,
+        documents: [...newMandatoryDocs, ...prev.documents],
+      }));
+
+      mandatoryDocsInitialized.current = true;
+      console.log("✅ Missing mandatory documents added for EDIT mode");
+      return;
+    }
+
+    // Mark existing documents that match mandatory types with isMandatory flag
+    const documentsNeedUpdate = documents.some((doc) => {
+      const docTypeId = doc.documentType || doc.documentTypeId;
+      const isMandatoryType = mandatoryDocuments.some((mandDoc) => {
+        const mandDocTypeId =
+          mandDoc.documentTypeId ||
+          mandDoc.doc_name_master_id ||
+          mandDoc.documentTypeCode ||
+          "";
+        return mandDocTypeId === docTypeId;
+      });
+      return isMandatoryType && !doc.isMandatory;
+    });
+
+    if (documentsNeedUpdate) {
+      console.log(
+        "🔒 EDIT MODE: Marking existing documents with mandatory flags"
+      );
+      const updatedDocuments = documents.map((doc) => {
+        const docTypeId = doc.documentType || doc.documentTypeId;
+        const isMandatoryType = mandatoryDocuments.some((mandDoc) => {
+          const mandDocTypeId =
+            mandDoc.documentTypeId ||
+            mandDoc.doc_name_master_id ||
+            mandDoc.documentTypeCode ||
+            "";
+          return mandDocTypeId === docTypeId;
+        });
+
+        if (isMandatoryType && !doc.isMandatory) {
+          return { ...doc, isMandatory: true };
+        }
+        return doc;
+      });
+
+      setFormData((prev) => ({
+        ...prev,
+        documents: updatedDocuments,
+      }));
+    }
+
+    // Mark as initialized after all checks
+    mandatoryDocsInitialized.current = true;
+    console.log("✅ Document initialization complete");
   }, [mandatoryDocuments, setFormData]); // intentionally not depending on documents to avoid loops
 
   // Get all countries
