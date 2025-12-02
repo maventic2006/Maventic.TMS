@@ -20,22 +20,24 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install PM2
+        run: npm install -g pm2
+
       - name: Install Frontend Dependencies
         run: |
-            cd /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/frontend
-            npm ci --production
-  
+          cd frontend
+          npm ci
+
       - name: Build Frontend
         run: |
-            cd /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/frontend
-            npm run build
-  
+          cd frontend
+          npm run build
+
       - name: Install Backend Dependencies
         run: |
-            cd /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/tms-backend
-            npm ci --production
-  
+          cd tms-backend
+          npm ci
+
       - name: Deploy with PM2
         run: |
-            cd /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS
-            pm2 restart all || pm2 start ecosystem.config.js
+          pm2 restart all || pm2 start ecosystem.config.js
