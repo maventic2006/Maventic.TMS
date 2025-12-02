@@ -6,7 +6,7 @@ module.exports = {
         script: "npx",
         args: "serve -s dist -l 5174",
         env: {
-          NODE_ENV: "production"
+          NODE_ENV: "development"
         }
       },
       {
