@@ -40,4 +40,5 @@ jobs:
 
       - name: Deploy with PM2
         run: |
+          cd /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/
           pm2 restart all || pm2 start ecosystem.config.js
