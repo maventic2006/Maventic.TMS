@@ -35,7 +35,7 @@ const ConfigurationTopActionBar = ({
             </Button>
             <div className="flex flex-col min-w-0 flex-1">
               <h1 className="text-2xl font-bold text-[#0D1A33] font-poppins truncate">
-                Global Master Config -  {configurationName || 'Configuration Management'}
+                Consignor Config -  {configurationName || 'Configuration Management'}
               </h1>
               {/* {totalCount > 0 && (
                 <p className="text-xs sm:text-sm text-gray-600 font-medium">

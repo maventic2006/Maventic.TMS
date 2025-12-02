@@ -4,6 +4,8 @@ const {
   getConsignorConfigurations,
   getConsignorConfigurationMetadata,
   getConsignorConfigurationData,
+  getConsignorConfigurationDropdownOptions,
+  getTableSchemaInfo,
   createConsignorConfigurationRecord,
   updateConsignorConfigurationRecord,
   deleteConsignorConfigurationRecord
@@ -31,6 +33,20 @@ router.get("/:configName/metadata", authenticateToken, getConsignorConfiguration
  * @access Protected
  */
 router.get("/:configName/data", authenticateToken, getConsignorConfigurationData);
+
+/**
+ * @route GET /api/consignor-configuration/:configName/dropdown-options
+ * @desc Get dropdown options for select fields in a specific consignor configuration
+ * @access Protected
+ */
+router.get("/:configName/dropdown-options", authenticateToken, getConsignorConfigurationDropdownOptions);
+
+/**
+ * @route GET /api/consignor-configuration/:configName/schema
+ * @desc Get database table schema information for a specific consignor configuration
+ * @access Protected
+ */
+router.get("/:configName/schema", authenticateToken, getTableSchemaInfo);
 
 /**
  * @route POST /api/consignor-configuration/:configName

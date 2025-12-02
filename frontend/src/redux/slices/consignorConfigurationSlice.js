@@ -29,6 +29,19 @@ export const fetchConsignorConfigurationMetadata = createAsyncThunk(
   }
 );
 
+// Get dropdown options for select fields
+export const fetchConsignorConfigurationDropdownOptions = createAsyncThunk(
+  'consignorConfiguration/fetchConsignorConfigurationDropdownOptions',
+  async (configName, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/consignor-configuration/${configName}/dropdown-options`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch dropdown options');
+    }
+  }
+);
+
 // Get consignor configuration data with pagination
 export const fetchConsignorConfigurationData = createAsyncThunk(
   'consignorConfiguration/fetchConsignorConfigurationData',
@@ -88,6 +101,7 @@ const initialState = {
   metadata: null,
   data: [],
   currentRecord: null,
+  dropdownOptions: {},
   pagination: {
     currentPage: 1,
     totalPages: 1,
@@ -119,6 +133,9 @@ const consignorConfigurationSlice = createSlice({
     clearMetadata: (state) => {
       state.metadata = null;
     },
+    clearDropdownOptions: (state) => {
+      state.dropdownOptions = {};
+    },
     setCurrentPage: (state, action) => {
       state.pagination.currentPage = action.payload;
     }
@@ -149,6 +166,20 @@ const consignorConfigurationSlice = createSlice({
         state.metadata = action.payload.data || action.payload;
       })
       .addCase(fetchConsignorConfigurationMetadata.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      
+      // Fetch dropdown options
+      .addCase(fetchConsignorConfigurationDropdownOptions.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchConsignorConfigurationDropdownOptions.fulfilled, (state, action) => {
+        state.loading = false;
+        state.dropdownOptions = action.payload.data || action.payload;
+      })
+      .addCase(fetchConsignorConfigurationDropdownOptions.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
@@ -234,6 +265,6 @@ const consignorConfigurationSlice = createSlice({
   }
 });
 
-export const { clearErrors, clearData, clearMetadata, setCurrentPage } = consignorConfigurationSlice.actions;
+export const { clearErrors, clearData, clearMetadata, clearDropdownOptions, setCurrentPage } = consignorConfigurationSlice.actions;
 
 export default consignorConfigurationSlice.reducer;
