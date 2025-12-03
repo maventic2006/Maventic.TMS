@@ -195,7 +195,7 @@ const HistoryTab = ({
               <p className="text-lg font-medium">
                 No employment history added yet
               </p>
-              <p className="text-sm">Click "Add" to get started</p>
+              <p className="text-sm">Click "Add" to get started (Optional)</p>
             </div>
           )}
         </div>

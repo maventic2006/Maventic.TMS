@@ -168,7 +168,7 @@ const AccidentViolationTab = ({
               <p className="text-lg font-medium">
                 No accident or violation records added yet
               </p>
-              <p className="text-sm">Click "Add" to get started</p>
+              <p className="text-sm">Click "Add" to get started (Optional)</p>
             </div>
           )}
         </div>

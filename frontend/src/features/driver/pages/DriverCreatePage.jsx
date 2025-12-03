@@ -917,23 +917,8 @@ const DriverCreatePage = () => {
       },
     ],
     documents: [], // Start with empty array - mandatory docs will be added by DocumentsTab
-    history: [
-      {
-        employer: "",
-        employmentStatus: "",
-        fromDate: "",
-        toDate: "",
-        jobTitle: "",
-      },
-    ],
-    accidents: [
-      {
-        type: "",
-        date: "",
-        description: "",
-        vehicleRegistrationNumber: "",
-      },
-    ],
+    history: [], // Optional - start with empty array
+    accidents: [], // Optional - start with empty array
   });
 
   const [validationErrors, setValidationErrors] = useState({});
@@ -985,23 +970,8 @@ const DriverCreatePage = () => {
         status: true,
       },
     ],
-    history: [
-      {
-        employer: "",
-        employmentStatus: "",
-        fromDate: "",
-        toDate: "",
-        jobTitle: "",
-      },
-    ],
-    accidents: [
-      {
-        type: "",
-        date: "",
-        description: "",
-        vehicleRegistrationNumber: "",
-      },
-    ],
+    history: [], // Optional - start with empty array
+    accidents: [], // Optional - start with empty array
   };
 
   // Form dirty tracking - Pass INITIAL form data (empty baseline) to the hook
