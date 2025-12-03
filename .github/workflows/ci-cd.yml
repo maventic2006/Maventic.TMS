@@ -20,24 +20,27 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install PM2
-        run: npm install -g pm2
+      - name: Copy Frontend .env file from secrets
+        run: |
+          cp /home/tms/secrets/frontend/.env /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/frontend/.env
+
+      - name: Copy Backend .env file from secrets
+        run: |
+          cp /home/tms/secrets/backend/.env /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/tms-backend/.env
 
       - name: Install Frontend Dependencies
-        run: |
-          cd frontend
-          npm ci
+        working-directory: frontend
+        run: npm ci
 
       - name: Build Frontend
-        run: |
-          cd frontend
-          npm run build
+        working-directory: frontend
+        run: npm run build
 
       - name: Install Backend Dependencies
-        run: |
-          cd tms-backend
-          npm ci
+        working-directory: tms-backend
+        run: npm ci
 
-      - name: Deploy with PM2
+      - name: Restart PM2 applications
         run: |
-          pm2 restart all || pm2 start /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/ecosystem.config.js
+          pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+          pm2 save

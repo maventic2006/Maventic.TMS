@@ -5,9 +5,10 @@ module.exports = {
       cwd: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/frontend",
       script: "npx",
       args: "serve -s dist -l 5174",
-      env_file: "/home/tms/secrets/frontend/.env",
+      env_file: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/frontend/.env",
       env: {
-        NODE_ENV: "development"
+        NODE_ENV: "development",
+        PORT: 5174
       }
     },
     {
@@ -15,9 +16,9 @@ module.exports = {
       cwd: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/tms-backend",
       script: "npm",
       args: "start",
-      env_file: "/home/tms/secrets/backend/.env",
+      env_file: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/tms-backend/.env",
       env: {
-        NODE_ENV: "production",
+        NODE_ENV: "development",
         PORT: 5001
       }
     }
