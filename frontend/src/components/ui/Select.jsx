@@ -279,7 +279,13 @@ SelectValue.displayName = "SelectValue";
 //   );
 // };
 
-const DropdownPortal = ({ isOpen, triggerRef, children, className }) => {
+const DropdownPortal = ({
+  isOpen,
+  triggerRef,
+  children,
+  className,
+  portalRef,
+}) => {
   const [position, setPosition] = useState({});
   const contentRef = useRef(null);
 
@@ -328,7 +334,12 @@ const DropdownPortal = ({ isOpen, triggerRef, children, className }) => {
 
   return createPortal(
     <div
-      ref={contentRef}
+      ref={(node) => {
+        contentRef.current = node;
+        if (portalRef) {
+          portalRef.current = node;
+        }
+      }}
       data-dropdown-container="true"
       className={clsx(
         "max-h-72 overflow-y-auto overflow-x-hidden rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-lg py-2 text-sm shadow-2xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-300",
@@ -730,32 +741,33 @@ const MultiSelect = ({
   getOptionLabel,
   getOptionValue,
 }) => {
-  const globalDropdownContext = useContext(GlobalDropdownContext);
-  const dropdownId = useRef(Math.random().toString(36).substr(2, 9)).current;
-
-  const triggerRef = useRef(null);
-  const searchInputRef = useRef(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const dropdownRef = useRef(null);
+  const triggerRef = useRef(null);
+  const portalRef = useRef(null);
 
-  const isOpen = globalDropdownContext?.isDropdownOpen(dropdownId) || false;
-
-  const setIsOpen = (open) => {
-    if (!globalDropdownContext) return;
-    if (open && !disabled) {
-      globalDropdownContext.openDropdown(dropdownId);
-      setSearchTerm("");
-    } else {
-      globalDropdownContext.closeDropdown();
-      setSearchTerm("");
-    }
-  };
-
-  // Autofocus search input when dropdown opens
+  // Click-outside detection - includes portal content
   useEffect(() => {
-    if (isOpen && searchable) {
-      setTimeout(() => searchInputRef.current?.focus(), 10);
+    const handleClickOutside = (event) => {
+      // Check if click is outside both the trigger and the portal dropdown
+      const isOutsideTrigger =
+        dropdownRef.current && !dropdownRef.current.contains(event.target);
+      const isOutsidePortal =
+        portalRef.current && !portalRef.current.contains(event.target);
+
+      if (isOutsideTrigger && isOutsidePortal) {
+        setIsDropdownOpen(false);
+        setSearchTerm("");
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [isOpen, searchable]);
+  }, [isDropdownOpen]);
 
   const extractLabel = (option) => {
     if (!option) return "";
@@ -789,73 +801,67 @@ const MultiSelect = ({
     onValueChange(updated); // send full array back
   };
 
-  const getDisplayLabel = () => {
-    if (!value || value.length === 0) return placeholder;
-    return `${value.length} selected`;
+  const handleRemoveItem = (itemValue) => {
+    const updated = value.filter((v) => v !== itemValue);
+    onValueChange(updated);
+  };
+
+  // Get label for selected value
+  const getSelectedLabel = (val) => {
+    const option = options.find((opt) => extractValue(opt) === val);
+    return option ? extractLabel(option) : val;
   };
 
   return (
-    <div className="relative w-full">
-      {/* TRIGGER BUTTON */}
-      <button
+    <div className="w-full" ref={dropdownRef}>
+      {/* TRIGGER - Shows only placeholder or selected count */}
+      <div
         ref={triggerRef}
-        data-dropdown-trigger
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        disabled={disabled}
+        onClick={() => !disabled && setIsDropdownOpen(!isDropdownOpen)}
         className={clsx(
-          "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-xs",
-          "transition-all duration-200 focus:outline-none focus:ring-2",
-          disabled
-            ? "bg-gray-50 text-gray-500 cursor-not-allowed border-gray-200"
-            : error
-            ? "border-red-300 bg-white"
-            : isOpen
-            ? "border-blue-400 bg-white"
-            : "border-gray-200/80 bg-white/90 hover:border-gray-300",
+          "w-full min-h-[38px] px-3 py-2 text-sm border rounded-lg cursor-pointer transition-colors",
+          error
+            ? "border-red-500 focus:border-red-500"
+            : "border-[#E5E7EB] hover:border-[#3B82F6]",
+          disabled && "opacity-50 cursor-not-allowed bg-gray-50",
           className
         )}
       >
-        <span
-          className={clsx(
-            "truncate flex-1",
-            value.length ? "text-gray-900" : "text-gray-500"
-          )}
-        >
-          {getDisplayLabel()}
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-gray-400">{placeholder}</span>
+          <ChevronDown
+            className={clsx(
+              "w-4 h-4 text-gray-400 transition-transform flex-shrink-0",
+              isDropdownOpen && "transform rotate-180"
+            )}
+          />
+        </div>
+      </div>
 
-        <ChevronDown
-          className={clsx(
-            "h-4 w-4 text-gray-400 transition-transform duration-200",
-            isOpen && "rotate-180"
-          )}
-        />
-      </button>
-
-      {/* DROPDOWN PORTAL */}
-      <DropdownPortal isOpen={isOpen} triggerRef={triggerRef}>
+      {/* DROPDOWN MENU - Using Portal */}
+      <DropdownPortal
+        isOpen={isDropdownOpen}
+        triggerRef={triggerRef}
+        portalRef={portalRef}
+      >
+        {/* Search Input */}
         {searchable && (
-          <div className="p-2 border-b border-gray-100">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md"
-              />
-            </div>
+          <div className="p-2 border-b border-gray-200">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search..."
+              className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         )}
 
         {/* OPTIONS LIST */}
-        <div className="max-h-48 overflow-y-auto">
+        <div className="overflow-y-auto max-h-48">
           {filteredOptions.length === 0 ? (
-            <div className="px-3 py-4 text-sm text-gray-500 text-center">
+            <div className="px-3 py-2 text-sm text-gray-500 text-center">
               No options found
             </div>
           ) : (
@@ -866,35 +872,57 @@ const MultiSelect = ({
 
               return (
                 <div
-                  className="w-full px-3 py-2.5 flex items-center gap-3 text-sm cursor-pointer hover:bg-blue-50"
-                  onMouseDown={(e) => {
-                    // prevents the item selection click from bubbling and closing
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
+                  key={index}
                   onClick={(e) => {
-                    e.preventDefault();
                     e.stopPropagation();
                     toggleSelection(optionValue);
                   }}
+                  className={clsx(
+                    "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors",
+                    isSelected
+                      ? "bg-blue-50 text-blue-700 font-medium"
+                      : "hover:bg-gray-50"
+                  )}
                 >
-                  {/* CHECKBOX */}
                   <input
                     type="checkbox"
                     checked={isSelected}
-                    readOnly
-                    className="h-4 w-4"
+                    onChange={() => {}}
+                    className="w-4 h-4 rounded border-gray-300"
                   />
-
-                  <span className="truncate flex-1">{optionLabel}</span>
-
-                  {isSelected && <Check className="h-4 w-4 text-blue-600" />}
+                  {optionLabel}
                 </div>
               );
             })
           )}
         </div>
       </DropdownPortal>
+
+      {/* Error Message */}
+      {error && (
+        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+          ⚠️ {error}
+        </p>
+      )}
+
+      {/* SELECTED PILLS - Display below everything */}
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {value.map((val) => (
+            <span
+              key={val}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!disabled) handleRemoveItem(val);
+              }}
+            >
+              {getSelectedLabel(val)}
+              <X className="w-3 h-3 cursor-pointer hover:text-blue-900" />
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

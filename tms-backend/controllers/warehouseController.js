@@ -528,6 +528,10 @@ const getWarehouseList = async (req, res) => {
       query.where("w.fuel_availability", req.query.fuelAvailability === "true");
     }
 
+    if (req.query.geoFencing !== undefined) {
+      query.where("w.geo_fencing", req.query.geoFencing === "true");
+    }
+
     // -------------------------------
     // DATE RANGE FILTERS (using created_at, exposing as created_on)
     // -------------------------------
@@ -1221,7 +1225,7 @@ const createWarehouse = async (req, res) => {
       driver_waiting_area: facilities?.driverWaitingArea || false,
       gate_in_checklist_auth: facilities?.gateInChecklistAuth || false,
       gate_out_checklist_auth: facilities?.gateOutChecklistAuth || false,
-      status: "ACTIVE",
+      status: "PENDING", // ✅ FIXED: Set to PENDING (will be updated to ACTIVE after approval)
       created_by: userId,
       created_at: knex.fn.now(),
     });
@@ -2278,6 +2282,28 @@ const saveWarehouseAsDraft = async (req, res) => {
             updated_at: new Date(),
           });
 
+          // ✅ FIX: If file is uploaded, save to document_upload table (matching createWarehouse pattern)
+          if (doc.fileData && doc.fileName) {
+            const docUploadId = await generateDocumentUploadId(trx);
+
+            await trx("document_upload").insert({
+              document_id: docUploadId,
+              file_name: doc.fileName,
+              file_type: doc.fileType || "application/pdf",
+              file_xstring_value: doc.fileData, // base64 encoded file data
+              system_reference_id: documentUniqueId,
+              is_verified: false,
+              valid_from: doc.validFrom || null,
+              valid_to: doc.validTo || null,
+              created_by: userId,
+              updated_by: userId,
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+
+            console.log(`    ✅ Document file uploaded: ${doc.fileName}`);
+          }
+
           console.log(`    ✅ Document saved: ${documentUniqueId}`);
         }
       }
@@ -2575,12 +2601,18 @@ const updateWarehouseDraft = async (req, res) => {
             const docUploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
-              document_id: docUploadId, // ✅ Fixed: Use document_id (matches document_upload table)
+              document_id: docUploadId,
               file_name: doc.fileName,
               file_type: doc.fileType || "application/pdf",
-              file_data: Buffer.from(doc.fileData.split(",")[1], "base64"),
-              uploaded_by: req.user.user_id,
-              uploaded_at: new Date(),
+              file_xstring_value: doc.fileData, // ✅ FIXED: Use file_xstring_value (not file_data)
+              system_reference_id: documentId, // ✅ FIXED: Link to document_unique_id
+              is_verified: false,
+              valid_from: doc.validFrom ? formatDateForMySQL(doc.validFrom) : null,
+              valid_to: doc.validTo ? formatDateForMySQL(doc.validTo) : null,
+              created_by: req.user.user_id,
+              updated_by: req.user.user_id,
+              created_at: new Date(),
+              updated_at: new Date(),
             });
           }
         }

@@ -244,49 +244,20 @@ const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
                               key={`state-${index}-${area.states?.length}`}
                               value={area.states || []}
                               onValueChange={(selectedValues) => {
-                                const validStates = getStatesForCountry(
-                                  area.country
-                                ).map((s) => s.name);
-
-                                const filtered = selectedValues.filter((v) =>
-                                  validStates.includes(v)
-                                );
-
                                 updateServiceableArea(
                                   index,
                                   "states",
-                                  filtered
+                                  selectedValues
                                 );
                               }}
-                              options={getStatesForCountry(area.country)}
-                              placeholder="Select states to add"
-                              searchable
-                              getOptionLabel={(option) => option.name}
-                              getOptionValue={(option) => option.name}
+                              options={getStatesForCountry(area.country).map(
+                                (s) => s.name
+                              )}
+                              placeholder="Select states..."
+                              searchable={true}
+                              error={errors.serviceableAreas?.[index]?.states}
                               className="min-w-[400px] text-sm"
                             />
-
-                            {/* Selected States Tags */}
-                            {area.states && area.states.length > 0 && (
-                              <div className="flex flex-wrap gap-1.5">
-                                {area.states.map((stateName) => (
-                                  <span
-                                    key={stateName}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#D1FAE5] text-[#10B981] text-xs rounded-full font-medium"
-                                  >
-                                    {getStateName(area.country, stateName)}
-                                    <button
-                                      onClick={() =>
-                                        removeState(index, stateName)
-                                      }
-                                      className="text-[#10B981] hover:text-[#059669] ml-1"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
 
                             {errors.serviceableAreas?.[index]?.states && (
                               <p className="text-xs text-red-500 mt-1">
