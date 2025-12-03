@@ -1,28 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Building2, Briefcase, Info, X, ChevronDown } from "lucide-react";
+import React, { useState } from "react";
+import { Building2, Briefcase, Info } from "lucide-react";
 import { State } from "country-state-city";
-import { CustomSelect } from "@/components/ui/Select";
+import { CustomSelect, MultiSelect } from "@/components/ui/Select";
 
 const OrganizationTab = ({ formData, setFormData, errors = {} }) => {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const dropdownRef = useRef(null);
-
   // Get all Indian states
   const allStates = State.getStatesOfCountry("IN").map((state) => state.name);
-
-  // Handle click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsDropdownOpen(false);
-        setSearchTerm("");
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -33,34 +16,6 @@ const OrganizationTab = ({ formData, setFormData, errors = {} }) => {
       },
     }));
   };
-
-  const handleStateToggle = (stateName) => {
-    const currentStates = formData.organization?.business_area || [];
-    const isSelected = currentStates.includes(stateName);
-
-    if (isSelected) {
-      // Remove state
-      handleInputChange(
-        "business_area",
-        currentStates.filter((s) => s !== stateName)
-      );
-    } else {
-      // Add state
-      handleInputChange("business_area", [...currentStates, stateName]);
-    }
-  };
-
-  const handleRemoveState = (stateName) => {
-    const currentStates = formData.organization?.business_area || [];
-    handleInputChange(
-      "business_area",
-      currentStates.filter((s) => s !== stateName)
-    );
-  };
-
-  const filteredStates = allStates.filter((state) =>
-    state.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const selectedStates = formData.organization?.business_area || [];
 
@@ -111,101 +66,16 @@ const OrganizationTab = ({ formData, setFormData, errors = {} }) => {
             Business Area (States) <span className="text-red-500">*</span>
           </label>
 
-          <div className="relative" ref={dropdownRef}>
-            {/* Selected States Display */}
-            <div
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className={`w-full min-h-[38px] px-3 py-1.5 text-sm border rounded-lg cursor-pointer transition-colors ${
-                errors.organization?.business_area
-                  ? "border-red-500 focus:border-red-500"
-                  : "border-[#E5E7EB] hover:border-[#3B82F6]"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex flex-wrap gap-1 flex-1">
-                  {selectedStates.length === 0 ? (
-                    <span className="text-gray-400">Select states...</span>
-                  ) : (
-                    selectedStates.map((state) => (
-                      <span
-                        key={state}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveState(state);
-                        }}
-                      >
-                        {state}
-                        <X className="w-3 h-3 cursor-pointer hover:text-blue-900" />
-                      </span>
-                    ))
-                  )}
-                </div>
-                <ChevronDown
-                  className={`w-4 h-4 text-gray-400 transition-transform ${
-                    isDropdownOpen ? "transform rotate-180" : ""
-                  }`}
-                />
-              </div>
-            </div>
+          <MultiSelect
+            value={selectedStates}
+            onValueChange={(value) => handleInputChange("business_area", value)}
+            options={allStates}
+            placeholder="Select states..."
+            searchable={true}
+            error={errors.organization?.business_area}
+            className="w-full"
+          />
 
-            {/* Dropdown Menu */}
-            {isDropdownOpen && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden">
-                {/* Search Input */}
-                <div className="p-2 border-b border-gray-200">
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search states..."
-                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-
-                {/* States List */}
-                <div className="overflow-y-auto max-h-48">
-                  {filteredStates.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-500 text-center">
-                      No states found
-                    </div>
-                  ) : (
-                    filteredStates.map((state) => {
-                      const isSelected = selectedStates.includes(state);
-                      return (
-                        <div
-                          key={state}
-                          onClick={() => handleStateToggle(state)}
-                          className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
-                            isSelected
-                              ? "bg-blue-50 text-blue-700 font-medium"
-                              : "hover:bg-gray-50 text-gray-700"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => {}}
-                              className="w-4 h-4 text-blue-600 rounded"
-                            />
-                            {state}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {errors.organization?.business_area && (
-            <p className="text-sm text-red-500 flex items-center gap-1">
-              ⚠️ {errors.organization.business_area}
-            </p>
-          )}
           <p className="text-xs text-gray-400 mt-1">
             Select one or more states where this consignor operates
           </p>
