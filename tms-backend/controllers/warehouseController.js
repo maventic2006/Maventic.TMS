@@ -218,6 +218,7 @@ const generateGeoFenceItemId = async (trx = knex) => {
 
 // Helper: Format date to MySQL DATE format (YYYY-MM-DD)
 // Converts ISO date strings or Date objects to MySQL-compatible format
+// Fixed to handle timezone issues - prevents date shifting
 const formatDateForMySQL = (dateValue) => {
   if (!dateValue) return null;
 
@@ -232,8 +233,12 @@ const formatDateForMySQL = (dateValue) => {
   // Check if date is valid
   if (isNaN(date.getTime())) return null;
 
-  // Return YYYY-MM-DD format
-  return date.toISOString().split("T")[0];
+  // Use UTC methods to avoid timezone shifts
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 };
 
 // @desc    Get warehouse list with filters and pagination

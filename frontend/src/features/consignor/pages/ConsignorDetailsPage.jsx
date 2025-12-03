@@ -34,6 +34,7 @@ import { validateTab } from "../validation";
 import { TOAST_TYPES } from "../../../utils/constants";
 import EmptyState from "../../../components/ui/EmptyState";
 import ApprovalActionBar from "../../../components/approval/ApprovalActionBar";
+import SubmitDraftModal from "../../../components/ui/SubmitDraftModal";
 
 // Import view tab components
 import GeneralInfoViewTab from "../components/GeneralInfoViewTab";
@@ -71,6 +72,7 @@ const ConsignorDetailsPage = () => {
     4: false, // Warehouse List
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   const actionButtonTheme = getComponentTheme("actionButton");
   const tabButtonTheme = getComponentTheme("tabButton");
@@ -253,6 +255,13 @@ const ConsignorDetailsPage = () => {
   };
 
   const handleSaveChanges = async () => {
+    // If this is a draft consignor, show the submit modal
+    if (currentConsignor?.status === "SAVE_AS_DRAFT") {
+      setShowSubmitModal(true);
+      return;
+    }
+
+    // For non-draft consignors, proceed with normal update
     try {
       // Clear previous errors
       setValidationErrors({});
@@ -363,10 +372,12 @@ const ConsignorDetailsPage = () => {
             cleanDoc.fileKey = null;
           }
 
-          // Remove preview URL (not needed for backend)
+          // Remove fields not accepted by backend validation
           delete cleanDoc.fileUpload_preview;
-          // Remove fileUpload from payload (already extracted)
           delete cleanDoc.fileUpload;
+          delete cleanDoc.documentProvider; // Not in backend schema
+          delete cleanDoc.premiumAmount; // Not in backend schema
+          delete cleanDoc.remarks; // Not in backend schema
 
           return cleanDoc;
         });
@@ -528,6 +539,8 @@ const ConsignorDetailsPage = () => {
 
   // Handle update draft (for SAVE_AS_DRAFT status only)
   const handleUpdateDraft = async () => {
+    setShowSubmitModal(false);
+
     try {
       // Extract file objects from editFormData
       const files = {};
@@ -617,10 +630,12 @@ const ConsignorDetailsPage = () => {
             );
           }
 
-          // Remove preview URL (not needed for backend)
+          // Remove fields not accepted by backend validation
           delete cleanDoc.fileUpload_preview;
-          // Remove fileUpload from payload (already extracted)
           delete cleanDoc.fileUpload;
+          delete cleanDoc.documentProvider; // Not in backend schema
+          delete cleanDoc.premiumAmount; // Not in backend schema
+          delete cleanDoc.remarks; // Not in backend schema
 
           return cleanDoc;
         });
@@ -696,6 +711,8 @@ const ConsignorDetailsPage = () => {
 
   // Handle submit draft for approval (SAVE_AS_DRAFT → PENDING)
   const handleSubmitForApproval = async () => {
+    setShowSubmitModal(false);
+
     try {
       // Extract file objects from editFormData
       const files = {};
@@ -749,10 +766,12 @@ const ConsignorDetailsPage = () => {
             cleanDoc.fileKey = null;
           }
 
-          // Remove preview URL (not needed for backend)
+          // Remove fields not accepted by backend validation
           delete cleanDoc.fileUpload_preview;
-          // Remove fileUpload from payload (already extracted)
           delete cleanDoc.fileUpload;
+          delete cleanDoc.documentProvider; // Not in backend schema
+          delete cleanDoc.premiumAmount; // Not in backend schema
+          delete cleanDoc.remarks; // Not in backend schema
 
           return cleanDoc;
         });
@@ -819,33 +838,82 @@ const ConsignorDetailsPage = () => {
       console.error("Error submitting for approval:", err);
       dispatch(clearError());
 
-      // Handle validation errors
-      if (err.code === "VALIDATION_ERROR" && err.field) {
-        const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
-        if (fieldMatch) {
-          const [, section] = fieldMatch;
-          const tabMapping = {
-            general: 0,
-            contacts: 1,
-            organization: 2,
-            documents: 3,
-          };
-          const tabWithError = tabMapping[section];
-          if (tabWithError !== null) {
-            setActiveTab(tabWithError);
+      // Handle validation errors with multiple error details
+      if (err.code === "VALIDATION_ERROR") {
+        // If there are multiple validation errors in details array
+        if (err.errors && Array.isArray(err.errors) && err.errors.length > 0) {
+          // Show each error in a toast
+          err.errors.forEach((error) => {
+            const errorMessage = error.message || "Validation error";
+            dispatch(
+              addToast({
+                type: TOAST_TYPES.ERROR,
+                message: errorMessage,
+              })
+            );
+          });
+
+          // Switch to the first tab with errors
+          const firstError = err.errors[0];
+          if (firstError.field) {
+            const fieldMatch = firstError.field.match(
+              /^(\w+)(?:\[(\d+)\])?\.?(.+)?$/
+            );
+            if (fieldMatch) {
+              const [, section] = fieldMatch;
+              const tabMapping = {
+                general: 0,
+                contacts: 1,
+                organization: 2,
+                documents: 3,
+              };
+              const tabWithError = tabMapping[section];
+              if (tabWithError !== undefined && tabWithError !== null) {
+                setActiveTab(tabWithError);
+              }
+            }
           }
+          return;
         }
 
-        // Build user-friendly error message with expected format
-        let errorMessage = err.message;
-        if (err.expectedFormat) {
-          errorMessage = `${err.message} (Expected format: ${err.expectedFormat})`;
+        // Handle single validation error (backward compatibility)
+        if (err.field) {
+          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+          if (fieldMatch) {
+            const [, section] = fieldMatch;
+            const tabMapping = {
+              general: 0,
+              contacts: 1,
+              organization: 2,
+              documents: 3,
+            };
+            const tabWithError = tabMapping[section];
+            if (tabWithError !== null) {
+              setActiveTab(tabWithError);
+            }
+          }
+
+          // Build user-friendly error message with expected format
+          let errorMessage = err.message;
+          if (err.expectedFormat) {
+            errorMessage = `${err.message} (Expected format: ${err.expectedFormat})`;
+          }
+
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.ERROR,
+              message: errorMessage,
+            })
+          );
+          return;
         }
 
+        // Generic validation error without field info
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
-            message: errorMessage,
+            message:
+              err.message || "Validation failed. Please check your input.",
           })
         );
         return;
@@ -1021,67 +1089,24 @@ const ConsignorDetailsPage = () => {
                   Cancel
                 </button>
 
-                {/* Show different save buttons based on status */}
-                {currentConsignor.status === "SAVE_AS_DRAFT" ? (
-                  <>
-                    {/* Update Draft button */}
-                    <button
-                      onClick={handleUpdateDraft}
-                      disabled={isUpdating}
-                      className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white rounded-xl font-medium text-sm hover:from-[#2563EB] hover:to-[#3B82F6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    >
-                      {isUpdating ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                          Update Draft
-                        </>
-                      )}
-                    </button>
-
-                    {/* Submit for Approval button */}
-                    <button
-                      onClick={handleSubmitForApproval}
-                      disabled={isUpdating}
-                      className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    >
-                      {isUpdating ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                          Submit for Approval
-                        </>
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  /* Regular Save Changes button for ACTIVE/PENDING status */
-                  <button
-                    onClick={handleSaveChanges}
-                    disabled={isUpdating}
-                    className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  >
-                    {isUpdating ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                        Save Changes
-                      </>
-                    )}
-                  </button>
-                )}
+                {/* Single Save Changes button for all statuses (including drafts) */}
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={isUpdating}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isUpdating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
               </>
             ) : (
               <button
@@ -1220,6 +1245,17 @@ const ConsignorDetailsPage = () => {
           })}
         </div>
       </div>
+
+      {/* Submit Draft Modal */}
+      <SubmitDraftModal
+        isOpen={showSubmitModal}
+        onUpdateDraft={handleUpdateDraft}
+        onSubmitForApproval={handleSubmitForApproval}
+        onCancel={() => setShowSubmitModal(false)}
+        isLoading={isUpdating}
+        title="Submit Changes"
+        message="Would you like to update the draft or submit it for approval?"
+      />
     </div>
   );
 };

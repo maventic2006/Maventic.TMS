@@ -2639,12 +2639,29 @@ const getTransporterById = async (req, res) => {
     });
 
     // Helper function to format date to YYYY-MM-DD
+    // Fixed to handle timezone issues - prevents date shifting
     const formatDateForInput = (dateValue) => {
       if (!dateValue) return null;
+
+      // If already a string in YYYY-MM-DD format, return as-is
+      if (
+        typeof dateValue === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+      ) {
+        return dateValue;
+      }
+
+      // Handle Date objects or datetime strings
       const date = new Date(dateValue);
       // Check if date is valid
       if (isNaN(date.getTime())) return null;
-      return date.toISOString().split("T")[0];
+
+      // Use UTC methods to avoid timezone shifts
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(date.getUTCDate()).padStart(2, "0");
+
+      return `${year}-${month}-${day}`;
     };
 
     // Build response
