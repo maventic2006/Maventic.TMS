@@ -2607,7 +2607,9 @@ const updateWarehouseDraft = async (req, res) => {
               file_xstring_value: doc.fileData, // ✅ FIXED: Use file_xstring_value (not file_data)
               system_reference_id: documentId, // ✅ FIXED: Link to document_unique_id
               is_verified: false,
-              valid_from: doc.validFrom ? formatDateForMySQL(doc.validFrom) : null,
+              valid_from: doc.validFrom
+                ? formatDateForMySQL(doc.validFrom)
+                : null,
               valid_to: doc.validTo ? formatDateForMySQL(doc.validTo) : null,
               created_by: req.user.user_id,
               updated_by: req.user.user_id,
