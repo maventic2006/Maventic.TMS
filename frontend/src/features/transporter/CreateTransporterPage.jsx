@@ -68,7 +68,7 @@ const CreateTransporterPage = () => {
     transporterId: null,
     generalDetails: {
       businessName: "",
-      fromDate: "",
+      fromDate: new Date().toISOString().split("T")[0], // Auto-filled with current date
       toDate: "",
       avgRating: 0,
       transMode: {
@@ -142,7 +142,7 @@ const CreateTransporterPage = () => {
     transporterId: null,
     generalDetails: {
       businessName: "",
-      fromDate: "",
+      fromDate: new Date().toISOString().split("T")[0], // Auto-filled with current date
       toDate: "",
       avgRating: 0,
       transMode: {

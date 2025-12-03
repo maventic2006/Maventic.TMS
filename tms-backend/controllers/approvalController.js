@@ -500,7 +500,7 @@ async function updateRelatedEntityStatus(
   // Database uses UPPERCASE for entity statuses (ACTIVE, PENDING, INACTIVE)
   // user_master uses "Active" or "Sent Back"
   const userStatus = newStatus === "Active" ? "Active" : "Sent Back";
-  const entityStatus = newStatus === "Active" ? "ACTIVE" : "PENDING"; // Entity tables use UPPERCASE
+  const entityStatus = newStatus === "Active" ? "ACTIVE" : "INACTIVE"; // ✅ FIXED: Rejected entities set to INACTIVE
   const isActive = newStatus === "Active" ? 1 : 0;
 
   try {

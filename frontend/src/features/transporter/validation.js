@@ -45,6 +45,7 @@ export const generalDetailsSchema = z
       .min(1, ERROR_MESSAGES.FROM_DATE_REQUIRED)
       .refine((date) => {
         const selectedDate = new Date(date);
+        selectedDate.setHours(0, 0, 0, 0);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return selectedDate <= today;
