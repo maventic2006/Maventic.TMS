@@ -67,6 +67,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       label: "Document Upload",
       type: "file",
       width: "min-w-[200px]",
+      accept: ".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx",
     },
   ];
 
@@ -89,6 +90,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       fileName: "",
       fileType: "",
       fileData: "",
+      fileUpload: null, // For file upload handling
     };
 
     const updatedDocuments = [...documents, newDocument];

@@ -542,7 +542,7 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
         {/* GPS Tracker IMEI Number */}
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-            GPS Tracker IMEI Number <span className="text-red-500">*</span>
+            GPS Tracker IMEI Number 
           </label>
           <input
             type="text"
@@ -569,7 +569,7 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
               className="w-4 h-4 text-[#10B981] border-gray-300 rounded focus:ring-2 focus:ring-[#10B981]"
             />
             <span className="text-xs font-semibold text-gray-700">
-              GPS Tracker Active <span className="text-red-500">*</span>
+              GPS Tracker Active 
             </span>
           </label>
         </div>
