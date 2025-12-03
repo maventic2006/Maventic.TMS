@@ -12,6 +12,7 @@ import {
   setFilters as setReduxFilters,
   clearFilters,
   deleteConsignorDraft,
+  resetPaginationToFirstPage,
 } from "../redux/slices/consignorSlice";
 import { addToast } from "../redux/slices/uiSlice";
 import { TOAST_TYPES } from "../utils/constants";
@@ -91,6 +92,8 @@ const ConsignorMaintenance = () => {
 
   // Handle apply filters - this actually triggers the API call
   const handleApplyFilters = useCallback(() => {
+    // Reset pagination to first page
+    dispatch(resetPaginationToFirstPage());
     // Copy local filters to applied filters
     setAppliedFilters({ ...localFilters });
     // Also update Redux for consistency

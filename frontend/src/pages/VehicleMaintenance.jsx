@@ -10,6 +10,7 @@ import VehicleBulkUploadHistory from "../features/vehicle/components/VehicleBulk
 import {
   fetchVehicles,
   deleteVehicleDraft,
+  resetPaginationToFirstPage,
 } from "../redux/slices/vehicleSlice";
 import { openVehicleBulkUploadModal } from "../redux/slices/vehicleBulkUploadSlice";
 import { addToast, TOAST_TYPES } from "../redux/slices/uiSlice";
@@ -91,8 +92,8 @@ const VehicleMaintenance = () => {
     fuelType: "",
     leasingFlag: "",
     gpsEnabled: "",
-    ownership: "",
     vehicleCondition: "",
+    registrationDate: "",
     engineType: "",
     emissionStandard: "",
     bodyType: "",
@@ -114,8 +115,8 @@ const VehicleMaintenance = () => {
     fuelType: "",
     leasingFlag: "",
     gpsEnabled: "",
-    ownership: "",
     vehicleCondition: "",
+    registrationDate: "",
     engineType: "",
     emissionStandard: "",
     bodyType: "",
@@ -169,8 +170,8 @@ const VehicleMaintenance = () => {
       if (appliedFilters.gpsEnabled) {
         params.gpsEnabled = appliedFilters.gpsEnabled;
       }
-      if (appliedFilters.ownership) {
-        params.ownership = appliedFilters.ownership;
+      if (appliedFilters.registrationDate) {
+        params.registrationDate = appliedFilters.registrationDate;
       }
       if (appliedFilters.vehicleCondition) {
         params.vehicleCondition = appliedFilters.vehicleCondition;
@@ -208,8 +209,9 @@ const VehicleMaintenance = () => {
   }, []);
 
   const handleApplyFilters = useCallback(() => {
+    dispatch(resetPaginationToFirstPage());
     setAppliedFilters({ ...filters });
-  }, [filters]);
+  }, [filters, dispatch]);
 
   const handleClearFilters = useCallback(() => {
     const emptyFilters = {
@@ -224,8 +226,8 @@ const VehicleMaintenance = () => {
       fuelType: "",
       leasingFlag: "",
       gpsEnabled: "",
-      ownership: "",
       vehicleCondition: "",
+      registrationDate: "",
       engineType: "",
       emissionStandard: "",
       bodyType: "",
@@ -283,8 +285,8 @@ const VehicleMaintenance = () => {
       if (appliedFilters.gpsEnabled) {
         params.gpsEnabled = appliedFilters.gpsEnabled;
       }
-      if (appliedFilters.ownership) {
-        params.ownership = appliedFilters.ownership;
+      if (appliedFilters.registrationDate) {
+        params.registrationDate = appliedFilters.registrationDate;
       }
       if (appliedFilters.vehicleCondition) {
         params.vehicleCondition = appliedFilters.vehicleCondition;

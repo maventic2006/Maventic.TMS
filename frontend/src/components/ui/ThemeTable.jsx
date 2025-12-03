@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState } from "react";
+﻿import React, { useRef, useState, useEffect } from "react";
 import { Plus, X, Upload, FileText, Image, Eye } from "lucide-react";
 import { useSelector } from "react-redux";
 import { CustomSelect } from "./Select";
@@ -26,6 +26,23 @@ const ThemeTable = ({
   const { masterData } = useSelector((state) => state.transporter);
   const fileInputRefs = useRef({});
   const [previewDocument, setPreviewDocument] = useState(null);
+
+  // Handle ESC key to close preview modal
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && previewDocument) {
+        closePreview();
+      }
+    };
+
+    if (previewDocument) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [previewDocument]);
 
   const handleCellChange = (rowIndex, columnKey, value) => {
     const updatedData = [...data];
@@ -89,24 +106,34 @@ const ThemeTable = ({
     }
 
     try {
-      // Store file object for backend upload
-      const updatedData = [...data];
-      updatedData[rowIndex] = {
-        ...updatedData[rowIndex],
-        [columnKey]: file, // Store file object directly
-        [`${columnKey}_preview`]: URL.createObjectURL(file), // For preview
+      // Convert file to base64 for storage and preview
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+        
+        const updatedData = [...data];
+        updatedData[rowIndex] = {
+          ...updatedData[rowIndex],
+          [columnKey]: file, // Store file object for backend upload
+          [`${columnKey}_preview`]: URL.createObjectURL(file), // For preview
+          fileName: file.name,
+          fileType: file.type,
+          fileData: base64Data, // Store base64 for preview modal
+        };
+
+        console.log(`📎 ThemeTable - File uploaded:`, {
+          rowIndex,
+          columnKey,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          isFileObject: file instanceof File,
+          hasBase64Data: !!base64Data,
+        });
+
+        onDataChange(updatedData);
       };
-
-      console.log(`📎 ThemeTable - File uploaded:`, {
-        rowIndex,
-        columnKey,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        isFileObject: file instanceof File,
-      });
-
-      onDataChange(updatedData);
+      reader.readAsDataURL(file);
     } catch (error) {
       alert("Error uploading file: " + error.message);
     }
@@ -114,6 +141,13 @@ const ThemeTable = ({
 
   const removeFile = (rowIndex, columnKey = "photo") => {
     const updatedData = [...data];
+    
+    // Clean up preview URL if it exists
+    const previewUrl = updatedData[rowIndex][`${columnKey}_preview`];
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    
     updatedData[rowIndex] = {
       ...updatedData[rowIndex],
       [columnKey]: null,
@@ -141,12 +175,32 @@ const ThemeTable = ({
   };
 
   const handlePreviewDocument = (row) => {
-    if (row.fileData && row.fileType) {
+    const fileValue = row.fileUpload || row.photo || null;
+    const isFileObject = fileValue instanceof File;
+    
+    let previewData = {};
+    
+    if (isFileObject) {
+      // For File objects, convert to base64 for preview
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+        setPreviewDocument({
+          fileName: fileValue.name,
+          fileType: fileValue.type,
+          fileData: base64Data,
+        });
+      };
+      reader.readAsDataURL(fileValue);
+    } else if (row.fileData && row.fileType && row.fileName) {
+      // For existing uploaded documents with base64 data
       setPreviewDocument({
         fileName: row.fileName,
         fileType: row.fileType,
         fileData: row.fileData,
       });
+    } else {
+      console.log('No valid file data for preview:', row);
     }
   };
 
@@ -209,17 +263,10 @@ const ThemeTable = ({
               <span className="text-sm text-gray-700 truncate flex-1">
                 {fileName}
               </span>
-              {(previewUrl ||
-                (typeof fileValue === "string" &&
-                  fileValue.startsWith("http"))) && (
+              {/* Preview button - show if we have file data or an uploaded file */}
+              {(isFileObject || (row.fileData && row.fileType) || (row.fileName && row.fileType)) && (
                 <button
-                  onClick={() =>
-                    handlePreviewDocument({
-                      fileName,
-                      fileType,
-                      fileData: previewUrl || fileValue,
-                    })
-                  }
+                  onClick={() => handlePreviewDocument(row)}
                   className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
                   title="Preview"
                 >
@@ -427,8 +474,15 @@ const ThemeTable = ({
 
       {/* Document Preview Modal */}
       {previewDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={closePreview}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
@@ -449,13 +503,21 @@ const ThemeTable = ({
             <div className="flex-1 overflow-auto p-4">
               {previewDocument.fileType?.startsWith("image/") ? (
                 <img
-                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  src={
+                    previewDocument.fileData.startsWith('http') 
+                      ? previewDocument.fileData
+                      : `data:${previewDocument.fileType};base64,${previewDocument.fileData}`
+                  }
                   alt={previewDocument.fileName}
                   className="max-w-full h-auto mx-auto"
                 />
               ) : previewDocument.fileType === "application/pdf" ? (
                 <iframe
-                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  src={
+                    previewDocument.fileData.startsWith('http')
+                      ? previewDocument.fileData
+                      : `data:application/pdf;base64,${previewDocument.fileData}`
+                  }
                   className="w-full h-[600px] border-0"
                   title={previewDocument.fileName}
                 />

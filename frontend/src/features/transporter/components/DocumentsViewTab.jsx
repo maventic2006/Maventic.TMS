@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   Download,
@@ -20,6 +20,23 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
   const documents = data?.documents || [];
   const [previewDocument, setPreviewDocument] = useState(null);
   const [loadingDocument, setLoadingDocument] = useState(null);
+
+  // Handle keyboard events for modal
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && previewDocument) {
+        closePreview();
+      }
+    };
+
+    if (previewDocument) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [previewDocument]);
 
   // Helper function to convert country code to country name
   const getCountryName = (countryCode) => {
@@ -69,17 +86,59 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
     });
   };
 
-  const handleViewDocument = async (documentUniqueId, fileName, fileType) => {
+  // Main preview handler that matches vehicle implementation
+  const handlePreviewDocument = (doc) => {
+    // Check if document has file data (for uploaded files)
+    if (doc.fileData && doc.fileType && doc.fileName) {
+      setPreviewDocument({
+        fileName: doc.fileName,
+        fileType: doc.fileType,
+        fileData: doc.fileData,
+      });
+      return;
+    }
+
+    // For files uploaded via File objects (in create mode)
+    if (doc.fileUpload instanceof File) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+        setPreviewDocument({
+          fileName: doc.fileUpload.name,
+          fileType: doc.fileUpload.type,
+          fileData: base64Data,
+        });
+      };
+      reader.readAsDataURL(doc.fileUpload);
+      return;
+    }
+
+    // For API-fetched documents, try to fetch file data
+    if (doc.documentUniqueId) {
+      handleViewDocument(doc);
+      return;
+    }
+
+    console.log('No valid file data for preview:', doc);
+    alert("No file data available for this document");
+  };
+
+  const handleViewDocument = async (document) => {
+    if (!document.documentUniqueId) {
+      alert("No document ID available for this document");
+      return;
+    }
+
     try {
-      setLoadingDocument(documentUniqueId);
+      setLoadingDocument(document.documentUniqueId);
       const response = await api.get(
-        `/transporter/document/${documentUniqueId}`
+        `/transporter/document/${document.documentUniqueId}`
       );
 
       if (response.data.success && response.data.data.fileData) {
         setPreviewDocument({
-          fileName: fileName,
-          fileType: fileType,
+          fileName: document.fileName || 'Document',
+          fileType: document.fileType || 'application/octet-stream',
           fileData: response.data.data.fileData,
         });
       } else {
@@ -93,19 +152,42 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
     }
   };
 
-  const handleDownloadDocument = async (
-    documentUniqueId,
-    fileName,
-    fileType
-  ) => {
+  const handleDownloadDocument = async (doc) => {
+    // If document has local fileData, download directly
+    if (doc.fileData && doc.fileType) {
+      const byteCharacters = atob(doc.fileData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: doc.fileType });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = doc.fileName || `${doc.documentType}_${doc.documentNumber}.${doc.fileType.split("/")[1]}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Otherwise fetch from API
+    if (!doc.documentUniqueId) {
+      alert("No document ID available for download");
+      return;
+    }
+
     try {
-      setLoadingDocument(documentUniqueId);
+      setLoadingDocument(doc.documentUniqueId);
       const response = await api.get(
-        `/transporter/document/${documentUniqueId}`
+        `/transporter/document/${doc.documentUniqueId}`
       );
 
       if (response.data.success && response.data.data.fileData) {
-        // Create a download link
         const base64Data = response.data.data.fileData;
         const byteCharacters = atob(base64Data);
         const byteNumbers = new Array(byteCharacters.length);
@@ -115,11 +197,11 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
         }
 
         const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: fileType });
+        const blob = new Blob([byteArray], { type: doc.fileType });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = fileName;
+        link.download = doc.fileName || `${doc.documentType}_${doc.documentNumber}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -327,53 +409,47 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() =>
-                          handleViewDocument(
-                            document.documentUniqueId,
-                            document.fileName,
-                            document.fileType
-                          )
-                        }
-                        disabled={loadingDocument === document.documentUniqueId}
-                        className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loadingDocument === document.documentUniqueId ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                            Loading...
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="w-4 h-4" />
-                            View
-                          </>
-                        )}
-                      </button>
+                      {/* Show view button if document has any file data */}
+                      {(document.fileData || document.fileUpload || document.fileName) && (
+                        <button
+                          onClick={() => handlePreviewDocument(document)}
+                          disabled={loadingDocument === document.documentUniqueId}
+                          className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loadingDocument === document.documentUniqueId ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-4 h-4" />
+                              View
+                            </>
+                          )}
+                        </button>
+                      )}
 
-                      <button
-                        onClick={() =>
-                          handleDownloadDocument(
-                            document.documentUniqueId,
-                            document.fileName,
-                            document.fileType
-                          )
-                        }
-                        disabled={loadingDocument === document.documentUniqueId}
-                        className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loadingDocument === document.documentUniqueId ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-                            Loading...
-                          </>
-                        ) : (
-                          <>
-                            <Download className="w-4 h-4" />
-                            Download
-                          </>
-                        )}
-                      </button>
+                      {/* Show download button for documents that can be downloaded */}
+                      {(document.fileData || document.documentUniqueId) && (
+                        <button
+                          onClick={() => handleDownloadDocument(document)}
+                          disabled={loadingDocument === document.documentUniqueId}
+                          className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loadingDocument === document.documentUniqueId ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4" />
+                              Download
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -436,14 +512,22 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
         })
       )}
 
-      {/* Document Preview Modal */}
+      {/* Document Preview Modal - Matching Vehicle Implementation */}
       {previewDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
-            {/* Header */}
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={closePreview}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-blue-600" />
+                <div className="p-2 bg-[#E0E7FF] rounded-lg">
+                  <FileText className="h-5 w-5 text-[#6366F1]" />
+                </div>
                 <h3 className="text-lg font-semibold text-gray-800">
                   {previewDocument.fileName}
                 </h3>
@@ -456,7 +540,7 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
               </button>
             </div>
 
-            {/* Content */}
+            {/* Modal Body */}
             <div className="flex-1 overflow-auto p-4">
               {previewDocument.fileType?.startsWith("image/") ? (
                 <img
@@ -477,30 +561,17 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
                     Preview not available for this file type
                   </p>
                   <p className="text-sm text-gray-400 mt-2">
-                    {previewDocument.fileName}
+                    You can still download the file
                   </p>
-                  <button
-                    onClick={() =>
-                      handleDownloadDocument(
-                        previewDocument.documentUniqueId,
-                        previewDocument.fileName,
-                        previewDocument.fileType
-                      )
-                    }
-                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download File
-                  </button>
                 </div>
               )}
             </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
               <button
                 onClick={closePreview}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-6 py-2.5 border border-[#E5E7EB] text-[#4A5568] rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
               >
                 Close
               </button>

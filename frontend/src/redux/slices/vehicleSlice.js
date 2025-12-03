@@ -928,6 +928,9 @@ const vehicleSlice = createSlice({
     clearCurrentVehicle: (state) => {
       state.currentVehicle = null;
     },
+    resetPaginationToFirstPage: (state) => {
+      state.pagination.page = 1;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -1083,7 +1086,7 @@ const vehicleSlice = createSlice({
   },
 });
 
-export const { clearError, clearSuccessMessage, clearCurrentVehicle } =
+export const { clearError, clearSuccessMessage, clearCurrentVehicle, resetPaginationToFirstPage } =
   vehicleSlice.actions;
 
 // Export the transform function for use in components

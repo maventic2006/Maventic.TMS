@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   FileText,
   Calendar,
@@ -16,12 +16,31 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Country, State } from "country-state-city";
 import { getPageTheme } from "../../../theme.config";
+import api from "../../../utils/api";
 
 const DocumentsViewTab = ({ driver }) => {
   const theme = getPageTheme("tab") || {};
   const documents = driver?.documents || [];
   const [expandedDocuments, setExpandedDocuments] = useState({});
   const [previewDocument, setPreviewDocument] = useState(null);
+  const [loadingDocument, setLoadingDocument] = useState(null);
+
+  // Handle ESC key to close preview modal
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && previewDocument) {
+        closePreview();
+      }
+    };
+
+    if (previewDocument) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [previewDocument]);
 
   const toggleDocument = (index) => {
     setExpandedDocuments((prev) => ({
@@ -96,9 +115,68 @@ const DocumentsViewTab = ({ driver }) => {
     });
   };
 
-  const handlePreview = (document) => {
-    if (document.fileData) {
-      setPreviewDocument(document);
+  const handlePreview = (doc) => {
+    // Check if document has file data (for uploaded files)
+    if (doc.fileData && doc.fileType && doc.fileName) {
+      setPreviewDocument({
+        fileName: doc.fileName,
+        fileType: doc.fileType,
+        fileData: doc.fileData,
+      });
+      return;
+    }
+
+    // For files uploaded via File objects (in create mode)
+    if (doc.fileUpload instanceof File) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+        setPreviewDocument({
+          fileName: doc.fileUpload.name,
+          fileType: doc.fileUpload.type,
+          fileData: base64Data,
+        });
+      };
+      reader.readAsDataURL(doc.fileUpload);
+      return;
+    }
+
+    // For API-fetched documents, try to fetch file data
+    if (doc.documentUniqueId) {
+      handleViewDocument(doc);
+      return;
+    }
+
+    // No preview available
+    console.log("No preview available for document:", doc);
+  };
+
+  const handleViewDocument = async (document) => {
+    if (!document.documentUniqueId) {
+      alert("No document ID available for this document");
+      return;
+    }
+
+    try {
+      setLoadingDocument(document.documentUniqueId);
+      const response = await api.get(
+        `/driver/document/${document.documentUniqueId}`
+      );
+
+      if (response.data.success && response.data.data.fileData) {
+        setPreviewDocument({
+          fileName: document.fileName || 'Document',
+          fileType: document.fileType || 'application/octet-stream',
+          fileData: response.data.data.fileData,
+        });
+      } else {
+        alert("No file data available for this document");
+      }
+    } catch (error) {
+      console.error("Error fetching document:", error);
+      alert("Failed to load document. Please try again.");
+    } finally {
+      setLoadingDocument(null);
     }
   };
 

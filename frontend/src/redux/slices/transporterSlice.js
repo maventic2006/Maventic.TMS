@@ -484,6 +484,9 @@ const transporterSlice = createSlice({
       state.isFetchingDetails = false;
       state.error = null;
     },
+    resetPaginationToFirstPage: (state) => {
+      state.pagination.page = 1;
+    },
     resetTransporterState: (state) => {
       return initialState;
     },
@@ -752,7 +755,7 @@ const transporterSlice = createSlice({
   },
 });
 
-export const { clearError, clearLastCreated, resetTransporterState } =
+export const { clearError, clearLastCreated, resetTransporterState, resetPaginationToFirstPage } =
   transporterSlice.actions;
 
 export default transporterSlice.reducer;

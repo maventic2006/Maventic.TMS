@@ -85,33 +85,8 @@ const TopActionBar = ({
         </div> */}
 
         {/* Bulk Upload Button */}
-        {onBulkUpload && (
-          // <motion.button
-          //   whileHover={{ scale: 1.02 }}
-          //   whileTap={{ scale: 0.98 }}
-          //   onClick={onBulkUpload}
-          //   className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm"
-          //   style={{
-          //     background: "#3B82F6",
-          //     color: "#FFFFFF",
-          //     border: "1px solid #2563EB",
-          //   }}
-          //   onMouseEnter={(e) => {
-          //     e.currentTarget.style.background = "#2563EB";
-          //     e.currentTarget.style.boxShadow =
-          //       "0 4px 12px rgba(59, 130, 246, 0.3)";
-          //   }}
-          //   onMouseLeave={(e) => {
-          //     e.currentTarget.style.background = "#3B82F6";
-          //     e.currentTarget.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.05)";
-          //   }}
-          //   title="Bulk Upload Vehicles"
-          // >
-          //   <Upload className="h-4 w-4" />
-          //   <span className="hidden sm:inline">Bulk Upload</span>
-          //   <span className="sm:hidden">Upload</span>
-          // </motion.button>
-
+        {/* {onBulkUpload && (
+         
           <Button
             variant="default"
             size="sm"
@@ -121,7 +96,7 @@ const TopActionBar = ({
             <Upload className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Bulk Upload</span>
           </Button>
-        )}
+        )} */}
 
         {/* Filter Toggle Button */}
         {/* <motion.button

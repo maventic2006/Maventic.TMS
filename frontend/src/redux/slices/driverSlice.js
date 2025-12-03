@@ -568,6 +568,9 @@ const driverSlice = createSlice({
     resetDriverState: (state) => {
       Object.assign(state, initialState);
     },
+    resetPaginationToFirstPage: (state) => {
+      state.pagination.page = 1;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -805,7 +808,7 @@ const driverSlice = createSlice({
   },
 });
 
-export const { clearError, clearSelectedDriver, clearLastCreated, resetDriverState } =
+export const { clearError, clearSelectedDriver, clearLastCreated, resetDriverState, resetPaginationToFirstPage } =
   driverSlice.actions;
 
 export default driverSlice.reducer;

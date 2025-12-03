@@ -986,6 +986,7 @@ const getAllVehicles = async (req, res) => {
       sortOrder = "asc", // Changed to 'asc' so newest vehicles appear at the end of the list
       createdOnStart = "",
       createdOnEnd = "",
+      registrationDate = "",
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -1167,6 +1168,11 @@ const getAllVehicles = async (req, res) => {
         "<=",
         parseInt(towingCapacityMax)
       );
+    }
+
+    if (registrationDate) {
+      // Filter by registration date - exact match on date part
+      query = query.whereRaw("DATE(vod.registration_date) = ?", [registrationDate]);
     }
 
     //Created On Date Range Filter

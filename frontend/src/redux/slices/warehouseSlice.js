@@ -575,6 +575,9 @@ const warehouseSlice = createSlice({
       state.bulkUpload.currentBatch = null;
       state.bulkUpload.statusCounts = { valid: 0, invalid: 0 };
     },
+    resetPaginationToFirstPage: (state) => {
+      state.pagination.page = 1;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -817,6 +820,7 @@ export const {
   openBulkUploadHistory,
   closeBulkUploadHistory,
   resetBulkUploadState,
+  resetPaginationToFirstPage,
 } = warehouseSlice.actions;
 
 export default warehouseSlice.reducer;

@@ -10,6 +10,7 @@ import PaginationBar from "../components/transporter/PaginationBar";
 import {
   fetchTransporters,
   deleteTransporterDraft,
+  resetPaginationToFirstPage,
 } from "../redux/slices/transporterSlice";
 import { addToast, TOAST_TYPES } from "../redux/slices/uiSlice";
 
@@ -136,7 +137,9 @@ const TransporterMaintenance = () => {
   const handleApplyFilters = useCallback(() => {
     // Apply filters by copying current filter state to appliedFilters
     setAppliedFilters({ ...filters });
-  }, [filters]);
+    // Reset pagination to page 1 when applying new filters
+    dispatch(resetPaginationToFirstPage());
+  }, [filters, dispatch]);
 
   const handleClearFilters = useCallback(() => {
     // Clear both filter input state and applied filters

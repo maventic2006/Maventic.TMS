@@ -255,6 +255,19 @@ const contactSchema = Joi.object({
         "Contact photo must be a string (URL/base64) or file object",
     }),
 
+  // File metadata fields (added by ThemeTable component during file uploads)
+  fileName: Joi.string().trim().max(255).optional().allow(null, "").messages({
+    "string.max": "File name cannot exceed 255 characters",
+  }),
+
+  fileType: Joi.string().trim().max(100).optional().allow(null, "").messages({
+    "string.max": "File type cannot exceed 100 characters",
+  }),
+
+  fileData: Joi.string().optional().allow(null, "").messages({
+    "string.base": "File data must be a string",
+  }),
+
   status: Joi.string()
     .valid("ACTIVE", "INACTIVE", "Active", "Inactive")
     .default("ACTIVE")

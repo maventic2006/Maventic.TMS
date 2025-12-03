@@ -495,7 +495,6 @@ import { Filter } from "lucide-react";
 import {
   VEHICLE_TYPES,
   VEHICLE_STATUS_OPTIONS,
-  OWNERSHIP_TYPES,
   FUEL_TYPES,
 } from "../../utils/vehicleConstants";
 import { getPageTheme, getComponentTheme } from "../../theme.config";
@@ -712,24 +711,34 @@ const VehicleFilterPanel = ({
               />
             </div>
 
-            {/* Ownership Type Filter */}
+            {/* Registration Date Filter */}
             <div>
               <Label
-                htmlFor="ownership"
+                htmlFor="registrationDate"
                 className="block text-xs font-bold uppercase tracking-wider mb-2"
                 style={{ color: theme.colors.text.primary }}
               >
-                Ownership
+                Registration Date
               </Label>
-              <StatusSelect
-                value={filters.ownership}
-                onChange={(value) => onFilterChange("ownership", value)}
-                options={[
-                  { value: "", label: "All Types" },
-                  ...OWNERSHIP_TYPES,
-                ]}
-                placeholder="All Types"
-                className="w-full"
+              <Input
+                id="registrationDate"
+                type="date"
+                value={filters.registrationDate}
+                onChange={(e) => onFilterChange("registrationDate", e.target.value)}
+                className="w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200 focus:outline-none focus:ring-2"
+                style={{
+                  border: `1px solid ${inputTheme.border.default}`,
+                  background: inputTheme.background,
+                  color: inputTheme.text,
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = inputTheme.border.focus;
+                  e.target.style.boxShadow = `0 0 0 3px ${inputTheme.border.focus}20`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = inputTheme.border.default;
+                  e.target.style.boxShadow = "none";
+                }}
               />
             </div>
 

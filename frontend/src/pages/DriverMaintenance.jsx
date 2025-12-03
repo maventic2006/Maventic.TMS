@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import TMSHeader from "../components/layout/TMSHeader";
 import { getPageTheme } from "../theme.config";
-import { fetchDrivers } from "../redux/slices/driverSlice";
+import { fetchDrivers, resetPaginationToFirstPage } from "../redux/slices/driverSlice";
 import DriverTopActionBar from "../components/driver/DriverTopActionBar";
 import DriverFilterPanel from "../components/driver/DriverFilterPanel";
 import DriverListTable from "../components/driver/DriverListTable";
@@ -152,8 +152,9 @@ const DriverMaintenance = () => {
   }, []);
 
   const handleApplyFilters = useCallback(() => {
+    dispatch(resetPaginationToFirstPage());
     setAppliedFilters({ ...filters });
-  }, [filters]);
+  }, [filters, dispatch]);
 
   const handleClearFilters = useCallback(() => {
     const emptyFilters = {

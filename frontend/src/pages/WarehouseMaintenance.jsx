@@ -6,6 +6,7 @@ import { getPageTheme } from "../theme.config";
 import {
   fetchWarehouses,
   deleteWarehouseDraft,
+  resetPaginationToFirstPage,
 } from "../redux/slices/warehouseSlice"; // ✅ Add deleteWarehouseDraft
 import { addToast } from "../redux/slices/uiSlice"; // ✅ Add toast for feedback
 import { TOAST_TYPES } from "../utils/constants"; // ✅ Add toast constants
@@ -140,8 +141,9 @@ const WarehouseMaintenance = () => {
     // Apply filters by copying current filter state to appliedFilters
     // This will trigger the useEffect to fetch data with new filters
     // Also reset to page 1 when applying filters
+    dispatch(resetPaginationToFirstPage());
     setAppliedFilters({ ...filters });
-  }, [filters]);
+  }, [filters, dispatch]);
 
   const handleClearFilters = useCallback(() => {
     // Clear both filter input state and applied filters
