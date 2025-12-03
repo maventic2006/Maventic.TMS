@@ -241,7 +241,7 @@ const ServiceableAreaTab = ({ formData, setFormData, errors = {} }) => {
                             /> */}
 
                             <MultiSelect
-                              key={`state-${index}-${area.states?.length}`}
+                              key={`state-${index}-${area.country}`}
                               value={area.states || []}
                               onValueChange={(selectedValues) => {
                                 updateServiceableArea(
