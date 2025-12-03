@@ -127,7 +127,7 @@ const LoginPage = () => {
 
           {/* Welcome Message */}
           <div className="mb-8">
-            <h2 className="text-3xl font-bold mb-3">Welcome to TMS(test)</h2>
+            <h2 className="text-3xl font-bold mb-3">Welcome to TMS</h2>
             <p className="text-base text-gray-300 leading-relaxed">
               Streamline fleet management, optimize routes, and track shipments
               in real-time. Join 500+ companies revolutionizing logistics
