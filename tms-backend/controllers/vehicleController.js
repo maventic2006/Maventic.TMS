@@ -1215,12 +1215,12 @@ const getAllVehicles = async (req, res) => {
       );
     }
 
-    if (registrationDate) {
-      // Filter by registration date - exact match on date part
-      query = query.whereRaw("DATE(vod.registration_date) = ?", [
-        registrationDate,
-      ]);
-    }
+    // if (registrationDate) {
+    //   // Filter by registration date - exact match on date part
+    //   query = query.whereRaw("DATE(vod.registration_date) = ?", [
+    //     registrationDate,
+    //   ]);
+    // }
 
     //Created On Date Range Filter
     if (createdOnStart) {
