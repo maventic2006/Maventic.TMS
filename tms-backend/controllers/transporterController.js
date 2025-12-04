@@ -2400,6 +2400,32 @@ const getTransporters = async (req, res) => {
         "tgi.transporter_id",
         "tc.transporter_id"
       )
+      // LEFT JOIN for PAN document
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as pan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'PAN Card'
+            AND status = 'ACTIVE'
+        ) as pan_doc`),
+        "tgi.transporter_id",
+        "pan_doc.transporter_id"
+      )
+      // LEFT JOIN for TAN document
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as tan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'TAN'
+            AND status = 'ACTIVE'
+        ) as tan_doc`),
+        "tgi.transporter_id",
+        "tan_doc.transporter_id"
+      )
       .leftJoin(
         knex.raw(`(
           SELECT aft1.*
@@ -2438,8 +2464,9 @@ const getTransporters = async (req, res) => {
         "addr.city",
         "addr.district",
         "addr.vat_number",
-        "addr.tin_pan",
-        "addr.tan",
+        // Get PAN and TAN from transporter_documents instead of tms_address
+        "pan_doc.pan_number as tin_pan",
+        "tan_doc.tan_number as tan",
         knex.raw(
           "CONCAT(COALESCE(addr.street_1, ''), ', ', COALESCE(addr.city, ''), ', ', COALESCE(addr.state, ''), ', ', COALESCE(addr.country, '')) as address"
         ),
@@ -2496,7 +2523,8 @@ const getTransporters = async (req, res) => {
     if (state) query = query.where("addr.state", "like", `%${state}%`);
     if (city) query = query.where("addr.city", "like", `%${city}%`);
     if (vatGst) query = query.where("addr.vat_number", "like", `%${vatGst}%`);
-    if (tan) query = query.where("addr.tan", "like", `%${tan}%`);
+    // Filter by TAN from transporter_documents (joined as tan_doc)
+    if (tan) query = query.where("tan_doc.tan_number", "like", `%${tan}%`);
 
     if (transportMode) {
       const modes = transportMode.split(",");
@@ -2536,10 +2564,10 @@ const getTransporters = async (req, res) => {
       query = query.where("tgi.created_on", "<=", endDateWithTime);
     }
 
-    // Count query (with same date filters)
+    // Count query (with same date filters and document joins for TAN filter)
     let countQuery = knex("transporter_general_info as tgi");
 
-    if (search || state || city || vatGst || tan) {
+    if (search || state || city || vatGst) {
       countQuery = countQuery.leftJoin("tms_address as addr", function () {
         this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
           "addr.user_type",
@@ -2547,6 +2575,22 @@ const getTransporters = async (req, res) => {
           knex.raw("'TRANSPORTER'")
         );
       });
+    }
+
+    // Add TAN document join if filtering by TAN
+    if (tan) {
+      countQuery = countQuery.leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as tan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'TAN'
+            AND status = 'ACTIVE'
+        ) as tan_doc`),
+        "tgi.transporter_id",
+        "tan_doc.transporter_id"
+      );
     }
 
     // Reapply filters
@@ -2597,7 +2641,9 @@ const getTransporters = async (req, res) => {
     if (city) countQuery = countQuery.where("addr.city", "like", `%${city}%`);
     if (vatGst)
       countQuery = countQuery.where("addr.vat_number", "like", `%${vatGst}%`);
-    if (tan) countQuery = countQuery.where("addr.tan", "like", `%${tan}%`);
+    // Filter by TAN from transporter_documents instead of tms_address
+    if (tan) 
+      countQuery = countQuery.where("tan_doc.tan_number", "like", `%${tan}%`);
 
     if (transportMode) {
       const modes = transportMode.split(",");
