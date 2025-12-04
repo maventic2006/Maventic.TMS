@@ -5,6 +5,10 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
+const {
+  validateGSTPAN,
+  getGSTStateCode,
+} = require("../utils/gstPanValidation");
 
 // Helper function to generate unique IDs
 const generateTransporterId = async () => {
@@ -635,6 +639,67 @@ const createTransporter = async (req, res) => {
             field: `documents[${i}].validTo`,
           },
         });
+      }
+    }
+
+    // ========================================
+    // GST-PAN VALIDATION (India Only)
+    // ========================================
+    // Validate primary address GST number against PAN card
+    // Only for India (country code 'IN' or country name 'India')
+    const gstPrimaryAddress = addresses.find((addr) => addr.isPrimary === true);
+
+    if (gstPrimaryAddress) {
+      const isIndia =
+        gstPrimaryAddress.country === "IN" ||
+        gstPrimaryAddress.country === "India" ||
+        gstPrimaryAddress.country.toLowerCase().includes("india");
+
+      if (isIndia && gstPrimaryAddress.vatNumber) {
+        console.log("🔍 Validating GST-PAN for primary address in India");
+
+        // Find PAN card document (DN001 is PAN/TIN)
+        const panDocument = documents.find((doc) => {
+          const docTypeId = doc.documentTypeId || doc.documentType;
+          return (
+            docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+          );
+        });
+
+        if (!panDocument) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+              field: "documents",
+              hint: "Please add a PAN card document in the Documents tab",
+            },
+          });
+        }
+
+        // Validate GST-PAN match
+        const gstValidation = validateGSTPAN(
+          gstPrimaryAddress.vatNumber,
+          panDocument.documentNumber,
+          gstPrimaryAddress.state
+        );
+
+        if (!gstValidation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: gstValidation.error,
+              field: gstValidation.field || "vatNumber",
+              validationCode: gstValidation.code,
+              hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+            },
+          });
+        }
+
+        console.log("✅ GST-PAN validation passed for primary address");
       }
     }
 
@@ -1557,6 +1622,74 @@ const updateTransporter = async (req, res) => {
             },
             timestamp: new Date().toISOString(),
           });
+        }
+      }
+
+      // ========================================
+      // GST-PAN VALIDATION (India Only) - UPDATE TRANSPORTER
+      // ========================================
+      // Validate primary address GST number against PAN card
+      const gstPrimaryAddr = addresses.find((addr) => addr.isPrimary === true);
+
+      if (gstPrimaryAddr) {
+        const isIndia =
+          gstPrimaryAddr.country === "IN" ||
+          gstPrimaryAddr.country === "India" ||
+          gstPrimaryAddr.country.toLowerCase().includes("india");
+
+        if (isIndia && gstPrimaryAddr.vatNumber) {
+          console.log(
+            "🔍 [UPDATE] Validating GST-PAN for primary address in India"
+          );
+
+          // Find PAN card document (DN001 is PAN/TIN)
+          const panDocument = documents.find((doc) => {
+            const docTypeId = doc.documentTypeId || doc.documentType;
+            return (
+              docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+            );
+          });
+
+          if (!panDocument) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message:
+                  "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+                field: "documents",
+                hint: "Please add a PAN card document in the Documents tab",
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Validate GST-PAN match
+          const gstValidation = validateGSTPAN(
+            gstPrimaryAddr.vatNumber,
+            panDocument.documentNumber,
+            gstPrimaryAddr.state
+          );
+
+          if (!gstValidation.isValid) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: gstValidation.error,
+                field: gstValidation.field || "vatNumber",
+                validationCode: gstValidation.code,
+                hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          console.log(
+            "✅ [UPDATE] GST-PAN validation passed for primary address"
+          );
         }
       }
 
@@ -3958,6 +4091,72 @@ const submitTransporterFromDraft = async (req, res) => {
             field: `documents[${i}].validTo`,
           },
         });
+      }
+    }
+
+    // ========================================
+    // GST-PAN VALIDATION (India Only) - SUBMIT DRAFT FOR APPROVAL
+    // ========================================
+    // Validate primary address GST number against PAN card
+    const gstPrimaryAddrDraft = addresses.find(
+      (addr) => addr.isPrimary === true
+    );
+
+    if (gstPrimaryAddrDraft) {
+      const isIndia =
+        gstPrimaryAddrDraft.country === "IN" ||
+        gstPrimaryAddrDraft.country === "India" ||
+        gstPrimaryAddrDraft.country.toLowerCase().includes("india");
+
+      if (isIndia && gstPrimaryAddrDraft.vatNumber) {
+        console.log(
+          "🔍 [SUBMIT DRAFT] Validating GST-PAN for primary address in India"
+        );
+
+        // Find PAN card document (DN001 is PAN/TIN)
+        const panDocument = documents.find((doc) => {
+          const docTypeId = doc.documentTypeId || doc.documentType;
+          return (
+            docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+          );
+        });
+
+        if (!panDocument) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+              field: "documents",
+              hint: "Please add a PAN card document in the Documents tab before submitting for approval",
+            },
+          });
+        }
+
+        // Validate GST-PAN match
+        const gstValidation = validateGSTPAN(
+          gstPrimaryAddrDraft.vatNumber,
+          panDocument.documentNumber,
+          gstPrimaryAddrDraft.state
+        );
+
+        if (!gstValidation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: gstValidation.error,
+              field: gstValidation.field || "vatNumber",
+              validationCode: gstValidation.code,
+              hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+            },
+          });
+        }
+
+        console.log(
+          "✅ [SUBMIT DRAFT] GST-PAN validation passed for primary address"
+        );
       }
     }
 

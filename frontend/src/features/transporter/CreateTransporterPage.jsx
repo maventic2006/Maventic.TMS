@@ -28,7 +28,11 @@ import {
 import { openModal } from "../../redux/slices/bulkUploadSlice";
 import BulkUploadModal from "./components/BulkUploadModal";
 import BulkUploadHistory from "./components/BulkUploadHistory";
-import { createTransporterSchema, validateFormSection } from "./validation";
+import {
+  createTransporterSchema,
+  validateFormSection,
+  validateGSTPANRelationship,
+} from "./validation";
 import { getComponentTheme } from "../../utils/theme";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../utils/constants";
 import { addToast } from "../../redux/slices/uiSlice";
@@ -461,6 +465,61 @@ const CreateTransporterPage = () => {
       2: false,
       3: false,
     });
+
+    // ========================================
+    // GST-PAN VALIDATION (before main validation)
+    // ========================================
+    const gstPanErrors = validateGSTPANRelationship(formData);
+
+    if (gstPanErrors.gstPan) {
+      const error = gstPanErrors.gstPan;
+      const nestedErrors = {};
+
+      // Set error on the appropriate field
+      if (error.tab === "addresses") {
+        // Find primary address index
+        const primaryIndex = formData.addresses?.findIndex(
+          (addr) => addr.isPrimary === true
+        );
+        if (primaryIndex >= 0) {
+          nestedErrors.addresses = [];
+          nestedErrors.addresses[primaryIndex] = {
+            vatNumber: error.message,
+          };
+        }
+      } else if (error.tab === "documents") {
+        nestedErrors.documents = {
+          _general: error.message,
+        };
+      }
+
+      setValidationErrors(nestedErrors);
+
+      // Set tab errors
+      const newTabErrors = {
+        0: false,
+        1: error.tab === "addresses",
+        2: false,
+        3: error.tab === "documents",
+      };
+      setTabErrors(newTabErrors);
+
+      // Switch to the tab with error
+      const errorTab = error.tab === "addresses" ? 1 : 3;
+      setActiveTab(errorTab);
+
+      // Show toast notification
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "GST-PAN Validation Failed",
+          details: [error.message, error.hint].filter(Boolean),
+          duration: 8000,
+        })
+      );
+
+      return;
+    }
 
     // Validate entire form
     const validation = createTransporterSchema.safeParse(formData);
