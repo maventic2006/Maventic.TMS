@@ -2777,6 +2777,24 @@ const getDrivers = async (req, res) => {
         "dbi.driver_id",
         "dd.driver_id"
       )
+      .leftJoin(
+        knex.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT003'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        knex.raw(
+          "CONCAT('DRV', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED), 4, '0'))"
+        ),
+        "dbi.driver_id"
+      )
       .select(
         "dbi.driver_id",
         "dbi.full_name",
@@ -2797,7 +2815,12 @@ const getDrivers = async (req, res) => {
         "addr.city",
         "addr.district",
         "addr.postal_code",
-        "dd.license_numbers"
+        "dd.license_numbers",
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
       );
 
     // Count query
@@ -3010,6 +3033,11 @@ const getDrivers = async (req, res) => {
       createdBy: driver.created_by,
       createdOn: formatDateForInput(driver.created_on),
       updatedOn: formatDateForInput(driver.updated_on),
+      approver: driver.approver_name || null,
+      approvedOn:
+        driver.approved_on && driver.approval_status === "Approve"
+          ? new Date(driver.approved_on).toISOString().split("T")[0]
+          : null,
     }));
 
     res.json({

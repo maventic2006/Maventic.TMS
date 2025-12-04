@@ -1008,6 +1008,24 @@ const getAllVehicles = async (req, res) => {
         "vbih.fuel_type_id",
         "ftm.fuel_type_id"
       )
+      .leftJoin(
+        db.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT004'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        db.raw(
+          "CONCAT('VEH', CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED))"
+        ),
+        "vbih.vehicle_id_code_hdr"
+      )
       .select(
         "vbih.vehicle_id_code_hdr as vehicleId",
         "vbih.vehicle_registration_number as registrationNumber",
@@ -1040,7 +1058,12 @@ const getAllVehicles = async (req, res) => {
         "vod.ownership_name",
         "vod.registration_date",
         // Get towing capacity from the basic info header table
-        "vbih.towing_capacity as towingCapacity"
+        "vbih.towing_capacity as towingCapacity",
+        db.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
       );
 
     // Apply search filter
@@ -1172,7 +1195,9 @@ const getAllVehicles = async (req, res) => {
 
     if (registrationDate) {
       // Filter by registration date - exact match on date part
-      query = query.whereRaw("DATE(vod.registration_date) = ?", [registrationDate]);
+      query = query.whereRaw("DATE(vod.registration_date) = ?", [
+        registrationDate,
+      ]);
     }
 
     //Created On Date Range Filter
@@ -1242,6 +1267,11 @@ const getAllVehicles = async (req, res) => {
       ownershipName: vehicle.ownership_name,
       registrationDate: vehicle.registration_date,
       towingCapacity: parseFloat(vehicle.towingCapacity) || 0,
+      approver: vehicle.approver_name || null,
+      approvedOn:
+        vehicle.approved_on && vehicle.approval_status === "Approve"
+          ? new Date(vehicle.approved_on).toISOString().split("T")[0]
+          : null,
     }));
 
     res.json({

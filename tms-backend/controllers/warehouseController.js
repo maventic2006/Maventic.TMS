@@ -472,6 +472,33 @@ const getWarehouseList = async (req, res) => {
         "w.material_type_id",
         "mtm.material_types_id"
       )
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            aft1.*,
+            um.user_id as warehouse_user_id,
+            um.consignor_id,
+            um.created_at as user_created_at
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT005'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
+            AND um.user_type_id = 'UT007'
+        ) as aft`),
+        function () {
+          this.on("aft.consignor_id", "=", "w.consignor_id").andOn(
+            knex.raw(
+              "ABS(TIMESTAMPDIFF(SECOND, aft.user_created_at, w.created_at)) < 60"
+            )
+          );
+        }
+      )
       .select(
         "w.warehouse_id",
         "w.consignor_id",
@@ -495,8 +522,11 @@ const getWarehouseList = async (req, res) => {
         // Correct: expose as created_on
         knex.raw("DATE(w.created_at) as created_on"),
 
-        knex.raw("'N/A' as approver"),
-        knex.raw("NULL as approved_on"),
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status",
         "w.status"
       );
 
@@ -612,11 +642,21 @@ const getWarehouseList = async (req, res) => {
       .limit(limit)
       .offset(offset);
 
-    console.log(`✅ Found ${warehouses.length} warehouses`);
+    // Transform warehouses to include approver fields
+    const transformedWarehouses = warehouses.map((warehouse) => ({
+      ...warehouse,
+      approver: warehouse.approver_name || null,
+      approvedOn:
+        warehouse.approved_on && warehouse.approval_status === "Approve"
+          ? new Date(warehouse.approved_on).toISOString().split("T")[0]
+          : null,
+    }));
+
+    console.log(`✅ Found ${transformedWarehouses.length} warehouses`);
 
     res.json({
       success: true,
-      warehouses,
+      warehouses: transformedWarehouses,
       pagination: {
         page,
         limit,
