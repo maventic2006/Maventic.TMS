@@ -1607,6 +1607,8 @@ const updateDriver = async (req, res) => {
   try {
     const { id } = req.params;
     const { basicInfo, addresses, documents, history, accidents } = req.body;
+    const userId = req.user?.user_id;
+    const userRole = req.user?.role;
 
     // Validate driver exists
     const existingDriver = await trx("driver_basic_information")
@@ -1623,6 +1625,52 @@ const updateDriver = async (req, res) => {
         },
         timestamp: new Date().toISOString(),
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingDriver.status;
+    const createdBy = existingDriver.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Only the creator can edit rejected entities",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Cannot edit entity during approval process",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      if (!isApprover) {
+        await trx.rollback();
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only approvers can edit active entities",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     const currentTimestamp = new Date();
@@ -1721,6 +1769,55 @@ const updateDriver = async (req, res) => {
         }
       }
 
+      // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+      const isResubmission =
+        currentStatus === "INACTIVE" && basicInfo.status === "PENDING";
+
+      if (isResubmission) {
+        console.log(`🔄 Resubmission detected for driver ${id}`);
+
+        // Get driver admin user ID (DRV0001 → DA0001)
+        const driverNumber = id.substring(3); // Remove 'DRV' prefix
+        const driverAdminUserId = `DA${driverNumber}`; // DA0001
+
+        // Find existing approval flow record
+        const approvalFlow = await trx("approval_flow_trans")
+          .where("user_id_reference_id", driverAdminUserId)
+          .where("approval_type_id", "AT003") // Driver Admin
+          .orderBy("created_at", "desc")
+          .first();
+
+        if (approvalFlow) {
+          // Update approval flow to restart from Level 1
+          await trx("approval_flow_trans")
+            .where(
+              "approval_flow_unique_id",
+              approvalFlow.approval_flow_unique_id
+            )
+            .update({
+              s_status: "PENDING",
+              approver_level: 1,
+              actioned_by_id: null,
+              actioned_by_name: null,
+              approved_on: null,
+              // Keep remarks from rejection for history
+              updated_at: currentTimestamp,
+            });
+
+          console.log(`✅ Approval flow restarted for ${driverAdminUserId}`);
+        }
+
+        // Update user status to Pending for Approval
+        await trx("user_master").where("user_id", driverAdminUserId).update({
+          status: "Pending for Approval",
+          updated_at: currentTimestamp,
+        });
+
+        console.log(
+          `✅ User status updated to Pending for Approval: ${driverAdminUserId}`
+        );
+      }
+
       await trx("driver_basic_information")
         .where("driver_id", id)
         .update({
@@ -1732,6 +1829,7 @@ const updateDriver = async (req, res) => {
           email_id: basicInfo.emailId || null,
           emergency_contact: basicInfo.emergencyContact || null,
           alternate_phone_number: basicInfo.alternatePhoneNumber || null,
+          status: basicInfo.status || currentStatus, // Update status if provided
           updated_at: currentTimestamp,
           updated_on: currentTimestamp,
           updated_by: currentUser,
@@ -2902,8 +3000,12 @@ const getDrivers = async (req, res) => {
     }
 
     if (createdOnEnd) {
-      query.where("dbi.created_on", "<=", createdOnEnd);
-      countQuery.where("dbi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      query.where("dbi.created_on", "<=", endDateWithTime);
+      countQuery.where("dbi.created_on", "<=", endDateWithTime);
     }
 
     // ------- ADDRESS FILTERS -------

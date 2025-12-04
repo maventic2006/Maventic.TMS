@@ -273,6 +273,13 @@ export const vehicleAPI = {
       queryParams.append("towingCapacityMin", params.towingCapacityMin);
     if (params.towingCapacityMax)
       queryParams.append("towingCapacityMax", params.towingCapacityMax);
+
+    // Date filters
+    if (params.createdOnStart)
+      queryParams.append("createdOnStart", params.createdOnStart);
+    if (params.createdOnEnd)
+      queryParams.append("createdOnEnd", params.createdOnEnd);
+
     if (params.sortBy) queryParams.append("sortBy", params.sortBy);
     if (params.sortOrder) queryParams.append("sortOrder", params.sortOrder);
 
@@ -309,7 +316,9 @@ export const vehicleAPI = {
 
   // RC Lookup API - Get vehicle details by registration number
   lookupVehicleByRC: (registrationNumber) => {
-    return api.get(`/vehicles/rc-lookup/${encodeURIComponent(registrationNumber)}`);
+    return api.get(
+      `/vehicles/rc-lookup/${encodeURIComponent(registrationNumber)}`
+    );
   },
 
   // ==================== DRAFT WORKFLOW ENDPOINTS ====================

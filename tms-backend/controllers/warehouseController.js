@@ -1,5 +1,6 @@
 const knex = require("../config/database");
 const bcrypt = require("bcrypt");
+const { Country, State } = require("country-state-city");
 const {
   validateWarehouseListQuery,
   validateWarehouseCreate,
@@ -519,8 +520,10 @@ const getWarehouseList = async (req, res) => {
         "w.zone",
         "w.created_by",
 
-        // Correct: expose as created_on
-        knex.raw("DATE(w.created_at) as created_on"),
+        // Fixed: Use SUBSTRING to extract date without timezone conversion
+        // DATE(created_at) converts to server timezone (IST +5:30), showing wrong date
+        // SUBSTRING extracts YYYY-MM-DD directly from UTC timestamp
+        knex.raw("SUBSTRING(w.created_at, 1, 10) as created_on"),
 
         knex.raw(
           "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
@@ -569,13 +572,24 @@ const getWarehouseList = async (req, res) => {
 
     // -------------------------------
     // DATE RANGE FILTERS (using created_at, exposing as created_on)
+    // Fix: Explicitly use UTC timezone to prevent IST offset issues
     // -------------------------------
     if (createdOnStart) {
-      query.whereRaw("DATE(w.created_at) >= ?", [createdOnStart]);
+      // Convert date to UTC timestamp to avoid timezone shifts
+      // Add 'Z' to indicate UTC timezone
+      const startDateUTC = createdOnStart.includes("T")
+        ? createdOnStart
+        : `${createdOnStart}T00:00:00Z`;
+      query.where("w.created_at", ">=", startDateUTC);
     }
 
     if (createdOnEnd) {
-      query.whereRaw("DATE(w.created_at) <= ?", [createdOnEnd]);
+      // Convert date to UTC timestamp to avoid timezone shifts
+      // Add 'Z' to indicate UTC timezone
+      const endDateUTC = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd}T23:59:59Z`;
+      query.where("w.created_at", "<=", endDateUTC);
     }
 
     // COUNT QUERY
@@ -624,12 +638,21 @@ const getWarehouseList = async (req, res) => {
         }
 
         // DATE FILTERS FOR COUNT
+        // Fix: Explicitly use UTC timezone to prevent IST offset issues
         if (createdOnStart) {
-          builder.whereRaw("DATE(w.created_at) >= ?", [createdOnStart]);
+          // Convert date to UTC timestamp to avoid timezone shifts
+          const startDateUTC = createdOnStart.includes("T")
+            ? createdOnStart
+            : `${createdOnStart}T00:00:00Z`;
+          builder.where("w.created_at", ">=", startDateUTC);
         }
 
         if (createdOnEnd) {
-          builder.whereRaw("DATE(w.created_at) <= ?", [createdOnEnd]);
+          // Convert date to UTC timestamp to avoid timezone shifts
+          const endDateUTC = createdOnEnd.includes("T")
+            ? createdOnEnd
+            : `${createdOnEnd}T23:59:59Z`;
+          builder.where("w.created_at", "<=", endDateUTC);
         }
       })
       .first();
@@ -642,15 +665,47 @@ const getWarehouseList = async (req, res) => {
       .limit(limit)
       .offset(offset);
 
-    // Transform warehouses to include approver fields
-    const transformedWarehouses = warehouses.map((warehouse) => ({
-      ...warehouse,
-      approver: warehouse.approver_name || null,
-      approvedOn:
-        warehouse.approved_on && warehouse.approval_status === "Approve"
-          ? new Date(warehouse.approved_on).toISOString().split("T")[0]
-          : null,
-    }));
+    // Transform warehouses to include approver fields and convert ISO codes to names
+    const transformedWarehouses = warehouses.map((warehouse) => {
+      // Convert country code to country name
+      let countryName = warehouse.country;
+      if (warehouse.country && warehouse.country.length === 2) {
+        const countryObj = Country.getCountryByCode(warehouse.country);
+        countryName = countryObj ? countryObj.name : warehouse.country;
+      }
+
+      // Convert state code to state name
+      let stateName = warehouse.state;
+      if (warehouse.state && warehouse.state.length <= 3 && warehouse.country) {
+        // Get country code for state lookup
+        let countryCode = warehouse.country;
+        if (warehouse.country.length !== 2) {
+          // If country is already a name, find its code
+          const countryObj = Country.getAllCountries().find(
+            (c) => c.name.toLowerCase() === warehouse.country.toLowerCase()
+          );
+          countryCode = countryObj ? countryObj.isoCode : warehouse.country;
+        }
+
+        // Get state by code
+        const stateObj = State.getStateByCodeAndCountry(
+          warehouse.state,
+          countryCode
+        );
+        stateName = stateObj ? stateObj.name : warehouse.state;
+      }
+
+      return {
+        ...warehouse,
+        country: countryName,
+        state: stateName,
+        approver: warehouse.approver_name || null,
+        approvedOn:
+          warehouse.approved_on && warehouse.approval_status === "Approve"
+            ? new Date(warehouse.approved_on).toISOString().split("T")[0]
+            : null,
+      };
+    });
 
     console.log(`✅ Found ${transformedWarehouses.length} warehouses`);
 
@@ -739,6 +794,35 @@ const getWarehouseById = async (req, res) => {
       .first();
 
     console.log(`📍 Address data: ${address ? "Found" : "Not found"}`);
+
+    // Convert ISO codes to full names for address (if address exists)
+    if (address) {
+      // Convert country code to country name
+      if (address.country && address.country.length === 2) {
+        const countryObj = Country.getCountryByCode(address.country);
+        address.country = countryObj ? countryObj.name : address.country;
+      }
+
+      // Convert state code to state name
+      if (address.state && address.state.length <= 3 && address.country) {
+        // Get country code for state lookup
+        let countryCode = address.country;
+        if (address.country.length !== 2) {
+          // If country is already a name, find its code
+          const countryObj = Country.getAllCountries().find(
+            (c) => c.name.toLowerCase() === address.country.toLowerCase()
+          );
+          countryCode = countryObj ? countryObj.isoCode : address.country;
+        }
+
+        // Get state by code
+        const stateObj = State.getStateByCodeAndCountry(
+          address.state,
+          countryCode
+        );
+        address.state = stateObj ? stateObj.name : address.state;
+      }
+    }
 
     // Fetch documents with LEFT JOIN to document_upload and document_name_master
     const documents = await knex("warehouse_documents as wd")
@@ -1616,6 +1700,9 @@ const updateWarehouse = async (req, res) => {
   let trx;
   try {
     const { id } = req.params;
+    const userId = req.user?.user_id || "SYSTEM";
+    const userRole = req.user?.role;
+
     console.log(`📦 Updating warehouse: ${id}`);
     console.log("Request body:", JSON.stringify(req.body, null, 2));
 
@@ -1639,6 +1726,37 @@ const updateWarehouse = async (req, res) => {
         success: false,
         message: "Warehouse not found",
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingWarehouse.status;
+    const createdBy = existingWarehouse.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the creator can edit rejected entities",
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      return res.status(403).json({
+        success: false,
+        message: "Cannot edit entity during approval process",
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      if (!isApprover) {
+        return res.status(403).json({
+          success: false,
+          message: "Only approvers can edit active entities",
+        });
+      }
     }
 
     console.log("✅ Warehouse found, starting update transaction");
@@ -1667,10 +1785,72 @@ const updateWarehouse = async (req, res) => {
       geofencing,
     } = req.body;
 
-    const userId = req.user.user_id || "SYSTEM";
+    // const userId = req.user.user_id || "SYSTEM";
 
     // Start transaction
     trx = await knex.transaction();
+
+    // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+    const isResubmission =
+      currentStatus === "INACTIVE" && req.body.status === "PENDING";
+
+    if (isResubmission) {
+      console.log(`🔄 Resubmission detected for warehouse ${id}`);
+
+      // Get warehouse manager user ID via user_master lookup
+      const warehouseUser = await trx("user_master")
+        .where("user_type_id", "UT007") // Consignor WH Manager
+        .where("consignor_id", existingWarehouse.consignor_id)
+        .whereRaw("ABS(TIMESTAMPDIFF(SECOND, created_at, ?)) < 60", [
+          existingWarehouse.created_at,
+        ])
+        .first();
+
+      if (warehouseUser) {
+        const warehouseManagerUserId = warehouseUser.user_id;
+
+        // Find existing approval flow record
+        const approvalFlow = await trx("approval_flow_trans")
+          .where("user_id_reference_id", warehouseManagerUserId)
+          .where("approval_type_id", "AT005") // Warehouse Manager
+          .orderBy("created_at", "desc")
+          .first();
+
+        if (approvalFlow) {
+          // Update approval flow to restart from Level 1
+          await trx("approval_flow_trans")
+            .where(
+              "approval_flow_unique_id",
+              approvalFlow.approval_flow_unique_id
+            )
+            .update({
+              s_status: "PENDING",
+              approver_level: 1,
+              actioned_by_id: null,
+              actioned_by_name: null,
+              approved_on: null,
+              // Keep remarks from rejection for history
+              updated_at: knex.fn.now(),
+            });
+
+          console.log(
+            `✅ Approval flow restarted for ${warehouseManagerUserId}`
+          );
+        }
+
+        // Update user status to Pending for Approval
+        await trx("user_master")
+          .where("user_id", warehouseManagerUserId)
+          .update({
+            status: "Pending for Approval",
+            updated_at: knex.fn.now(),
+          });
+
+        console.log(
+          `✅ User status updated to Pending for Approval: ${warehouseManagerUserId}`
+        );
+      }
+    }
 
     // Update warehouse basic information
     await trx("warehouse_basic_information")

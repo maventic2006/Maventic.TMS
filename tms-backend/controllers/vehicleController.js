@@ -755,7 +755,7 @@ const createVehicle = async (req, res) => {
       max_running_speed: vehicleData.max_running_speed || 0,
       created_by: req.user?.user_id || "SYSTEM",
       updated_by: req.user?.user_id || "SYSTEM",
-      status: "ACTIVE",
+      status: "PENDING",
     });
 
     // Insert ownership details if provided
@@ -1063,6 +1063,19 @@ const getAllVehicles = async (req, res) => {
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
+    // Normalize date inputs for accurate filtering
+    // Fix: Use UTC timezone (T00:00:00Z format) to prevent IST offset issues
+    let dateStart = createdOnStart
+      ? createdOnStart.includes("T")
+        ? createdOnStart
+        : `${createdOnStart}T00:00:00Z`
+      : null;
+    let dateEnd = createdOnEnd
+      ? createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd}T23:59:59Z`
+      : null;
+
     // Build query without the non-existent vehicle_capacity_details table
     let query = db("vehicle_basic_information_hdr as vbih")
       .leftJoin(
@@ -1082,20 +1095,21 @@ const getAllVehicles = async (req, res) => {
       )
       .leftJoin(
         db.raw(`(
-          SELECT aft1.*
+          SELECT 
+            aft1.*,
+            um.user_full_name,
+            SUBSTRING_INDEX(um.user_full_name, ' - ', -1) as vehicle_id_extracted
           FROM approval_flow_trans aft1
           INNER JOIN (
             SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
             FROM approval_flow_trans
             WHERE approval_type_id = 'AT004'
-              AND s_status IN ('Approve', 'Reject', 'PENDING')
             GROUP BY user_id_reference_id
           ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
                AND aft1.approval_flow_unique_id = aft2.max_id
+          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
         ) as aft`),
-        db.raw(
-          "CONCAT('VEH', CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED))"
-        ),
+        "aft.vehicle_id_extracted",
         "vbih.vehicle_id_code_hdr"
       )
       .select(
@@ -1272,29 +1286,21 @@ const getAllVehicles = async (req, res) => {
     //   ]);
     // }
 
-    //Created On Date Range Filter
-    if (createdOnStart) {
-      query = query.where("vbhi.created_on", ">=", createdOnStart);
+    // Created On Date Range Filter (with UTC timezone handling)
+    if (dateStart) {
+      query = query.where("vbih.created_at", ">=", dateStart);
     }
-    if (createdOnEnd) {
-      query = query.where("vbhi.created_on", "<=", createdOnEnd);
+    if (dateEnd) {
+      query = query.where("vbih.created_at", "<=", dateEnd);
     }
 
-    // Get total count for pagination
+    // Get total count for pagination (filters already applied to base query)
     const countQuery = query
       .clone()
       .clearSelect()
       .clearOrder()
       .count("* as total")
       .first();
-
-    // Date Filters for Count Query
-    if (createdOnStart) {
-      countQuery = countQuery.where("vbhi.created_on", ">=", createdOnStart);
-    }
-    if (createdOnEnd) {
-      countQuery = countQuery.where("vbhi.created_on", "<=", createdOnEnd);
-    }
 
     const { total } = await countQuery;
 
@@ -1305,6 +1311,15 @@ const getAllVehicles = async (req, res) => {
       .offset(offset);
 
     const vehicles = await query;
+
+    // Debug: Log the first vehicle to see what data we're getting
+    if (vehicles.length > 0) {
+      console.log("📊 Sample vehicle data from query:");
+      console.log("Vehicle ID:", vehicles[0].vehicleId);
+      console.log("Approver Name:", vehicles[0].approver_name);
+      console.log("Approved On:", vehicles[0].approved_on);
+      console.log("Approval Status:", vehicles[0].approval_status);
+    }
 
     // Transform the data to match frontend expectations
     const transformedVehicles = vehicles.map((vehicle) => ({
@@ -1339,7 +1354,9 @@ const getAllVehicles = async (req, res) => {
       ownershipName: vehicle.ownership_name,
       registrationDate: vehicle.registration_date,
       towingCapacity: parseFloat(vehicle.towingCapacity) || 0,
+      // Show approver name for all statuses (Pending shows pending_with_name, Approved shows actioned_by_name)
       approver: vehicle.approver_name || null,
+      // Show approved date only when actually approved
       approvedOn:
         vehicle.approved_on && vehicle.approval_status === "Approve"
           ? new Date(vehicle.approved_on).toISOString().split("T")[0]
@@ -1409,17 +1426,19 @@ const getVehicleById = async (req, res) => {
     // Fix: Use DISTINCT to avoid duplicate rows from multiple document_upload entries
     const documents = await db("vehicle_documents as vd")
       .leftJoin(
-        function() {
+        function () {
           // Subquery to get the latest/most recent document upload for each system_reference_id
           this.select([
             "system_reference_id",
-            "file_name", 
+            "file_name",
             "file_type",
-            "file_xstring_value"
+            "file_xstring_value",
           ])
-          .from("document_upload")
-          .whereRaw("(system_reference_id, created_at) IN (SELECT system_reference_id, MAX(created_at) FROM document_upload GROUP BY system_reference_id)")
-          .as("du");
+            .from("document_upload")
+            .whereRaw(
+              "(system_reference_id, created_at) IN (SELECT system_reference_id, MAX(created_at) FROM document_upload GROUP BY system_reference_id)"
+            )
+            .as("du");
         },
         "vd.document_id",
         "du.system_reference_id"
@@ -1701,6 +1720,9 @@ const updateVehicle = async (req, res) => {
 
   try {
     const { id } = req.params;
+    const userId = req.user?.user_id;
+    const userRole = req.user?.role;
+
     const {
       basicInformation,
       specifications,
@@ -1721,6 +1743,37 @@ const updateVehicle = async (req, res) => {
         success: false,
         message: "Vehicle not found",
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingVehicle.status;
+    const createdBy = existingVehicle.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the creator can edit rejected entities",
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      return res.status(403).json({
+        success: false,
+        message: "Cannot edit entity during approval process",
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      if (!isApprover) {
+        return res.status(403).json({
+          success: false,
+          message: "Only approvers can edit active entities",
+        });
+      }
     }
 
     // Combine basic information and specifications for validation
@@ -1765,6 +1818,55 @@ const updateVehicle = async (req, res) => {
           field: "basicInformation.gpsIMEI",
         });
       }
+    }
+
+    // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+    const isResubmission =
+      currentStatus === "INACTIVE" && basicInformation?.status === "PENDING";
+
+    if (isResubmission) {
+      console.log(`🔄 Resubmission detected for vehicle ${id}`);
+
+      // Get vehicle owner user ID (VEH0001 → VO0001)
+      const vehicleNumber = id.substring(3); // Remove 'VEH' prefix
+      const vehicleOwnerUserId = `VO${vehicleNumber}`; // VO0001
+
+      // Find existing approval flow record
+      const approvalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", vehicleOwnerUserId)
+        .where("approval_type_id", "AT004") // Vehicle Owner
+        .orderBy("created_at", "desc")
+        .first();
+
+      if (approvalFlow) {
+        // Update approval flow to restart from Level 1
+        await trx("approval_flow_trans")
+          .where(
+            "approval_flow_unique_id",
+            approvalFlow.approval_flow_unique_id
+          )
+          .update({
+            s_status: "PENDING",
+            approver_level: 1,
+            actioned_by_id: null,
+            actioned_by_name: null,
+            approved_on: null,
+            // Keep remarks from rejection for history
+            updated_at: db.fn.now(),
+          });
+
+        console.log(`✅ Approval flow restarted for ${vehicleOwnerUserId}`);
+      }
+
+      // Update user status to Pending for Approval
+      await trx("user_master").where("user_id", vehicleOwnerUserId).update({
+        status: "Pending for Approval",
+        updated_at: db.fn.now(),
+      });
+
+      console.log(
+        `✅ User status updated to Pending for Approval: ${vehicleOwnerUserId}`
+      );
     }
 
     // Update vehicle basic information

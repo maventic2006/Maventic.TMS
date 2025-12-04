@@ -1219,6 +1219,8 @@ const updateTransporter = async (req, res) => {
   try {
     const { id } = req.params;
     const { generalDetails, addresses, serviceableAreas, documents } = req.body;
+    const userId = req.user?.user_id;
+    const userRole = req.user?.role;
 
     // Validate transporter exists
     const existingTransporter = await trx("transporter_general_info")
@@ -1235,6 +1237,52 @@ const updateTransporter = async (req, res) => {
         },
         timestamp: new Date().toISOString(),
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingTransporter.status;
+    const createdBy = existingTransporter.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Only the creator can edit rejected entities",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Cannot edit entity during approval process",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      if (!isApprover) {
+        await trx.rollback();
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only approvers can edit active entities",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     // Validate general details (only if provided)
@@ -1758,6 +1806,55 @@ const updateTransporter = async (req, res) => {
     const currentUser = req.user?.user_id || "SYSTEM";
     const currentTimestamp = new Date();
 
+    // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+    const isResubmission =
+      currentStatus === "INACTIVE" && generalDetails?.status === "PENDING";
+
+    if (isResubmission) {
+      console.log(`🔄 Resubmission detected for transporter ${id}`);
+
+      // Get transporter admin user ID (T001 → TA0001)
+      const transporterNumber = id.substring(1); // Remove 'T' prefix
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`; // TA0001
+
+      // Find existing approval flow record
+      const approvalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", transporterAdminUserId)
+        .where("approval_type_id", "AT001") // Transporter Admin
+        .orderBy("created_at", "desc")
+        .first();
+
+      if (approvalFlow) {
+        // Update approval flow to restart from Level 1
+        await trx("approval_flow_trans")
+          .where(
+            "approval_flow_unique_id",
+            approvalFlow.approval_flow_unique_id
+          )
+          .update({
+            s_status: "PENDING",
+            approver_level: 1,
+            actioned_by_id: null,
+            actioned_by_name: null,
+            approved_on: null,
+            // Keep remarks from rejection for history
+            updated_at: currentTimestamp,
+          });
+
+        console.log(`✅ Approval flow restarted for ${transporterAdminUserId}`);
+      }
+
+      // Update user status to Pending for Approval
+      await trx("user_master").where("user_id", transporterAdminUserId).update({
+        status: "Pending for Approval",
+        updated_at: currentTimestamp,
+      });
+
+      console.log(
+        `✅ User status updated to Pending for Approval: ${transporterAdminUserId}`
+      );
+    }
+
     // Update general details if provided
     if (generalDetails) {
       await trx("transporter_general_info")
@@ -1772,6 +1869,7 @@ const updateTransporter = async (req, res) => {
           trans_mode_air: generalDetails.transMode.air ? 1 : 0,
           trans_mode_sea: generalDetails.transMode.sea ? 1 : 0,
           active_flag: generalDetails.activeFlag !== false ? 1 : 0,
+          status: generalDetails.status || currentStatus, // Update status if provided
           updated_at: currentTimestamp,
           updated_on: currentTimestamp,
           updated_by: currentUser,
@@ -2302,6 +2400,32 @@ const getTransporters = async (req, res) => {
         "tgi.transporter_id",
         "tc.transporter_id"
       )
+      // LEFT JOIN for PAN document
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as pan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'PAN Card'
+            AND status = 'ACTIVE'
+        ) as pan_doc`),
+        "tgi.transporter_id",
+        "pan_doc.transporter_id"
+      )
+      // LEFT JOIN for TAN document
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as tan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'TAN'
+            AND status = 'ACTIVE'
+        ) as tan_doc`),
+        "tgi.transporter_id",
+        "tan_doc.transporter_id"
+      )
       .leftJoin(
         knex.raw(`(
           SELECT aft1.*
@@ -2340,8 +2464,9 @@ const getTransporters = async (req, res) => {
         "addr.city",
         "addr.district",
         "addr.vat_number",
-        "addr.tin_pan",
-        "addr.tan",
+        // Get PAN and TAN from transporter_documents instead of tms_address
+        "pan_doc.pan_number as tin_pan",
+        "tan_doc.tan_number as tan",
         knex.raw(
           "CONCAT(COALESCE(addr.street_1, ''), ', ', COALESCE(addr.city, ''), ', ', COALESCE(addr.state, ''), ', ', COALESCE(addr.country, '')) as address"
         ),
@@ -2398,7 +2523,8 @@ const getTransporters = async (req, res) => {
     if (state) query = query.where("addr.state", "like", `%${state}%`);
     if (city) query = query.where("addr.city", "like", `%${city}%`);
     if (vatGst) query = query.where("addr.vat_number", "like", `%${vatGst}%`);
-    if (tan) query = query.where("addr.tan", "like", `%${tan}%`);
+    // Filter by TAN from transporter_documents (joined as tan_doc)
+    if (tan) query = query.where("tan_doc.tan_number", "like", `%${tan}%`);
 
     if (transportMode) {
       const modes = transportMode.split(",");
@@ -2431,13 +2557,17 @@ const getTransporters = async (req, res) => {
       query = query.where("tgi.created_on", ">=", createdOnStart);
     }
     if (createdOnEnd) {
-      query = query.where("tgi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      query = query.where("tgi.created_on", "<=", endDateWithTime);
     }
 
-    // Count query (with same date filters)
+    // Count query (with same date filters and document joins for TAN filter)
     let countQuery = knex("transporter_general_info as tgi");
 
-    if (search || state || city || vatGst || tan) {
+    if (search || state || city || vatGst) {
       countQuery = countQuery.leftJoin("tms_address as addr", function () {
         this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
           "addr.user_type",
@@ -2445,6 +2575,22 @@ const getTransporters = async (req, res) => {
           knex.raw("'TRANSPORTER'")
         );
       });
+    }
+
+    // Add TAN document join if filtering by TAN
+    if (tan) {
+      countQuery = countQuery.leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as tan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'TAN'
+            AND status = 'ACTIVE'
+        ) as tan_doc`),
+        "tgi.transporter_id",
+        "tan_doc.transporter_id"
+      );
     }
 
     // Reapply filters
@@ -2495,7 +2641,9 @@ const getTransporters = async (req, res) => {
     if (city) countQuery = countQuery.where("addr.city", "like", `%${city}%`);
     if (vatGst)
       countQuery = countQuery.where("addr.vat_number", "like", `%${vatGst}%`);
-    if (tan) countQuery = countQuery.where("addr.tan", "like", `%${tan}%`);
+    // Filter by TAN from transporter_documents instead of tms_address
+    if (tan) 
+      countQuery = countQuery.where("tan_doc.tan_number", "like", `%${tan}%`);
 
     if (transportMode) {
       const modes = transportMode.split(",");
@@ -2528,7 +2676,11 @@ const getTransporters = async (req, res) => {
       countQuery = countQuery.where("tgi.created_on", ">=", createdOnStart);
     }
     if (createdOnEnd) {
-      countQuery = countQuery.where("tgi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      countQuery = countQuery.where("tgi.created_on", "<=", endDateWithTime);
     }
 
     const totalResult = await countQuery
@@ -3036,7 +3188,14 @@ const getTransporterById = async (req, res) => {
             pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
             createdByUserId: approvalFlows[0]?.created_by_user_id || null,
             createdByName: approvalFlows[0]?.created_by_name || null,
+            remarks: approvalFlows[0]?.remarks || null, // ✅ ADD REJECTION REMARKS
           };
+
+          console.log(
+            `📝 User Approval Status created with remarks: ${
+              userApprovalStatus.remarks ? "YES" : "NO"
+            }`
+          );
 
           approvalHistory = approvalFlows;
         } else {

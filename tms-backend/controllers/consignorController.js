@@ -205,7 +205,8 @@ const updateConsignor = async (req, res) => {
       id,
       payload,
       req.files || {},
-      req.user.user_id
+      req.user.user_id,
+      req.user.role // Pass user role for permission checks
     );
 
     console.log("✅ Consignor updated successfully");
@@ -215,6 +216,17 @@ const updateConsignor = async (req, res) => {
 
     if (error.type === "NOT_FOUND") {
       return notFoundResponse(res, "Consignor", req.params.id);
+    }
+
+    if (error.type === "FORBIDDEN") {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+        timestamp: new Date().toISOString(),
+      });
     }
 
     if (error.type === "VALIDATION_ERROR") {
