@@ -240,6 +240,109 @@ const WarehouseDetails = () => {
     }
   };
 
+  // Check if warehouse is a draft
+  const isDraftWarehouse = currentWarehouse?.status === "SAVE_AS_DRAFT";
+
+  // Check if current user is the creator of this warehouse
+  // Use String() to ensure type consistency in comparison
+  const isCreator =
+    currentWarehouse?.createdBy &&
+    user?.user_id &&
+    String(currentWarehouse.createdBy) === String(user.user_id);
+
+  // Check if current user is an approver
+  // Check both role and user_type_id for Product Owner detection
+  const isApprover =
+    user?.role === "Product Owner" ||
+    user?.role === "admin" ||
+    user?.user_type_id === "UT001"; // UT001 is Owner/Product Owner
+
+  // 🔍 DEBUG: Log creator and approver checks
+  console.log("🔍 EDIT BUTTON DEBUG - WAREHOUSE:");
+  console.log("  Current User ID:", user?.user_id, typeof user?.user_id);
+  console.log("  Current User Role:", user?.role);
+  console.log("  Current User Type ID:", user?.user_type_id);
+  console.log(
+    "  Warehouse Created By:",
+    currentWarehouse?.createdBy,
+    typeof currentWarehouse?.createdBy
+  );
+  console.log(
+    "  String Comparison:",
+    String(currentWarehouse?.createdBy),
+    "===",
+    String(user?.user_id)
+  );
+  console.log("  Is Creator:", isCreator);
+  console.log("  Is Approver:", isApprover, "(role-based or UT001)");
+  console.log("  Is Draft:", isDraftWarehouse);
+  console.log("  Status:", currentWarehouse?.status);
+
+  // ✅ PERMISSION LOGIC - Rejection/Resubmission Workflow
+  // Determine if user can edit based on entity status and user role
+  const canEdit = React.useMemo(() => {
+    const status = currentWarehouse?.status;
+
+    console.log("🔍 CANEDIT CALCULATION - WAREHOUSE:");
+    console.log("  Status:", status);
+    console.log("  isDraftWarehouse:", isDraftWarehouse);
+    console.log("  isCreator:", isCreator);
+    console.log("  isApprover:", isApprover);
+
+    // DRAFT: Only creator can edit
+    if (isDraftWarehouse) {
+      console.log("  Result: DRAFT - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // INACTIVE (rejected): Only creator can edit
+    if (status === "INACTIVE") {
+      console.log("  Result: INACTIVE - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // PENDING: No one can edit (locked during approval)
+    if (status === "PENDING") {
+      console.log("  Result: PENDING - returning false");
+      return false;
+    }
+
+    // ACTIVE: Only approvers can edit
+    if (status === "ACTIVE") {
+      console.log("  Result: ACTIVE - returning isApprover:", isApprover);
+      return isApprover;
+    }
+
+    // Default: Allow edit
+    console.log("  Result: DEFAULT - returning true");
+    return true;
+  }, [currentWarehouse?.status, isCreator, isApprover, isDraftWarehouse]);
+
+  console.log("🔍 FINAL CANEDIT VALUE - WAREHOUSE:", canEdit);
+
+  // Debug logging for approval data
+  useEffect(() => {
+    if (currentWarehouse) {
+      console.log("🔍 WarehouseDetails - Warehouse Data Loaded:");
+      console.log("  Warehouse ID:", currentWarehouse.warehouseId);
+      console.log("  Status:", currentWarehouse.status);
+      console.log(
+        "  User Approval Status:",
+        currentWarehouse.userApprovalStatus
+      );
+      console.log(
+        "  ✅ Remarks Available:",
+        currentWarehouse.userApprovalStatus?.remarks ? "YES" : "NO"
+      );
+      console.log(
+        "  Remarks Content:",
+        currentWarehouse.userApprovalStatus?.remarks
+      );
+      console.log("  Current User:", user);
+      console.log("  Full currentWarehouse object:", currentWarehouse);
+    }
+  }, [currentWarehouse, user]);
+
   // Track unsaved changes
   useEffect(() => {
     if (isEditMode && editFormData && currentWarehouse) {
@@ -414,8 +517,24 @@ const WarehouseDetails = () => {
       });
       dispatch(clearError());
 
+      // ✅ RESUBMISSION LOGIC - If entity is INACTIVE (rejected), change status to PENDING
+      const isResubmission = currentWarehouse?.status === "INACTIVE";
+
       // Transform nested frontend structure to flat backend structure
-      const backendData = transformToBackendFormat(editFormData);
+      let backendData = transformToBackendFormat(editFormData);
+
+      // If resubmitting, update the status to PENDING to restart approval workflow
+      if (isResubmission) {
+        backendData = {
+          ...backendData,
+          status: "PENDING", // Restart approval workflow
+        };
+      }
+
+      console.log("🔍 RESUBMISSION CHECK - WAREHOUSE:");
+      console.log("  Current Status:", currentWarehouse?.status);
+      console.log("  Is Resubmission:", isResubmission);
+      console.log("  Final Status:", backendData?.status);
 
       // Call appropriate update API based on status
       let result;
@@ -441,7 +560,9 @@ const WarehouseDetails = () => {
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: isDraft
+          message: isResubmission
+            ? "Warehouse resubmitted for approval successfully! Status changed to PENDING."
+            : isDraft
             ? "Warehouse draft updated successfully!"
             : "Warehouse updated successfully!",
         })
@@ -828,6 +949,12 @@ const WarehouseDetails = () => {
               </div>
             )}
 
+            {console.log("🔍 BUTTON RENDER CHECK - WAREHOUSE:", {
+              isEditMode,
+              canEdit,
+              showButton: !isEditMode && canEdit,
+            })}
+
             {isEditMode ? (
               <>
                 <button
@@ -880,19 +1007,50 @@ const WarehouseDetails = () => {
                 </button>
               </>
             ) : (
-              <button
-                onClick={handleEditToggle}
-                className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
-              >
-                <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                {currentWarehouse?.status === "SAVE_AS_DRAFT"
-                  ? "Edit Draft"
-                  : "Edit Details"}
-              </button>
+              !isEditMode &&
+              canEdit && (
+                <button
+                  onClick={handleEditToggle}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
+                >
+                  <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  {currentWarehouse?.status === "SAVE_AS_DRAFT"
+                    ? "Edit Draft"
+                    : "Edit Details"}
+                </button>
+              )
             )}
           </div>
         </div>
       </div>
+
+      {/* ✅ REJECTION REMARKS BANNER - Show when entity is rejected (INACTIVE) */}
+      {currentWarehouse?.status === "INACTIVE" &&
+        currentWarehouse?.userApprovalStatus?.remarks && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-6 mx-6 mt-4 rounded-lg shadow-sm">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-red-900 font-semibold text-lg mb-2 flex items-center gap-2">
+                  Rejection Remarks
+                  <span className="text-xs bg-red-100 px-2 py-1 rounded-full ml-2">
+                    Entity Rejected
+                  </span>
+                </h4>
+                <p className="text-red-800 whitespace-pre-wrap leading-relaxed">
+                  {currentWarehouse.userApprovalStatus.remarks}
+                </p>
+                {isCreator && !isEditMode && (
+                  <div className="mt-4 text-sm text-red-700 bg-red-100 p-3 rounded-md">
+                    <strong>Note:</strong> Please address the rejection remarks
+                    above and click "Edit Details" to make the necessary
+                    changes, then save to resubmit for approval.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Modern Tab Navigation with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">

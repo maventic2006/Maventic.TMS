@@ -751,7 +751,7 @@ const createVehicle = async (req, res) => {
       max_running_speed: vehicleData.max_running_speed || 0,
       created_by: req.user?.user_id || "SYSTEM",
       updated_by: req.user?.user_id || "SYSTEM",
-      status: "ACTIVE",
+      status: "PENDING",
     });
 
     // Insert ownership details if provided
@@ -1359,17 +1359,19 @@ const getVehicleById = async (req, res) => {
     // Fix: Use DISTINCT to avoid duplicate rows from multiple document_upload entries
     const documents = await db("vehicle_documents as vd")
       .leftJoin(
-        function() {
+        function () {
           // Subquery to get the latest/most recent document upload for each system_reference_id
           this.select([
             "system_reference_id",
-            "file_name", 
+            "file_name",
             "file_type",
-            "file_xstring_value"
+            "file_xstring_value",
           ])
-          .from("document_upload")
-          .whereRaw("(system_reference_id, created_at) IN (SELECT system_reference_id, MAX(created_at) FROM document_upload GROUP BY system_reference_id)")
-          .as("du");
+            .from("document_upload")
+            .whereRaw(
+              "(system_reference_id, created_at) IN (SELECT system_reference_id, MAX(created_at) FROM document_upload GROUP BY system_reference_id)"
+            )
+            .as("du");
         },
         "vd.document_id",
         "du.system_reference_id"

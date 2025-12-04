@@ -191,6 +191,109 @@ const ConsignorDetailsPage = () => {
     }
   };
 
+  // Check if consignor is a draft
+  const isDraftConsignor = currentConsignor?.status === "SAVE_AS_DRAFT";
+
+  // Check if current user is the creator of this consignor
+  // Use String() to ensure type consistency in comparison
+  const isCreator =
+    currentConsignor?.createdBy &&
+    user?.user_id &&
+    String(currentConsignor.createdBy) === String(user.user_id);
+
+  // Check if current user is an approver
+  // Check both role and user_type_id for Product Owner detection
+  const isApprover =
+    user?.role === "Product Owner" ||
+    user?.role === "admin" ||
+    user?.user_type_id === "UT001"; // UT001 is Owner/Product Owner
+
+  // 🔍 DEBUG: Log creator and approver checks
+  console.log("🔍 EDIT BUTTON DEBUG - CONSIGNOR:");
+  console.log("  Current User ID:", user?.user_id, typeof user?.user_id);
+  console.log("  Current User Role:", user?.role);
+  console.log("  Current User Type ID:", user?.user_type_id);
+  console.log(
+    "  Consignor Created By:",
+    currentConsignor?.createdBy,
+    typeof currentConsignor?.createdBy
+  );
+  console.log(
+    "  String Comparison:",
+    String(currentConsignor?.createdBy),
+    "===",
+    String(user?.user_id)
+  );
+  console.log("  Is Creator:", isCreator);
+  console.log("  Is Approver:", isApprover, "(role-based or UT001)");
+  console.log("  Is Draft:", isDraftConsignor);
+  console.log("  Status:", currentConsignor?.status);
+
+  // ✅ PERMISSION LOGIC - Rejection/Resubmission Workflow
+  // Determine if user can edit based on entity status and user role
+  const canEdit = React.useMemo(() => {
+    const status = currentConsignor?.status;
+
+    console.log("🔍 CANEDIT CALCULATION - CONSIGNOR:");
+    console.log("  Status:", status);
+    console.log("  isDraftConsignor:", isDraftConsignor);
+    console.log("  isCreator:", isCreator);
+    console.log("  isApprover:", isApprover);
+
+    // DRAFT: Only creator can edit
+    if (isDraftConsignor) {
+      console.log("  Result: DRAFT - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // INACTIVE (rejected): Only creator can edit
+    if (status === "INACTIVE") {
+      console.log("  Result: INACTIVE - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // PENDING: No one can edit (locked during approval)
+    if (status === "PENDING") {
+      console.log("  Result: PENDING - returning false");
+      return false;
+    }
+
+    // ACTIVE: Only approvers can edit
+    if (status === "ACTIVE") {
+      console.log("  Result: ACTIVE - returning isApprover:", isApprover);
+      return isApprover;
+    }
+
+    // Default: Allow edit
+    console.log("  Result: DEFAULT - returning true");
+    return true;
+  }, [currentConsignor?.status, isCreator, isApprover, isDraftConsignor]);
+
+  console.log("🔍 FINAL CANEDIT VALUE - CONSIGNOR:", canEdit);
+
+  // Debug logging for approval data
+  useEffect(() => {
+    if (currentConsignor) {
+      console.log("🔍 ConsignorDetailsPage - Consignor Data Loaded:");
+      console.log("  Consignor ID:", currentConsignor.customerId);
+      console.log("  Status:", currentConsignor.general?.status);
+      console.log(
+        "  User Approval Status:",
+        currentConsignor.userApprovalStatus
+      );
+      console.log(
+        "  ✅ Remarks Available:",
+        currentConsignor.userApprovalStatus?.remarks ? "YES" : "NO"
+      );
+      console.log(
+        "  Remarks Content:",
+        currentConsignor.userApprovalStatus?.remarks
+      );
+      console.log("  Current User:", user);
+      console.log("  Full currentConsignor object:", currentConsignor);
+    }
+  }, [currentConsignor, user]);
+
   const handleEditToggle = () => {
     if (isEditMode && hasUnsavedChanges) {
       // Show confirmation dialog for unsaved changes
@@ -416,12 +519,28 @@ const ConsignorDetailsPage = () => {
       });
       console.log("===========================\n");
 
+      // ✅ RESUBMISSION LOGIC - If entity is INACTIVE (rejected), change status to PENDING
+      const isResubmission = currentConsignor?.status === "INACTIVE";
+
+      // If resubmitting, update the status to PENDING to restart approval workflow
+      const finalGeneral = isResubmission
+        ? {
+            ...general,
+            status: "PENDING", // Restart approval workflow
+          }
+        : general;
+
+      console.log("🔍 RESUBMISSION CHECK - CONSIGNOR:");
+      console.log("  Current Status:", currentConsignor?.status);
+      console.log("  Is Resubmission:", isResubmission);
+      console.log("  Final Status:", finalGeneral?.status);
+
       // Call the update API
       const result = await dispatch(
         updateConsignor({
           customerId: id,
           data: {
-            general,
+            general: finalGeneral,
             contacts,
             organization,
             documents,
@@ -434,7 +553,9 @@ const ConsignorDetailsPage = () => {
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: "Consignor updated successfully!",
+          message: isResubmission
+            ? "Consignor resubmitted for approval successfully! Status changed to PENDING."
+            : "Consignor updated successfully!",
         })
       );
 
@@ -1079,6 +1200,12 @@ const ConsignorDetailsPage = () => {
                 </>
               )}
 
+            {console.log("🔍 BUTTON RENDER CHECK - CONSIGNOR:", {
+              isEditMode,
+              canEdit,
+              showButton: !isEditMode && canEdit,
+            })}
+
             {isEditMode ? (
               <>
                 <button
@@ -1109,20 +1236,51 @@ const ConsignorDetailsPage = () => {
                 </button>
               </>
             ) : (
-              <button
-                onClick={handleEditToggle}
-                className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
-              >
-                <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                {currentConsignor.status === "SAVE_AS_DRAFT" ||
-                currentConsignor.status === "DRAFT"
-                  ? "Edit Draft"
-                  : "Edit Details"}
-              </button>
+              !isEditMode &&
+              canEdit && (
+                <button
+                  onClick={handleEditToggle}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
+                >
+                  <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  {currentConsignor.status === "SAVE_AS_DRAFT" ||
+                  currentConsignor.status === "DRAFT"
+                    ? "Edit Draft"
+                    : "Edit Details"}
+                </button>
+              )
             )}
           </div>
         </div>
       </div>
+
+      {/* ✅ REJECTION REMARKS BANNER - Show when entity is rejected (INACTIVE) */}
+      {currentConsignor?.status === "INACTIVE" &&
+        currentConsignor?.userApprovalStatus?.remarks && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-6 mx-6 mt-4 rounded-lg shadow-sm">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-red-900 font-semibold text-lg mb-2 flex items-center gap-2">
+                  Rejection Remarks
+                  <span className="text-xs bg-red-100 px-2 py-1 rounded-full ml-2">
+                    Entity Rejected
+                  </span>
+                </h4>
+                <p className="text-red-800 whitespace-pre-wrap leading-relaxed">
+                  {currentConsignor.userApprovalStatus.remarks}
+                </p>
+                {isCreator && !isEditMode && (
+                  <div className="mt-4 text-sm text-red-700 bg-red-100 p-3 rounded-md">
+                    <strong>Note:</strong> Please address the rejection remarks
+                    above and click "Edit Details" to make the necessary
+                    changes, then save to resubmit for approval.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Modern Tab Navigation with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">

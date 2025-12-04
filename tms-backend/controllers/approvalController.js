@@ -621,7 +621,7 @@ async function updateRelatedEntityStatus(
       // First, get the vehicle owner user details
       const vehicleOwnerUser = await trx("user_master")
         .where("user_id", user_id_reference_id)
-        .select("user_id", "user_full_name", "created_at")
+        .select("user_id", "user_full_name", "created_at", "created_by_user_id")
         .first();
 
       if (!vehicleOwnerUser) {
@@ -645,25 +645,49 @@ async function updateRelatedEntityStatus(
       );
 
       // CRITICAL: Find and update the vehicle associated with this user
-      // Vehicle Owner user IDs follow pattern: VO0001, VO0062, etc.
-      // Corresponding vehicle IDs: VEH0001, VEH0062, etc.
-      // Extract number from VO ID and create VEH ID
-
+      // Strategy 1: Extract vehicle ID from user full name (most reliable)
+      // Format: "Vehicle Owner - VEH0001"
       let vehicleId = null;
-
-      // Try pattern-based derivation first (VO0001 → VEH0001)
-      if (user_id_reference_id.startsWith("VO")) {
-        const vehicleNumber = user_id_reference_id.substring(2); // Remove 'VO' prefix
-        vehicleId = `VEH${vehicleNumber}`;
+      const vehicleIdMatch = vehicleOwnerUser.user_full_name.match(/VEH\d+/);
+      if (vehicleIdMatch) {
+        vehicleId = vehicleIdMatch[0];
         console.log(
-          `🔍 Derived vehicle ID from user ID: ${user_id_reference_id} → ${vehicleId}`
+          `🔍 Extracted vehicle ID from user name: ${vehicleOwnerUser.user_full_name} → ${vehicleId}`
         );
       } else {
-        // Fallback: Extract from user name (Vehicle Owner - VEH0062)
-        const vehicleIdMatch = vehicleOwnerUser.user_full_name.match(/VEH\d+/);
-        if (vehicleIdMatch) {
-          vehicleId = vehicleIdMatch[0];
-          console.log(`🔍 Extracted vehicle ID from user name: ${vehicleId}`);
+        // Strategy 2: Try pattern-based derivation (VO0001 → VEH0001)
+        if (user_id_reference_id.startsWith("VO")) {
+          const vehicleNumber = user_id_reference_id.substring(2); // Remove 'VO' prefix
+          vehicleId = `VEH${vehicleNumber}`;
+          console.log(
+            `🔍 Derived vehicle ID from user ID: ${user_id_reference_id} → ${vehicleId}`
+          );
+        }
+      }
+
+      // Strategy 3: If still not found, search by created_by and creation time
+      if (!vehicleId) {
+        console.log(
+          `🔍 Trying to find vehicle by creator and time: ${vehicleOwnerUser.created_by_user_id}`
+        );
+        const vehicle = await trx("vehicle_basic_information_hdr")
+          .where("created_by", vehicleOwnerUser.created_by_user_id)
+          .where(
+            "created_at",
+            ">=",
+            new Date(new Date(vehicleOwnerUser.created_at).getTime() - 5000)
+          ) // Within 5 seconds before
+          .where(
+            "created_at",
+            "<=",
+            new Date(new Date(vehicleOwnerUser.created_at).getTime() + 5000)
+          ) // Within 5 seconds after
+          .orderBy("created_at", "desc")
+          .first();
+
+        if (vehicle) {
+          vehicleId = vehicle.vehicle_id_code_hdr;
+          console.log(`🔍 Found vehicle by time matching: ${vehicleId}`);
         }
       }
 
@@ -672,7 +696,7 @@ async function updateRelatedEntityStatus(
           `🔍 Updating vehicle ${vehicleId} status to ${entityStatus}...`
         );
 
-        // Update vehicle status
+        // Update vehicle status in vehicle_basic_information_hdr
         const vehicleUpdateResult = await trx("vehicle_basic_information_hdr")
           .where("vehicle_id_code_hdr", vehicleId)
           .update({
@@ -683,25 +707,28 @@ async function updateRelatedEntityStatus(
 
         if (vehicleUpdateResult > 0) {
           console.log(
-            `✅ Updated vehicle ${vehicleId} status to ${entityStatus}`
+            `✅ Updated vehicle ${vehicleId} status in vehicle_basic_information_hdr to ${entityStatus}`
           );
 
           // Verify the update
           const updatedVehicle = await trx("vehicle_basic_information_hdr")
             .where("vehicle_id_code_hdr", vehicleId)
-            .select("status")
+            .select("vehicle_id_code_hdr", "status")
             .first();
 
           console.log(
-            `✅ Verified vehicle ${vehicleId} status: ${updatedVehicle?.status}`
+            `✅ Verified vehicle ${updatedVehicle?.vehicle_id_code_hdr} status: ${updatedVehicle?.status}`
           );
         } else {
           console.warn(`⚠️ No vehicle found with ID ${vehicleId} to update`);
         }
       } else {
-        console.warn(
-          `⚠️ Could not extract vehicle ID from user ${user_id_reference_id} or name: ${vehicleOwnerUser.user_full_name}`
+        console.error(
+          `❌ CRITICAL: Could not determine vehicle ID for user ${user_id_reference_id}`
         );
+        console.error(`   User full name: ${vehicleOwnerUser.user_full_name}`);
+        console.error(`   Created by: ${vehicleOwnerUser.created_by_user_id}`);
+        console.error(`   Created at: ${vehicleOwnerUser.created_at}`);
       }
     }
 
