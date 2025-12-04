@@ -1321,21 +1321,46 @@ const updateTransporter = async (req, res) => {
           });
         }
 
-        // Validate VAT number format
-        const countryCode = Country.getAllCountries().find(
-          (c) => c.name === address.country
-        )?.isoCode;
-        if (countryCode && !validateVATNumber(address.vatNumber, countryCode)) {
-          await trx.rollback();
-          return res.status(400).json({
-            success: false,
-            error: {
-              code: "VALIDATION_ERROR",
-              message: `Invalid VAT number format for ${address.country}`,
-              field: `addresses[${i}].vatNumber`,
-            },
-            timestamp: new Date().toISOString(),
-          });
+        // Validate VAT number format - BUT skip validation for existing addresses with unchanged VAT
+        let shouldValidateVAT = true;
+
+        // Check if this is an existing address
+        if (address.addressId) {
+          const existingAddress = await trx("tms_address")
+            .where("address_id", address.addressId)
+            .first();
+
+          // If address exists and VAT number hasn't changed, skip validation
+          if (
+            existingAddress &&
+            existingAddress.vat_number === address.vatNumber
+          ) {
+            shouldValidateVAT = false;
+            console.log(
+              `✅ Skipping VAT validation for existing address ${address.addressId} - VAT unchanged`
+            );
+          }
+        }
+
+        if (shouldValidateVAT) {
+          const countryCode = Country.getAllCountries().find(
+            (c) => c.name === address.country
+          )?.isoCode;
+          if (
+            countryCode &&
+            !validateVATNumber(address.vatNumber, countryCode)
+          ) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: `Invalid VAT number format for ${address.country}`,
+                field: `addresses[${i}].vatNumber`,
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
 
         // Validate contacts

@@ -390,19 +390,47 @@ const getConsignorList = async (queryParams) => {
     // Build data query with select columns (clone again)
     const dataQuery = baseQuery
       .clone()
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            aft1.*,
+            um.consignor_id
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT 
+              user_id_reference_id,
+              MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT002'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+                AND aft1.approval_flow_unique_id = aft2.max_id
+          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
+        ) as aft`),
+        knex.raw("aft.consignor_id = consignor_basic_information.customer_id")
+      )
       .select(
-        "consignor_unique_id",
-        "customer_id",
-        "customer_name",
-        "search_term",
-        "industry_type",
-        "currency_type",
-        "payment_term",
-        "status",
-        "approved_by",
-        "approved_date",
-        "created_at",
-        "updated_at"
+        "consignor_basic_information.consignor_unique_id",
+        "consignor_basic_information.customer_id",
+        "consignor_basic_information.customer_name",
+        "consignor_basic_information.search_term",
+        "consignor_basic_information.industry_type",
+        "consignor_basic_information.currency_type",
+        "consignor_basic_information.payment_term",
+        "consignor_basic_information.status",
+        "consignor_basic_information.approved_by",
+        "consignor_basic_information.approved_date",
+        "consignor_basic_information.created_at",
+        "consignor_basic_information.updated_at",
+        // Use approval flow data if available, fallback to table columns
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name, consignor_basic_information.approved_by) as approver_name"
+        ),
+        knex.raw(
+          "COALESCE(aft.approved_on, consignor_basic_information.approved_date) as approved_on"
+        ),
+        "aft.s_status as approval_status"
       );
 
     // Apply sorting
@@ -416,9 +444,19 @@ const getConsignorList = async (queryParams) => {
     // Execute query
     const consignors = await dataQuery;
 
+    // Transform consignors to include approver fields
+    const transformedConsignors = consignors.map((consignor) => ({
+      ...consignor,
+      approver: consignor.approver_name || null,
+      approvedOn:
+        consignor.approved_on && consignor.approval_status === "Approve"
+          ? new Date(consignor.approved_on).toISOString().split("T")[0]
+          : null,
+    }));
+
     // Return with metadata
     return {
-      data: consignors,
+      data: transformedConsignors,
       meta: {
         page: pageNum,
         limit: limitNum,
@@ -1179,7 +1217,7 @@ const createConsignor = async (payload, files, userId) => {
       approval_config_id: approvalConfig.approval_config_id,
       approval_type_id: "AT002", // Consignor Admin
       user_id_reference_id: consignorAdminUserId,
-      s_status: "Pending for Approval",
+      s_status: "PENDING",
       approver_level: 1,
       pending_with_role_id: "RL001", // Product Owner role
       pending_with_user_id: pendingWithUserId,

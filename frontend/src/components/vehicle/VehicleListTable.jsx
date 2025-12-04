@@ -484,13 +484,13 @@ const VehicleListTable = ({
                     className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
                     style={{ color: theme.colors.text.primary }}
                   >
-                    {displayValue(vehicle.approvedName)}
+                    {displayValue(vehicle.approver)}
                   </td>
                   <td
                     className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
                     style={{ color: theme.colors.text.primary }}
                   >
-                    {displayValue(vehicle.approvedBy)}
+                    {displayValue(vehicle.approvedOn)}
                   </td>
                   <td className="px-4 py-2 text-center text-nowrap">
                     {vehicle.status === "SAVE_AS_DRAFT" && onDeleteDraft && (
