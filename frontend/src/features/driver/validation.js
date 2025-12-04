@@ -198,12 +198,8 @@ export const createDriverSchema = z.object({
       }
       return true;
     }, "Duplicate document numbers found for the same document type"),
-  history: z
-    .array(historySchema)
-    .min(1, "At least one employment history record is required"),
-  accidents: z
-    .array(accidentViolationSchema)
-    .min(1, "At least one accident/violation record is required"),
+  history: z.array(historySchema).optional().default([]),
+  accidents: z.array(accidentViolationSchema).optional().default([]),
 });
 
 // Helper function to format Zod errors into a flat object

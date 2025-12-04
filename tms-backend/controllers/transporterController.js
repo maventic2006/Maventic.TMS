@@ -5,6 +5,10 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
+const {
+  validateGSTPAN,
+  getGSTStateCode,
+} = require("../utils/gstPanValidation");
 
 // Helper function to generate unique IDs
 const generateTransporterId = async () => {
@@ -635,6 +639,67 @@ const createTransporter = async (req, res) => {
             field: `documents[${i}].validTo`,
           },
         });
+      }
+    }
+
+    // ========================================
+    // GST-PAN VALIDATION (India Only)
+    // ========================================
+    // Validate primary address GST number against PAN card
+    // Only for India (country code 'IN' or country name 'India')
+    const gstPrimaryAddress = addresses.find((addr) => addr.isPrimary === true);
+
+    if (gstPrimaryAddress) {
+      const isIndia =
+        gstPrimaryAddress.country === "IN" ||
+        gstPrimaryAddress.country === "India" ||
+        gstPrimaryAddress.country.toLowerCase().includes("india");
+
+      if (isIndia && gstPrimaryAddress.vatNumber) {
+        console.log("🔍 Validating GST-PAN for primary address in India");
+
+        // Find PAN card document (DN001 is PAN/TIN)
+        const panDocument = documents.find((doc) => {
+          const docTypeId = doc.documentTypeId || doc.documentType;
+          return (
+            docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+          );
+        });
+
+        if (!panDocument) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+              field: "documents",
+              hint: "Please add a PAN card document in the Documents tab",
+            },
+          });
+        }
+
+        // Validate GST-PAN match
+        const gstValidation = validateGSTPAN(
+          gstPrimaryAddress.vatNumber,
+          panDocument.documentNumber,
+          gstPrimaryAddress.state
+        );
+
+        if (!gstValidation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: gstValidation.error,
+              field: gstValidation.field || "vatNumber",
+              validationCode: gstValidation.code,
+              hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+            },
+          });
+        }
+
+        console.log("✅ GST-PAN validation passed for primary address");
       }
     }
 
@@ -1560,6 +1625,74 @@ const updateTransporter = async (req, res) => {
         }
       }
 
+      // ========================================
+      // GST-PAN VALIDATION (India Only) - UPDATE TRANSPORTER
+      // ========================================
+      // Validate primary address GST number against PAN card
+      const gstPrimaryAddr = addresses.find((addr) => addr.isPrimary === true);
+
+      if (gstPrimaryAddr) {
+        const isIndia =
+          gstPrimaryAddr.country === "IN" ||
+          gstPrimaryAddr.country === "India" ||
+          gstPrimaryAddr.country.toLowerCase().includes("india");
+
+        if (isIndia && gstPrimaryAddr.vatNumber) {
+          console.log(
+            "🔍 [UPDATE] Validating GST-PAN for primary address in India"
+          );
+
+          // Find PAN card document (DN001 is PAN/TIN)
+          const panDocument = documents.find((doc) => {
+            const docTypeId = doc.documentTypeId || doc.documentType;
+            return (
+              docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+            );
+          });
+
+          if (!panDocument) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message:
+                  "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+                field: "documents",
+                hint: "Please add a PAN card document in the Documents tab",
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Validate GST-PAN match
+          const gstValidation = validateGSTPAN(
+            gstPrimaryAddr.vatNumber,
+            panDocument.documentNumber,
+            gstPrimaryAddr.state
+          );
+
+          if (!gstValidation.isValid) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: gstValidation.error,
+                field: gstValidation.field || "vatNumber",
+                validationCode: gstValidation.code,
+                hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          console.log(
+            "✅ [UPDATE] GST-PAN validation passed for primary address"
+          );
+        }
+      }
+
       // Check for duplicate document numbers (excluding current transporter's documents)
       for (let i = 0; i < documents.length; i++) {
         const document = documents[i];
@@ -2144,6 +2277,24 @@ const getTransporters = async (req, res) => {
         "tgi.transporter_id",
         "tc.transporter_id"
       )
+      .leftJoin(
+        knex.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT001'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        knex.raw(
+          "CONCAT('T', CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED))"
+        ),
+        "tgi.transporter_id"
+      )
       .select(
         "tgi.transporter_id",
         "tgi.business_name",
@@ -2171,7 +2322,13 @@ const getTransporters = async (req, res) => {
         ),
         "tc.contact_person_name",
         "tc.phone_number",
-        "tc.email_id"
+        "tc.email_id",
+        // Get approver name - try actioned_by_name first, fallback to pending_with_name
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
       );
 
     // Search
@@ -2366,6 +2523,18 @@ const getTransporters = async (req, res) => {
       if (transporter.trans_mode_air) transportModes.push("A");
       if (transporter.trans_mode_sea) transportModes.push("S");
 
+      // Debug approval data - show for PENDING and approved/rejected
+      if (transporter.approval_status) {
+        console.log(
+          `📊 ${transporter.transporter_id} approval (${transporter.approval_status}):`,
+          {
+            approver_name: transporter.approver_name,
+            approved_on: transporter.approved_on,
+            transporter_status: transporter.status,
+          }
+        );
+      }
+
       return {
         id: transporter.transporter_id,
         businessName: transporter.business_name,
@@ -2393,6 +2562,12 @@ const getTransporters = async (req, res) => {
         activeFlag: transporter.active_flag,
         fromDate: transporter.from_date,
         toDate: transporter.to_date,
+        // Approval data - show approver name for both Approve and Reject status
+        approver: transporter.approver_name || null,
+        approvedOn:
+          transporter.approved_on && transporter.approval_status === "Approve"
+            ? new Date(transporter.approved_on).toISOString().split("T")[0]
+            : null,
       };
     });
 
@@ -2664,6 +2839,54 @@ const getTransporterById = async (req, res) => {
       return `${year}-${month}-${day}`;
     };
 
+    // Get latest approval data for this transporter
+    // Derive TA user ID from transporter ID (T132 -> TA0132)
+    const transporterNumber = id.substring(1); // Remove 'T' prefix
+    const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`;
+
+    let approverName = null;
+    let approvedDate = null;
+
+    try {
+      // Get latest approval record for this transporter's admin user
+      // Include PENDING to show assigned approver for pending transporters
+      const latestApproval = await knex("approval_flow_trans")
+        .where("user_id_reference_id", transporterAdminUserId)
+        .where("approval_type_id", "AT001")
+        .whereIn("s_status", ["Approve", "Reject", "PENDING"])
+        .orderBy("approval_flow_unique_id", "desc")
+        .first();
+
+      if (latestApproval) {
+        // Try actioned_by_name first, fallback to pending_with_name
+        // For PENDING: pending_with_name shows who should approve
+        // For Approve/Reject: pending_with_name shows who approved/rejected
+        approverName =
+          latestApproval.actioned_by_name ||
+          latestApproval.pending_with_name ||
+          null;
+
+        // Only show approved date if status is Approve
+        approvedDate =
+          latestApproval.s_status === "Approve" && latestApproval.approved_on
+            ? formatDateForInput(latestApproval.approved_on)
+            : null;
+
+        console.log(`✅ Found approval data for ${transporterAdminUserId}:`, {
+          actioned_by_name: latestApproval.actioned_by_name,
+          pending_with_name: latestApproval.pending_with_name,
+          approverName,
+          approvedDate,
+          status: latestApproval.s_status,
+        });
+      } else {
+        console.log(`⚠️ No approval data found for ${transporterAdminUserId}`);
+      }
+    } catch (approvalError) {
+      console.error("Error fetching approval data:", approvalError);
+      // Don't fail the entire request
+    }
+
     // Build response
     const response = {
       transporterId: transporter.transporter_id,
@@ -2679,6 +2902,8 @@ const getTransporterById = async (req, res) => {
         updatedBy: transporter.updated_by,
         updatedOn: formatDateForInput(transporter.updated_on),
         status: transporter.status,
+        approvedBy: approverName, // Frontend expects approvedBy
+        approvedOn: approvedDate, // Frontend expects approvedOn
       },
       addresses: addressesWithContacts,
       serviceableAreas: groupedServiceableAreas,
@@ -3958,6 +4183,72 @@ const submitTransporterFromDraft = async (req, res) => {
             field: `documents[${i}].validTo`,
           },
         });
+      }
+    }
+
+    // ========================================
+    // GST-PAN VALIDATION (India Only) - SUBMIT DRAFT FOR APPROVAL
+    // ========================================
+    // Validate primary address GST number against PAN card
+    const gstPrimaryAddrDraft = addresses.find(
+      (addr) => addr.isPrimary === true
+    );
+
+    if (gstPrimaryAddrDraft) {
+      const isIndia =
+        gstPrimaryAddrDraft.country === "IN" ||
+        gstPrimaryAddrDraft.country === "India" ||
+        gstPrimaryAddrDraft.country.toLowerCase().includes("india");
+
+      if (isIndia && gstPrimaryAddrDraft.vatNumber) {
+        console.log(
+          "🔍 [SUBMIT DRAFT] Validating GST-PAN for primary address in India"
+        );
+
+        // Find PAN card document (DN001 is PAN/TIN)
+        const panDocument = documents.find((doc) => {
+          const docTypeId = doc.documentTypeId || doc.documentType;
+          return (
+            docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+          );
+        });
+
+        if (!panDocument) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+              field: "documents",
+              hint: "Please add a PAN card document in the Documents tab before submitting for approval",
+            },
+          });
+        }
+
+        // Validate GST-PAN match
+        const gstValidation = validateGSTPAN(
+          gstPrimaryAddrDraft.vatNumber,
+          panDocument.documentNumber,
+          gstPrimaryAddrDraft.state
+        );
+
+        if (!gstValidation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: gstValidation.error,
+              field: gstValidation.field || "vatNumber",
+              validationCode: gstValidation.code,
+              hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+            },
+          });
+        }
+
+        console.log(
+          "✅ [SUBMIT DRAFT] GST-PAN validation passed for primary address"
+        );
       }
     }
 

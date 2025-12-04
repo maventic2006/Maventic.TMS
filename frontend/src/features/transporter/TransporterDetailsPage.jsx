@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 
 import { getComponentTheme } from "../../utils/theme";
-import { validateFormSection } from "./validation";
+import { validateFormSection, validateGSTPANRelationship } from "./validation";
 import { TOAST_TYPES } from "../../utils/constants";
 import EmptyState from "../../components/ui/EmptyState";
 import SubmitDraftModal from "../../components/ui/SubmitDraftModal";
@@ -361,6 +361,61 @@ const TransporterDetailsPage = () => {
         3: false,
       });
 
+      // ========================================
+      // GST-PAN VALIDATION (before main validation)
+      // ========================================
+      const gstPanErrors = validateGSTPANRelationship(editFormData);
+
+      if (gstPanErrors.gstPan) {
+        const error = gstPanErrors.gstPan;
+        const nestedErrors = {};
+
+        // Set error on the appropriate field
+        if (error.tab === "addresses") {
+          // Find primary address index
+          const primaryIndex = editFormData.addresses?.findIndex(
+            (addr) => addr.isPrimary === true
+          );
+          if (primaryIndex >= 0) {
+            nestedErrors.addresses = {};
+            nestedErrors.addresses[primaryIndex] = {
+              vatNumber: error.message,
+            };
+          }
+        } else if (error.tab === "documents") {
+          nestedErrors.documents = {
+            _general: error.message,
+          };
+        }
+
+        setValidationErrors(nestedErrors);
+
+        // Set tab errors
+        const newTabErrors = {
+          0: false,
+          1: error.tab === "addresses",
+          2: false,
+          3: error.tab === "documents",
+        };
+        setTabErrors(newTabErrors);
+
+        // Switch to the tab with error
+        const errorTab = error.tab === "addresses" ? 1 : 3;
+        setActiveTab(errorTab);
+
+        // Show toast notification
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "GST-PAN Validation Failed",
+            details: [error.message, error.hint].filter(Boolean),
+            duration: 8000,
+          })
+        );
+
+        return;
+      }
+
       // Full validation - same as create transporter
       const errors = validateAllSections(editFormData);
 
@@ -540,6 +595,61 @@ const TransporterDetailsPage = () => {
         2: false,
         3: false,
       });
+
+      // ========================================
+      // GST-PAN VALIDATION (before main validation)
+      // ========================================
+      const gstPanErrors = validateGSTPANRelationship(editFormData);
+
+      if (gstPanErrors.gstPan) {
+        const error = gstPanErrors.gstPan;
+        const nestedErrors = {};
+
+        // Set error on the appropriate field
+        if (error.tab === "addresses") {
+          // Find primary address index
+          const primaryIndex = editFormData.addresses?.findIndex(
+            (addr) => addr.isPrimary === true
+          );
+          if (primaryIndex >= 0) {
+            nestedErrors.addresses = {};
+            nestedErrors.addresses[primaryIndex] = {
+              vatNumber: error.message,
+            };
+          }
+        } else if (error.tab === "documents") {
+          nestedErrors.documents = {
+            _general: error.message,
+          };
+        }
+
+        setValidationErrors(nestedErrors);
+
+        // Set tab errors
+        const newTabErrors = {
+          0: false,
+          1: error.tab === "addresses",
+          2: false,
+          3: error.tab === "documents",
+        };
+        setTabErrors(newTabErrors);
+
+        // Switch to the tab with error
+        const errorTab = error.tab === "addresses" ? 1 : 3;
+        setActiveTab(errorTab);
+
+        // Show toast notification
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "GST-PAN Validation Failed",
+            details: [error.message, error.hint].filter(Boolean),
+            duration: 8000,
+          })
+        );
+
+        return;
+      }
 
       // Validate all sections
       const errors = validateAllSections(editFormData);

@@ -2119,12 +2119,11 @@ const updateDriver = async (req, res) => {
               );
             } else {
               // Insert new upload for existing document
-              const docUploadId = await generateDocumentUploadId();
+              const docUploadId = await generateDocumentUploadId(trx);
               const documentUniqueId = `${id}-${doc.documentId}`;
 
               await trx("document_upload").insert({
-                document_upload_unique_id: docUploadId,
-                document_id: doc.documentId,
+                document_id: docUploadId,
                 file_name: doc.fileName || null,
                 file_type: doc.fileType || null,
                 file_xstring_value: doc.fileData,
@@ -2174,11 +2173,10 @@ const updateDriver = async (req, res) => {
 
           // If file data is provided for new document, insert into document_upload table
           if (doc.fileData) {
-            const docUploadId = await generateDocumentUploadId();
+            const docUploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
-              document_upload_unique_id: docUploadId,
-              document_id: documentId,
+              document_id: docUploadId,
               file_name: doc.fileName || null,
               file_type: doc.fileType || null,
               file_xstring_value: doc.fileData,
