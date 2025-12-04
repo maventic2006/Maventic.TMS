@@ -1356,9 +1356,21 @@ const getVehicleById = async (req, res) => {
       .orderBy("sequence_number", "asc");
 
     // Get documents with file data and document type names
+    // Fix: Use DISTINCT to avoid duplicate rows from multiple document_upload entries
     const documents = await db("vehicle_documents as vd")
       .leftJoin(
-        "document_upload as du",
+        function() {
+          // Subquery to get the latest/most recent document upload for each system_reference_id
+          this.select([
+            "system_reference_id",
+            "file_name", 
+            "file_type",
+            "file_xstring_value"
+          ])
+          .from("document_upload")
+          .whereRaw("(system_reference_id, created_at) IN (SELECT system_reference_id, MAX(created_at) FROM document_upload GROUP BY system_reference_id)")
+          .as("du");
+        },
         "vd.document_id",
         "du.system_reference_id"
       )
