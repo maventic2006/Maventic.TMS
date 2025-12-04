@@ -243,9 +243,9 @@ const generateDocumentId = async () => {
 /**
  * Generate unique document upload ID
  */
-const generateDocumentUploadId = async () => {
+const generateDocumentUploadId = async (trx) => {
   try {
-    const result = await db("document_upload").count("* as count").first();
+    const result = await trx("document_upload").count("* as count").first();
 
     const count = parseInt(result.count) + 1;
     return `DU${count.toString().padStart(4, "0")}`;
@@ -273,15 +273,22 @@ const generateSequenceNumber = async (vehicleId) => {
 };
 
 /**
- * Generate unique Vehicle Owner User ID based on vehicle ID
- * Format: VO0001 (from VEH0001), VO0002 (from VEH0002), etc.
- * This ensures 1:1 mapping between vehicle and vehicle owner user
+ * Generate unique Vehicle Owner User ID
+ * Format: VO0001, VO0002, etc.
  */
-const generateVehicleOwnerUserId = async (vehicleId) => {
+const generateVehicleOwnerUserId = async () => {
   try {
-    // Extract number from vehicle ID (VEH0001 -> 0001)
-    const vehicleNumber = vehicleId.substring(3);
-    return `VO${vehicleNumber}`;
+    const result = await db("user_master")
+      .where("user_id", "like", "VO%")
+      .max("user_id as max_id")
+      .first();
+
+    if (!result.max_id) {
+      return "VO0001";
+    }
+
+    const numPart = parseInt(result.max_id.substring(2)) + 1;
+    return "VO" + numPart.toString().padStart(4, "0");
   } catch (error) {
     console.error("Error generating vehicle owner user ID:", error);
     throw new Error("Failed to generate vehicle owner user ID");
@@ -729,7 +736,7 @@ const createVehicle = async (req, res) => {
       max_running_speed: vehicleData.max_running_speed || 0,
       created_by: req.user?.user_id || "SYSTEM",
       updated_by: req.user?.user_id || "SYSTEM",
-      status: "PENDING", // Vehicle remains PENDING until Vehicle Owner user is approved
+      status: "ACTIVE",
     });
 
     // Insert ownership details if provided
@@ -824,10 +831,11 @@ const createVehicle = async (req, res) => {
 
         // Insert document file if provided
         if (doc.fileData && doc.fileName) {
-          const uploadId = await generateDocumentUploadId();
+          const uploadId = await generateDocumentUploadId(trx);
 
           await trx("document_upload").insert({
             document_id: uploadId,
+
             file_name: doc.fileName,
             file_type: doc.fileType || "application/pdf",
             file_xstring_value: doc.fileData, // Base64 encoded file
@@ -854,8 +862,8 @@ const createVehicle = async (req, res) => {
     const creatorUserId = currentUser?.user_id || "SYSTEM";
     const creatorName = currentUser?.name || currentUser?.user_id || "System";
 
-    // Generate vehicle owner user ID (pattern-based: VEH0001 -> VO0001)
-    const vehicleOwnerUserId = await generateVehicleOwnerUserId(vehicleId);
+    // Generate vehicle owner user ID
+    const vehicleOwnerUserId = await generateVehicleOwnerUserId();
 
     // Generate initial password
     const initialPassword = generateVehicleOwnerPassword(
@@ -986,7 +994,6 @@ const getAllVehicles = async (req, res) => {
       sortOrder = "asc", // Changed to 'asc' so newest vehicles appear at the end of the list
       createdOnStart = "",
       createdOnEnd = "",
-      registrationDate = "",
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -1383,90 +1390,63 @@ const getVehicleById = async (req, res) => {
     let userApprovalStatus = null;
     let approvalHistory = [];
 
-    // Only fetch approval status for vehicles that are not in DRAFT status
-    const isDraftStatus =
-      vehicle.status === "DRAFT" || vehicle.status === "SAVE_AS_DRAFT";
+    try {
+      // Find Vehicle Owner user associated with this vehicle
+      // Vehicle Owner users have names like "Vehicle Owner - VEH0062"
+      const associatedUser = await db("user_master")
+        .where("user_type_id", "UT005") // Vehicle Owner user type
+        .where("user_full_name", "like", `%${id}%`) // Match vehicle ID in name
+        .first();
 
-    if (!isDraftStatus) {
-      try {
-        // Find Vehicle Owner user associated with this vehicle
-        // Vehicle Owner users have pattern: VO0001, VO0002, etc.
-        const vehicleNumber = id.substring(3); // Remove 'VEH' prefix
-        const vehicleOwnerUserId = `VO${vehicleNumber.padStart(4, "0")}`;
+      if (associatedUser) {
+        console.log(
+          `✅ Found associated Vehicle Owner user: ${associatedUser.user_id} for vehicle ${id}`
+        );
+
+        // Get approval flow for this user
+        const approvalFlows = await db("approval_flow_trans as aft")
+          .leftJoin(
+            "approval_type_master as atm",
+            "aft.approval_type_id",
+            "atm.approval_type_id"
+          )
+          .where("aft.user_id_reference_id", associatedUser.user_id)
+          .select(
+            "aft.*",
+            "atm.approval_type as approval_category",
+            "atm.approval_name"
+          )
+          .orderBy("aft.created_at", "desc");
+
+        userApprovalStatus = {
+          approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id || null,
+          userId: associatedUser.user_id,
+          userEmail: associatedUser.email_id,
+          userMobile: associatedUser.mobile_number,
+          userStatus: associatedUser.status,
+          isActive: associatedUser.is_active,
+          currentApprovalStatus:
+            approvalFlows[0]?.s_status || associatedUser.status,
+          pendingWith: approvalFlows[0]?.pending_with_name || null,
+          pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
+          createdByUserId: approvalFlows[0]?.created_by_user_id || null,
+          createdByName: approvalFlows[0]?.created_by_name || null,
+        };
+
+        approvalHistory = approvalFlows;
 
         console.log(
-          `🔍 Looking for Vehicle Owner user with derived ID: ${vehicleOwnerUserId} (from vehicle ${id})`
+          `✅ Found approval status for vehicle ${id}:`,
+          userApprovalStatus
         );
-
-        // Get user record with derived ID
-        const associatedUser = await db("user_master")
-          .where("user_id", vehicleOwnerUserId)
-          .where("user_type_id", "UT003") // Vehicle Owner user type (corrected from UT005)
-          .first();
-
-        if (associatedUser) {
-          console.log(
-            `✅ Found associated Vehicle Owner user: ${associatedUser.user_id} for vehicle ${id}`
-          );
-
-          // Get approval flow for this user
-          const approvalFlows = await db("approval_flow_trans as aft")
-            .leftJoin(
-              "approval_type_master as atm",
-              "aft.approval_type_id",
-              "atm.approval_type_id"
-            )
-            .where("aft.user_id_reference_id", associatedUser.user_id)
-            .select(
-              "aft.*",
-              "atm.approval_type as approval_category",
-              "atm.approval_name"
-            )
-            .orderBy("aft.created_at", "desc");
-
-          console.log(
-            `✅ Found ${approvalFlows.length} approval flow records for ${associatedUser.user_id}`
-          );
-
-          if (approvalFlows.length > 0) {
-            userApprovalStatus = {
-              approvalFlowTransId:
-                approvalFlows[0]?.approval_flow_trans_id || null,
-              userId: associatedUser.user_id,
-              userEmail: associatedUser.email_id,
-              userMobile: associatedUser.mobile_number,
-              userStatus: associatedUser.status,
-              isActive: associatedUser.is_active,
-              currentApprovalStatus:
-                approvalFlows[0]?.s_status || associatedUser.status,
-              pendingWith: approvalFlows[0]?.pending_with_name || null,
-              pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
-              createdByUserId: approvalFlows[0]?.created_by_user_id || null,
-              createdByName: approvalFlows[0]?.created_by_name || null,
-            };
-
-            approvalHistory = approvalFlows;
-
-            console.log(
-              `✅ Found approval status for vehicle ${id}:`,
-              userApprovalStatus
-            );
-          } else {
-            console.warn(
-              `⚠️ No approval flow found for user: ${vehicleOwnerUserId}`
-            );
-          }
-        } else {
-          console.warn(
-            `⚠️ No Vehicle Owner user found with ID: ${vehicleOwnerUserId}`
-          );
-        }
-      } catch (approvalError) {
-        console.error(
-          "❌ Error fetching vehicle approval status:",
-          approvalError.message
-        );
+      } else {
+        console.log(`⚠️  No Vehicle Owner user found for vehicle ${id}`);
       }
+    } catch (approvalError) {
+      console.error(
+        "❌ Error fetching vehicle approval status:",
+        approvalError.message
+      );
     }
 
     // Format response
@@ -1909,7 +1889,7 @@ const updateVehicle = async (req, res) => {
                 });
             } else {
               // Insert new file
-              const uploadId = await generateDocumentUploadId();
+              const uploadId = await generateDocumentUploadId(trx);
               await trx("document_upload").insert({
                 document_id: uploadId,
                 file_name: doc.fileName,
@@ -1952,7 +1932,7 @@ const updateVehicle = async (req, res) => {
 
           // Insert document file if provided
           if (doc.fileData && doc.fileName) {
-            const uploadId = await generateDocumentUploadId();
+            const uploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
               document_id: uploadId,
@@ -2538,7 +2518,7 @@ const saveVehicleAsDraft = async (req, res) => {
           });
 
           if (doc.fileData && doc.fileName) {
-            const uploadId = await generateDocumentUploadId();
+            const uploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
               document_id: uploadId,
@@ -2861,7 +2841,7 @@ const updateVehicleDraft = async (req, res) => {
           });
 
           if (doc.fileData && doc.fileName) {
-            const uploadId = await generateDocumentUploadId();
+            const uploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
               document_id: uploadId,
@@ -3087,209 +3067,6 @@ const submitVehicleFromDraft = async (req, res) => {
         status: "PENDING", // Change to PENDING
       });
 
-    // ==================================================================
-    // CREATE VEHICLE OWNER USER & APPROVAL FLOW (matching driver pattern)
-    // ==================================================================
-
-    const vehicleOwnerUserId = await generateVehicleOwnerUserId(id); // Pass vehicle ID for pattern-based generation
-    const initialPassword = generateVehicleOwnerPassword(
-      vehicleData.vehicle_registration_number
-    );
-    const hashedPassword = await require("bcrypt").hash(initialPassword, 10);
-
-    console.log(
-      `  📝 Creating Vehicle Owner user: ${vehicleOwnerUserId} for vehicle ${id}`
-    );
-
-    // Check if vehicle owner user already exists
-    const existingUser = await trx("user_master")
-      .where("user_id", vehicleOwnerUserId)
-      .first();
-
-    if (!existingUser) {
-      // Create vehicle owner user
-      await trx("user_master").insert({
-        user_id: vehicleOwnerUserId,
-        user_full_name: `Vehicle Owner - ${vehicleData.vehicle_registration_number}`,
-        password: hashedPassword,
-        user_type_id: "UT003", // Vehicle Owner type
-        email_id: `vehicle_${vehicleData.vehicle_registration_number
-          .replace(/\s+/g, "_")
-          .toLowerCase()}@tms.com`,
-        mobile_number: "0000000000", // Placeholder
-        status: "PENDING",
-        created_by: userId,
-        updated_by: userId,
-        created_at: db.fn.now(),
-        updated_at: db.fn.now(),
-        created_on: db.fn.now(),
-        updated_on: db.fn.now(),
-      });
-
-      console.log(`  ✅ Created Vehicle Owner user: ${vehicleOwnerUserId}`);
-      console.log(
-        `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
-      );
-
-      // Get approval configuration for Vehicle Owner (AT004)
-      const approvalConfig = await trx("approval_configuration")
-        .where("approval_type_id", "AT004")
-        .where("status", "ACTIVE")
-        .first();
-
-      if (!approvalConfig) {
-        throw new Error(
-          "Approval configuration not found for Vehicle Owner (AT004)"
-        );
-      }
-
-      // Determine approver based on creator
-      const creator = await trx("user_master").where("user_id", userId).first();
-      const creatorUserId = creator?.user_id || userId;
-      const creatorName = creator?.user_full_name || "System User";
-
-      let pendingWithUserId;
-      let pendingWithName;
-
-      // If creator is PO1, assign to PO2, and vice versa
-      if (creatorUserId === "PO001") {
-        const po2 = await trx("user_master").where("user_id", "PO002").first();
-        pendingWithUserId = "PO002";
-        pendingWithName = po2?.user_full_name || "Product Owner 2";
-      } else if (creatorUserId === "PO002") {
-        const po1 = await trx("user_master").where("user_id", "PO001").first();
-        pendingWithUserId = "PO001";
-        pendingWithName = po1?.user_full_name || "Product Owner 1";
-      } else {
-        // If creator is neither PO1 nor PO2, default to PO001
-        const po1 = await trx("user_master").where("user_id", "PO001").first();
-        pendingWithUserId = "PO001";
-        pendingWithName = po1?.user_full_name || "Product Owner 1";
-      }
-
-      // Generate approval flow trans ID
-      const approvalFlowId = await generateApprovalFlowId();
-
-      // Create approval flow transaction entry
-      await trx("approval_flow_trans").insert({
-        approval_flow_trans_id: approvalFlowId,
-        approval_config_id: approvalConfig.approval_config_id,
-        approval_type_id: "AT004", // Vehicle Owner
-        user_id_reference_id: vehicleOwnerUserId, // Use Vehicle Owner user ID
-        s_status: "PENDING",
-        approver_level: 1,
-        pending_with_role_id: "RL001", // Product Owner role
-        pending_with_user_id: pendingWithUserId,
-        pending_with_name: pendingWithName,
-        created_by_user_id: creatorUserId,
-        created_by_name: creatorName,
-        created_by: creatorUserId,
-        updated_by: creatorUserId,
-        created_at: db.fn.now(),
-        updated_at: db.fn.now(),
-        created_on: db.fn.now(),
-        updated_on: db.fn.now(),
-        status: "ACTIVE",
-      });
-
-      console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
-      console.log(
-        `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
-      );
-    } else {
-      console.log(
-        `  ✅ Vehicle Owner user already exists: ${vehicleOwnerUserId}`
-      );
-
-      // Update existing user status to PENDING if it's currently DRAFT
-      if (existingUser.status === "DRAFT") {
-        await trx("user_master").where("user_id", vehicleOwnerUserId).update({
-          status: "PENDING",
-          updated_by: userId,
-          updated_at: db.fn.now(),
-          updated_on: db.fn.now(),
-        });
-        console.log(
-          `  ✅ Updated user status to PENDING: ${vehicleOwnerUserId}`
-        );
-      }
-
-      // Check if approval flow already exists
-      const existingApprovalFlow = await trx("approval_flow_trans")
-        .where("user_id_reference_id", vehicleOwnerUserId)
-        .where("s_status", "PENDING")
-        .first();
-
-      if (!existingApprovalFlow) {
-        console.log(`  🔄 Creating missing approval flow for existing user`);
-
-        const approvalConfig = await trx("approval_configuration")
-          .where("approval_type_id", "AT004")
-          .where("status", "ACTIVE")
-          .first();
-
-        if (approvalConfig) {
-          const creator = await trx("user_master")
-            .where("user_id", userId)
-            .first();
-          const creatorUserId = creator?.user_id || userId;
-          const creatorName = creator?.user_full_name || "System User";
-
-          let pendingWithUserId;
-          let pendingWithName;
-
-          if (creatorUserId === "PO001") {
-            const po2 = await trx("user_master")
-              .where("user_id", "PO002")
-              .first();
-            pendingWithUserId = "PO002";
-            pendingWithName = po2?.user_full_name || "Product Owner 2";
-          } else if (creatorUserId === "PO002") {
-            const po1 = await trx("user_master")
-              .where("user_id", "PO001")
-              .first();
-            pendingWithUserId = "PO001";
-            pendingWithName = po1?.user_full_name || "Product Owner 1";
-          } else {
-            const po1 = await trx("user_master")
-              .where("user_id", "PO001")
-              .first();
-            pendingWithUserId = "PO001";
-            pendingWithName = po1?.user_full_name || "Product Owner 1";
-          }
-
-          const approvalFlowId = await generateApprovalFlowId();
-
-          await trx("approval_flow_trans").insert({
-            approval_flow_trans_id: approvalFlowId,
-            approval_config_id: approvalConfig.approval_config_id,
-            approval_type_id: "AT004",
-            user_id_reference_id: vehicleOwnerUserId,
-            s_status: "PENDING",
-            approver_level: 1,
-            pending_with_role_id: "RL001",
-            pending_with_user_id: pendingWithUserId,
-            pending_with_name: pendingWithName,
-            created_by_user_id: creatorUserId,
-            created_by_name: creatorName,
-            created_by: creatorUserId,
-            updated_by: creatorUserId,
-            created_at: db.fn.now(),
-            updated_at: db.fn.now(),
-            created_on: db.fn.now(),
-            updated_on: db.fn.now(),
-            status: "ACTIVE",
-          });
-
-          console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
-        }
-      }
-    }
-
-    // ==================================================================
-    // Continue with existing logic for ownership, maintenance, etc.
-    // ==================================================================
-
     // Delete existing related data and re-insert with ACTIVE status
     await trx("vehicle_ownership_details").where("vehicle_id_code", id).del();
     await trx("vehicle_maintenance_service_history")
@@ -3395,7 +3172,7 @@ const submitVehicleFromDraft = async (req, res) => {
         });
 
         if (doc.fileData && doc.fileName) {
-          const uploadId = await generateDocumentUploadId();
+          const uploadId = await generateDocumentUploadId(trx);
 
           await trx("document_upload").insert({
             document_id: uploadId,

@@ -193,6 +193,35 @@ export const downloadVehicleErrorReport = createAsyncThunk(
   }
 );
 
+/**
+ * Fetch detailed error information for a batch
+ */
+export const fetchVehicleBatchErrors = createAsyncThunk(
+  "vehicleBulkUpload/fetchBatchErrors",
+  async ({ batchId, page = 1, limit = 50 }, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        `/vehicle/bulk-upload/errors/${batchId}?page=${page}&limit=${limit}`
+      );
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(
+          response.data.error || "Failed to fetch error details"
+        );
+      }
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "FETCH_ERROR",
+          message: "Failed to fetch error details",
+        }
+      );
+    }
+  }
+);
+
 // ============================================================================
 // INITIAL STATE
 // ============================================================================
@@ -206,6 +235,16 @@ const initialState = {
   // Validation state
   validationResults: null,
   
+  // Error details state
+  errorDetails: [],
+  errorPagination: {
+    page: 1,
+    limit: 50,
+    total: 0,
+    pages: 0,
+  },
+  errorSummary: null,
+  
   // History state
   uploadHistory: [],
   historyPagination: {
@@ -218,10 +257,12 @@ const initialState = {
   // UI state
   isModalOpen: false,
   isHistoryModalOpen: false,
+  isErrorDetailsOpen: false,
   
   // Loading states
   isFetchingHistory: false,
   isFetchingStatus: false,
+  isFetchingErrors: false,
   isDownloadingTemplate: false,
   isDownloadingErrorReport: false,
   
@@ -277,6 +318,28 @@ const vehicleBulkUploadSlice = createSlice({
      */
     closeVehicleHistoryModal: (state) => {
       state.isHistoryModalOpen = false;
+    },
+    
+    /**
+     * Open error details modal
+     */
+    openVehicleErrorDetailsModal: (state) => {
+      state.isErrorDetailsOpen = true;
+    },
+    
+    /**
+     * Close error details modal
+     */
+    closeVehicleErrorDetailsModal: (state) => {
+      state.isErrorDetailsOpen = false;
+      state.errorDetails = [];
+      state.errorPagination = {
+        page: 1,
+        limit: 50,
+        total: 0,
+        pages: 0,
+      };
+      state.errorSummary = null;
     },
     
     // ========================================================================
@@ -400,6 +463,16 @@ const vehicleBulkUploadSlice = createSlice({
       state.validationResults = null;
       state.progressLogs = [];
       state.error = null;
+      // Reset error details state
+      state.errorDetails = [];
+      state.errorPagination = {
+        page: 1,
+        limit: 50,
+        total: 0,
+        pages: 0,
+      };
+      state.errorSummary = null;
+      state.isErrorDetailsOpen = false;
     },
     
     /**
@@ -449,11 +522,13 @@ const vehicleBulkUploadSlice = createSlice({
         ];
       })
       .addCase(uploadVehicleBulk.fulfilled, (state, action) => {
-        state.isUploading = false;
-        state.currentBatch = action.payload.batch;
+        // Keep isUploading = true because processing is still happening
+        // isUploading will be set to false when batch completes or fails
+        state.currentBatch = action.payload;
+        state.uploadProgress = 10; // Small progress to show upload completed
         state.progressLogs.push({
           timestamp: new Date().toISOString(),
-          message: "File uploaded successfully. Processing...",
+          message: "File uploaded successfully. Starting background processing...",
           type: "success",
         });
       })
@@ -476,8 +551,63 @@ const vehicleBulkUploadSlice = createSlice({
       })
       .addCase(fetchVehicleBatchStatus.fulfilled, (state, action) => {
         state.isFetchingStatus = false;
-        state.currentBatch = action.payload.batch;
-        state.validationResults = action.payload.statusCounts;
+        const batchData = action.payload.batch;
+        const statusCounts = action.payload.statusCounts;
+        
+        // Update current batch
+        state.currentBatch = batchData;
+        state.validationResults = statusCounts;
+        
+        // Update upload state based on batch status
+        if (batchData.status === 'processing') {
+          state.isUploading = true;
+          // Estimate progress based on processed rows
+          if (batchData.total_rows > 0 && batchData.processed_rows > 0) {
+            state.uploadProgress = Math.min(95, Math.round((batchData.processed_rows / batchData.total_rows) * 100));
+          }
+          
+          // Add progress log for processing status
+          if (batchData.processed_rows > 0) {
+            const lastLog = state.progressLogs[state.progressLogs.length - 1];
+            const progressMessage = `Processing: ${batchData.processed_rows}/${batchData.total_rows} rows completed`;
+            
+            // Only add if this is a different message than the last one
+            if (!lastLog || lastLog.message !== progressMessage) {
+              state.progressLogs.push({
+                timestamp: new Date().toISOString(),
+                message: progressMessage,
+                type: "info",
+              });
+            }
+          }
+        } else if (batchData.status === 'completed') {
+          state.isUploading = false;
+          state.uploadProgress = 100;
+          
+          // Add completion log if not already added
+          const lastLog = state.progressLogs[state.progressLogs.length - 1];
+          const completionMessage = `Batch completed: ${batchData.success_count} created, ${batchData.error_count} failed`;
+          
+          if (!lastLog || !lastLog.message.includes('completed')) {
+            state.progressLogs.push({
+              timestamp: new Date().toISOString(),
+              message: completionMessage,
+              type: batchData.success_count > 0 && batchData.error_count === 0 ? "success" : "warning",
+            });
+          }
+        } else if (batchData.status === 'failed') {
+          state.isUploading = false;
+          state.error = {
+            code: "BATCH_FAILED",
+            message: batchData.processing_notes || "Batch processing failed",
+          };
+          
+          state.progressLogs.push({
+            timestamp: new Date().toISOString(),
+            message: `Batch failed: ${batchData.processing_notes || "Unknown error"}`,
+            type: "error",
+          });
+        }
       })
       .addCase(fetchVehicleBatchStatus.rejected, (state, action) => {
         state.isFetchingStatus = false;
@@ -517,6 +647,25 @@ const vehicleBulkUploadSlice = createSlice({
         state.isDownloadingErrorReport = false;
         state.error = action.payload;
       });
+
+    // ========================================================================
+    // FETCH BATCH ERRORS
+    // ========================================================================
+    builder
+      .addCase(fetchVehicleBatchErrors.pending, (state) => {
+        state.isFetchingErrors = true;
+        state.error = null;
+      })
+      .addCase(fetchVehicleBatchErrors.fulfilled, (state, action) => {
+        state.isFetchingErrors = false;
+        state.errorDetails = action.payload.errors;
+        state.errorPagination = action.payload.pagination;
+        state.errorSummary = action.payload.summary;
+      })
+      .addCase(fetchVehicleBatchErrors.rejected, (state, action) => {
+        state.isFetchingErrors = false;
+        state.error = action.payload;
+      });
   },
 });
 
@@ -529,6 +678,8 @@ export const {
   closeVehicleBulkUploadModal,
   openVehicleHistoryModal,
   closeVehicleHistoryModal,
+  openVehicleErrorDetailsModal,
+  closeVehicleErrorDetailsModal,
   updateVehicleProgress,
   updateVehicleBatchStatus,
   handleVehicleBatchComplete,

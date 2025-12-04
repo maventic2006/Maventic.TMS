@@ -85,7 +85,7 @@ const TopActionBar = ({
         </div> */}
 
         {/* Bulk Upload Button */}
-        {/* {onBulkUpload && (
+        {onBulkUpload && (
          
           <Button
             variant="default"
@@ -96,7 +96,7 @@ const TopActionBar = ({
             <Upload className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Bulk Upload</span>
           </Button>
-        )} */}
+        )}
 
         {/* Filter Toggle Button */}
         {/* <motion.button
