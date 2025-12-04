@@ -2277,6 +2277,24 @@ const getTransporters = async (req, res) => {
         "tgi.transporter_id",
         "tc.transporter_id"
       )
+      .leftJoin(
+        knex.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT001'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        knex.raw(
+          "CONCAT('T', CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED))"
+        ),
+        "tgi.transporter_id"
+      )
       .select(
         "tgi.transporter_id",
         "tgi.business_name",
@@ -2304,7 +2322,13 @@ const getTransporters = async (req, res) => {
         ),
         "tc.contact_person_name",
         "tc.phone_number",
-        "tc.email_id"
+        "tc.email_id",
+        // Get approver name - try actioned_by_name first, fallback to pending_with_name
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
       );
 
     // Search
@@ -2499,6 +2523,18 @@ const getTransporters = async (req, res) => {
       if (transporter.trans_mode_air) transportModes.push("A");
       if (transporter.trans_mode_sea) transportModes.push("S");
 
+      // Debug approval data - show for PENDING and approved/rejected
+      if (transporter.approval_status) {
+        console.log(
+          `📊 ${transporter.transporter_id} approval (${transporter.approval_status}):`,
+          {
+            approver_name: transporter.approver_name,
+            approved_on: transporter.approved_on,
+            transporter_status: transporter.status,
+          }
+        );
+      }
+
       return {
         id: transporter.transporter_id,
         businessName: transporter.business_name,
@@ -2526,6 +2562,12 @@ const getTransporters = async (req, res) => {
         activeFlag: transporter.active_flag,
         fromDate: transporter.from_date,
         toDate: transporter.to_date,
+        // Approval data - show approver name for both Approve and Reject status
+        approver: transporter.approver_name || null,
+        approvedOn:
+          transporter.approved_on && transporter.approval_status === "Approve"
+            ? new Date(transporter.approved_on).toISOString().split("T")[0]
+            : null,
       };
     });
 
@@ -2797,6 +2839,54 @@ const getTransporterById = async (req, res) => {
       return `${year}-${month}-${day}`;
     };
 
+    // Get latest approval data for this transporter
+    // Derive TA user ID from transporter ID (T132 -> TA0132)
+    const transporterNumber = id.substring(1); // Remove 'T' prefix
+    const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`;
+
+    let approverName = null;
+    let approvedDate = null;
+
+    try {
+      // Get latest approval record for this transporter's admin user
+      // Include PENDING to show assigned approver for pending transporters
+      const latestApproval = await knex("approval_flow_trans")
+        .where("user_id_reference_id", transporterAdminUserId)
+        .where("approval_type_id", "AT001")
+        .whereIn("s_status", ["Approve", "Reject", "PENDING"])
+        .orderBy("approval_flow_unique_id", "desc")
+        .first();
+
+      if (latestApproval) {
+        // Try actioned_by_name first, fallback to pending_with_name
+        // For PENDING: pending_with_name shows who should approve
+        // For Approve/Reject: pending_with_name shows who approved/rejected
+        approverName =
+          latestApproval.actioned_by_name ||
+          latestApproval.pending_with_name ||
+          null;
+
+        // Only show approved date if status is Approve
+        approvedDate =
+          latestApproval.s_status === "Approve" && latestApproval.approved_on
+            ? formatDateForInput(latestApproval.approved_on)
+            : null;
+
+        console.log(`✅ Found approval data for ${transporterAdminUserId}:`, {
+          actioned_by_name: latestApproval.actioned_by_name,
+          pending_with_name: latestApproval.pending_with_name,
+          approverName,
+          approvedDate,
+          status: latestApproval.s_status,
+        });
+      } else {
+        console.log(`⚠️ No approval data found for ${transporterAdminUserId}`);
+      }
+    } catch (approvalError) {
+      console.error("Error fetching approval data:", approvalError);
+      // Don't fail the entire request
+    }
+
     // Build response
     const response = {
       transporterId: transporter.transporter_id,
@@ -2812,6 +2902,8 @@ const getTransporterById = async (req, res) => {
         updatedBy: transporter.updated_by,
         updatedOn: formatDateForInput(transporter.updated_on),
         status: transporter.status,
+        approvedBy: approverName, // Frontend expects approvedBy
+        approvedOn: approvedDate, // Frontend expects approvedOn
       },
       addresses: addressesWithContacts,
       serviceableAreas: groupedServiceableAreas,
