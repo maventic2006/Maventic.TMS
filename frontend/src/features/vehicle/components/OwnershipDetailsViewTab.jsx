@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Key, CreditCard, Calendar, Phone, Mail, MapPin } from "lucide-react";
 import CollapsibleSection from "../../../components/ui/CollapsibleSection";
 import { formatDate } from "../../../utils/helpers";
@@ -44,8 +44,7 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">
-                      {ownership.ownershipName ||
-                        `Ownership Record ${index + 1}`}
+                      {ownership.ownershipName || `Ownership Record ${index + 1}`}
                     </h3>
                     <p className="text-sm text-gray-600">
                       {ownership.registrationNumber || "No Registration Number"}
@@ -55,49 +54,14 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
               </div>
             }
           >
-            {/* Ownership Information */}
+            {/* Ownership Information - matching create page fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-600">
-                  Owner ID
-                </label>
-                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800">{ownership.ownerId || "N/A"}</p>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-600">
                   Ownership Name
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800">
-                    {ownership.ownershipName || "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-600">
-                  Valid From
-                </label>
-                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">
-                    {formatDate(ownership.validFrom)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-600">
-                  Valid To
-                </label>
-                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">
-                    {formatDate(ownership.validTo)}
-                  </p>
+                  <p className="text-gray-800">{ownership.ownershipName || "N/A"}</p>
                 </div>
               </div>
 
@@ -106,9 +70,7 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   Registration Number
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800 font-semibold">
-                    {ownership.registrationNumber || "N/A"}
-                  </p>
+                  <p className="text-gray-800">{ownership.registrationNumber || "N/A"}</p>
                 </div>
               </div>
 
@@ -118,21 +80,17 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">
-                    {formatDate(ownership.registrationDate)}
-                  </p>
+                  <p className="text-gray-800">{formatDate(ownership.registrationDate)}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-600">
-                  Registration Upto
+                  Registration Up To
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">
-                    {formatDate(ownership.registrationUpto)}
-                  </p>
+                  <p className="text-gray-800">{formatDate(ownership.registrationUpto)}</p>
                 </div>
               </div>
 
@@ -142,9 +100,7 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800">
-                    {formatDate(ownership.purchaseDate)}
-                  </p>
+                  <p className="text-gray-800">{formatDate(ownership.purchaseDate)}</p>
                 </div>
               </div>
 
@@ -153,9 +109,7 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   Owner Sr Number
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800">
-                    {ownership.ownerSrNumber || "N/A"}
-                  </p>
+                  <p className="text-gray-800">{ownership.ownerSrNumber || "N/A"}</p>
                 </div>
               </div>
 
@@ -164,9 +118,7 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                   State Code
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
-                  <p className="text-gray-800">
-                    {ownership.stateCode || "N/A"}
-                  </p>
+                  <p className="text-gray-800">{ownership.stateCode || "N/A"}</p>
                 </div>
               </div>
 
@@ -185,47 +137,77 @@ const OwnershipDetailsViewTab = ({ vehicle, isEditMode }) => {
                 </label>
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-gray-500" />
-                  <p className="text-gray-800 font-semibold">
-                    ₹ {ownership.saleAmount?.toLocaleString() || "0"}
+                  <p className="text-gray-800">
+                    {ownership.saleAmount ? `₹${ownership.saleAmount}` : "N/A"}
                   </p>
                 </div>
               </div>
 
-              {ownership.country && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-600">
-                    Country
-                  </label>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-500" />
-                    <p className="text-gray-800">{ownership.country}</p>
-                  </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-600">
+                  Contact Number
+                </label>
+                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-gray-500" />
+                  <p className="text-gray-800">{ownership.contactNumber || "N/A"}</p>
                 </div>
-              )}
+              </div>
 
-              {ownership.contactNumber && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-600">
-                    Contact Number
-                  </label>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-gray-500" />
-                    <p className="text-gray-800">{ownership.contactNumber}</p>
-                  </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-600">
+                  Email
+                </label>
+                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-gray-500" />
+                  <p className="text-gray-800">{ownership.email || "N/A"}</p>
                 </div>
-              )}
+              </div>
 
-              {ownership.email && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-600">
-                    Email
-                  </label>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-500" />
-                    <p className="text-gray-800">{ownership.email}</p>
-                  </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-600">
+                  Country
+                </label>
+                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                  <p className="text-gray-800">{ownership.country || "N/A"}</p>
                 </div>
-              )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-600">
+                  State
+                </label>
+                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                  <p className="text-gray-800">{ownership.state || "N/A"}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-600">
+                  City
+                </label>
+                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                  <p className="text-gray-800">{ownership.city || "N/A"}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-600">
+                  Address
+                </label>
+                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-500" />
+                  <p className="text-gray-800">{ownership.address || "N/A"}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-600">
+                  Pincode
+                </label>
+                <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                  <p className="text-gray-800">{ownership.pincode || "N/A"}</p>
+                </div>
+              </div>
             </div>
           </CollapsibleSection>
         ))

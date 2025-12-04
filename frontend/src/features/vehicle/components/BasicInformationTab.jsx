@@ -19,12 +19,20 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
   const debounceRef = useRef(null);
 
   const handleChange = (field, value) => {
+    // Create updated basic information object
+    const updatedBasicInfo = {
+      ...formData.basicInformation,
+      [field]: value,
+    };
+
+    // If GPS tracking is being disabled, clear the IMEI number
+    if (field === 'gpsActive' && !value) {
+      updatedBasicInfo.gpsIMEI = '';
+    }
+
     setFormData((prev) => ({
       ...prev,
-      basicInformation: {
-        ...prev.basicInformation,
-        [field]: value,
-      },
+      basicInformation: updatedBasicInfo,
     }));
 
     // If registration number is being changed, trigger RC lookup
@@ -292,6 +300,11 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
   };
 
   const data = formData.basicInformation || {};
+  
+  // Debug logging for data reception
+  console.log("🎛️ BasicInformationTab received formData:", formData);
+  console.log("🎛️ Extracted data:", data);
+  console.log("🎛️ registrationNumber value:", data.registrationNumber);
 
   // Get current year for month/year picker
   const currentYear = new Date().getFullYear();
@@ -542,7 +555,10 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
         {/* GPS Tracker IMEI Number */}
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-            GPS Tracker IMEI Number 
+            GPS Tracker IMEI Number {data.gpsActive && <span className="text-red-500">*</span>}
+            {data.gpsActive && (
+              <span className="text-xs text-gray-500 ml-2">(Required when GPS tracking is enabled)</span>
+            )}
           </label>
           <input
             type="text"
@@ -550,12 +566,16 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
             onChange={(e) => handleChange("gpsIMEI", e.target.value)}
             placeholder="123456789012345"
             maxLength={15}
+            disabled={!data.gpsActive}
             className={`w-full px-3 py-2 text-sm border ${
               errors.gpsIMEI ? "border-red-500" : "border-gray-300"
-            } rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
+            } ${!data.gpsActive ? "bg-gray-100 cursor-not-allowed" : ""} rounded-lg focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent`}
           />
           {errors.gpsIMEI && (
             <p className="mt-1 text-xs text-red-600">{errors.gpsIMEI}</p>
+          )}
+          {!data.gpsActive && (
+            <p className="mt-1 text-xs text-gray-500">Enable GPS tracking to enter IMEI number</p>
           )}
         </div>
 
