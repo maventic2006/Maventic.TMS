@@ -1,0 +1,46 @@
+{
+generalDetails: {
+businessName: QWERTY Transports,
+fromDate: 2025-12-03,
+toDate: 2028-12-30,
+avgRating: 0.00,
+transMode: {
+road: 1,
+rail: 1,
+air: 0,
+sea: 0
+},
+activeFlag: 1
+},
+addresses: [
+{
+addressId: ADDR0330,
+vatNumber: 27ABCDE1234C0C0,
+country: India,
+state: Assam,
+city: Guwahati,
+street1: Street1,
+district: District1,
+postalCode: 899909,
+isPrimary: 1,
+addressType: AT001,
+contacts: [
+{
+contactId: TC0153,
+name: Dambe,
+role: Manager,
+phoneNumber: 7789098890,
+email: dambe@gmail.com
+}
+]
+}
+],
+serviceableAreas: [
+{
+country: India,
+countryCode: IN,
+states: [Assam, Bihar]
+}
+],
+documents: []
+}

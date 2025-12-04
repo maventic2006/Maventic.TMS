@@ -390,7 +390,7 @@ const WarehouseListTable = ({
                     </span>
                   </div>
                 </div>
-                {(warehouse.approver || warehouse.approved_on) && (
+                {(warehouse.approver || warehouse.approvedOn) && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1">
                       <User className="h-3 w-3 text-[#10B981]" />
@@ -402,9 +402,9 @@ const WarehouseListTable = ({
                       <Calendar className="h-3 w-3 text-[#10B981]" />
                       <span className="text-xs text-[#10B981] font-semibold">
                         {displayValue(
-                          warehouse.approved_on
+                          warehouse.approvedOn
                             ? new Date(
-                                warehouse.approved_on
+                                warehouse.approvedOn
                               ).toLocaleDateString()
                             : null
                         )}
@@ -619,8 +619,8 @@ const WarehouseListTable = ({
                   <TableCell className="px-4 py-3 whitespace-nowrap text-nowrap">
                     <span className="text-sm text-[#4A5568]">
                       {displayValue(
-                        warehouse.approved_on
-                          ? new Date(warehouse.approved_on).toLocaleDateString()
+                        warehouse.approvedOn
+                          ? new Date(warehouse.approvedOn).toLocaleDateString()
                           : null
                       )}
                     </span>

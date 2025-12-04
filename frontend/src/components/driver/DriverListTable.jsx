@@ -466,7 +466,7 @@ const DriverListTable = ({
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-[#4A5568]">
-                      {displayValue(driver.approved_on)}
+                      {displayValue(driver.approvedOn)}
                     </span>
                   </TableCell>
                 </TableRow>
