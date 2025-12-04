@@ -242,13 +242,28 @@ const generateDocumentId = async () => {
 
 /**
  * Generate unique document upload ID
+ * Format: DU0001, DU0002, etc.
+ * Uses collision-resistant logic to prevent duplicate IDs
  */
 const generateDocumentUploadId = async (trx) => {
   try {
-    const result = await trx("document_upload").count("* as count").first();
+    const result = await trx("document_upload")
+      .select("document_id")
+      .whereNotNull("document_id")
+      .andWhere("document_id", "like", "DU%")
+      .orderByRaw("CAST(SUBSTRING(document_id, 3) AS UNSIGNED) DESC")
+      .first();
 
-    const count = parseInt(result.count) + 1;
-    return `DU${count.toString().padStart(4, "0")}`;
+    let next = 1;
+
+    if (result?.document_id) {
+      const numeric = parseInt(result.document_id.substring(2)); // Skip "DU"
+      if (!isNaN(numeric)) {
+        next = numeric + 1;
+      }
+    }
+
+    return `DU${next.toString().padStart(4, "0")}`;
   } catch (error) {
     console.error("Error generating document upload ID:", error);
     throw new Error("Failed to generate document upload ID");
