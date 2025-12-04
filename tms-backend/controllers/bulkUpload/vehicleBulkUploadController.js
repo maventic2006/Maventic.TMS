@@ -128,6 +128,7 @@ exports.uploadFile = async (req, res) => {
 exports.getBatchStatus = async (req, res) => {
   try {
     const { batchId } = req.params;
+    const { includeErrors } = req.query; // Option to include error details
     
     console.log(`📊 Fetching status for batch: ${batchId}`);
     
@@ -157,12 +158,63 @@ exports.getBatchStatus = async (req, res) => {
     vehicles.forEach(v => {
       statusCounts[v.validation_status] = parseInt(v.count);
     });
+
+    let errorDetails = null;
+    
+    // If errors exist and client wants error details, fetch them
+    if (statusCounts.invalid > 0 && includeErrors === 'true') {
+      console.log(`📝 Fetching error details for ${statusCounts.invalid} invalid vehicles...`);
+      
+      const invalidVehicles = await knex('tms_bulk_upload_vehicles')
+        .where({ 
+          batch_id: batchId,
+          validation_status: 'invalid'
+        })
+        .select('vehicle_ref_id', 'excel_row_number', 'validation_errors', 'data')
+        .orderBy('excel_row_number')
+        .limit(100); // Limit to first 100 errors for performance
+      
+      // Parse and format error details
+      errorDetails = invalidVehicles.map(vehicle => {
+        let errors = [];
+        let parsedData = {};
+        
+        try {
+          errors = JSON.parse(vehicle.validation_errors || '[]');
+          parsedData = JSON.parse(vehicle.data || '{}');
+        } catch (parseError) {
+          console.error('Error parsing vehicle data:', parseError);
+          errors = [{ message: 'Failed to parse error data', field: 'unknown' }];
+        }
+        
+        return {
+          vehicleRefId: vehicle.vehicle_ref_id,
+          excelRowNumber: vehicle.excel_row_number,
+          errors: errors.map(error => ({
+            sheet: error.sheet || 'Unknown',
+            field: error.field || 'unknown',
+            message: error.message || 'Validation error',
+            severity: error.severity || 'error',
+            value: error.value || null
+          })),
+          // Include some basic vehicle info for context
+          vehicleInfo: {
+            make: parsedData.basicInformation?.Make_Brand || 'N/A',
+            model: parsedData.basicInformation?.Model || 'N/A',
+            vin: parsedData.basicInformation?.VIN_Chassis_Number || 'N/A'
+          }
+        };
+      });
+      
+      console.log(`✓ Retrieved ${errorDetails.length} error records`);
+    }
     
     res.json({
       success: true,
       data: {
         batch,
-        statusCounts
+        statusCounts,
+        errorDetails // Will be null unless explicitly requested
       }
     });
     
@@ -171,6 +223,156 @@ exports.getBatchStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch batch status',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get detailed error information for a batch
+ * @route GET /api/vehicle/bulk-upload/errors/:batchId
+ */
+exports.getBatchErrors = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+    
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+    
+    console.log(`📋 Fetching error details for batch: ${batchId} (page ${pageNum}, limit ${limitNum})`);
+    
+    // Check if batch exists
+    const batch = await knex('tms_bulk_upload_vehicle_batches')
+      .where({ batch_id: batchId })
+      .first();
+    
+    if (!batch) {
+      return res.status(404).json({
+        success: false,
+        message: 'Batch not found'
+      });
+    }
+    
+    // Get total count of invalid vehicles
+    const countResult = await knex('tms_bulk_upload_vehicles')
+      .where({ 
+        batch_id: batchId,
+        validation_status: 'invalid'
+      })
+      .count('* as count')
+      .first();
+    
+    const totalErrors = parseInt(countResult.count);
+    
+    if (totalErrors === 0) {
+      return res.json({
+        success: true,
+        data: {
+          errors: [],
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            total: 0,
+            pages: 0
+          },
+          summary: {
+            totalErrors: 0,
+            errorsBySheet: {},
+            errorsByType: {}
+          }
+        }
+      });
+    }
+    
+    // Get paginated invalid vehicles with error details
+    const invalidVehicles = await knex('tms_bulk_upload_vehicles')
+      .where({ 
+        batch_id: batchId,
+        validation_status: 'invalid'
+      })
+      .select('vehicle_ref_id', 'excel_row_number', 'validation_errors', 'data')
+      .orderBy('excel_row_number')
+      .limit(limitNum)
+      .offset(offset);
+    
+    // Parse and format error details
+    const errorDetails = [];
+    const errorsBySheet = {};
+    const errorsByType = {};
+    
+    for (const vehicle of invalidVehicles) {
+      let errors = [];
+      let parsedData = {};
+      
+      try {
+        errors = JSON.parse(vehicle.validation_errors || '[]');
+        parsedData = JSON.parse(vehicle.data || '{}');
+      } catch (parseError) {
+        console.error('Error parsing vehicle data:', parseError);
+        errors = [{ message: 'Failed to parse error data', field: 'unknown', sheet: 'System' }];
+      }
+      
+      // Count errors by sheet and type
+      errors.forEach(error => {
+        const sheet = error.sheet || 'Unknown';
+        const errorType = error.field || 'unknown';
+        
+        errorsBySheet[sheet] = (errorsBySheet[sheet] || 0) + 1;
+        errorsByType[errorType] = (errorsByType[errorType] || 0) + 1;
+      });
+      
+      const vehicleError = {
+        vehicleRefId: vehicle.vehicle_ref_id,
+        excelRowNumber: vehicle.excel_row_number,
+        errors: errors.map(error => ({
+          sheet: error.sheet || 'Unknown',
+          field: error.field || 'unknown',
+          message: error.message || 'Validation error',
+          severity: error.severity || 'error',
+          value: error.value || null,
+          expectedFormat: error.expectedFormat || null
+        })),
+        vehicleInfo: {
+          make: parsedData.basicInformation?.Make_Brand || 'N/A',
+          model: parsedData.basicInformation?.Model || 'N/A',
+          vin: parsedData.basicInformation?.VIN_Chassis_Number || 'N/A',
+          refId: parsedData.basicInformation?.Vehicle_Ref_ID || vehicle.vehicle_ref_id
+        },
+        errorCount: errors.length
+      };
+      
+      errorDetails.push(vehicleError);
+    }
+    
+    const totalPages = Math.ceil(totalErrors / limitNum);
+    
+    console.log(`✓ Retrieved ${errorDetails.length} error records (page ${pageNum}/${totalPages})`);
+    
+    res.json({
+      success: true,
+      data: {
+        errors: errorDetails,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalErrors,
+          pages: totalPages
+        },
+        summary: {
+          totalErrors,
+          errorsBySheet,
+          errorsByType
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching vehicle batch errors:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch batch errors',
       error: error.message
     });
   }

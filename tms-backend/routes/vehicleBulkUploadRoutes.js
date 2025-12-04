@@ -69,6 +69,16 @@ router.post('/upload', authenticateToken, upload.single('file'), vehicleBulkUplo
 router.get('/status/:batchId', authenticateToken, vehicleBulkUploadController.getBatchStatus);
 
 /**
+ * @route   GET /api/vehicle/bulk-upload/errors/:batchId
+ * @desc    Get detailed error information for a batch
+ * @access  Private
+ * @param   {string} batchId - Batch ID
+ * @query   {number} page - Page number (default: 1)
+ * @query   {number} limit - Items per page (default: 50)
+ */
+router.get('/errors/:batchId', authenticateToken, vehicleBulkUploadController.getBatchErrors);
+
+/**
  * @route   GET /api/vehicle/bulk-upload/history
  * @desc    Get upload history for user
  * @access  Private
