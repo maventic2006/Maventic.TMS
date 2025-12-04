@@ -242,13 +242,28 @@ const generateDocumentId = async () => {
 
 /**
  * Generate unique document upload ID
+ * Format: DU0001, DU0002, etc.
+ * Uses collision-resistant logic to prevent duplicate IDs
  */
 const generateDocumentUploadId = async (trx) => {
   try {
-    const result = await trx("document_upload").count("* as count").first();
+    const result = await trx("document_upload")
+      .select("document_id")
+      .whereNotNull("document_id")
+      .andWhere("document_id", "like", "DU%")
+      .orderByRaw("CAST(SUBSTRING(document_id, 3) AS UNSIGNED) DESC")
+      .first();
 
-    const count = parseInt(result.count) + 1;
-    return `DU${count.toString().padStart(4, "0")}`;
+    let next = 1;
+
+    if (result?.document_id) {
+      const numeric = parseInt(result.document_id.substring(2)); // Skip "DU"
+      if (!isNaN(numeric)) {
+        next = numeric + 1;
+      }
+    }
+
+    return `DU${next.toString().padStart(4, "0")}`;
   } catch (error) {
     console.error("Error generating document upload ID:", error);
     throw new Error("Failed to generate document upload ID");
@@ -1200,12 +1215,12 @@ const getAllVehicles = async (req, res) => {
       );
     }
 
-    if (registrationDate) {
-      // Filter by registration date - exact match on date part
-      query = query.whereRaw("DATE(vod.registration_date) = ?", [
-        registrationDate,
-      ]);
-    }
+    // if (registrationDate) {
+    //   // Filter by registration date - exact match on date part
+    //   query = query.whereRaw("DATE(vod.registration_date) = ?", [
+    //     registrationDate,
+    //   ]);
+    // }
 
     //Created On Date Range Filter
     if (createdOnStart) {
@@ -1341,9 +1356,21 @@ const getVehicleById = async (req, res) => {
       .orderBy("sequence_number", "asc");
 
     // Get documents with file data and document type names
+    // Fix: Use DISTINCT to avoid duplicate rows from multiple document_upload entries
     const documents = await db("vehicle_documents as vd")
       .leftJoin(
-        "document_upload as du",
+        function() {
+          // Subquery to get the latest/most recent document upload for each system_reference_id
+          this.select([
+            "system_reference_id",
+            "file_name", 
+            "file_type",
+            "file_xstring_value"
+          ])
+          .from("document_upload")
+          .whereRaw("(system_reference_id, created_at) IN (SELECT system_reference_id, MAX(created_at) FROM document_upload GROUP BY system_reference_id)")
+          .as("du");
+        },
         "vd.document_id",
         "du.system_reference_id"
       )
