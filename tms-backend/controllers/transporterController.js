@@ -1219,6 +1219,8 @@ const updateTransporter = async (req, res) => {
   try {
     const { id } = req.params;
     const { generalDetails, addresses, serviceableAreas, documents } = req.body;
+    const userId = req.user?.user_id;
+    const userRole = req.user?.role;
 
     // Validate transporter exists
     const existingTransporter = await trx("transporter_general_info")
@@ -1235,6 +1237,52 @@ const updateTransporter = async (req, res) => {
         },
         timestamp: new Date().toISOString(),
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingTransporter.status;
+    const createdBy = existingTransporter.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Only the creator can edit rejected entities",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Cannot edit entity during approval process",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      if (!isApprover) {
+        await trx.rollback();
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only approvers can edit active entities",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     // Validate general details (only if provided)
@@ -1758,6 +1806,55 @@ const updateTransporter = async (req, res) => {
     const currentUser = req.user?.user_id || "SYSTEM";
     const currentTimestamp = new Date();
 
+    // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+    const isResubmission =
+      currentStatus === "INACTIVE" && generalDetails?.status === "PENDING";
+
+    if (isResubmission) {
+      console.log(`🔄 Resubmission detected for transporter ${id}`);
+
+      // Get transporter admin user ID (T001 → TA0001)
+      const transporterNumber = id.substring(1); // Remove 'T' prefix
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`; // TA0001
+
+      // Find existing approval flow record
+      const approvalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", transporterAdminUserId)
+        .where("approval_type_id", "AT001") // Transporter Admin
+        .orderBy("created_at", "desc")
+        .first();
+
+      if (approvalFlow) {
+        // Update approval flow to restart from Level 1
+        await trx("approval_flow_trans")
+          .where(
+            "approval_flow_unique_id",
+            approvalFlow.approval_flow_unique_id
+          )
+          .update({
+            s_status: "PENDING",
+            approver_level: 1,
+            actioned_by_id: null,
+            actioned_by_name: null,
+            approved_on: null,
+            // Keep remarks from rejection for history
+            updated_at: currentTimestamp,
+          });
+
+        console.log(`✅ Approval flow restarted for ${transporterAdminUserId}`);
+      }
+
+      // Update user status to Pending for Approval
+      await trx("user_master").where("user_id", transporterAdminUserId).update({
+        status: "Pending for Approval",
+        updated_at: currentTimestamp,
+      });
+
+      console.log(
+        `✅ User status updated to Pending for Approval: ${transporterAdminUserId}`
+      );
+    }
+
     // Update general details if provided
     if (generalDetails) {
       await trx("transporter_general_info")
@@ -1772,6 +1869,7 @@ const updateTransporter = async (req, res) => {
           trans_mode_air: generalDetails.transMode.air ? 1 : 0,
           trans_mode_sea: generalDetails.transMode.sea ? 1 : 0,
           active_flag: generalDetails.activeFlag !== false ? 1 : 0,
+          status: generalDetails.status || currentStatus, // Update status if provided
           updated_at: currentTimestamp,
           updated_on: currentTimestamp,
           updated_by: currentUser,
@@ -3036,7 +3134,14 @@ const getTransporterById = async (req, res) => {
             pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
             createdByUserId: approvalFlows[0]?.created_by_user_id || null,
             createdByName: approvalFlows[0]?.created_by_name || null,
+            remarks: approvalFlows[0]?.remarks || null, // ✅ ADD REJECTION REMARKS
           };
+
+          console.log(
+            `📝 User Approval Status created with remarks: ${
+              userApprovalStatus.remarks ? "YES" : "NO"
+            }`
+          );
 
           approvalHistory = approvalFlows;
         } else {

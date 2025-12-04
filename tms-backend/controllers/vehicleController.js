@@ -1624,6 +1624,9 @@ const updateVehicle = async (req, res) => {
 
   try {
     const { id } = req.params;
+    const userId = req.user?.user_id;
+    const userRole = req.user?.role;
+
     const {
       basicInformation,
       specifications,
@@ -1644,6 +1647,37 @@ const updateVehicle = async (req, res) => {
         success: false,
         message: "Vehicle not found",
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingVehicle.status;
+    const createdBy = existingVehicle.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the creator can edit rejected entities",
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      return res.status(403).json({
+        success: false,
+        message: "Cannot edit entity during approval process",
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      if (!isApprover) {
+        return res.status(403).json({
+          success: false,
+          message: "Only approvers can edit active entities",
+        });
+      }
     }
 
     // Combine basic information and specifications for validation
@@ -1687,6 +1721,55 @@ const updateVehicle = async (req, res) => {
           field: "basicInformation.gpsIMEI",
         });
       }
+    }
+
+    // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+    const isResubmission =
+      currentStatus === "INACTIVE" && basicInformation?.status === "PENDING";
+
+    if (isResubmission) {
+      console.log(`🔄 Resubmission detected for vehicle ${id}`);
+
+      // Get vehicle owner user ID (VEH0001 → VO0001)
+      const vehicleNumber = id.substring(3); // Remove 'VEH' prefix
+      const vehicleOwnerUserId = `VO${vehicleNumber}`; // VO0001
+
+      // Find existing approval flow record
+      const approvalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", vehicleOwnerUserId)
+        .where("approval_type_id", "AT004") // Vehicle Owner
+        .orderBy("created_at", "desc")
+        .first();
+
+      if (approvalFlow) {
+        // Update approval flow to restart from Level 1
+        await trx("approval_flow_trans")
+          .where(
+            "approval_flow_unique_id",
+            approvalFlow.approval_flow_unique_id
+          )
+          .update({
+            s_status: "PENDING",
+            approver_level: 1,
+            actioned_by_id: null,
+            actioned_by_name: null,
+            approved_on: null,
+            // Keep remarks from rejection for history
+            updated_at: db.fn.now(),
+          });
+
+        console.log(`✅ Approval flow restarted for ${vehicleOwnerUserId}`);
+      }
+
+      // Update user status to Pending for Approval
+      await trx("user_master").where("user_id", vehicleOwnerUserId).update({
+        status: "Pending for Approval",
+        updated_at: db.fn.now(),
+      });
+
+      console.log(
+        `✅ User status updated to Pending for Approval: ${vehicleOwnerUserId}`
+      );
     }
 
     // Update vehicle basic information

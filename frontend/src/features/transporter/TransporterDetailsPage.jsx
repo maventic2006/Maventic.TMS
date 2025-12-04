@@ -167,6 +167,14 @@ const TransporterDetailsPage = () => {
         "  User Approval Status:",
         selectedTransporter.userApprovalStatus
       );
+      console.log(
+        "  ✅ Remarks Available:",
+        selectedTransporter.userApprovalStatus?.remarks ? "YES" : "NO"
+      );
+      console.log(
+        "  Remarks Content:",
+        selectedTransporter.userApprovalStatus?.remarks
+      );
       console.log("  Current User:", user);
       console.log("  Full selectedTransporter object:", selectedTransporter);
     }
@@ -184,11 +192,87 @@ const TransporterDetailsPage = () => {
     selectedTransporter?.generalDetails?.status === "SAVE_AS_DRAFT";
 
   // Check if current user is the creator of this transporter
+  // Use String() to ensure type consistency in comparison
   const isCreator =
-    selectedTransporter?.generalDetails?.createdBy === user?.user_id;
+    selectedTransporter?.generalDetails?.createdBy &&
+    user?.user_id &&
+    String(selectedTransporter.generalDetails.createdBy) ===
+      String(user.user_id);
 
-  // Determine if user can edit (creator-only for drafts, any product owner for non-drafts)
-  const canEdit = isDraftTransporter ? isCreator : true;
+  // Check if current user is an approver
+  // Check both role and user_type_id for Product Owner detection
+  const isApprover =
+    user?.role === "Product Owner" ||
+    user?.role === "admin" ||
+    user?.user_type_id === "UT001"; // UT001 is Owner/Product Owner
+
+  // 🔍 DEBUG: Log creator and approver checks
+  console.log("🔍 EDIT BUTTON DEBUG:");
+  console.log("  Current User ID:", user?.user_id, typeof user?.user_id);
+  console.log("  Current User Role:", user?.role);
+  console.log("  Current User Type ID:", user?.user_type_id);
+  console.log(
+    "  Transporter Created By:",
+    selectedTransporter?.generalDetails?.createdBy,
+    typeof selectedTransporter?.generalDetails?.createdBy
+  );
+  console.log(
+    "  String Comparison:",
+    String(selectedTransporter?.generalDetails?.createdBy),
+    "===",
+    String(user?.user_id)
+  );
+  console.log("  Is Creator:", isCreator);
+  console.log("  Is Approver:", isApprover, "(role-based or UT001)");
+  console.log("  Is Draft:", isDraftTransporter);
+  console.log("  Status:", selectedTransporter?.generalDetails?.status);
+
+  // ✅ PERMISSION LOGIC - Rejection/Resubmission Workflow
+  // Determine if user can edit based on entity status and user role
+  const canEdit = React.useMemo(() => {
+    const status = selectedTransporter?.generalDetails?.status;
+
+    console.log("🔍 CANEDIT CALCULATION:");
+    console.log("  Status:", status);
+    console.log("  isDraftTransporter:", isDraftTransporter);
+    console.log("  isCreator:", isCreator);
+    console.log("  isApprover:", isApprover);
+
+    // DRAFT: Only creator can edit
+    if (isDraftTransporter) {
+      console.log("  Result: DRAFT - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // INACTIVE (rejected): Only creator can edit
+    if (status === "INACTIVE") {
+      console.log("  Result: INACTIVE - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // PENDING: No one can edit (locked during approval)
+    if (status === "PENDING") {
+      console.log("  Result: PENDING - returning false");
+      return false;
+    }
+
+    // ACTIVE: Only approvers can edit
+    if (status === "ACTIVE") {
+      console.log("  Result: ACTIVE - returning isApprover:", isApprover);
+      return isApprover;
+    }
+
+    // Default: Allow edit
+    console.log("  Result: DEFAULT - returning true");
+    return true;
+  }, [
+    selectedTransporter?.generalDetails?.status,
+    isCreator,
+    isApprover,
+    isDraftTransporter,
+  ]);
+
+  console.log("🔍 FINAL CANEDIT VALUE:", canEdit);
 
   // Track unsaved changes
   useEffect(() => {
@@ -700,24 +784,39 @@ const TransporterDetailsPage = () => {
       });
       dispatch(clearError());
 
+      // ✅ RESUBMISSION LOGIC - If entity is INACTIVE, change status to PENDING for resubmission
+      const isResubmission =
+        selectedTransporter?.generalDetails?.status === "INACTIVE";
+      const updatedFormData = isResubmission
+        ? {
+            ...editFormData,
+            generalDetails: {
+              ...editFormData.generalDetails,
+              status: "PENDING", // Restart approval workflow
+            },
+          }
+        : editFormData;
+
       // Call the update API
       const result = await dispatch(
         updateTransporter({
           transporterId: id,
           transporterData: {
-            generalDetails: editFormData.generalDetails,
-            addresses: editFormData.addresses,
-            serviceableAreas: editFormData.serviceableAreas,
-            documents: editFormData.documents,
+            generalDetails: updatedFormData.generalDetails,
+            addresses: updatedFormData.addresses,
+            serviceableAreas: updatedFormData.serviceableAreas,
+            documents: updatedFormData.documents,
           },
         })
       ).unwrap();
 
-      // Success - show toast notification
+      // Success - show toast notification with resubmission message if applicable
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: "Transporter updated successfully!",
+          message: isResubmission
+            ? "Transporter resubmitted for approval successfully! Status changed to PENDING."
+            : "Transporter updated successfully!",
         })
       );
 
@@ -954,6 +1053,11 @@ const TransporterDetailsPage = () => {
             )}
 
             {/* Edit/Save/Cancel Buttons */}
+            {console.log("🔍 BUTTON RENDER CHECK:", {
+              isEditMode,
+              canEdit,
+              showButton: !isEditMode && canEdit,
+            })}
             {isEditMode ? (
               <>
                 <button
@@ -996,6 +1100,34 @@ const TransporterDetailsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* ✅ REJECTION REMARKS DISPLAY - Show for INACTIVE status */}
+      {selectedTransporter?.generalDetails?.status === "INACTIVE" &&
+        selectedTransporter?.userApprovalStatus?.remarks && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-6 mx-6 mt-4 rounded-lg shadow-sm">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-red-900 font-semibold text-lg mb-2 flex items-center gap-2">
+                  Rejection Remarks
+                  <span className="text-xs font-normal text-red-700 bg-red-100 px-2 py-1 rounded-full">
+                    Entity Rejected
+                  </span>
+                </h4>
+                <p className="text-red-800 leading-relaxed whitespace-pre-wrap">
+                  {selectedTransporter.userApprovalStatus.remarks}
+                </p>
+                {isCreator && !isEditMode && (
+                  <div className="mt-4 text-sm text-red-700 bg-red-100 p-3 rounded-md">
+                    <strong>Note:</strong> Please address the rejection remarks
+                    and click "Edit Details" to make changes, then save to
+                    resubmit for approval.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Modern Tab Navigation with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">

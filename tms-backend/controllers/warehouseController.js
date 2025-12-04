@@ -1616,6 +1616,9 @@ const updateWarehouse = async (req, res) => {
   let trx;
   try {
     const { id } = req.params;
+    const userId = req.user?.user_id || "SYSTEM";
+    const userRole = req.user?.role;
+
     console.log(`📦 Updating warehouse: ${id}`);
     console.log("Request body:", JSON.stringify(req.body, null, 2));
 
@@ -1639,6 +1642,37 @@ const updateWarehouse = async (req, res) => {
         success: false,
         message: "Warehouse not found",
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingWarehouse.status;
+    const createdBy = existingWarehouse.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the creator can edit rejected entities",
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      return res.status(403).json({
+        success: false,
+        message: "Cannot edit entity during approval process",
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      if (!isApprover) {
+        return res.status(403).json({
+          success: false,
+          message: "Only approvers can edit active entities",
+        });
+      }
     }
 
     console.log("✅ Warehouse found, starting update transaction");
@@ -1667,10 +1701,72 @@ const updateWarehouse = async (req, res) => {
       geofencing,
     } = req.body;
 
-    const userId = req.user.user_id || "SYSTEM";
+    // const userId = req.user.user_id || "SYSTEM";
 
     // Start transaction
     trx = await knex.transaction();
+
+    // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+    const isResubmission =
+      currentStatus === "INACTIVE" && req.body.status === "PENDING";
+
+    if (isResubmission) {
+      console.log(`🔄 Resubmission detected for warehouse ${id}`);
+
+      // Get warehouse manager user ID via user_master lookup
+      const warehouseUser = await trx("user_master")
+        .where("user_type_id", "UT007") // Consignor WH Manager
+        .where("consignor_id", existingWarehouse.consignor_id)
+        .whereRaw("ABS(TIMESTAMPDIFF(SECOND, created_at, ?)) < 60", [
+          existingWarehouse.created_at,
+        ])
+        .first();
+
+      if (warehouseUser) {
+        const warehouseManagerUserId = warehouseUser.user_id;
+
+        // Find existing approval flow record
+        const approvalFlow = await trx("approval_flow_trans")
+          .where("user_id_reference_id", warehouseManagerUserId)
+          .where("approval_type_id", "AT005") // Warehouse Manager
+          .orderBy("created_at", "desc")
+          .first();
+
+        if (approvalFlow) {
+          // Update approval flow to restart from Level 1
+          await trx("approval_flow_trans")
+            .where(
+              "approval_flow_unique_id",
+              approvalFlow.approval_flow_unique_id
+            )
+            .update({
+              s_status: "PENDING",
+              approver_level: 1,
+              actioned_by_id: null,
+              actioned_by_name: null,
+              approved_on: null,
+              // Keep remarks from rejection for history
+              updated_at: knex.fn.now(),
+            });
+
+          console.log(
+            `✅ Approval flow restarted for ${warehouseManagerUserId}`
+          );
+        }
+
+        // Update user status to Pending for Approval
+        await trx("user_master")
+          .where("user_id", warehouseManagerUserId)
+          .update({
+            status: "Pending for Approval",
+            updated_at: knex.fn.now(),
+          });
+
+        console.log(
+          `✅ User status updated to Pending for Approval: ${warehouseManagerUserId}`
+        );
+      }
+    }
 
     // Update warehouse basic information
     await trx("warehouse_basic_information")

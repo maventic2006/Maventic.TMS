@@ -1266,7 +1266,13 @@ const createConsignor = async (payload, files, userId) => {
 /**
  * Update existing consignor
  */
-const updateConsignor = async (customerId, payload, files, userId) => {
+const updateConsignor = async (
+  customerId,
+  payload,
+  files,
+  userId,
+  userRole = null
+) => {
   const trx = await knex.transaction();
 
   try {
@@ -1280,6 +1286,37 @@ const updateConsignor = async (customerId, payload, files, userId) => {
         type: "NOT_FOUND",
         message: `Consignor with ID '${customerId}' not found`,
       };
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existing.status;
+    const createdBy = existing.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      throw {
+        type: "FORBIDDEN",
+        message: "Only the creator can edit rejected entities",
+      };
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      throw {
+        type: "FORBIDDEN",
+        message: "Cannot edit entity during approval process",
+      };
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      if (!isApprover) {
+        throw {
+          type: "FORBIDDEN",
+          message: "Only approvers can edit active entities",
+        };
+      }
     }
 
     // Validate payload
@@ -1316,6 +1353,65 @@ const updateConsignor = async (customerId, payload, files, userId) => {
             ],
             message: "Duplicate customer ID",
           };
+        }
+      }
+
+      // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+      const isResubmission =
+        currentStatus === "INACTIVE" && general.status === "PENDING";
+
+      if (isResubmission) {
+        console.log(`🔄 Resubmission detected for consignor ${customerId}`);
+
+        // Get consignor admin user ID via user_master lookup
+        const consignorUser = await trx("user_master")
+          .where("consignor_id", customerId)
+          .where("user_type_id", "UT006") // Consignor Admin
+          .first();
+
+        if (consignorUser) {
+          const consignorAdminUserId = consignorUser.user_id;
+
+          // Find existing approval flow record
+          const approvalFlow = await trx("approval_flow_trans")
+            .where("user_id_reference_id", consignorAdminUserId)
+            .where("approval_type_id", "AT002") // Consignor Admin
+            .orderBy("created_at", "desc")
+            .first();
+
+          if (approvalFlow) {
+            // Update approval flow to restart from Level 1
+            await trx("approval_flow_trans")
+              .where(
+                "approval_flow_unique_id",
+                approvalFlow.approval_flow_unique_id
+              )
+              .update({
+                s_status: "PENDING",
+                approver_level: 1,
+                actioned_by_id: null,
+                actioned_by_name: null,
+                approved_on: null,
+                // Keep remarks from rejection for history
+                updated_at: knex.fn.now(),
+              });
+
+            console.log(
+              `✅ Approval flow restarted for ${consignorAdminUserId}`
+            );
+          }
+
+          // Update user status to Pending for Approval
+          await trx("user_master")
+            .where("user_id", consignorAdminUserId)
+            .update({
+              status: "Pending for Approval",
+              updated_at: knex.fn.now(),
+            });
+
+          console.log(
+            `✅ User status updated to Pending for Approval: ${consignorAdminUserId}`
+          );
         }
       }
 
