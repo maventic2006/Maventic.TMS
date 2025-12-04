@@ -2529,7 +2529,11 @@ const getTransporters = async (req, res) => {
       query = query.where("tgi.created_on", ">=", createdOnStart);
     }
     if (createdOnEnd) {
-      query = query.where("tgi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      query = query.where("tgi.created_on", "<=", endDateWithTime);
     }
 
     // Count query (with same date filters)
@@ -2626,7 +2630,11 @@ const getTransporters = async (req, res) => {
       countQuery = countQuery.where("tgi.created_on", ">=", createdOnStart);
     }
     if (createdOnEnd) {
-      countQuery = countQuery.where("tgi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      countQuery = countQuery.where("tgi.created_on", "<=", endDateWithTime);
     }
 
     const totalResult = await countQuery

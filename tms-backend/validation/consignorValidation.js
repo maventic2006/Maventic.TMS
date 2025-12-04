@@ -496,10 +496,12 @@ const listQuerySchema = Joi.object({
   }),
 
   status: Joi.string()
-    .valid("ACTIVE", "INACTIVE", "PENDING")
+    .valid("ACTIVE", "INACTIVE", "PENDING", "SAVE_AS_DRAFT")
     .optional()
+    .allow("")
     .messages({
-      "any.only": "Status must be one of: ACTIVE, INACTIVE, PENDING",
+      "any.only":
+        "Status must be one of: ACTIVE, INACTIVE, PENDING, SAVE_AS_DRAFT",
     }),
 
   industry_type: Joi.string().trim().optional().allow("").messages({
@@ -529,6 +531,27 @@ const listQuerySchema = Joi.object({
     .default("desc")
     .messages({
       "any.only": "Sort order must be either asc or desc",
+    }),
+
+  createdOnStart: Joi.string()
+    .trim()
+    .optional()
+    .allow("")
+    .pattern(/^\d{4}-\d{2}-\d{2}$/)
+    .messages({
+      "string.base": "Created on start date must be a string",
+      "string.pattern.base":
+        "Created on start date must be in YYYY-MM-DD format",
+    }),
+
+  createdOnEnd: Joi.string()
+    .trim()
+    .optional()
+    .allow("")
+    .pattern(/^\d{4}-\d{2}-\d{2}$/)
+    .messages({
+      "string.base": "Created on end date must be a string",
+      "string.pattern.base": "Created on end date must be in YYYY-MM-DD format",
     }),
 });
 

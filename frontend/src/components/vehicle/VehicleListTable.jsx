@@ -259,6 +259,32 @@ const VehicleListTable = ({
                     {displayValue(vehicle.vehicleCondition)}
                   </span>
                 </div>
+                {vehicle.approver && (
+                  <div>
+                    <span style={{ color: theme.colors.text.secondary }}>
+                      Approver:
+                    </span>
+                    <span
+                      className="ml-2 font-semibold"
+                      style={{ color: theme.colors.text.primary }}
+                    >
+                      {vehicle.approver}
+                    </span>
+                  </div>
+                )}
+                {vehicle.approvedOn && (
+                  <div>
+                    <span style={{ color: theme.colors.text.secondary }}>
+                      Approved On:
+                    </span>
+                    <span
+                      className="ml-2 font-semibold"
+                      style={{ color: theme.colors.text.primary }}
+                    >
+                      {vehicle.approvedOn}
+                    </span>
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}

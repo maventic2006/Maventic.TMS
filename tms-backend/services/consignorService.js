@@ -340,45 +340,85 @@ const getConsignorList = async (queryParams) => {
     const offset = (pageNum - 1) * limitNum;
 
     // Normalize date inputs for accurate filtering
-    let dateStart = createdOnStart ? `${createdOnStart} 00:00:00` : null;
-    let dateEnd = createdOnEnd ? `${createdOnEnd} 23:59:59` : null;
+    // Fix: Use UTC timezone (T00:00:00Z format) to prevent IST offset issues
+    let dateStart = createdOnStart
+      ? createdOnStart.includes("T")
+        ? createdOnStart
+        : `${createdOnStart}T00:00:00Z`
+      : null;
+    let dateEnd = createdOnEnd
+      ? createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd}T23:59:59Z`
+      : null;
 
     // Build base query with filters
     const baseQuery = knex("consignor_basic_information");
 
-    // Apply filters
+    // Apply filters (table-qualified to avoid ambiguity with joined tables)
     if (customer_id) {
-      baseQuery.where("customer_id", "like", `%${customer_id}%`);
+      baseQuery.where(
+        "consignor_basic_information.customer_id",
+        "like",
+        `%${customer_id}%`
+      );
     }
 
     if (status) {
-      baseQuery.where("status", status);
+      baseQuery.where("consignor_basic_information.status", status);
     }
 
     if (industry_type) {
-      baseQuery.where("industry_type", "like", `%${industry_type}%`);
+      baseQuery.where(
+        "consignor_basic_information.industry_type",
+        "like",
+        `%${industry_type}%`
+      );
     }
 
     if (currency_type) {
-      baseQuery.where("currency_type", "like", `%${currency_type}%`);
+      baseQuery.where(
+        "consignor_basic_information.currency_type",
+        "like",
+        `%${currency_type}%`
+      );
     }
 
     // Apply search (searches across customer_id, customer_name, search_term)
     if (search) {
       baseQuery.where(function () {
-        this.where("customer_id", "like", `%${search}%`)
-          .orWhere("customer_name", "like", `%${search}%`)
-          .orWhere("search_term", "like", `%${search}%`);
+        this.where(
+          "consignor_basic_information.customer_id",
+          "like",
+          `%${search}%`
+        )
+          .orWhere(
+            "consignor_basic_information.customer_name",
+            "like",
+            `%${search}%`
+          )
+          .orWhere(
+            "consignor_basic_information.search_term",
+            "like",
+            `%${search}%`
+          );
       });
     }
 
     // --- Created On Date Range Filter ---
     if (dateStart && dateEnd) {
-      baseQuery.whereBetween("created_at", [dateStart, dateEnd]);
+      baseQuery.whereBetween("consignor_basic_information.created_at", [
+        dateStart,
+        dateEnd,
+      ]);
     } else if (dateStart) {
-      baseQuery.where("created_at", ">=", dateStart);
+      baseQuery.where(
+        "consignor_basic_information.created_at",
+        ">=",
+        dateStart
+      );
     } else if (dateEnd) {
-      baseQuery.where("created_at", "<=", dateEnd);
+      baseQuery.where("consignor_basic_information.created_at", "<=", dateEnd);
     }
     // --- End date range filter ---
 
@@ -433,10 +473,19 @@ const getConsignorList = async (queryParams) => {
         "aft.s_status as approval_status"
       );
 
-    // Apply sorting
+    // Apply sorting (table-qualified to avoid ambiguity)
     const sortColumn = sortBy || "created_at";
     const sortDirection = (sortOrder || "desc").toUpperCase();
-    dataQuery.orderBy(sortColumn, sortDirection);
+    // Qualify sortColumn if it's a basic column (not an alias like approver_name)
+    const qualifiedSortColumn = [
+      "created_at",
+      "status",
+      "customer_id",
+      "customer_name",
+    ].includes(sortColumn)
+      ? `consignor_basic_information.${sortColumn}`
+      : sortColumn;
+    dataQuery.orderBy(qualifiedSortColumn, sortDirection);
 
     // Apply pagination
     dataQuery.limit(limitNum).offset(offset);

@@ -3000,8 +3000,12 @@ const getDrivers = async (req, res) => {
     }
 
     if (createdOnEnd) {
-      query.where("dbi.created_on", "<=", createdOnEnd);
-      countQuery.where("dbi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      query.where("dbi.created_on", "<=", endDateWithTime);
+      countQuery.where("dbi.created_on", "<=", endDateWithTime);
     }
 
     // ------- ADDRESS FILTERS -------

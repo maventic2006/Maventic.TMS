@@ -1,5 +1,6 @@
 const knex = require("../config/database");
 const bcrypt = require("bcrypt");
+const { Country, State } = require("country-state-city");
 const {
   validateWarehouseListQuery,
   validateWarehouseCreate,
@@ -519,8 +520,10 @@ const getWarehouseList = async (req, res) => {
         "w.zone",
         "w.created_by",
 
-        // Correct: expose as created_on
-        knex.raw("DATE(w.created_at) as created_on"),
+        // Fixed: Use SUBSTRING to extract date without timezone conversion
+        // DATE(created_at) converts to server timezone (IST +5:30), showing wrong date
+        // SUBSTRING extracts YYYY-MM-DD directly from UTC timestamp
+        knex.raw("SUBSTRING(w.created_at, 1, 10) as created_on"),
 
         knex.raw(
           "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
@@ -569,13 +572,24 @@ const getWarehouseList = async (req, res) => {
 
     // -------------------------------
     // DATE RANGE FILTERS (using created_at, exposing as created_on)
+    // Fix: Explicitly use UTC timezone to prevent IST offset issues
     // -------------------------------
     if (createdOnStart) {
-      query.whereRaw("DATE(w.created_at) >= ?", [createdOnStart]);
+      // Convert date to UTC timestamp to avoid timezone shifts
+      // Add 'Z' to indicate UTC timezone
+      const startDateUTC = createdOnStart.includes("T")
+        ? createdOnStart
+        : `${createdOnStart}T00:00:00Z`;
+      query.where("w.created_at", ">=", startDateUTC);
     }
 
     if (createdOnEnd) {
-      query.whereRaw("DATE(w.created_at) <= ?", [createdOnEnd]);
+      // Convert date to UTC timestamp to avoid timezone shifts
+      // Add 'Z' to indicate UTC timezone
+      const endDateUTC = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd}T23:59:59Z`;
+      query.where("w.created_at", "<=", endDateUTC);
     }
 
     // COUNT QUERY
@@ -624,12 +638,21 @@ const getWarehouseList = async (req, res) => {
         }
 
         // DATE FILTERS FOR COUNT
+        // Fix: Explicitly use UTC timezone to prevent IST offset issues
         if (createdOnStart) {
-          builder.whereRaw("DATE(w.created_at) >= ?", [createdOnStart]);
+          // Convert date to UTC timestamp to avoid timezone shifts
+          const startDateUTC = createdOnStart.includes("T")
+            ? createdOnStart
+            : `${createdOnStart}T00:00:00Z`;
+          builder.where("w.created_at", ">=", startDateUTC);
         }
 
         if (createdOnEnd) {
-          builder.whereRaw("DATE(w.created_at) <= ?", [createdOnEnd]);
+          // Convert date to UTC timestamp to avoid timezone shifts
+          const endDateUTC = createdOnEnd.includes("T")
+            ? createdOnEnd
+            : `${createdOnEnd}T23:59:59Z`;
+          builder.where("w.created_at", "<=", endDateUTC);
         }
       })
       .first();
@@ -642,15 +665,47 @@ const getWarehouseList = async (req, res) => {
       .limit(limit)
       .offset(offset);
 
-    // Transform warehouses to include approver fields
-    const transformedWarehouses = warehouses.map((warehouse) => ({
-      ...warehouse,
-      approver: warehouse.approver_name || null,
-      approvedOn:
-        warehouse.approved_on && warehouse.approval_status === "Approve"
-          ? new Date(warehouse.approved_on).toISOString().split("T")[0]
-          : null,
-    }));
+    // Transform warehouses to include approver fields and convert ISO codes to names
+    const transformedWarehouses = warehouses.map((warehouse) => {
+      // Convert country code to country name
+      let countryName = warehouse.country;
+      if (warehouse.country && warehouse.country.length === 2) {
+        const countryObj = Country.getCountryByCode(warehouse.country);
+        countryName = countryObj ? countryObj.name : warehouse.country;
+      }
+
+      // Convert state code to state name
+      let stateName = warehouse.state;
+      if (warehouse.state && warehouse.state.length <= 3 && warehouse.country) {
+        // Get country code for state lookup
+        let countryCode = warehouse.country;
+        if (warehouse.country.length !== 2) {
+          // If country is already a name, find its code
+          const countryObj = Country.getAllCountries().find(
+            (c) => c.name.toLowerCase() === warehouse.country.toLowerCase()
+          );
+          countryCode = countryObj ? countryObj.isoCode : warehouse.country;
+        }
+
+        // Get state by code
+        const stateObj = State.getStateByCodeAndCountry(
+          warehouse.state,
+          countryCode
+        );
+        stateName = stateObj ? stateObj.name : warehouse.state;
+      }
+
+      return {
+        ...warehouse,
+        country: countryName,
+        state: stateName,
+        approver: warehouse.approver_name || null,
+        approvedOn:
+          warehouse.approved_on && warehouse.approval_status === "Approve"
+            ? new Date(warehouse.approved_on).toISOString().split("T")[0]
+            : null,
+      };
+    });
 
     console.log(`✅ Found ${transformedWarehouses.length} warehouses`);
 
@@ -739,6 +794,35 @@ const getWarehouseById = async (req, res) => {
       .first();
 
     console.log(`📍 Address data: ${address ? "Found" : "Not found"}`);
+
+    // Convert ISO codes to full names for address (if address exists)
+    if (address) {
+      // Convert country code to country name
+      if (address.country && address.country.length === 2) {
+        const countryObj = Country.getCountryByCode(address.country);
+        address.country = countryObj ? countryObj.name : address.country;
+      }
+
+      // Convert state code to state name
+      if (address.state && address.state.length <= 3 && address.country) {
+        // Get country code for state lookup
+        let countryCode = address.country;
+        if (address.country.length !== 2) {
+          // If country is already a name, find its code
+          const countryObj = Country.getAllCountries().find(
+            (c) => c.name.toLowerCase() === address.country.toLowerCase()
+          );
+          countryCode = countryObj ? countryObj.isoCode : address.country;
+        }
+
+        // Get state by code
+        const stateObj = State.getStateByCodeAndCountry(
+          address.state,
+          countryCode
+        );
+        address.state = stateObj ? stateObj.name : address.state;
+      }
+    }
 
     // Fetch documents with LEFT JOIN to document_upload and document_name_master
     const documents = await knex("warehouse_documents as wd")
