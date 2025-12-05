@@ -50,14 +50,24 @@ import AddressEditTab from "../features/warehouse/components/AddressTab";
 import DocumentsEditTab from "../features/warehouse/components/DocumentsTab";
 import GeofencingEditTab from "../features/warehouse/components/GeofencingTab";
 
+// Import submit draft modal
+import SubmitDraftModal from "../components/ui/SubmitDraftModal";
+
 const WarehouseDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const { user, role } = useSelector((state) => state.auth);
-  const { warehouses, currentWarehouse, masterData, loading, error } =
-    useSelector((state) => state.warehouse);
+  const {
+    warehouses,
+    currentWarehouse,
+    masterData,
+    loading,
+    error,
+    isUpdatingDraft,
+    isSubmittingDraft,
+  } = useSelector((state) => state.warehouse);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -70,6 +80,7 @@ const WarehouseDetails = () => {
     3: false, // Geofencing
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false); // ✅ Add modal state
 
   const actionButtonTheme = getComponentTheme("actionButton");
   const tabButtonTheme = getComponentTheme("tabButton");
@@ -424,6 +435,167 @@ const WarehouseDetails = () => {
   };
 
   const handleSaveChanges = async () => {
+    // ✅ If this is a draft warehouse, show the submit modal
+    const isDraft = currentWarehouse?.status === "SAVE_AS_DRAFT";
+
+    if (isDraft) {
+      setShowSubmitModal(true);
+      return;
+    }
+
+    // For non-draft warehouses, proceed with normal update
+    await handleNormalUpdate();
+  };
+
+  // ✅ Handle update draft (minimal validation)
+  const handleUpdateDraft = async () => {
+    setShowSubmitModal(false);
+
+    try {
+      // Minimal validation - only warehouse name required
+      if (
+        !editFormData?.generalDetails?.warehouseName ||
+        editFormData.generalDetails.warehouseName.trim().length < 2
+      ) {
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "Warehouse name is required (minimum 2 characters)",
+          })
+        );
+        return;
+      }
+
+      // Clear previous errors
+      dispatch(clearError());
+
+      // Transform nested frontend structure to flat backend structure
+      const backendData = transformToBackendFormat(editFormData);
+
+      // Update draft without validation
+      const result = await dispatch(
+        updateWarehouseDraft({
+          warehouseId: id,
+          warehouseData: backendData,
+        })
+      ).unwrap();
+
+      // Success
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Warehouse draft updated successfully!",
+        })
+      );
+
+      // Refresh the warehouse data
+      await dispatch(fetchWarehouseById(id));
+
+      // Switch to view mode
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
+    } catch (err) {
+      console.error("Error updating draft:", err);
+
+      // Clear Redux error state
+      dispatch(clearError());
+
+      // Show error toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: err.message || "Failed to update draft. Please try again.",
+        })
+      );
+    }
+  };
+
+  // ✅ Handle submit for approval (full validation)
+  const handleSubmitForApprovalFromModal = async () => {
+    setShowSubmitModal(false);
+
+    try {
+      // Clear previous errors
+      dispatch(clearError());
+
+      // Transform nested frontend structure to flat backend structure
+      const backendData = transformToBackendFormat(editFormData);
+
+      // Submit for approval (will perform full validation)
+      const result = await dispatch(
+        submitWarehouseFromDraft({
+          warehouseId: id,
+          warehouseData: backendData,
+        })
+      ).unwrap();
+
+      // Success
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Warehouse submitted for approval successfully!",
+        })
+      );
+
+      // Refresh the warehouse data
+      await dispatch(fetchWarehouseById(id));
+
+      // Switch to view mode
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
+    } catch (err) {
+      console.error("Error submitting warehouse for approval:", err);
+
+      // Clear Redux error state
+      dispatch(clearError());
+
+      // Check if it's a validation error
+      if (
+        err.code === "VALIDATION_ERROR" ||
+        err.message?.includes("required") ||
+        err.message?.includes("validation")
+      ) {
+        // Build user-friendly error message
+        let errorMessage = err.message || "Validation failed";
+
+        // If there's a field specified, make it more specific
+        if (err.field) {
+          errorMessage = `${err.message}`;
+
+          // If there's expected format info, add it
+          if (err.expectedFormat) {
+            errorMessage += ` (Expected format: ${err.expectedFormat})`;
+          }
+        }
+
+        // Show validation error
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: errorMessage,
+          })
+        );
+
+        // Stay in edit mode to allow user to fix errors
+        return;
+      }
+
+      // Other errors
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message:
+            err.message ||
+            "Failed to submit warehouse for approval. Please try again.",
+        })
+      );
+    }
+  };
+
+  // ✅ Handle normal update for non-draft warehouses
+  const handleNormalUpdate = async () => {
     try {
       // Clear previous errors
       setValidationErrors({});
@@ -670,96 +842,6 @@ const WarehouseDetails = () => {
     }
   };
 
-  // Submit warehouse draft for approval
-  const handleSubmitForApproval = async () => {
-    try {
-      // Confirm submission
-      // const confirmed = window.confirm(
-      //   "Are you sure you want to submit this warehouse for approval? Full validation will be applied."
-      // );
-
-      // if (!confirmed) {
-      //   return;
-      // }
-
-      // Clear previous errors
-      dispatch(clearError());
-
-      // Transform nested frontend structure to flat backend structure
-      const backendData = transformToBackendFormat(editFormData);
-
-      // Submit for approval (will perform full validation)
-      const result = await dispatch(
-        submitWarehouseFromDraft({
-          warehouseId: id,
-          warehouseData: backendData,
-        })
-      ).unwrap();
-
-      // Success
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.SUCCESS,
-          message: "Warehouse submitted for approval successfully!",
-        })
-      );
-
-      // Refresh the warehouse data
-      await dispatch(fetchWarehouseById(id));
-
-      // Switch to view mode
-      setIsEditMode(false);
-      setHasUnsavedChanges(false);
-      setValidationErrors({});
-    } catch (err) {
-      console.error("Error submitting warehouse for approval:", err);
-
-      // Clear Redux error state
-      dispatch(clearError());
-
-      // Check if it's a validation error
-      if (
-        err.code === "VALIDATION_ERROR" ||
-        err.message?.includes("required") ||
-        err.message?.includes("validation")
-      ) {
-        // Build user-friendly error message
-        let errorMessage = err.message || "Validation failed";
-
-        // If there's a field specified, make it more specific
-        if (err.field) {
-          errorMessage = `${err.message}`;
-
-          // If there's expected format info, add it
-          if (err.expectedFormat) {
-            errorMessage += ` (Expected format: ${err.expectedFormat})`;
-          }
-        }
-
-        // Show validation error
-        dispatch(
-          addToast({
-            type: TOAST_TYPES.ERROR,
-            message: errorMessage,
-          })
-        );
-
-        // Stay in edit mode to allow user to fix errors
-        return;
-      }
-
-      // Other errors
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.ERROR,
-          message:
-            err.message ||
-            "Failed to submit warehouse for approval. Please try again.",
-        })
-      );
-    }
-  };
-
   const handleBackClick = () => {
     if (isEditMode && hasUnsavedChanges) {
       const confirmLeave = window.confirm(
@@ -969,27 +1051,7 @@ const WarehouseDetails = () => {
                   Cancel
                 </button>
 
-                {/* Show "Submit for Approval" button for drafts in edit mode */}
-                {currentWarehouse?.status === "SAVE_AS_DRAFT" && (
-                  <button
-                    onClick={handleSubmitForApproval}
-                    disabled={loading}
-                    className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white rounded-xl font-medium text-sm hover:from-[#2563EB] hover:to-[#3B82F6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                        Submit for Approval
-                      </>
-                    )}
-                  </button>
-                )}
-
+                {/* ✅ SINGLE "Save Changes" button - opens modal for drafts */}
                 <button
                   onClick={handleSaveChanges}
                   disabled={loading}
@@ -1003,9 +1065,7 @@ const WarehouseDetails = () => {
                   ) : (
                     <>
                       <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                      {currentWarehouse?.status === "SAVE_AS_DRAFT"
-                        ? "Save Draft"
-                        : "Save Changes"}
+                      Save Changes
                     </>
                   )}
                 </button>
@@ -1171,6 +1231,17 @@ const WarehouseDetails = () => {
           })}
         </div>
       </div>
+
+      {/* ✅ Submit Draft Modal */}
+      <SubmitDraftModal
+        isOpen={showSubmitModal}
+        onUpdateDraft={handleUpdateDraft}
+        onSubmitForApproval={handleSubmitForApprovalFromModal}
+        onCancel={() => setShowSubmitModal(false)}
+        isLoading={isUpdatingDraft || isSubmittingDraft}
+        title="Submit Changes"
+        message="Would you like to update the draft or submit it for approval?"
+      />
     </div>
   );
 };

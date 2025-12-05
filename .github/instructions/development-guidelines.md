@@ -1452,7 +1452,250 @@ if (process.env.NODE_ENV === "production") {
 }
 ```
 
-### 10. Future-Proofing Architecture
+### 10. Approval Flow Pattern (CRITICAL - REQUIRED FOR ALL MODULES)
+
+#### Overview
+
+**EVERY list page in TMS MUST display approver name and approved_on date using the standardized approval flow JOIN pattern.**
+
+This pattern applies to:
+
+- Transporter List
+- Driver List
+- Warehouse List
+- Consignor List
+- Vehicle List
+- All future entity list pages
+
+#### Database Architecture
+
+```
+Entity Flow:
+1. Entity Created (e.g., Warehouse WH001)
+   └─> Creates Manager User (e.g., CW0001) with status PENDING
+       └─> Creates approval_flow_trans record with user_id_reference_id = CW0001
+
+Relationship:
+- Warehouse ID: WH001
+- Manager User ID: CW0001 (derived from warehouse: CW + warehouse number)
+- Approval Record: user_id_reference_id = CW0001
+```
+
+#### Standard Approval Flow JOIN Pattern
+
+**This is the ONLY correct way to join approval flow data in list queries:**
+
+```javascript
+// ✅ CORRECT PATTERN (Used in Transporter, Driver, Warehouse, etc.)
+.leftJoin(
+  knex.raw(`(
+    SELECT aft1.*
+    FROM approval_flow_trans aft1
+    INNER JOIN (
+      SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+      FROM approval_flow_trans
+      WHERE approval_type_id = 'AT00X'  -- Replace with module's approval type
+        AND s_status IN ('Approve', 'Reject', 'PENDING')
+      GROUP BY user_id_reference_id
+    ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+         AND aft1.approval_flow_unique_id = aft2.max_id
+  ) as aft`),
+  knex.raw(
+    "CONCAT('XX', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED), 3, '0'))"
+  ),
+  "entity.entity_id"
+)
+```
+
+#### Module-Specific JOIN Examples
+
+**Transporter (AT001):**
+
+```javascript
+.leftJoin(
+  knex.raw(`(
+    SELECT aft1.*
+    FROM approval_flow_trans aft1
+    INNER JOIN (
+      SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+      FROM approval_flow_trans
+      WHERE approval_type_id = 'AT001'
+        AND s_status IN ('Approve', 'Reject', 'PENDING')
+      GROUP BY user_id_reference_id
+    ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+         AND aft1.approval_flow_unique_id = aft2.max_id
+  ) as aft`),
+  knex.raw(
+    "CONCAT('T', CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED))"
+  ),
+  "tgi.transporter_id"
+)
+```
+
+**Driver (AT002):**
+
+```javascript
+.leftJoin(
+  knex.raw(`(
+    SELECT aft1.*
+    FROM approval_flow_trans aft1
+    INNER JOIN (
+      SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+      FROM approval_flow_trans
+      WHERE approval_type_id = 'AT002'
+        AND s_status IN ('Approve', 'Reject', 'PENDING')
+      GROUP BY user_id_reference_id
+    ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+         AND aft1.approval_flow_unique_id = aft2.max_id
+  ) as aft`),
+  knex.raw(
+    "CONCAT('DRV', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED), 4, '0'))"
+  ),
+  "dbi.driver_id"
+)
+```
+
+**Warehouse (AT005):**
+
+```javascript
+.leftJoin(
+  knex.raw(`(
+    SELECT aft1.*
+    FROM approval_flow_trans aft1
+    INNER JOIN (
+      SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+      FROM approval_flow_trans
+      WHERE approval_type_id = 'AT005'
+        AND s_status IN ('Approve', 'Reject', 'PENDING')
+      GROUP BY user_id_reference_id
+    ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+         AND aft1.approval_flow_unique_id = aft2.max_id
+  ) as aft`),
+  knex.raw(
+    "CONCAT('WH', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED), 3, '0'))"
+  ),
+  "w.warehouse_id"
+)
+```
+
+#### Selecting Approval Fields
+
+**Always include these fields in SELECT:**
+
+```javascript
+.select(
+  // ... other entity fields ...
+
+  // Approver name (try actioned_by_name first, fallback to pending_with_name)
+  knex.raw(
+    "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+  ),
+
+  // Approved on date
+  "aft.approved_on",
+
+  // Approval status (for filtering if needed)
+  "aft.s_status as approval_status"
+)
+```
+
+#### Response Transformation
+
+**Backend must transform approver fields for frontend consumption:**
+
+```javascript
+// Transform warehouses to include approver fields
+const transformedEntities = entities.map((entity) => {
+  return {
+    ...entity,
+    approver: entity.approver_name || null,
+    approvedOn:
+      entity.approved_on && entity.approval_status === "Approve"
+        ? new Date(entity.approved_on).toISOString().split("T")[0]
+        : null,
+  };
+});
+```
+
+#### Frontend Display Requirements
+
+**All list tables MUST include these columns:**
+
+```javascript
+// Desktop Table Columns
+<th>Approver</th>
+<th>Approved On</th>
+
+// Mobile Card Display
+<div>
+  <User className="h-4 w-4" />
+  <span>Approver: {displayValue(entity.approver)}</span>
+</div>
+<div>
+  <Calendar className="h-4 w-4" />
+  <span>
+    Approved On: {entity.approvedOn
+      ? new Date(entity.approvedOn).toLocaleDateString()
+      : 'N/A'}
+  </span>
+</div>
+```
+
+#### Common Mistakes to Avoid
+
+**❌ WRONG: Timestamp-based JOIN (Unreliable)**
+
+```javascript
+// DO NOT USE - This breaks when timestamps don't match perfectly
+.andOn(
+  knex.raw(
+    "ABS(TIMESTAMPDIFF(SECOND, aft.user_created_at, w.created_at)) < 60"
+  )
+);
+```
+
+**❌ WRONG: Direct JOIN without transformation**
+
+```javascript
+// DO NOT USE - User ID format doesn't match entity ID
+.leftJoin("approval_flow_trans as aft",
+  "aft.user_id_reference_id",
+  "entity.entity_id"
+)
+```
+
+**✅ CORRECT: ID transformation JOIN**
+
+```javascript
+// ALWAYS USE - Transforms user ID to entity ID format
+knex.raw(
+  "CONCAT('PREFIX', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, N) AS UNSIGNED), X, '0'))"
+),
+  "entity.entity_id";
+```
+
+#### Approval Type IDs by Module
+
+| Module      | Approval Type ID | User Prefix | Entity Prefix | Example          |
+| ----------- | ---------------- | ----------- | ------------- | ---------------- |
+| Transporter | AT001            | CT          | T             | CT0001 → T1      |
+| Driver      | AT002            | CD          | DRV           | CD0001 → DRV0001 |
+| Consignor   | AT003            | CC          | C             | CC0001 → C0001   |
+| Vehicle     | AT004            | CV          | VEH           | CV0001 → VEH0001 |
+| Warehouse   | AT005            | CW          | WH            | CW0001 → WH001   |
+
+#### Testing Approval Flow Integration
+
+**Verify these scenarios for each module:**
+
+1. ✅ Direct creation shows approver immediately
+2. ✅ Draft submission shows approver after submit
+3. ✅ Approved entities show actioned_by_name
+4. ✅ Pending entities show pending_with_name
+5. ✅ Rejected entities show actioned_by_name
+6. ✅ List page filters work with approval status
+
+### 11. Future-Proofing Architecture
 
 #### Background Jobs (BullMQ)
 

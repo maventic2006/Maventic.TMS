@@ -475,11 +475,7 @@ const getWarehouseList = async (req, res) => {
       )
       .leftJoin(
         knex.raw(`(
-          SELECT 
-            aft1.*,
-            um.user_id as warehouse_user_id,
-            um.consignor_id,
-            um.created_at as user_created_at
+          SELECT aft1.*
           FROM approval_flow_trans aft1
           INNER JOIN (
             SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
@@ -489,16 +485,11 @@ const getWarehouseList = async (req, res) => {
             GROUP BY user_id_reference_id
           ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
                AND aft1.approval_flow_unique_id = aft2.max_id
-          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
-            AND um.user_type_id = 'UT007'
         ) as aft`),
-        function () {
-          this.on("aft.consignor_id", "=", "w.consignor_id").andOn(
-            knex.raw(
-              "ABS(TIMESTAMPDIFF(SECOND, aft.user_created_at, w.created_at)) < 60"
-            )
-          );
-        }
+        knex.raw(
+          "CONCAT('WH', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED), 3, '0'))"
+        ),
+        "w.warehouse_id"
       )
       .select(
         "w.warehouse_id",
