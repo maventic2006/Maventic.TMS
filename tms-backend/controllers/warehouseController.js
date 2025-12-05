@@ -538,6 +538,18 @@ const getWarehouseList = async (req, res) => {
       query.where("w.consignor_id", consignorId);
     }
 
+    // ✅ FILTER: Drafts should only be visible to their creator
+    // For SAVE_AS_DRAFT status, filter by created_by (user_id)
+    // This ensures super admin can only see their own drafts
+    query.where(function () {
+      this.where("w.status", "!=", "SAVE_AS_DRAFT").orWhere(function () {
+        this.where("w.status", "=", "SAVE_AS_DRAFT").andWhere(
+          "w.created_by",
+          req.user.user_id
+        );
+      });
+    });
+
     // FILTERS
     if (req.query.warehouseId) {
       query.where("w.warehouse_id", "like", `%${req.query.warehouseId}%`);
@@ -599,6 +611,16 @@ const getWarehouseList = async (req, res) => {
         if (consignorId) {
           builder.where("w.consignor_id", consignorId);
         }
+
+        // ✅ FILTER: Drafts should only be visible to their creator
+        builder.where(function () {
+          this.where("w.status", "!=", "SAVE_AS_DRAFT").orWhere(function () {
+            this.where("w.status", "=", "SAVE_AS_DRAFT").andWhere(
+              "w.created_by",
+              req.user.user_id
+            );
+          });
+        });
 
         if (req.query.warehouseId) {
           builder.where("w.warehouse_id", "like", `%${req.query.warehouseId}%`);
@@ -939,71 +961,55 @@ const getWarehouseById = async (req, res) => {
     // ========================================
     // FETCH USER APPROVAL STATUS
     // ========================================
+    // ✅ USING TRANSPORTER PATTERN: ID derivation with fallback for robustness
 
-    // Find associated Warehouse Manager user by warehouse creation time and consignor_id
     console.log(`🔍 Fetching approval status for warehouse ${id}`);
 
     let userApprovalStatus = null;
     let approvalHistory = [];
 
-    // Get warehouse manager user created for this warehouse
-    // Match by consignor_id and user_type_id, and created around same time as warehouse
-    const warehouseManagerUser = await knex("user_master")
-      .where("user_type_id", "UT007") // Consignor WH Manager
-      .where("consignor_id", warehouse.consignor_id)
-      .whereBetween("created_at", [
-        knex.raw(
-          "DATE_SUB(?, INTERVAL 1 MINUTE)",
-          warehouse.created_at || warehouse.created_on
-        ),
-        knex.raw(
-          "DATE_ADD(?, INTERVAL 1 MINUTE)",
-          warehouse.created_at || warehouse.created_on
-        ),
-      ])
-      .orderBy("created_at", "desc")
-      .first();
+    try {
+      // STEP 1: Derive CW (Consignor Warehouse Manager) user ID from warehouse ID
+      // WH001 → CW0001, WH002 → CW0002, etc.
+      const warehouseNumber = id.substring(2); // Remove 'WH' prefix
+      const warehouseManagerUserId = `CW${warehouseNumber.padStart(4, "0")}`;
 
-    if (warehouseManagerUser) {
       console.log(
-        `  ✅ Found associated user: ${warehouseManagerUser.user_id}`
+        `  🔍 Looking for warehouse manager user: ${warehouseManagerUserId}`
       );
 
-      // Get approval flow status for this user
-      const approvalFlow = await knex("approval_flow_trans")
-        .where("user_id_reference_id", warehouseManagerUser.user_id)
-        .where("approval_type_id", "AT005") // Warehouse Manager
-        .orderBy("created_at", "desc")
+      // STEP 2: Primary lookup - Derived ID (most reliable)
+      let warehouseManagerUser = await knex("user_master")
+        .where("user_id", warehouseManagerUserId)
         .first();
 
-      if (approvalFlow) {
-        userApprovalStatus = {
-          userId: warehouseManagerUser.user_id,
-          userEmail: warehouseManagerUser.email_id,
-          userName: warehouseManagerUser.user_full_name,
-          userStatus: warehouseManagerUser.status,
-          isActive: warehouseManagerUser.is_active,
-          approvalFlowTransId: approvalFlow.approval_flow_trans_id, // ✅ CRITICAL: Include for approval API
-          currentApprovalStatus: approvalFlow.s_status, // Match consignor pattern
-          approvalStatus: approvalFlow.s_status,
-          approverLevel: approvalFlow.approver_level,
-          pendingWith: approvalFlow.pending_with_name, // Match consignor pattern
-          pendingWithUserId: approvalFlow.pending_with_user_id,
-          pendingWithName: approvalFlow.pending_with_name,
-          createdByUserId: approvalFlow.created_by_user_id,
-          createdByName: approvalFlow.created_by_name,
-          actionedByUserId: approvalFlow.actioned_by_id,
-          actionedByName: approvalFlow.actioned_by_name,
-          approvedOn: approvalFlow.approved_on,
-          remarks: approvalFlow.remarks,
-        };
+      // STEP 3: Fallback - Name and consignor matching (backward compatibility)
+      if (!warehouseManagerUser) {
+        console.log(`  ⚠️ No user found with derived ID, searching by name...`);
+        console.log(`     - user_type_id: UT007`);
+        console.log(`     - consignor_id: ${warehouse.consignor_id}`);
+        console.log(`     - user_full_name: ${warehouse.warehouse_name1}`);
 
+        warehouseManagerUser = await knex("user_master")
+          .where("user_type_id", "UT007") // Consignor WH Manager
+          .where("consignor_id", warehouse.consignor_id)
+          .where("user_full_name", warehouse.warehouse_name1)
+          .first();
+      }
+
+      // STEP 4: If user found, fetch ALL approval flows
+      if (warehouseManagerUser) {
         console.log(
-          `📋 Approval Flow Trans ID: ${approvalFlow.approval_flow_trans_id}`
+          `  ✅ Found associated user: ${warehouseManagerUser.user_id}`
         );
+        console.log(
+          `     - User Full Name: ${warehouseManagerUser.user_full_name}`
+        );
+        console.log(`     - User Status: ${warehouseManagerUser.status}`);
+        console.log(`     - Created At: ${warehouseManagerUser.created_at}`);
 
-        // Get complete approval history for this user
-        approvalHistory = await knex("approval_flow_trans as aft")
+        // Fetch ALL approval flows (not just first) ordered by most recent
+        const approvalFlows = await knex("approval_flow_trans as aft")
           .leftJoin(
             "approval_type_master as atm",
             "aft.approval_type_id",
@@ -1015,14 +1021,83 @@ const getWarehouseById = async (req, res) => {
             "atm.approval_type as approval_category",
             "atm.approval_name"
           )
-          .orderBy("aft.created_at", "desc");
+          .orderBy("aft.created_at", "desc"); // Get ALL flows, ordered
 
+        console.log(`  ✅ Found ${approvalFlows.length} approval flow records`);
+
+        // STEP 5: Use most recent approval flow (array [0], not .first())
+        if (approvalFlows.length > 0) {
+          console.log(
+            `  ✅ Most recent approval flow: ${approvalFlows[0]?.approval_flow_trans_id}`
+          );
+          console.log(`     - Status: ${approvalFlows[0]?.s_status}`);
+          console.log(
+            `     - Pending With: ${approvalFlows[0]?.pending_with_name} (${approvalFlows[0]?.pending_with_user_id})`
+          );
+          console.log(
+            `     - Created By: ${approvalFlows[0]?.created_by_name} (${approvalFlows[0]?.created_by_user_id})`
+          );
+
+          userApprovalStatus = {
+            approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id, // ✅ CRITICAL: Include for approval API
+            userId: warehouseManagerUser.user_id,
+            userEmail: warehouseManagerUser.email_id,
+            userName: warehouseManagerUser.user_full_name,
+            userStatus: warehouseManagerUser.status,
+            isActive: warehouseManagerUser.is_active,
+            currentApprovalStatus: approvalFlows[0]?.s_status, // Match consignor pattern
+            approvalStatus: approvalFlows[0]?.s_status,
+            approverLevel: approvalFlows[0]?.approver_level,
+            pendingWith: approvalFlows[0]?.pending_with_name, // Match consignor pattern
+            pendingWithUserId: approvalFlows[0]?.pending_with_user_id,
+            pendingWithName: approvalFlows[0]?.pending_with_name,
+            createdByUserId: approvalFlows[0]?.created_by_user_id,
+            createdByName: approvalFlows[0]?.created_by_name,
+            actionedByUserId: approvalFlows[0]?.actioned_by_id,
+            actionedByName: approvalFlows[0]?.actioned_by_name,
+            approvedOn: approvalFlows[0]?.approved_on,
+            remarks: approvalFlows[0]?.remarks,
+          };
+
+          // Save complete approval history
+          approvalHistory = approvalFlows;
+
+          console.log(
+            `📋 User Approval Status Object:`,
+            JSON.stringify(userApprovalStatus, null, 2)
+          );
+          console.log(
+            `📋 Approval status: ${approvalFlows[0]?.s_status}, Level: ${approvalFlows[0]?.approver_level}`
+          );
+        }
+      } else {
+        console.log(`  ⚠️ No associated user found for warehouse ${id}`);
+        console.log(`  ℹ️  This usually means:`);
         console.log(
-          `  📋 Approval status: ${approvalFlow.s_status}, Level: ${approvalFlow.approver_level}`
+          `     1. Warehouse has not been submitted for approval yet (still in SAVE_AS_DRAFT)`
+        );
+        console.log(
+          `     2. Warehouse manager user was not created during submission`
+        );
+        console.log(
+          `     3. Neither derived ID (${warehouseManagerUserId}) nor name matching worked`
         );
       }
-    } else {
-      console.log(`  ⚠️ No associated user found for warehouse ${id}`);
+    } catch (approvalError) {
+      console.error("Error fetching warehouse approval status:", approvalError);
+      // Don't fail entire request if approval fetch fails
+    }
+
+    console.log(`📤 Sending response for warehouse ${id}:`);
+    console.log(`   - Warehouse Status: ${warehouse.status}`);
+    console.log(
+      `   - User Approval Status: ${userApprovalStatus ? "YES" : "NO"}`
+    );
+    if (userApprovalStatus) {
+      console.log(
+        `   - Approval Status: ${userApprovalStatus.currentApprovalStatus}`
+      );
+      console.log(`   - Pending With: ${userApprovalStatus.pendingWith}`);
     }
 
     res.json({
@@ -1335,11 +1410,18 @@ const createWarehouse = async (req, res) => {
       }
     }
 
-    // Get consignor ID from logged-in user
-    const consignorId = req.user.consignor_id || "SYSTEM";
+    // Get consignor ID - prioritize from request body (for super admin), fallback to logged-in user
+    // Super admin can select any consignor, regular consignor uses their own ID
+    const consignorId =
+      generalDetails.consignorId || req.user.consignor_id || "SYSTEM";
     const userId = req.user.user_id || "SYSTEM";
 
     console.log("✅ Validation passed, starting database transaction");
+    console.log(
+      "✅ Using consignor ID:",
+      consignorId,
+      "(from request body or user token)"
+    );
 
     // ========================================
     // PHASE 2: DATABASE OPERATIONS
@@ -1503,9 +1585,13 @@ const createWarehouse = async (req, res) => {
 
     console.log("📝 Creating Warehouse Manager user for approval workflow...");
 
-    // Generate user ID for Warehouse Manager
-    const warehouseManagerUserId = await generateWarehouseManagerUserId(trx);
-    console.log(`  Generated user ID: ${warehouseManagerUserId}`);
+    // ✅ FIXED: Derive user ID from warehouse ID (WH001 -> CW0001)
+    // This ensures consistent lookup in getWarehouseById (matching transporter pattern)
+    const warehouseNumber = warehouseId.substring(2); // Remove 'WH' prefix
+    const warehouseManagerUserId = `CW${warehouseNumber.padStart(4, "0")}`;
+    console.log(
+      `  Generated user ID: ${warehouseManagerUserId} (derived from ${warehouseId})`
+    );
 
     // Get creator details from request (current logged-in Product Owner)
     const creatorUserId = req.user?.user_id || "SYSTEM";
@@ -2284,8 +2370,19 @@ const getMasterData = async (req, res) => {
       .where("status", "ACTIVE")
       .orderBy("document_name");
 
+    // Fetch consignors (for super admin dropdown)
+    const consignors = await knex("consignor_basic_information")
+      .select(
+        "customer_id as value",
+        "customer_name as label",
+        "customer_id",
+        "customer_name"
+      )
+      .where("status", "ACTIVE")
+      .orderBy("customer_name");
+
     console.log(
-      `✅ Found ${warehouseTypes.length} warehouse types, ${materialTypes.length} material types, ${addressTypes.length} address types, ${subLocationTypes.length} sub-location types, ${documentTypes.length} document types, ${documentNames.length} document names`
+      `✅ Found ${warehouseTypes.length} warehouse types, ${materialTypes.length} material types, ${addressTypes.length} address types, ${subLocationTypes.length} sub-location types, ${documentTypes.length} document types, ${documentNames.length} document names, ${consignors.length} consignors`
     );
 
     res.json({
@@ -2296,6 +2393,7 @@ const getMasterData = async (req, res) => {
       subLocationTypes,
       documentTypes,
       documentNames,
+      consignors,
     });
   } catch (error) {
     console.error("❌ Error fetching master data:", error);
@@ -2395,12 +2493,21 @@ const saveWarehouseAsDraft = async (req, res) => {
     console.log("User consignor_id:", req.user.consignor_id);
     console.log("Payload:", JSON.stringify(req.body, null, 2));
 
-    // ✅ Get consignorId from authenticated user's JWT token
-    const consignorId = req.user.consignor_id || "SYSTEM";
-    const userId = req.user.user_id;
-
     // Extract warehouse data from request body
     const { generalDetails } = req.body;
+
+    // ✅ Get consignorId - prioritize from request body (for super admin), fallback to logged-in user
+    // Super admin can select any consignor, regular consignor uses their own ID
+    const consignorId =
+      generalDetails?.consignorId || req.user.consignor_id || "SYSTEM";
+    const userId = req.user.user_id;
+
+    console.log(
+      "✅ Using consignor ID:",
+      consignorId,
+      "(from request body or user token)"
+    );
+
     const warehouse_name =
       generalDetails?.warehouseName || req.body.warehouse_name;
 
@@ -3234,8 +3341,13 @@ const submitWarehouseFromDraft = async (req, res) => {
     // STEP 4: Create Warehouse Manager User (like transporter pattern)
     // ========================================
 
-    // Generate warehouse manager user ID (format: CW0001, CW0002, etc.)
-    const warehouseManagerUserId = await generateWarehouseManagerUserId(trx);
+    // ✅ FIXED: Derive user ID from warehouse ID (WH054 -> CW0054)
+    // This ensures consistent lookup in getWarehouseById
+    const warehouseNumber = id.substring(2); // Remove 'WH' prefix
+    const warehouseManagerUserId = `CW${warehouseNumber.padStart(4, "0")}`;
+    console.log(
+      `  Generated user ID: ${warehouseManagerUserId} (derived from ${id})`
+    );
 
     // Get creator information
     const creator = await trx("user_master").where("user_id", userId).first();

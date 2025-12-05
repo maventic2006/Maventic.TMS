@@ -240,7 +240,9 @@ const GeneralDetailsViewTab = ({ warehouseData }) => {
                   : "bg-gray-100 text-gray-800"
               }`}
             >
-              {warehouseData?.status || "N/A"}
+              {warehouseData?.status === "SAVE_AS_DRAFT"
+                ? "Draft"
+                : warehouseData?.status || "N/A"}
             </span>
           </div>
         </div>

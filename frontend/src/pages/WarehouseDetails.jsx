@@ -245,10 +245,11 @@ const WarehouseDetails = () => {
 
   // Check if current user is the creator of this warehouse
   // Use String() to ensure type consistency in comparison
+  // Backend returns created_by (snake_case), not createdBy (camelCase)
   const isCreator =
-    currentWarehouse?.createdBy &&
+    currentWarehouse?.created_by &&
     user?.user_id &&
-    String(currentWarehouse.createdBy) === String(user.user_id);
+    String(currentWarehouse.created_by) === String(user.user_id);
 
   // Check if current user is an approver
   // Check both role and user_type_id for Product Owner detection
@@ -264,12 +265,12 @@ const WarehouseDetails = () => {
   console.log("  Current User Type ID:", user?.user_type_id);
   console.log(
     "  Warehouse Created By:",
-    currentWarehouse?.createdBy,
-    typeof currentWarehouse?.createdBy
+    currentWarehouse?.created_by,
+    typeof currentWarehouse?.created_by
   );
   console.log(
     "  String Comparison:",
-    String(currentWarehouse?.createdBy),
+    String(currentWarehouse?.created_by),
     "===",
     String(user?.user_id)
   );
