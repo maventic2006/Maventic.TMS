@@ -32,6 +32,7 @@ import {
 
 import { getComponentTheme } from "../utils/theme";
 import { TOAST_TYPES } from "../utils/constants";
+import { formatDateForInput } from "../utils/helpers";
 import EmptyState from "../components/ui/EmptyState";
 
 // Import warehouse approval component
@@ -84,13 +85,13 @@ const WarehouseDetails = () => {
         ? warehouseData.address[0]
         : warehouseData.address || {};
 
-    // Transform documents to edit format
+    // Transform documents to edit format with date formatting
     const transformedDocuments = (warehouseData.documents || []).map((doc) => ({
       documentUniqueId: doc.documentUniqueId || "", // ✅ PRESERVE document ID for updates
       documentType: doc.documentTypeId || doc.documentType || "",
       documentNumber: doc.documentNumber || "",
-      validFrom: doc.validFrom || "",
-      validTo: doc.validTo || "",
+      validFrom: formatDateForInput(doc.validFrom) || "", // ✅ Format date for input
+      validTo: formatDateForInput(doc.validTo) || "", // ✅ Format date for input
       fileName: doc.fileName || "",
       fileType: doc.fileType || "",
       fileData: doc.fileData || "",
@@ -99,6 +100,7 @@ const WarehouseDetails = () => {
 
     return {
       generalDetails: {
+        consignorId: warehouseData.consignor_id || "", // ✅ ADDED: Include consignor ID
         warehouseName: warehouseData.warehouse_name1 || "",
         warehouseName2: warehouseData.warehouse_name2 || "",
         warehouseType: warehouseData.warehouse_type || "",
@@ -160,7 +162,12 @@ const WarehouseDetails = () => {
         editData.generalDetails?.gateOutChecklistAuth || false,
       gatepass_system_available:
         editData.generalDetails?.gatepassSystem || false,
-      consignor_id: currentWarehouse?.consignor_id || user?.consignor_id || "",
+      // ✅ FIXED: Use consignorId from editData if available (preserved from transform)
+      consignor_id:
+        editData.generalDetails?.consignorId ||
+        currentWarehouse?.consignor_id ||
+        user?.consignor_id ||
+        "",
       address: editData.address
         ? {
             address_type_id: editData.address.addressType || "",
