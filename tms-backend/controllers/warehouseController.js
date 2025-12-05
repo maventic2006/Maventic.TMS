@@ -847,9 +847,20 @@ const getWarehouseById = async (req, res) => {
     }
 
     // Fetch documents with LEFT JOIN to document_upload and document_name_master
+    // ✅ FIX: Use subquery to get only the LATEST document_upload per warehouse_documents
+    // This prevents duplicates when multiple document_upload records exist for same system_reference_id
     const documents = await knex("warehouse_documents as wd")
       .leftJoin(
-        "document_upload as du",
+        knex.raw(`(
+          SELECT du1.*
+          FROM document_upload du1
+          INNER JOIN (
+            SELECT system_reference_id, MAX(created_at) as max_created_at
+            FROM document_upload
+            GROUP BY system_reference_id
+          ) du2 ON du1.system_reference_id = du2.system_reference_id 
+               AND du1.created_at = du2.max_created_at
+        ) as du`),
         "wd.document_unique_id",
         "du.system_reference_id"
       )
@@ -1225,22 +1236,48 @@ const createWarehouse = async (req, res) => {
       });
     }
 
-    if (
-      !address.vatNumber ||
-      !/^[A-Z0-9]{8,20}$/.test(address.vatNumber.trim().toUpperCase())
-    ) {
+    // Validate GST/VAT number format
+    if (!address.vatNumber) {
       return res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "VAT number must be 8-20 alphanumeric characters",
+          message: "GST/VAT number is required",
           field: "vatNumber",
         },
       });
     }
 
+    const normalizedVat = address.vatNumber.trim().toUpperCase();
+
+    // Indian GST format: 15 characters
+    // Pattern: 2 digits (state) + 10 chars (PAN) + 1 digit (entity) + 1 letter (Z) + 1 digit (checksum)
+    // Example: 27AAPFU0939F1ZV
+    const gstRegex =
+      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+
+    // International VAT format: 2 letter country code + 8-15 alphanumeric
+    // Examples: GB123456789, DE123456789, FR12345678901
+    const vatRegex = /^[A-Z]{2}[A-Z0-9]{8,15}$/;
+
+    if (!gstRegex.test(normalizedVat) && !vatRegex.test(normalizedVat)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message:
+            "Invalid GST/VAT format. Indian GST must be 15 characters (e.g., 27AAPFU0939F1ZV). International VAT: Country code + 8-15 alphanumeric characters",
+          field: "vatNumber",
+          expectedFormats: [
+            "Indian GST: 27AAPFU0939F1ZV (15 characters)",
+            "International VAT: GB123456789 (2 letter country code + 8-15 chars)",
+          ],
+        },
+      });
+    }
+
     // Normalize VAT number to uppercase
-    address.vatNumber = address.vatNumber.trim().toUpperCase();
+    address.vatNumber = normalizedVat;
 
     // Validate postal code (must be exactly 6 digits)
     if (!address.postalCode || !/^\d{6}$/.test(address.postalCode)) {
@@ -1266,23 +1303,6 @@ const createWarehouse = async (req, res) => {
               "TIN/PAN must match format: 5 letters + 4 digits + 1 letter (e.g., ABCDE1234F)",
             field: "tinPan",
             expectedFormat: "ABCDE1234F",
-          },
-        });
-      }
-    }
-
-    // Validate TAN if provided (optional, but must match TAN format if entered)
-    if (address.tan && address.tan.trim() !== "") {
-      const tanRegex = /^[A-Z]{4}\d{5}[A-Z]$/;
-      if (!tanRegex.test(address.tan.trim().toUpperCase())) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message:
-              "TAN must match format: 4 letters + 5 digits + 1 letter (e.g., ASDF12345N)",
-            field: "tan",
-            expectedFormat: "ASDF12345N",
           },
         });
       }
@@ -1476,8 +1496,6 @@ const createWarehouse = async (req, res) => {
       street_2: address.street2 || null,
       postal_code: address.postalCode || null,
       vat_number: address.vatNumber,
-      tin_pan: address.tinPan || null,
-      tan: address.tan || null,
       is_primary: address.isPrimary !== false,
       status: "ACTIVE",
       created_by: userId,
@@ -2078,6 +2096,38 @@ const updateWarehouse = async (req, res) => {
 
     // Update address if provided
     if (address && Object.keys(address).length > 0) {
+      // Validate GST/VAT number format if provided
+      if (address.vat_number) {
+        const normalizedVat = address.vat_number.trim().toUpperCase();
+
+        // Indian GST format: 15 characters
+        const gstRegex =
+          /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+
+        // International VAT format: 2 letter country code + 8-15 alphanumeric
+        const vatRegex = /^[A-Z]{2}[A-Z0-9]{8,15}$/;
+
+        if (!gstRegex.test(normalizedVat) && !vatRegex.test(normalizedVat)) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "Invalid GST/VAT format. Indian GST must be 15 characters (e.g., 27AAPFU0939F1ZV). International VAT: Country code + 8-15 alphanumeric characters",
+              field: "vatNumber",
+              expectedFormats: [
+                "Indian GST: 27AAPFU0939F1ZV (15 characters)",
+                "International VAT: GB123456789 (2 letter country code + 8-15 chars)",
+              ],
+            },
+          });
+        }
+
+        // Normalize VAT number to uppercase
+        address.vat_number = normalizedVat;
+      }
+
       const existingAddress = await trx("tms_address")
         .where("user_reference_id", id)
         .where("user_type", "WH")
@@ -2099,8 +2149,6 @@ const updateWarehouse = async (req, res) => {
             street_2: address.street_2 || existingAddress.street_2,
             postal_code: address.postal_code || existingAddress.postal_code,
             vat_number: address.vat_number || existingAddress.vat_number,
-            tin_pan: address.tin_pan || existingAddress.tin_pan,
-            tan: address.tan || existingAddress.tan,
             updated_by: userId,
             updated_at: knex.fn.now(),
           });
@@ -2121,8 +2169,6 @@ const updateWarehouse = async (req, res) => {
           street_2: address.street_2 || null,
           postal_code: address.postal_code || null,
           vat_number: address.vat_number,
-          tin_pan: address.tin_pan || null,
-          tan: address.tan || null,
           is_primary: true,
           status: "ACTIVE",
           created_by: userId,
@@ -2989,24 +3035,28 @@ const updateWarehouseDraft = async (req, res) => {
 
       // Update documents if provided (delete & re-insert)
       if (req.body.documents && Array.isArray(req.body.documents)) {
-        // Get existing document IDs to delete from document_upload table
+        // ✅ FIX: Get document_unique_id to properly delete uploads
         const existingDocs = await trx("warehouse_documents")
           .where({ warehouse_id: id })
-          .select("document_id"); // ✅ Fixed: Use document_id instead of document_upload_file_id
+          .select("document_unique_id");
 
-        const documentIds = existingDocs
-          .map((doc) => doc.document_id)
+        const documentUniqueIds = existingDocs
+          .map((doc) => doc.document_unique_id)
           .filter(Boolean);
 
-        // Delete from document_upload table (cleanup uploaded files)
-        if (documentIds.length > 0) {
+        // Delete from document_upload table using system_reference_id (FK to warehouse_documents)
+        if (documentUniqueIds.length > 0) {
           await trx("document_upload")
-            .whereIn("document_id", documentIds)
+            .whereIn("system_reference_id", documentUniqueIds)
             .del();
+          console.log(
+            `  🗑️ Deleted ${documentUniqueIds.length} old document uploads`
+          );
         }
 
         // Delete from warehouse_documents
         await trx("warehouse_documents").where({ warehouse_id: id }).del();
+        console.log(`  🗑️ Deleted old warehouse documents`);
 
         // Insert new documents
         const generatedDocIds = new Set();
@@ -3338,6 +3388,39 @@ const submitWarehouseFromDraft = async (req, res) => {
     // ========================================
     // STEP 2: Delete and re-insert address
     // ========================================
+
+    // Validate GST/VAT number format if address is provided
+    if (address && address.vat_number) {
+      const normalizedVat = address.vat_number.trim().toUpperCase();
+
+      // Indian GST format: 15 characters
+      const gstRegex =
+        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+
+      // International VAT format: 2 letter country code + 8-15 alphanumeric
+      const vatRegex = /^[A-Z]{2}[A-Z0-9]{8,15}$/;
+
+      if (!gstRegex.test(normalizedVat) && !vatRegex.test(normalizedVat)) {
+        await trx.rollback();
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message:
+              "Invalid GST/VAT format. Indian GST must be 15 characters (e.g., 27AAPFU0939F1ZV). International VAT: Country code + 8-15 alphanumeric characters",
+            field: "vatNumber",
+            expectedFormats: [
+              "Indian GST: 27AAPFU0939F1ZV (15 characters)",
+              "International VAT: GB123456789 (2 letter country code + 8-15 chars)",
+            ],
+          },
+        });
+      }
+
+      // Normalize VAT number to uppercase
+      address.vat_number = normalizedVat;
+    }
+
     await trx("tms_address")
       .where({ user_reference_id: id, user_type: "WH" })
       .del();
@@ -3357,8 +3440,6 @@ const submitWarehouseFromDraft = async (req, res) => {
         street_2: address.street_2 || null,
         postal_code: address.postal_code || null,
         vat_number: address.vat_number || null,
-        tin_pan: address.tin_pan || null,
-        tan: address.tan || null,
         is_primary: true,
         status: "ACTIVE",
         created_by: userId,
@@ -3373,15 +3454,25 @@ const submitWarehouseFromDraft = async (req, res) => {
     // ========================================
     // STEP 3: Delete and re-insert documents
     // ========================================
-    const existingDocIds = await trx("warehouse_documents")
-      .where({ warehouse_id: id })
-      .pluck("document_id");
 
-    if (existingDocIds.length > 0) {
-      await trx("document_upload").whereIn("document_id", existingDocIds).del();
+    // ✅ FIX: Get document_unique_id (not document_id) to properly delete uploads
+    const existingDocUniqueIds = await trx("warehouse_documents")
+      .where({ warehouse_id: id })
+      .pluck("document_unique_id");
+
+    // Delete document uploads using system_reference_id (the FK to warehouse_documents)
+    if (existingDocUniqueIds.length > 0) {
+      await trx("document_upload")
+        .whereIn("system_reference_id", existingDocUniqueIds)
+        .del();
+      console.log(
+        `  🗑️ Deleted ${existingDocUniqueIds.length} old document uploads`
+      );
     }
 
+    // Delete warehouse documents
     await trx("warehouse_documents").where({ warehouse_id: id }).del();
+    console.log(`  🗑️ Deleted old warehouse documents`);
 
     if (documents && documents.length > 0) {
       const generatedDocIds = new Set();

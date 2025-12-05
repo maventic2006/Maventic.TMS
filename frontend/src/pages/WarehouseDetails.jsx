@@ -128,8 +128,6 @@ const WarehouseDetails = () => {
         street2: address.street_2 || address.street2 || "",
         postalCode: address.postal_code || address.postalCode || "",
         vatNumber: address.vat_number || address.vatNumber || "",
-        tinPan: address.tin_pan || address.tinPan || "",
-        tan: address.tan || "",
       },
       documents: transformedDocuments,
       geofencing: warehouseData.geofencing || warehouseData.subLocations || [],
@@ -179,8 +177,6 @@ const WarehouseDetails = () => {
             street_2: editData.address.street2 || "",
             postal_code: editData.address.postalCode || "",
             vat_number: editData.address.vatNumber || "",
-            tin_pan: editData.address.tinPan || "",
-            tan: editData.address.tan || "",
           }
         : {},
       documents: editData.documents || [],

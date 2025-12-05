@@ -186,26 +186,6 @@ const AddressViewTab = ({ warehouseData }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-2">
-                TIN/PAN
-              </label>
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-gray-400" />
-                {displayValue(address.tin_pan)}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
-                TAN
-              </label>
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-gray-400" />
-                {displayValue(address.tan)}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">
                 Primary Address
               </label>
               <span
