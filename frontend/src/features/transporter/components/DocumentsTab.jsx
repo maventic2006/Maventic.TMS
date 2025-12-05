@@ -99,6 +99,10 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       searchable: true,
       width: "min-w-[200px]",
       required: true, // Mark as required visually
+      // Disable document type dropdown for mandatory documents
+      getDisabled: (row) => {
+        return row.isMandatory === true;
+      },
     },
     {
       key: "documentNumber",

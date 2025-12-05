@@ -308,6 +308,11 @@ const ThemeTable = ({
         ? column.getDynamicOptions(row)
         : column.options || [];
 
+      // Get disabled state - either static or dynamic based on row data
+      const isDisabled = column.getDisabled
+        ? column.getDisabled(row, rowIndex)
+        : column.disabled || false;
+
       return (
         <CustomSelect
           value={value}
@@ -316,7 +321,7 @@ const ThemeTable = ({
           }}
           options={selectOptions}
           placeholder={column.placeholder || `Select ${column.label}`}
-          disabled={column.disabled}
+          disabled={isDisabled}
           searchable={column.searchable || false}
           getOptionLabel={(option) => option.label}
           getOptionValue={(option) => option.value}
@@ -377,6 +382,11 @@ const ThemeTable = ({
     }
 
     // Default text input
+    // Get disabled state - either static or dynamic based on row data
+    const isInputDisabled = column.getDisabled
+      ? column.getDisabled(row, rowIndex)
+      : column.disabled || false;
+
     return (
       <input
         type={column.type || "text"}
@@ -384,7 +394,7 @@ const ThemeTable = ({
         onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
         placeholder={column.placeholder}
         className={`w-full min-w-[200px] px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent ${errorClass}`}
-        disabled={column.disabled}
+        disabled={isInputDisabled}
       />
     );
   };

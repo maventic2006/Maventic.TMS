@@ -24,17 +24,17 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
   // Handle keyboard events for modal
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && previewDocument) {
+      if (event.key === "Escape" && previewDocument) {
         closePreview();
       }
     };
 
     if (previewDocument) {
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener("keydown", handleKeyDown);
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [previewDocument]);
 
@@ -101,8 +101,8 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
     // For files uploaded via File objects (in create mode)
     if (doc.fileUpload instanceof File) {
       const reader = new FileReader();
-      reader.onload = function(e) {
-        const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+      reader.onload = function (e) {
+        const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
         setPreviewDocument({
           fileName: doc.fileUpload.name,
           fileType: doc.fileUpload.type,
@@ -119,7 +119,7 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
       return;
     }
 
-    console.log('No valid file data for preview:', doc);
+    console.log("No valid file data for preview:", doc);
     alert("No file data available for this document");
   };
 
@@ -137,8 +137,8 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
 
       if (response.data.success && response.data.data.fileData) {
         setPreviewDocument({
-          fileName: document.fileName || 'Document',
-          fileType: document.fileType || 'application/octet-stream',
+          fileName: document.fileName || "Document",
+          fileType: document.fileType || "application/octet-stream",
           fileData: response.data.data.fileData,
         });
       } else {
@@ -167,7 +167,11 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = doc.fileName || `${doc.documentType}_${doc.documentNumber}.${doc.fileType.split("/")[1]}`;
+      link.download =
+        doc.fileName ||
+        `${doc.documentType}_${doc.documentNumber}.${
+          doc.fileType.split("/")[1]
+        }`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -201,7 +205,8 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = doc.fileName || `${doc.documentType}_${doc.documentNumber}`;
+        link.download =
+          doc.fileName || `${doc.documentType}_${doc.documentNumber}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -255,7 +260,7 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
                     </div>
                     <div className="text-left">
                       <h3 className="text-lg font-semibold text-gray-800">
-                        {document.documentType ||
+                        {document.documentTypeName ||
                           `Document ${documentIndex + 1}`}
                       </h3>
                       <p className="text-sm text-gray-600">
@@ -410,10 +415,14 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
 
                     <div className="flex items-center gap-2">
                       {/* Show view button if document has any file data */}
-                      {(document.fileData || document.fileUpload || document.fileName) && (
+                      {(document.fileData ||
+                        document.fileUpload ||
+                        document.fileName) && (
                         <button
                           onClick={() => handlePreviewDocument(document)}
-                          disabled={loadingDocument === document.documentUniqueId}
+                          disabled={
+                            loadingDocument === document.documentUniqueId
+                          }
                           className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {loadingDocument === document.documentUniqueId ? (
@@ -434,7 +443,9 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
                       {(document.fileData || document.documentUniqueId) && (
                         <button
                           onClick={() => handleDownloadDocument(document)}
-                          disabled={loadingDocument === document.documentUniqueId}
+                          disabled={
+                            loadingDocument === document.documentUniqueId
+                          }
                           className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {loadingDocument === document.documentUniqueId ? (
@@ -514,11 +525,11 @@ const DocumentsViewTab = ({ formData, transporterData }) => {
 
       {/* Document Preview Modal - Matching Vehicle Implementation */}
       {previewDocument && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
           onClick={closePreview}
         >
-          <div 
+          <div
             className="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
