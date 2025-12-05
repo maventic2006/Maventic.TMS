@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import TMSHeader from "../components/layout/TMSHeader";
 import { getPageTheme } from "../theme.config";
@@ -49,6 +49,22 @@ const WarehouseMaintenance = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const theme = getPageTheme("list");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Helper: Read filters from URL query parameters
+  const getFiltersFromURL = useCallback(() => {
+    return {
+      warehouseId: searchParams.get("warehouseId") || "",
+      warehouseName: searchParams.get("warehouseName") || "",
+      status: searchParams.get("status") || "",
+      createdOnStart: searchParams.get("createdOnStart") || "",
+      createdOnEnd: searchParams.get("createdOnEnd") || "",
+      weighBridge: searchParams.get("weighBridge") || null,
+      virtualYardIn: searchParams.get("virtualYardIn") || null,
+      fuelAvailability: searchParams.get("fuelAvailability") || null,
+      geoFencing: searchParams.get("geoFencing") || null,
+    };
+  }, [searchParams]);
 
   // Redux state
   const { warehouses, pagination, loading, error } = useSelector(
@@ -59,36 +75,25 @@ const WarehouseMaintenance = () => {
   const [searchText, setSearchText] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Separate state for filter inputs and applied filters
-  const [filters, setFilters] = useState({
-    warehouseId: "",
-    warehouseName: "",
-    status: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-    weighBridge: null,
-    virtualYardIn: null,
-    fuelAvailability: null,
-    geoFencing: null,
-  });
+  // Separate state for filter inputs and applied filters - initialize from URL
+  const [filters, setFilters] = useState(() => getFiltersFromURL());
 
-  const [appliedFilters, setAppliedFilters] = useState({
-    warehouseId: "",
-    warehouseName: "",
-    status: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-    weighBridge: null,
-    virtualYardIn: null,
-    fuelAvailability: null,
-    geoFencing: null,
-  });
+  const [appliedFilters, setAppliedFilters] = useState(() =>
+    getFiltersFromURL()
+  );
+
+  // ✅ Sync URL params back to filter state when searchParams change (e.g., browser back button)
+  useEffect(() => {
+    const urlFilters = getFiltersFromURL();
+    setFilters(urlFilters);
+    setAppliedFilters(urlFilters);
+  }, [searchParams]); // Changed from getFiltersFromURL to searchParams to prevent infinite loop
 
   // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
     // Prevent multiple simultaneous calls
     if (loading) return;
-    
+
     const fetchData = () => {
       const params = {
         page: pagination.page || 1,
@@ -140,10 +145,31 @@ const WarehouseMaintenance = () => {
   const handleApplyFilters = useCallback(() => {
     // Apply filters by copying current filter state to appliedFilters
     // This will trigger the useEffect to fetch data with new filters
-    // Also reset to page 1 when applying filters
-    dispatch(resetPaginationToFirstPage());
     setAppliedFilters({ ...filters });
-  }, [filters, dispatch]);
+
+    // Sync filters to URL query parameters
+    const params = new URLSearchParams();
+    if (filters.warehouseId) params.set("warehouseId", filters.warehouseId);
+    if (filters.warehouseName)
+      params.set("warehouseName", filters.warehouseName);
+    if (filters.status) params.set("status", filters.status);
+    if (filters.createdOnStart)
+      params.set("createdOnStart", filters.createdOnStart);
+    if (filters.createdOnEnd) params.set("createdOnEnd", filters.createdOnEnd);
+    if (filters.weighBridge !== null)
+      params.set("weighBridge", filters.weighBridge);
+    if (filters.virtualYardIn !== null)
+      params.set("virtualYardIn", filters.virtualYardIn);
+    if (filters.fuelAvailability !== null)
+      params.set("fuelAvailability", filters.fuelAvailability);
+    if (filters.geoFencing !== null)
+      params.set("geoFencing", filters.geoFencing);
+
+    setSearchParams(params);
+
+    // Reset to page 1 when applying filters - done last to avoid interrupting state updates
+    dispatch(resetPaginationToFirstPage());
+  }, [filters, dispatch, setSearchParams]);
 
   const handleClearFilters = useCallback(() => {
     // Clear both filter input state and applied filters
@@ -160,7 +186,10 @@ const WarehouseMaintenance = () => {
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
-  }, []);
+
+    // Clear URL query parameters
+    setSearchParams(new URLSearchParams());
+  }, [setSearchParams]);
 
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);

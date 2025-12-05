@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import TMSHeader from "../components/layout/TMSHeader";
 import TopActionBar from "../components/vehicle/TopActionBar";
@@ -69,6 +69,33 @@ const fuzzySearch = (searchText, vehicles) => {
 const VehicleMaintenance = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Helper: Read filters from URL query parameters
+  const getFiltersFromURL = useCallback(() => {
+    return {
+      registrationNumber: searchParams.get("registrationNumber") || "",
+      vehicleType: searchParams.get("vehicleType") || "",
+      make: searchParams.get("make") || "",
+      model: searchParams.get("model") || "",
+      yearFrom: searchParams.get("yearFrom") || "",
+      yearTo: searchParams.get("yearTo") || "",
+      status: searchParams.get("status") || "",
+      registrationState: searchParams.get("registrationState") || "",
+      fuelType: searchParams.get("fuelType") || "",
+      leasingFlag: searchParams.get("leasingFlag") || "",
+      gpsEnabled: searchParams.get("gpsEnabled") || "",
+      vehicleCondition: searchParams.get("vehicleCondition") || "",
+      registrationDate: searchParams.get("registrationDate") || "",
+      engineType: searchParams.get("engineType") || "",
+      emissionStandard: searchParams.get("emissionStandard") || "",
+      bodyType: searchParams.get("bodyType") || "",
+      towingCapacityMin: searchParams.get("towingCapacityMin") || "",
+      towingCapacityMax: searchParams.get("towingCapacityMax") || "",
+      createdOnStart: searchParams.get("createdOnStart") || "",
+      createdOnEnd: searchParams.get("createdOnEnd") || "",
+    };
+  }, [searchParams]);
 
   // Redux state
   const { vehicles, pagination, isFetching, error } = useSelector(
@@ -79,58 +106,25 @@ const VehicleMaintenance = () => {
   const [searchText, setSearchText] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Filter state
-  const [filters, setFilters] = useState({
-    registrationNumber: "",
-    vehicleType: "",
-    make: "",
-    model: "",
-    yearFrom: "",
-    yearTo: "",
-    status: "",
-    registrationState: "",
-    fuelType: "",
-    leasingFlag: "",
-    gpsEnabled: "",
-    vehicleCondition: "",
-    registrationDate: "",
-    engineType: "",
-    emissionStandard: "",
-    bodyType: "",
-    towingCapacityMin: "",
-    towingCapacityMax: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-  });
+  // Filter state - initialize from URL
+  const [filters, setFilters] = useState(() => getFiltersFromURL());
 
-  const [appliedFilters, setAppliedFilters] = useState({
-    registrationNumber: "",
-    vehicleType: "",
-    make: "",
-    model: "",
-    yearFrom: "",
-    yearTo: "",
-    status: "",
-    registrationState: "",
-    fuelType: "",
-    leasingFlag: "",
-    gpsEnabled: "",
-    vehicleCondition: "",
-    registrationDate: "",
-    engineType: "",
-    emissionStandard: "",
-    bodyType: "",
-    towingCapacityMin: "",
-    towingCapacityMax: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-  });
+  const [appliedFilters, setAppliedFilters] = useState(() =>
+    getFiltersFromURL()
+  );
+
+  // ✅ Sync URL params back to filter state when searchParams change (e.g., browser back button)
+  useEffect(() => {
+    const urlFilters = getFiltersFromURL();
+    setFilters(urlFilters);
+    setAppliedFilters(urlFilters);
+  }, [searchParams]); // Changed from getFiltersFromURL to searchParams to prevent infinite loop
 
   // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
     // Prevent multiple simultaneous calls
     if (isFetching) return;
-    
+
     const fetchData = () => {
       const params = {
         page: pagination.page || 1,
@@ -209,9 +203,44 @@ const VehicleMaintenance = () => {
   }, []);
 
   const handleApplyFilters = useCallback(() => {
-    dispatch(resetPaginationToFirstPage());
     setAppliedFilters({ ...filters });
-  }, [filters, dispatch]);
+
+    // Sync filters to URL query parameters
+    const params = new URLSearchParams();
+    if (filters.registrationNumber)
+      params.set("registrationNumber", filters.registrationNumber);
+    if (filters.vehicleType) params.set("vehicleType", filters.vehicleType);
+    if (filters.make) params.set("make", filters.make);
+    if (filters.model) params.set("model", filters.model);
+    if (filters.yearFrom) params.set("yearFrom", filters.yearFrom);
+    if (filters.yearTo) params.set("yearTo", filters.yearTo);
+    if (filters.status) params.set("status", filters.status);
+    if (filters.registrationState)
+      params.set("registrationState", filters.registrationState);
+    if (filters.fuelType) params.set("fuelType", filters.fuelType);
+    if (filters.leasingFlag) params.set("leasingFlag", filters.leasingFlag);
+    if (filters.gpsEnabled) params.set("gpsEnabled", filters.gpsEnabled);
+    if (filters.vehicleCondition)
+      params.set("vehicleCondition", filters.vehicleCondition);
+    if (filters.registrationDate)
+      params.set("registrationDate", filters.registrationDate);
+    if (filters.engineType) params.set("engineType", filters.engineType);
+    if (filters.emissionStandard)
+      params.set("emissionStandard", filters.emissionStandard);
+    if (filters.bodyType) params.set("bodyType", filters.bodyType);
+    if (filters.towingCapacityMin)
+      params.set("towingCapacityMin", filters.towingCapacityMin);
+    if (filters.towingCapacityMax)
+      params.set("towingCapacityMax", filters.towingCapacityMax);
+    if (filters.createdOnStart)
+      params.set("createdOnStart", filters.createdOnStart);
+    if (filters.createdOnEnd) params.set("createdOnEnd", filters.createdOnEnd);
+
+    setSearchParams(params);
+
+    // Reset to page 1 when applying filters - done last to avoid interrupting state updates
+    dispatch(resetPaginationToFirstPage());
+  }, [filters, dispatch, setSearchParams]);
 
   const handleClearFilters = useCallback(() => {
     const emptyFilters = {
@@ -238,7 +267,10 @@ const VehicleMaintenance = () => {
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
-  }, []);
+
+    // Clear URL query parameters
+    setSearchParams(new URLSearchParams());
+  }, [setSearchParams]);
 
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);

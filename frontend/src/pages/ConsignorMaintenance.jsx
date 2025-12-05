@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import TMSHeader from "../components/layout/TMSHeader";
 import { getPageTheme } from "../theme.config";
@@ -21,6 +21,19 @@ const ConsignorMaintenance = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const theme = getPageTheme("list");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Helper: Read filters from URL query parameters
+  const getFiltersFromURL = useCallback(() => {
+    return {
+      customerId: searchParams.get("customerId") || "",
+      customerName: searchParams.get("customerName") || "",
+      industryType: searchParams.get("industryType") || "",
+      status: searchParams.get("status") || "",
+      createdOnStart: searchParams.get("createdOnStart") || "",
+      createdOnEnd: searchParams.get("createdOnEnd") || "",
+    };
+  }, [searchParams]);
 
   // Redux state
   const { consignors, pagination, filters, isFetching, error, masterData } =
@@ -30,28 +43,23 @@ const ConsignorMaintenance = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [searchText, setSearchText] = useState(""); // Fuzzy search state
-  const [localFilters, setLocalFilters] = useState({
-    customerId: "",
-    customerName: "",
-    industryType: "",
-    status: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-  });
-  const [appliedFilters, setAppliedFilters] = useState({
-    customerId: "",
-    customerName: "",
-    industryType: "",
-    status: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-  });
+  const [localFilters, setLocalFilters] = useState(() => getFiltersFromURL());
+  const [appliedFilters, setAppliedFilters] = useState(() =>
+    getFiltersFromURL()
+  );
+
+  // ✅ Sync URL params back to filter state when searchParams change (e.g., browser back button)
+  useEffect(() => {
+    const urlFilters = getFiltersFromURL();
+    setLocalFilters(urlFilters);
+    setAppliedFilters(urlFilters);
+  }, [searchParams]); // Changed from getFiltersFromURL to searchParams to prevent infinite loop
 
   // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
     // Prevent multiple simultaneous calls
     if (isFetching) return;
-    
+
     // Build filter object with mapped parameter names
     const filterParams = {};
 
@@ -98,7 +106,23 @@ const ConsignorMaintenance = () => {
     setAppliedFilters({ ...localFilters });
     // Also update Redux for consistency
     dispatch(setReduxFilters(localFilters));
-  }, [localFilters, dispatch]);
+
+    // Sync filters to URL query parameters
+    const params = new URLSearchParams();
+    if (localFilters.customerId)
+      params.set("customerId", localFilters.customerId);
+    if (localFilters.customerName)
+      params.set("customerName", localFilters.customerName);
+    if (localFilters.industryType)
+      params.set("industryType", localFilters.industryType);
+    if (localFilters.status) params.set("status", localFilters.status);
+    if (localFilters.createdOnStart)
+      params.set("createdOnStart", localFilters.createdOnStart);
+    if (localFilters.createdOnEnd)
+      params.set("createdOnEnd", localFilters.createdOnEnd);
+
+    setSearchParams(params);
+  }, [localFilters, dispatch, setSearchParams]);
 
   // Handle clear filters
   const handleClearFilters = useCallback(() => {
@@ -113,7 +137,10 @@ const ConsignorMaintenance = () => {
     setLocalFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
     dispatch(clearFilters());
-  }, [dispatch]);
+
+    // Clear URL query parameters
+    setSearchParams(new URLSearchParams());
+  }, [dispatch, setSearchParams]);
 
   // Handle page change
   const handlePageChange = useCallback(
