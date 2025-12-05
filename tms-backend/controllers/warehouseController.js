@@ -1453,6 +1453,9 @@ const createWarehouse = async (req, res) => {
     const warehouseId = await generateWarehouseId(trx);
     console.log("✅ Generated warehouse ID:", warehouseId);
 
+    // ✅ FIX: Use currentTimestamp for all inserts to ensure consistent timestamps
+    // This ensures the warehouse, user, and approval_flow_trans all have matching timestamps
+    // which is required for the getWarehouseList JOIN to work correctly
     // Insert warehouse basic information
     await trx("warehouse_basic_information").insert({
       warehouse_id: warehouseId,
@@ -1475,7 +1478,7 @@ const createWarehouse = async (req, res) => {
       gate_out_checklist_auth: facilities?.gateOutChecklistAuth || false,
       status: "PENDING", // ✅ FIXED: Set to PENDING (will be updated to ACTIVE after approval)
       created_by: userId,
-      created_at: knex.fn.now(),
+      created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
     });
 
     console.log("✅ Warehouse basic information inserted");
@@ -1499,7 +1502,7 @@ const createWarehouse = async (req, res) => {
       is_primary: address.isPrimary !== false,
       status: "ACTIVE",
       created_by: userId,
-      created_at: knex.fn.now(),
+      created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
     });
 
     console.log("✅ Address inserted");
@@ -1529,7 +1532,7 @@ const createWarehouse = async (req, res) => {
             valid_to: formatDateForMySQL(doc.validTo),
             active: doc.status !== false,
             created_by: userId,
-            created_at: knex.fn.now(),
+            created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
             status: "ACTIVE",
           });
 
@@ -1548,8 +1551,8 @@ const createWarehouse = async (req, res) => {
               valid_to: formatDateForMySQL(doc.validTo),
               created_by: userId,
               updated_by: userId,
-              created_at: knex.fn.now(),
-              updated_at: knex.fn.now(),
+              created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
+              updated_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
             });
           }
         }
@@ -1573,7 +1576,7 @@ const createWarehouse = async (req, res) => {
             description: subLoc.description || null,
             status: "ACTIVE",
             created_by: userId,
-            created_at: knex.fn.now(),
+            created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
           });
 
           // Insert coordinates
@@ -1587,7 +1590,7 @@ const createWarehouse = async (req, res) => {
               sequence: j + 1,
               status: "ACTIVE",
               created_by: userId,
-              created_at: knex.fn.now(),
+              created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
             });
           }
         }
