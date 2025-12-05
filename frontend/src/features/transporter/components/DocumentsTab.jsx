@@ -1,16 +1,19 @@
-import React from "react";
-import { FileText } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { FileText, AlertCircle } from "lucide-react";
 import { useSelector } from "react-redux";
 import { Country } from "country-state-city";
 import ThemeTable from "../../../components/ui/ThemeTable";
 
 const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   const { masterData } = useSelector((state) => state.transporter);
+  const [mandatoryDocumentsInitialized, setMandatoryDocumentsInitialized] =
+    useState(false);
 
   const documents = formData.documents || [];
 
   // Document type options from master data (backend already returns value/label format)
   const documentTypes = masterData?.documentNames || [];
+  const mandatoryDocuments = masterData?.mandatoryDocuments || [];
 
   // Get all countries from country-state-city package
   const allCountries = Country.getAllCountries();
@@ -23,6 +26,68 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
     }));
   }, []);
 
+  // Pre-fill mandatory documents on component mount
+  useEffect(() => {
+    // Only initialize once and only if we have mandatory documents
+    if (mandatoryDocumentsInitialized || mandatoryDocuments.length === 0) {
+      return;
+    }
+
+    // Check if mandatory documents are already in the form
+    const existingMandatoryDocs = documents.filter((doc) =>
+      mandatoryDocuments.some(
+        (mandatoryDoc) => mandatoryDoc.value === doc.documentType
+      )
+    );
+
+    // If no mandatory documents exist, pre-fill them
+    if (existingMandatoryDocs.length === 0) {
+      const mandatoryDocRows = mandatoryDocuments.map((mandatoryDoc) => ({
+        documentType: mandatoryDoc.value,
+        documentNumber: "",
+        referenceNumber: "",
+        country: "",
+        validFrom: "",
+        validTo: "",
+        status: true,
+        fileName: "",
+        fileType: "",
+        fileData: "",
+        fileUpload: null,
+        isMandatory: true, // Flag to identify mandatory documents
+      }));
+
+      setFormData((prev) => ({
+        ...prev,
+        documents: mandatoryDocRows,
+      }));
+
+      setMandatoryDocumentsInitialized(true);
+    } else {
+      // Mark existing documents as mandatory if they are in the mandatory list
+      const updatedDocuments = documents.map((doc) => ({
+        ...doc,
+        isMandatory: mandatoryDocuments.some(
+          (mandatoryDoc) => mandatoryDoc.value === doc.documentType
+        ),
+      }));
+
+      setFormData((prev) => ({
+        ...prev,
+        documents: updatedDocuments,
+      }));
+
+      setMandatoryDocumentsInitialized(true);
+    }
+  }, [mandatoryDocuments, mandatoryDocumentsInitialized]); // Only depend on mandatoryDocuments and initialization flag
+
+  // Helper function to check if a document is mandatory
+  const isMandatoryDocument = (documentType) => {
+    return mandatoryDocuments.some(
+      (mandatoryDoc) => mandatoryDoc.value === documentType
+    );
+  };
+
   // Table column configuration
   const columns = [
     {
@@ -33,6 +98,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       placeholder: "Select Document Type",
       searchable: true,
       width: "min-w-[200px]",
+      required: true, // Mark as required visually
     },
     {
       key: "documentNumber",
@@ -40,6 +106,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       type: "text",
       placeholder: "Enter document number",
       width: "min-w-[200px]",
+      required: true, // Mark as required visually
     },
     {
       key: "country",
@@ -72,9 +139,15 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   ];
 
   const handleDataChange = (updatedDocuments) => {
+    // Preserve the isMandatory flag when updating documents
+    const documentsWithMandatoryFlag = updatedDocuments.map((doc) => ({
+      ...doc,
+      isMandatory: doc.isMandatory || isMandatoryDocument(doc.documentType),
+    }));
+
     setFormData((prev) => ({
       ...prev,
-      documents: updatedDocuments,
+      documents: documentsWithMandatoryFlag,
     }));
   };
 
@@ -90,7 +163,8 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       fileName: "",
       fileType: "",
       fileData: "",
-      fileUpload: null, // For file upload handling
+      fileUpload: null,
+      isMandatory: false,
     };
 
     const updatedDocuments = [...documents, newDocument];
@@ -101,7 +175,19 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   };
 
   const handleRemoveDocument = (index) => {
-    if (documents.length <= 1) return; // Keep at least one document
+    const documentToRemove = documents[index];
+
+    // Prevent removal of mandatory documents
+    if (documentToRemove.isMandatory) {
+      console.log("Cannot remove mandatory document");
+      return;
+    }
+
+    // Prevent removal if it's the last document
+    if (documents.length <= 1) {
+      console.log("Cannot remove the last document");
+      return;
+    }
 
     const updatedDocuments = documents.filter((_, i) => i !== index);
     setFormData((prev) => ({
@@ -110,8 +196,34 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
     }));
   };
 
+  // Custom row renderer to disable remove button for mandatory documents
+  const isRowRemovable = (rowIndex) => {
+    const document = documents[rowIndex];
+    return !document?.isMandatory;
+  };
+
   return (
     <div className="bg-[#F5F7FA]">
+      {/* Mandatory Documents Notice */}
+      {mandatoryDocuments.length > 0 && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">
+                Mandatory Documents Required
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                The following documents are mandatory and must be filled:{" "}
+                <span className="font-semibold">
+                  {mandatoryDocuments.map((doc) => doc.label).join(", ")}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ThemeTable
         title="Transporter Documents"
         titleIcon={FileText}
@@ -124,6 +236,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
         hasRowSelection={false}
         canRemoveRows={true}
         canAddRows={true}
+        isRowRemovable={isRowRemovable} // Pass function to check if row is removable
         className="w-full"
       />
 
@@ -143,21 +256,6 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
           </p>
         </div>
       )}
-
-      {/* Guidelines */}
-      {/* <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h4 className="text-sm font-medium text-blue-900 mb-2">
-          Document Guidelines:
-        </h4>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li> Document numbers must be unique within the same document type</li>
-          <li> Valid from date cannot be in the future</li>
-          <li> Valid to date must be after valid from date</li>
-          <li> File uploads are optional but recommended for verification</li>
-          <li> Supported formats: JPEG, PNG, GIF, PDF, DOC, DOCX (max 5MB)</li>
-          <li> Document number format: Only uppercase letters, numbers, hyphens, and forward slashes</li>
-        </ul>
-      </div> */}
     </div>
   );
 };

@@ -133,6 +133,7 @@ export const documentSchema = z
         return sizeInBytes <= maxSizeInBytes;
       }, "File size must be less than 5MB"),
   })
+  .passthrough() // Allow extra fields from API (documentId, documentTypeId, isVerified, etc.)
   .refine(
     (data) => {
       if (!data.validFrom || !data.validTo) return true; // Skip if dates are empty

@@ -406,27 +406,22 @@
 
 // export default DocumentsTab;
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { useSelector } from "react-redux";
-import { Country } from "country-state-city";
+import { Country, State } from "country-state-city";
 import ThemeTable from "../../../components/ui/ThemeTable";
 
 const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   const { masterData } = useSelector((state) => state.driver);
+  const [mandatoryDocumentsInitialized, setMandatoryDocumentsInitialized] =
+    useState(false);
 
   const documents = formData.documents || [];
 
-  // Track if mandatory documents have been initialized to prevent duplicate additions
-  const mandatoryDocsInitialized = useRef(false);
-
   // Document type options from master data (backend returns value/label format)
   const documentTypes = masterData?.documentTypes || [];
-  
-  // Debug logging
-  console.log('📄 Driver DocumentsTab - masterData:', masterData);
-  console.log('📄 Driver DocumentsTab - documentTypes:', documentTypes);
-  console.log('📄 Driver DocumentsTab - mandatory count:', documentTypes.filter(dt => dt.isMandatory).length);
+  const mandatoryDocuments = masterData?.mandatoryDocuments || [];
 
   // Get all countries from country-state-city package
   const allCountries = Country.getAllCountries();
@@ -434,44 +429,96 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   // Country options from country-state-city package (convert to value/label format)
   const countryOptions = React.useMemo(() => {
     return allCountries.map((country) => ({
-      value: country.name,
+      value: country.isoCode, // Use ISO code as value for state lookup
       label: country.name,
     }));
   }, []);
 
-  // Auto-populate mandatory documents when component mounts or when documentTypes change
-  useEffect(() => {
-    if (documentTypes.length > 0 && documents.length === 0) {
-      const mandatoryDocuments = documentTypes
-        .filter(docType => docType.isMandatory)
-        .map(docType => ({
-          documentType: docType.value,
-          documentNumber: "",
-          referenceNumber: "",
-          country: "",
-          validFrom: "",
-          validTo: "",
-          status: true,
-          fileName: "",
-          fileType: "",
-          fileData: "",
-          fileUpload: null, // For file upload
-          documentProvider: "",
-          premiumAmount: 0,
-          remarks: "",
-        }));
+  // Function to get state options for a specific country
+  const getStateOptions = (countryCode) => {
+    if (!countryCode) return [];
+    const states = State.getStatesOfCountry(countryCode);
+    return states.map((state) => ({
+      value: state.isoCode,
+      label: state.name,
+    }));
+  };
 
-      // Only set if no documents exist yet
-      if (mandatoryDocuments.length > 0) {
+  // Pre-fill mandatory documents on component mount
+  useEffect(() => {
+    // Only initialize once and only if we have mandatory documents
+    if (mandatoryDocumentsInitialized || mandatoryDocuments.length === 0) {
+      return;
+    }
+
+    // Check if mandatory documents are already in the form
+    // Need to check both documentType and documentTypeId since API returns documentTypeId
+    const existingMandatoryDocs = documents.filter((doc) =>
+      mandatoryDocuments.some(
+        (mandatoryDoc) =>
+          mandatoryDoc.value === doc.documentType ||
+          mandatoryDoc.value === doc.documentTypeId
+      )
+    );
+
+    // If no mandatory documents exist, pre-fill them
+    if (existingMandatoryDocs.length === 0 && documents.length === 0) {
+      const mandatoryDocRows = mandatoryDocuments.map((mandatoryDoc) => ({
+        documentType: mandatoryDoc.value,
+        documentNumber: "",
+        issuingCountry: "",
+        issuingState: "",
+        validFrom: "",
+        validTo: "",
+        status: true,
+        fileName: "",
+        fileType: "",
+        fileData: "",
+        fileUpload: null,
+        remarks: "",
+        isMandatory: true, // Flag to identify mandatory documents
+      }));
+
+      setFormData((prev) => ({
+        ...prev,
+        documents: mandatoryDocRows,
+      }));
+
+      setMandatoryDocumentsInitialized(true);
+    } else {
+      // Mark existing documents as mandatory if they are in the mandatory list
+      // Check both documentType and documentTypeId
+      const updatedDocuments = documents.map((doc) => ({
+        ...doc,
+        // Normalize documentType to use the ID value if documentTypeId exists
+        documentType: doc.documentTypeId || doc.documentType,
+        isMandatory: mandatoryDocuments.some(
+          (mandatoryDoc) =>
+            mandatoryDoc.value === doc.documentType ||
+            mandatoryDoc.value === doc.documentTypeId
+        ),
+      }));
+
+      // Only update if we actually have documents to update
+      if (updatedDocuments.length > 0) {
         setFormData((prev) => ({
           ...prev,
-          documents: mandatoryDocuments,
+          documents: updatedDocuments,
         }));
       }
-    }
-  }, [documentTypes, documents.length, setFormData]);
 
-  // Table column configuration matching vehicle design
+      setMandatoryDocumentsInitialized(true);
+    }
+  }, [mandatoryDocuments, mandatoryDocumentsInitialized, documents.length]); // Added documents.length to detect changes
+
+  // Helper function to check if a document is mandatory
+  const isMandatoryDocument = (documentType) => {
+    return mandatoryDocuments.some(
+      (mandatoryDoc) => mandatoryDoc.value === documentType
+    );
+  };
+
+  // Table column configuration
   const columns = [
     {
       key: "documentType",
@@ -481,6 +528,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       placeholder: "Select Document Type",
       searchable: true,
       width: "min-w-[200px]",
+      required: true, // Mark as required visually
     },
     {
       key: "documentNumber",
@@ -488,15 +536,32 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       type: "text",
       placeholder: "Enter document number",
       width: "min-w-[200px]",
+      required: true, // Mark as required visually
     },
     {
-      key: "country",
-      label: "Country",
+      key: "issuingCountry",
+      label: "Issuing Country",
       type: "select",
       options: countryOptions,
       placeholder: "Select Country",
       searchable: true,
       width: "min-w-[200px]",
+    },
+    {
+      key: "issuingState",
+      label: "Issuing State",
+      type: "select",
+      options: [], // Will be populated dynamically based on country
+      placeholder: "Select State",
+      searchable: true,
+      width: "min-w-[200px]",
+      getDynamicOptions: (rowData) => {
+        // Return state options based on the selected country in this row
+        if (rowData.issuingCountry) {
+          return getStateOptions(rowData.issuingCountry);
+        }
+        return [];
+      },
     },
     {
       key: "validFrom",
@@ -520,9 +585,25 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   ];
 
   const handleDataChange = (updatedDocuments) => {
+    // Preserve the isMandatory flag when updating documents
+    const documentsWithMandatoryFlag = updatedDocuments.map((doc, index) => {
+      const prevDoc = documents[index];
+
+      // Check if country changed - if so, clear the state
+      const countryChanged =
+        prevDoc && prevDoc.issuingCountry !== doc.issuingCountry;
+
+      return {
+        ...doc,
+        // Clear state if country changed
+        issuingState: countryChanged ? "" : doc.issuingState,
+        isMandatory: doc.isMandatory || isMandatoryDocument(doc.documentType),
+      };
+    });
+
     setFormData((prev) => ({
       ...prev,
-      documents: updatedDocuments,
+      documents: documentsWithMandatoryFlag,
     }));
   };
 
@@ -530,8 +611,8 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
     const newDocument = {
       documentType: "",
       documentNumber: "",
-      referenceNumber: "",
-      country: "",
+      issuingCountry: "",
+      issuingState: "",
       validFrom: "",
       validTo: "",
       status: true,
@@ -539,54 +620,25 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       fileType: "",
       fileData: "",
       fileUpload: null,
-      documentProvider: "",
-      premiumAmount: 0,
       remarks: "",
+      isMandatory: false, // New documents are not mandatory
     };
 
     const updatedDocuments = [...documents, newDocument];
-    setFormData((prev) => ({
-      ...prev,
-      documents: updatedDocuments,
-    }));
+    handleDataChange(updatedDocuments);
   };
 
   const handleRemoveDocument = (index) => {
-    // Check if this is a mandatory document type
-    const documentToRemove = documents[index];
-    const mandatoryDocTypes = documentTypes.filter(dt => dt.isMandatory).map(dt => dt.value);
-    
-    if (mandatoryDocTypes.includes(documentToRemove.documentType)) {
-      // Don't allow removal of mandatory document types, just clear the fields
-      const updatedDocuments = [...documents];
-      updatedDocuments[index] = {
-        ...updatedDocuments[index],
-        documentNumber: "",
-        referenceNumber: "",
-        country: "",
-        validFrom: "",
-        validTo: "",
-        fileName: "",
-        fileType: "",
-        fileData: "",
-        fileUpload: null,
-        documentProvider: "",
-        premiumAmount: 0,
-        remarks: "",
-      };
-      setFormData((prev) => ({
-        ...prev,
-        documents: updatedDocuments,
-      }));
+    const document = documents[index];
+
+    // Prevent removal of mandatory documents
+    if (document?.isMandatory) {
+      alert("This is a mandatory document and cannot be removed.");
       return;
     }
 
-    // Allow removal of non-mandatory documents
     const updatedDocuments = documents.filter((_, i) => i !== index);
-    setFormData((prev) => ({
-      ...prev,
-      documents: updatedDocuments,
-    }));
+    handleDataChange(updatedDocuments);
   };
 
   return (
@@ -630,12 +682,17 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
         </h4>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• Mandatory documents are pre-populated and cannot be removed</li>
-          <li>• Document numbers must be unique within the same document type</li>
+          <li>
+            • Document numbers must be unique within the same document type
+          </li>
           <li>• Valid from date cannot be in the future</li>
           <li>• Valid to date must be after valid from date</li>
           <li>• File uploads are required for all document types</li>
           <li>• Supported formats: JPEG, PNG, GIF, PDF, DOC, DOCX (max 5MB)</li>
-          <li>• Document number format: Only uppercase letters, numbers, hyphens, and forward slashes</li>
+          <li>
+            • Document number format: Only uppercase letters, numbers, hyphens,
+            and forward slashes
+          </li>
         </ul>
       </div>
     </div>

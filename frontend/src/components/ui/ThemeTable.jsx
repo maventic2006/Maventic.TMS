@@ -19,6 +19,7 @@ const ThemeTable = ({
   onRowSelect,
   canRemoveRows = true,
   canAddRows = true,
+  isRowRemovable, // Function to check if a specific row can be removed
   customRenderers = {},
   validationRules = {},
   className = "",
@@ -30,17 +31,17 @@ const ThemeTable = ({
   // Handle ESC key to close preview modal
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && previewDocument) {
+      if (event.key === "Escape" && previewDocument) {
         closePreview();
       }
     };
 
     if (previewDocument) {
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener("keydown", handleKeyDown);
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [previewDocument]);
 
@@ -108,9 +109,9 @@ const ThemeTable = ({
     try {
       // Convert file to base64 for storage and preview
       const reader = new FileReader();
-      reader.onload = function(e) {
-        const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
-        
+      reader.onload = function (e) {
+        const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+
         const updatedData = [...data];
         updatedData[rowIndex] = {
           ...updatedData[rowIndex],
@@ -141,13 +142,13 @@ const ThemeTable = ({
 
   const removeFile = (rowIndex, columnKey = "photo") => {
     const updatedData = [...data];
-    
+
     // Clean up preview URL if it exists
     const previewUrl = updatedData[rowIndex][`${columnKey}_preview`];
-    if (previewUrl && previewUrl.startsWith('blob:')) {
+    if (previewUrl && previewUrl.startsWith("blob:")) {
       URL.revokeObjectURL(previewUrl);
     }
-    
+
     updatedData[rowIndex] = {
       ...updatedData[rowIndex],
       [columnKey]: null,
@@ -177,14 +178,14 @@ const ThemeTable = ({
   const handlePreviewDocument = (row) => {
     const fileValue = row.fileUpload || row.photo || null;
     const isFileObject = fileValue instanceof File;
-    
+
     let previewData = {};
-    
+
     if (isFileObject) {
       // For File objects, convert to base64 for preview
       const reader = new FileReader();
-      reader.onload = function(e) {
-        const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+      reader.onload = function (e) {
+        const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
         setPreviewDocument({
           fileName: fileValue.name,
           fileType: fileValue.type,
@@ -200,7 +201,7 @@ const ThemeTable = ({
         fileData: row.fileData,
       });
     } else {
-      console.log('No valid file data for preview:', row);
+      console.log("No valid file data for preview:", row);
     }
   };
 
@@ -264,7 +265,9 @@ const ThemeTable = ({
                 {fileName}
               </span>
               {/* Preview button - show if we have file data or an uploaded file */}
-              {(isFileObject || (row.fileData && row.fileType) || (row.fileName && row.fileType)) && (
+              {(isFileObject ||
+                (row.fileData && row.fileType) ||
+                (row.fileName && row.fileType)) && (
                 <button
                   onClick={() => handlePreviewDocument(row)}
                   className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
@@ -300,13 +303,18 @@ const ThemeTable = ({
 
     // Select dropdown
     if (column.type === "select") {
+      // Get options - either static or dynamic based on row data
+      const selectOptions = column.getDynamicOptions
+        ? column.getDynamicOptions(row)
+        : column.options || [];
+
       return (
         <CustomSelect
           value={value}
-          onValueChange={(newValue) =>
-            handleCellChange(rowIndex, column.key, newValue)
-          }
-          options={column.options || []}
+          onValueChange={(newValue) => {
+            handleCellChange(rowIndex, column.key, newValue);
+          }}
+          options={selectOptions}
           placeholder={column.placeholder || `Select ${column.label}`}
           disabled={column.disabled}
           searchable={column.searchable || false}
@@ -448,8 +456,16 @@ const ThemeTable = ({
                         <td className="px-3">
                           <button
                             onClick={() => onRemoveRow(rowIndex)}
-                            disabled={data.length <= 1}
+                            disabled={
+                              data.length <= 1 ||
+                              (isRowRemovable && !isRowRemovable(rowIndex))
+                            }
                             className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={
+                              isRowRemovable && !isRowRemovable(rowIndex)
+                                ? "This document is mandatory and cannot be removed"
+                                : "Remove row"
+                            }
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -476,11 +492,11 @@ const ThemeTable = ({
       {previewDocument && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm"
             onClick={closePreview}
           />
-          
+
           {/* Modal Content */}
           <div className="relative bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-4 max-h-[95vh] flex flex-col">
             {/* Modal Header */}
@@ -506,7 +522,7 @@ const ThemeTable = ({
               {previewDocument.fileType?.startsWith("image/") ? (
                 <img
                   src={
-                    previewDocument.fileData.startsWith('http') 
+                    previewDocument.fileData.startsWith("http")
                       ? previewDocument.fileData
                       : `data:${previewDocument.fileType};base64,${previewDocument.fileData}`
                   }
@@ -516,7 +532,7 @@ const ThemeTable = ({
               ) : previewDocument.fileType === "application/pdf" ? (
                 <iframe
                   src={
-                    previewDocument.fileData.startsWith('http')
+                    previewDocument.fileData.startsWith("http")
                       ? previewDocument.fileData
                       : `data:application/pdf;base64,${previewDocument.fileData}`
                   }

@@ -96,6 +96,15 @@ export const fetchMasterData = createAsyncThunk(
         { value: "DN008", label: "Contact Person ID Proof" },
         { value: "DN009", label: "NDA" },
       ],
+      mandatoryDocuments: [
+        {
+          value: "DN001",
+          label: "PAN/TIN",
+          is_mandatory: true,
+          is_expiry_required: true,
+          is_verification_required: true,
+        },
+      ],
     };
 
     /* 
@@ -435,6 +444,7 @@ const initialState = {
     documentTypes: [],
     documentNames: [],
     addressTypes: [],
+    mandatoryDocuments: [],
   },
   statesByCountry: {},
   citiesByCountryState: {},
@@ -755,7 +765,11 @@ const transporterSlice = createSlice({
   },
 });
 
-export const { clearError, clearLastCreated, resetTransporterState, resetPaginationToFirstPage } =
-  transporterSlice.actions;
+export const {
+  clearError,
+  clearLastCreated,
+  resetTransporterState,
+  resetPaginationToFirstPage,
+} = transporterSlice.actions;
 
 export default transporterSlice.reducer;

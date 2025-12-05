@@ -222,7 +222,7 @@ const DriverDetailsPage = () => {
 
   // Initialize edit form data when driver loads
   useEffect(() => {
-    if (selectedDriver && !editFormData) {
+    if (selectedDriver && !editFormData && isEditMode) {
       // Helper function to sanitize data (convert null to undefined/empty string)
       const sanitizeAddress = (addr) => ({
         ...addr,
@@ -259,8 +259,27 @@ const DriverDetailsPage = () => {
         vehicleMappings: selectedDriver.vehicleMappings || [],
         blacklistMappings: selectedDriver.blacklistMappings || [],
       });
+
+      // 🔍 DEBUG: Log documents loaded into edit mode
+      console.log("📋 ========================================");
+      console.log("📋 FRONTEND - Documents loaded into edit mode:");
+      console.log(
+        "📋 Total documents:",
+        (selectedDriver.documents || []).length
+      );
+      (selectedDriver.documents || []).forEach((doc, idx) => {
+        console.log(`📋 Document ${idx}:`, {
+          documentId: doc.documentId,
+          documentType: doc.documentType,
+          documentTypeId: doc.documentTypeId,
+          documentNumber: doc.documentNumber,
+          hasDocumentId: !!doc.documentId,
+          documentIdType: typeof doc.documentId,
+        });
+      });
+      console.log("📋 ========================================");
     }
-  }, [selectedDriver, editFormData]);
+  }, [selectedDriver, isEditMode]); // ✅ FIX: Only initialize editFormData when entering edit mode, not on every selectedDriver update
 
   // Handle errors
   useEffect(() => {
@@ -432,6 +451,8 @@ const DriverDetailsPage = () => {
   useEffect(() => {
     if (editFormData && selectedDriver && isEditMode) {
       setHasUnsavedChanges(true);
+    } else {
+      setHasUnsavedChanges(false);
     }
   }, [editFormData, selectedDriver, isEditMode]);
 
@@ -674,13 +695,13 @@ const DriverDetailsPage = () => {
     const newTabErrors = { ...tabErrors };
     const allErrorMessages = []; // Collect all error messages
 
-    // Validate Basic Info (Tab 1)
+    // Validate Basic Info (Tab 0)
     try {
       basicInfoSchema.parse(editFormData.basicInfo);
-      newTabErrors[1] = false;
+      newTabErrors[0] = false;
     } catch (err) {
       errors.basicInfo = err.errors || [err];
-      newTabErrors[1] = true;
+      newTabErrors[0] = true;
 
       // Collect all errors from this section
       const errorArray = err.errors || [err];
@@ -692,14 +713,14 @@ const DriverDetailsPage = () => {
       });
     }
 
-    // Validate Addresses (Tab 1)
+    // Validate Addresses (Tab 0 - same as Basic Info)
     if (editFormData.addresses && editFormData.addresses.length > 0) {
       editFormData.addresses.forEach((address, index) => {
         try {
           addressSchema.parse(address);
         } catch (err) {
           errors[`addresses[${index}]`] = err.errors || [err];
-          newTabErrors[1] = true;
+          newTabErrors[0] = true;
 
           // Collect all errors from this address
           const errorArray = err.errors || [err];
@@ -713,18 +734,24 @@ const DriverDetailsPage = () => {
       });
     }
 
-    // Validate Documents (Tab 2)
+    // Validate Documents (Tab 1)
     if (editFormData.documents && editFormData.documents.length > 0) {
       editFormData.documents.forEach((document, index) => {
-        // Skip validation for empty documents (documents without documentNumber)
-        if (!document.documentNumber || document.documentNumber.trim() === "") {
-          return; // Skip this document
+        // Skip validation for completely empty documents
+        // Check if document is truly empty (no documentType AND no documentNumber)
+        const isCompletelyEmpty =
+          (!document.documentType || document.documentType.trim() === "") &&
+          (!document.documentNumber || document.documentNumber.trim() === "");
+
+        if (isCompletelyEmpty) {
+          return; // Skip completely empty document
         }
 
         // Create a copy of the document with resolved document type name
         const documentForValidation = { ...document };
 
-        // If documentType is an ID (short code like DT001), resolve it to name
+        // If documentType is an ID (short code like DOC001), resolve it to name
+        // This handles cases where documentType contains the ID instead of the name
         if (documentForValidation.documentType && masterData?.documentTypes) {
           const docTypeMatch = masterData.documentTypes.find(
             (dt) => dt.value === documentForValidation.documentType
@@ -735,11 +762,19 @@ const DriverDetailsPage = () => {
           }
         }
 
+        // Debug logging for document validation
+        console.log(`🔍 Validating Document ${index}:`, {
+          original: document,
+          forValidation: documentForValidation,
+        });
+
         try {
           documentSchema.parse(documentForValidation);
+          console.log(`✅ Document ${index} passed validation`);
         } catch (err) {
+          console.error(`❌ Document ${index} validation failed:`, err);
           errors[`documents[${index}]`] = err.errors || [err];
-          newTabErrors[2] = true;
+          newTabErrors[1] = true;
 
           // Collect all errors from this document
           const errorArray = err.errors || [err];
@@ -783,14 +818,25 @@ const DriverDetailsPage = () => {
       });
     }
 
-    // Validate History (Tab 3)
+    // Validate History (Tab 2)
     if (editFormData.history && editFormData.history.length > 0) {
       editFormData.history.forEach((hist, index) => {
+        // Skip validation for empty history records (all fields are optional/empty)
+        if (
+          (!hist.employer || hist.employer.trim() === "") &&
+          (!hist.employmentStatus || hist.employmentStatus.trim() === "") &&
+          (!hist.fromDate || hist.fromDate.trim() === "") &&
+          (!hist.toDate || hist.toDate.trim() === "") &&
+          (!hist.jobTitle || hist.jobTitle.trim() === "")
+        ) {
+          return; // Skip this history record
+        }
+
         try {
           historySchema.parse(hist);
         } catch (err) {
           errors[`history[${index}]`] = err.errors || [err];
-          newTabErrors[3] = true;
+          newTabErrors[2] = true;
 
           // Collect all errors from this history record
           const errorArray = err.errors || [err];
@@ -804,7 +850,7 @@ const DriverDetailsPage = () => {
       });
     }
 
-    // Validate Accidents (Tab 4)
+    // Validate Accidents (Tab 3)
     if (editFormData.accidents && editFormData.accidents.length > 0) {
       editFormData.accidents.forEach((accident, index) => {
         // Skip validation for empty accident records (no type and no date)
@@ -819,7 +865,7 @@ const DriverDetailsPage = () => {
           accidentViolationSchema.parse(accident);
         } catch (err) {
           errors[`accidents[${index}]`] = err.errors || [err];
-          newTabErrors[4] = true;
+          newTabErrors[3] = true;
 
           // Collect all errors from this accident record
           const errorArray = err.errors || [err];
@@ -840,6 +886,11 @@ const DriverDetailsPage = () => {
     // Check if there are any errors
     const hasErrors = Object.keys(errors).length > 0;
     if (hasErrors) {
+      // Debug logging to help identify validation issues
+      console.log("🔍 Validation Errors Found:", errors);
+      console.log("📋 All Error Messages:", allErrorMessages);
+      console.log("📑 Tab Errors:", newTabErrors);
+
       // Get unique error messages (limit to first 10 for readability)
       const uniqueErrors = [...new Set(allErrorMessages)].slice(0, 10);
 
@@ -862,12 +913,16 @@ const DriverDetailsPage = () => {
       return;
     }
 
-    // Filter out empty documents (documents without documentNumber)
+    // Filter out completely empty documents (no documentType AND no documentNumber)
     const filteredFormData = {
       ...editFormData,
-      documents: (editFormData.documents || []).filter(
-        (doc) => doc.documentNumber && doc.documentNumber.trim() !== ""
-      ),
+      documents: (editFormData.documents || []).filter((doc) => {
+        // Keep document if it has either documentType or documentNumber filled
+        return (
+          (doc.documentType && doc.documentType.trim() !== "") ||
+          (doc.documentNumber && doc.documentNumber.trim() !== "")
+        );
+      }),
       // Filter out empty history records
       history: (editFormData.history || []).filter(
         (hist) => hist.employer || hist.jobTitle || hist.fromDate || hist.toDate
@@ -877,6 +932,22 @@ const DriverDetailsPage = () => {
         (acc) => acc.type && acc.date
       ),
     };
+
+    // 🔍 DEBUG: Log documents being sent to backend
+    console.log("📋 ========================================");
+    console.log("📋 FRONTEND - Documents being sent to backend:");
+    console.log("📋 Total documents:", filteredFormData.documents.length);
+    filteredFormData.documents.forEach((doc, idx) => {
+      console.log(`📋 Document ${idx}:`, {
+        documentId: doc.documentId,
+        documentType: doc.documentType,
+        documentTypeId: doc.documentTypeId,
+        documentNumber: doc.documentNumber,
+        hasDocumentId: !!doc.documentId,
+        documentIdType: typeof doc.documentId,
+      });
+    });
+    console.log("📋 ========================================");
 
     // ✅ RESUBMISSION LOGIC - If entity is INACTIVE, change status to PENDING for resubmission
     const isResubmission = selectedDriver?.status === "INACTIVE";

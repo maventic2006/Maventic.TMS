@@ -751,6 +751,24 @@ const createDriver = async (req, res) => {
               rejectUnauthorized: false, // Disable SSL verification for this API only
             });
 
+            // Format date to YYYY-MM-DD as required by the API
+            const formattedDob = formatDateForInput(basicInfo.dateOfBirth);
+
+            if (!formattedDob) {
+              await trx.rollback();
+              return res.status(400).json({
+                success: false,
+                error: {
+                  code: "VALIDATION_ERROR",
+                  message: "Invalid date of birth format",
+                  field: "basicInfo.dateOfBirth",
+                },
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            console.log("🔍 Formatted DOB for API:", formattedDob);
+
             const apiResponse = await axios({
               method: "GET",
               url: "https://api.maventic.in/mapi/getDLDetails",
@@ -760,7 +778,7 @@ const createDriver = async (req, res) => {
               },
               data: {
                 dlnumber: doc.documentNumber,
-                dob: basicInfo.dateOfBirth,
+                dob: formattedDob,
               },
               httpsAgent: httpsAgent, // Apply custom agent to bypass SSL verification
             });
@@ -1659,7 +1677,7 @@ const updateDriver = async (req, res) => {
 
     // ACTIVE entities: Only approvers can edit
     if (currentStatus === "ACTIVE") {
-      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      const isApprover = userRole === "product_owner" || userRole === "admin";
       if (!isApprover) {
         await trx.rollback();
         return res.status(403).json({
@@ -2051,6 +2069,24 @@ const updateDriver = async (req, res) => {
                 rejectUnauthorized: false, // Disable SSL verification for this API only
               });
 
+              // Format date to YYYY-MM-DD as required by the API
+              const formattedDob = formatDateForInput(driverInfo.date_of_birth);
+
+              if (!formattedDob) {
+                await trx.rollback();
+                return res.status(400).json({
+                  success: false,
+                  error: {
+                    code: "VALIDATION_ERROR",
+                    message: "Invalid date of birth format",
+                    field: `documents[${i}].documentNumber`,
+                  },
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              console.log("🔍 Formatted DOB for API:", formattedDob);
+
               const apiResponse = await axios({
                 method: "GET",
                 url: "https://api.maventic.in/mapi/getDLDetails",
@@ -2060,7 +2096,7 @@ const updateDriver = async (req, res) => {
                 },
                 data: {
                   dlnumber: doc.documentNumber,
-                  dob: driverInfo.date_of_birth,
+                  dob: formattedDob,
                 },
                 httpsAgent: httpsAgent, // Apply custom agent to bypass SSL verification
               });
@@ -2162,6 +2198,23 @@ const updateDriver = async (req, res) => {
         }
       }
 
+      // 🔍 DEBUG: Log all received documents to diagnose duplication issue
+      console.log("📋 ========================================");
+      console.log("📋 RECEIVED DOCUMENTS PAYLOAD (UPDATE DRIVER):");
+      console.log("📋 Total documents received:", documents.length);
+      documents.forEach((doc, idx) => {
+        console.log(`📋 Document ${idx}:`, {
+          documentId: doc.documentId,
+          documentType: doc.documentType,
+          documentTypeId: doc.documentTypeId,
+          documentNumber: doc.documentNumber,
+          hasDocumentId: !!doc.documentId,
+          documentIdType: typeof doc.documentId,
+          documentIdValue: doc.documentId,
+        });
+      });
+      console.log("📋 ========================================");
+
       // Update or insert documents
       for (const doc of documents) {
         // Skip documents without document number (empty documents)
@@ -2169,7 +2222,15 @@ const updateDriver = async (req, res) => {
           continue;
         }
 
+        console.log("🔍 Processing document:", {
+          documentId: doc.documentId,
+          documentNumber: doc.documentNumber,
+          willUpdate: !!doc.documentId,
+          willInsert: !doc.documentId,
+        });
+
         if (doc.documentId) {
+          console.log("✅ UPDATE path - documentId:", doc.documentId);
           // Update existing document
           await trx("driver_documents")
             .where("document_id", doc.documentId)
@@ -2244,6 +2305,7 @@ const updateDriver = async (req, res) => {
             }
           }
         } else {
+          console.log("⚠️ INSERT path - NO documentId, creating new document");
           // Insert new document
           const documentId = await generateDocumentId(trx);
           const documentUniqueId = `${id}-${documentId}`;
@@ -3628,6 +3690,26 @@ const getMasterData = async (req, res) => {
       ];
     }
 
+    // Get mandatory documents for DRIVER user type
+    const mandatoryDocuments = await knex("doc_type_configuration as dtc")
+      .join(
+        "document_name_master as dnm",
+        "dtc.doc_name_master_id",
+        "dnm.doc_name_master_id"
+      )
+      .select(
+        "dtc.doc_name_master_id as value",
+        "dnm.document_name as label",
+        "dtc.is_mandatory",
+        "dtc.is_expiry_required",
+        "dtc.is_verification_required"
+      )
+      .where("dtc.user_type", "DRIVER")
+      .where("dtc.status", "ACTIVE")
+      .where("dnm.status", "ACTIVE")
+      .where("dtc.is_mandatory", 1)
+      .orderBy("dnm.document_name");
+
     res.json({
       success: true,
       data: {
@@ -3637,6 +3719,7 @@ const getMasterData = async (req, res) => {
         genderOptions,
         bloodGroupOptions,
         violationTypes,
+        mandatoryDocuments,
       },
       timestamp: new Date().toISOString(),
     });
@@ -3693,14 +3776,14 @@ const getMandatoryDocuments = async (req, res) => {
   try {
     console.log("📋 Fetching mandatory documents for Driver...");
 
-    // Query doc_type_configuration for Driver user type
+    // Query doc_type_configuration for DRIVER user type
     const mandatoryDocs = await knex("doc_type_configuration as dtc")
       .join(
         "document_name_master as dnm",
         "dtc.doc_name_master_id",
         "dnm.doc_name_master_id"
       )
-      .where("dtc.user_type", "Driver")
+      .where("dtc.user_type", "DRIVER")
       .where("dtc.is_mandatory", 1)
       .where("dtc.status", "ACTIVE")
       .where("dnm.status", "ACTIVE")
