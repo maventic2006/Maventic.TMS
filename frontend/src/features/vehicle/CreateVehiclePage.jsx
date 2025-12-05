@@ -1605,23 +1605,61 @@ const CreateVehiclePage = () => {
             };
           })(),
           documents: (frontendData.documents || [])
-            .map((doc) => ({
-              documentType: doc.documentType || "",
-              referenceNumber: doc.documentNumber || doc.referenceNumber || "",
-              vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
-              permitCategory: doc.permitCategory || "",
-              permitCode: doc.permitCode || "",
-              documentProvider: doc.documentProvider || "",
-              coverageType: doc.coverageType || "",
-              premiumAmount: doc.premiumAmount || 0,
-              validFrom: formatDate(doc.issueDate || doc.validFrom),
-              validTo: formatDate(doc.expiryDate || doc.validTo),
-              remarks: doc.remarks || "Document uploaded",
-              // ✅ File upload data (base64 encoded from DocumentUploadModal)
-              fileName: doc.fileName || "",
-              fileType: doc.fileType || "",
-              fileData: doc.fileData || "", // Base64 encoded file string
-            }))
+            .map((doc) => {
+              // Helper function to convert document type description back to ID
+              const getDocumentTypeId = (documentTypeDescription) => {
+                // If it's already a short ID code (e.g., DN001), return as-is
+                if (/^DN\d{3}$/.test(documentTypeDescription)) {
+                  return documentTypeDescription;
+                }
+                
+                // Map common document type descriptions to their ID codes
+                const documentTypeMap = {
+                  "Vehicle Registration Certificate": "DN001",
+                  "Vehicle Insurance": "DN009", 
+                  "PUC certificate": "DN010",
+                  "Fitness Certificate": "DN012",
+                  "Tax Certificate": "DN005",
+                  "Permit": "DN006",
+                  "Driver License": "DN007",
+                  "Road Tax": "DN008",
+                  "Commercial Vehicle License": "DN011",
+                  "Pollution Certificate": "DN010", // Same as PUC
+                  "Insurance Policy": "DN009", // Same as Vehicle Insurance
+                  "Vehicle Permit": "DN006", // Same as Permit
+                };
+
+                // Check if we have a mapping for this description
+                const mappedId = documentTypeMap[documentTypeDescription];
+                if (mappedId) {
+                  return mappedId;
+                }
+
+                // If no mapping found, log warning
+                console.warn("⚠️ Unknown document type description:", documentTypeDescription);
+                
+                // Return the original value as fallback
+                return documentTypeDescription;
+              };
+
+              return {
+                documentType: getDocumentTypeId(doc.documentType || doc.documentTypeId || ""),
+                referenceNumber: doc.documentNumber || doc.referenceNumber || "",
+                vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
+                permitCategory: doc.permitCategory || "",
+                permitCode: doc.permitCode || "",
+                documentProvider: doc.documentProvider || doc.issuingAuthority || "",
+                coverageType: doc.coverageType || "",
+                premiumAmount: doc.premiumAmount || 0,
+                validFrom: formatDate(doc.issueDate || doc.validFrom),
+                validTo: formatDate(doc.expiryDate || doc.validTo),
+                remarks: doc.remarks || "Document uploaded",
+                // ✅ File upload data (base64 encoded from DocumentUploadModal)
+                fileName: doc.fileName || "",
+                fileType: doc.fileType || "",
+                fileData: doc.fileData || "", // Base64 encoded file string
+              };
+            })
             .filter((doc) => doc.documentType), // Only include documents with type
         };
       } catch (error) {

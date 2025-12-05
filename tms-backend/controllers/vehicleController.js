@@ -388,11 +388,14 @@ const validateBasicInformation = (data) => {
     });
   }
 
-  if (!data.gps_tracker_imei_number?.trim()) {
-    errors.push({
-      field: "basicInformation.gpsIMEI",
-      message: "GPS Tracker IMEI Number is required",
-    });
+  // GPS IMEI validation - only required if GPS tracking is active
+  if (data.gps_tracker_active_flag === 1 || data.gps_tracker_active_flag === true) {
+    if (!data.gps_tracker_imei_number?.trim()) {
+      errors.push({
+        field: "basicInformation.gpsIMEI",
+        message: "GPS Tracker IMEI Number is required when GPS tracking is enabled",
+      });
+    }
   }
 
   if (
@@ -672,7 +675,8 @@ const createVehicle = async (req, res) => {
       }
     }
 
-    if (vehicleData.gps_tracker_imei_number) {
+    // Check for duplicate GPS IMEI (only if GPS tracking is enabled and IMEI is provided)
+    if (vehicleData.gps_tracker_imei_number && (vehicleData.gps_tracker_active_flag === 1 || vehicleData.gps_tracker_active_flag === true)) {
       const isDuplicate = await checkDuplicateGPSIMEI(
         vehicleData.gps_tracker_imei_number
       );
@@ -822,13 +826,59 @@ const createVehicle = async (req, res) => {
     // Insert documents if provided
     if (documents && Array.isArray(documents) && documents.length > 0) {
       for (const doc of documents) {
+        // Validate document_type_id format to prevent database errors
+        const validateDocumentTypeId = (documentType) => {
+          if (!documentType) return null;
+          
+          // Check if it's already a valid ID format (DN001, DN002, etc.)
+          if (/^DN\d{3}$/.test(documentType)) {
+            return documentType;
+          }
+          
+          // If it's a description, map to ID
+          const documentTypeMap = {
+            "Vehicle Registration Certificate": "DN001",
+            "Vehicle Insurance": "DN009", 
+            "PUC certificate": "DN010",
+            "Fitness Certificate": "DN012",
+            "Tax Certificate": "DN005",
+            "Permit": "DN006",
+            "Driver License": "DN007",
+            "Road Tax": "DN008",
+            "Commercial Vehicle License": "DN011",
+            "Pollution Certificate": "DN010",
+            "Insurance Policy": "DN009",
+            "Vehicle Permit": "DN006",
+          };
+          
+          const mappedId = documentTypeMap[documentType];
+          if (mappedId) {
+            console.warn(`⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`);
+            return mappedId;
+          }
+          
+          // If too long for database field, reject it
+          if (documentType.length > 10) {
+            console.error(`❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`);
+            throw new Error(`Invalid document type: "${documentType}". Expected short code like DN001.`);
+          }
+          
+          return documentType;
+        };
+
         const documentId = await generateDocumentId();
+        const validatedDocumentTypeId = validateDocumentTypeId(doc.documentType);
+        
+        if (!validatedDocumentTypeId) {
+          console.warn(`⚠️ Skipping document with invalid type: ${doc.documentType}`);
+          continue; // Skip this document
+        }
 
         // Insert document metadata
         await trx("vehicle_documents").insert({
           document_id: documentId,
           vehicle_id_code: vehicleId,
-          document_type_id: doc.documentType,
+          document_type_id: validatedDocumentTypeId,
           reference_number: doc.referenceNumber,
           vehicle_maintenance_id: doc.vehicleMaintenanceId,
           permit_category: doc.permitCategory,
@@ -1750,9 +1800,10 @@ const updateVehicle = async (req, res) => {
       }
     }
 
-    // Check for duplicate GPS IMEI (excluding current vehicle)
+    // Check for duplicate GPS IMEI (only if GPS tracking is enabled and IMEI is provided, excluding current vehicle)
     if (
       vehicleData.gps_tracker_imei_number &&
+      (vehicleData.gps_tracker_active_flag === 1 || vehicleData.gps_tracker_active_flag === true) &&
       vehicleData.gps_tracker_imei_number !==
         existingVehicle.gps_tracker_imei_number
     ) {
@@ -1982,14 +2033,61 @@ const updateVehicle = async (req, res) => {
 
     // Handle documents (add new, update existing, or delete)
     if (documents && Array.isArray(documents)) {
+      // Document type validation function (same as in create)
+      const validateDocumentTypeId = (documentType) => {
+        if (!documentType) return null;
+        
+        // Check if it's already a valid ID format (DN001, DN002, etc.)
+        if (/^DN\d{3}$/.test(documentType)) {
+          return documentType;
+        }
+        
+        // If it's a description, map to ID
+        const documentTypeMap = {
+          "Vehicle Registration Certificate": "DN001",
+          "Vehicle Insurance": "DN009", 
+          "PUC certificate": "DN010",
+          "Fitness Certificate": "DN012",
+          "Tax Certificate": "DN005",
+          "Permit": "DN006",
+          "Driver License": "DN007",
+          "Road Tax": "DN008",
+          "Commercial Vehicle License": "DN011",
+          "Pollution Certificate": "DN010",
+          "Insurance Policy": "DN009",
+          "Vehicle Permit": "DN006",
+        };
+        
+        const mappedId = documentTypeMap[documentType];
+        if (mappedId) {
+          console.warn(`⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`);
+          return mappedId;
+        }
+        
+        // If too long for database field, reject it
+        if (documentType.length > 10) {
+          console.error(`❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`);
+          throw new Error(`Invalid document type: "${documentType}". Expected short code like DN001.`);
+        }
+        
+        return documentType;
+      };
+
       for (const doc of documents) {
+        const validatedDocumentTypeId = validateDocumentTypeId(doc.documentType);
+        
+        if (!validatedDocumentTypeId) {
+          console.warn(`⚠️ Skipping document with invalid type: ${doc.documentType}`);
+          continue; // Skip this document
+        }
+
         // If document has an ID, it's an existing document - update it
         if (doc.documentId) {
           // Update document metadata
           await trx("vehicle_documents")
             .where("document_id", doc.documentId)
             .update({
-              document_type_id: doc.documentType,
+              document_type_id: validatedDocumentTypeId,
               reference_number: doc.referenceNumber,
               valid_from: formatDateForMySQL(doc.validFrom),
               valid_to: formatDateForMySQL(doc.validTo),
@@ -2043,7 +2141,7 @@ const updateVehicle = async (req, res) => {
           await trx("vehicle_documents").insert({
             document_id: documentId,
             vehicle_id_code: id,
-            document_type_id: doc.documentType,
+            document_type_id: validatedDocumentTypeId,
             reference_number: doc.referenceNumber,
             vehicle_maintenance_id: doc.vehicleMaintenanceId,
             permit_category: doc.permitCategory,
@@ -2623,14 +2721,55 @@ const saveVehicleAsDraft = async (req, res) => {
 
     // Insert partial documents if provided
     if (documents && Array.isArray(documents) && documents.length > 0) {
+      // Document type validation function
+      const validateDocumentTypeId = (documentType) => {
+        if (!documentType) return null;
+        
+        // Check if it's already a valid ID format (DN001, DN002, etc.)
+        if (/^DN\d{3}$/.test(documentType)) {
+          return documentType;
+        }
+        
+        // If it's a description, map to ID
+        const documentTypeMap = {
+          "Vehicle Registration Certificate": "DN001",
+          "Vehicle Insurance": "DN009", 
+          "PUC certificate": "DN010",
+          "Fitness Certificate": "DN012",
+          "Tax Certificate": "DN005",
+          "Permit": "DN006",
+          "Driver License": "DN007",
+          "Road Tax": "DN008",
+          "Commercial Vehicle License": "DN011",
+          "Pollution Certificate": "DN010",
+          "Insurance Policy": "DN009",
+          "Vehicle Permit": "DN006",
+        };
+        
+        const mappedId = documentTypeMap[documentType];
+        if (mappedId) {
+          console.warn(`⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`);
+          return mappedId;
+        }
+        
+        // If too long for database field, reject it
+        if (documentType.length > 10) {
+          console.error(`❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`);
+          return null; // For drafts, just skip invalid documents
+        }
+        
+        return documentType;
+      };
+
       for (const doc of documents) {
         if (doc.documentType || doc.referenceNumber) {
+          const validatedDocumentTypeId = validateDocumentTypeId(doc.documentType);
           const documentId = await generateDocumentId();
 
           await trx("vehicle_documents").insert({
             document_id: documentId,
             vehicle_id_code: vehicleId,
-            document_type_id: doc.documentType || null,
+            document_type_id: validatedDocumentTypeId,
             reference_number: doc.referenceNumber || null,
             vehicle_maintenance_id: doc.vehicleMaintenanceId || null,
             permit_category: doc.permitCategory || null,
@@ -2947,13 +3086,60 @@ const updateVehicleDraft = async (req, res) => {
       // Insert all documents from the payload
       for (const doc of documents) {
         if (doc.documentType) {
+          // Document type validation function
+          const validateDocumentTypeId = (documentType) => {
+            if (!documentType) return null;
+            
+            // Check if it's already a valid ID format (DN001, DN002, etc.)
+            if (/^DN\d{3}$/.test(documentType)) {
+              return documentType;
+            }
+            
+            // If it's a description, map to ID
+            const documentTypeMap = {
+              "Vehicle Registration Certificate": "DN001",
+              "Vehicle Insurance": "DN009", 
+              "PUC certificate": "DN010",
+              "Fitness Certificate": "DN012",
+              "Tax Certificate": "DN005",
+              "Permit": "DN006",
+              "Driver License": "DN007",
+              "Road Tax": "DN008",
+              "Commercial Vehicle License": "DN011",
+              "Pollution Certificate": "DN010",
+              "Insurance Policy": "DN009",
+              "Vehicle Permit": "DN006",
+            };
+            
+            const mappedId = documentTypeMap[documentType];
+            if (mappedId) {
+              console.warn(`⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`);
+              return mappedId;
+            }
+            
+            // If too long for database field, reject it
+            if (documentType.length > 10) {
+              console.error(`❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`);
+              return null; // For drafts, just skip invalid documents
+            }
+            
+            return documentType;
+          };
+
+          const validatedDocumentTypeId = validateDocumentTypeId(doc.documentType);
+          
+          if (!validatedDocumentTypeId) {
+            console.warn(`⚠️ Skipping document with invalid type: ${doc.documentType}`);
+            continue;
+          }
+
           // Only insert if documentType is specified
           const documentId = await generateDocumentId();
 
           await trx("vehicle_documents").insert({
             document_id: documentId,
             vehicle_id_code: id,
-            document_type_id: doc.documentType || null,
+            document_type_id: validatedDocumentTypeId,
             reference_number: doc.referenceNumber || null,
             vehicle_maintenance_id: doc.vehicleMaintenanceId || null,
             permit_category: doc.permitCategory || null,
@@ -3117,7 +3303,8 @@ const submitVehicleFromDraft = async (req, res) => {
       }
     }
 
-    if (vehicleData.gps_tracker_imei_number) {
+    // Check for duplicate GPS IMEI (only if GPS tracking is enabled and IMEI is provided)
+    if (vehicleData.gps_tracker_imei_number && (vehicleData.gps_tracker_active_flag === 1 || vehicleData.gps_tracker_active_flag === true)) {
       const isDuplicate = await checkDuplicateGPSIMEI(
         vehicleData.gps_tracker_imei_number,
         id
@@ -3278,13 +3465,60 @@ const submitVehicleFromDraft = async (req, res) => {
 
     // Re-insert documents with ACTIVE status
     if (documents && Array.isArray(documents) && documents.length > 0) {
+      // Document type validation function
+      const validateDocumentTypeId = (documentType) => {
+        if (!documentType) return null;
+        
+        // Check if it's already a valid ID format (DN001, DN002, etc.)
+        if (/^DN\d{3}$/.test(documentType)) {
+          return documentType;
+        }
+        
+        // If it's a description, map to ID
+        const documentTypeMap = {
+          "Vehicle Registration Certificate": "DN001",
+          "Vehicle Insurance": "DN009", 
+          "PUC certificate": "DN010",
+          "Fitness Certificate": "DN012",
+          "Tax Certificate": "DN005",
+          "Permit": "DN006",
+          "Driver License": "DN007",
+          "Road Tax": "DN008",
+          "Commercial Vehicle License": "DN011",
+          "Pollution Certificate": "DN010",
+          "Insurance Policy": "DN009",
+          "Vehicle Permit": "DN006",
+        };
+        
+        const mappedId = documentTypeMap[documentType];
+        if (mappedId) {
+          console.warn(`⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`);
+          return mappedId;
+        }
+        
+        // If too long for database field, reject it
+        if (documentType.length > 10) {
+          console.error(`❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`);
+          throw new Error(`Invalid document type: "${documentType}". Expected short code like DN001.`);
+        }
+        
+        return documentType;
+      };
+
       for (const doc of documents) {
+        const validatedDocumentTypeId = validateDocumentTypeId(doc.documentType);
+        
+        if (!validatedDocumentTypeId) {
+          console.warn(`⚠️ Skipping document with invalid type: ${doc.documentType}`);
+          continue;
+        }
+
         const documentId = await generateDocumentId();
 
         await trx("vehicle_documents").insert({
           document_id: documentId,
           vehicle_id_code: id,
-          document_type_id: doc.documentType,
+          document_type_id: validatedDocumentTypeId,
           reference_number: doc.referenceNumber,
           vehicle_maintenance_id: doc.vehicleMaintenanceId,
           permit_category: doc.permitCategory,
