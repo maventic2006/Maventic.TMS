@@ -1900,17 +1900,34 @@ const updateWarehouse = async (req, res) => {
     if (isResubmission) {
       console.log(`🔄 Resubmission detected for warehouse ${id}`);
 
-      // Get warehouse manager user ID via user_master lookup
-      const warehouseUser = await trx("user_master")
-        .where("user_type_id", "UT007") // Consignor WH Manager
-        .where("consignor_id", existingWarehouse.consignor_id)
-        .whereRaw("ABS(TIMESTAMPDIFF(SECOND, created_at, ?)) < 60", [
-          existingWarehouse.created_at,
-        ])
+      // ✅ FIXED: Derive user ID from warehouse ID (WH056 → CW0056)
+      const warehouseNumber = id.substring(2); // Remove 'WH' prefix
+      const warehouseManagerUserId = `CW${warehouseNumber.padStart(4, "0")}`;
+
+      console.log(
+        `  Looking for warehouse manager user: ${warehouseManagerUserId}`
+      );
+
+      // Primary lookup by derived ID
+      let warehouseUser = await trx("user_master")
+        .where("user_id", warehouseManagerUserId)
         .first();
+
+      // Fallback to name matching for backward compatibility
+      if (!warehouseUser) {
+        console.log(`  Fallback: Searching by name and consignor`);
+        warehouseUser = await trx("user_master")
+          .where("user_type_id", "UT007") // Consignor WH Manager
+          .where("consignor_id", existingWarehouse.consignor_id)
+          .where("user_full_name", existingWarehouse.warehouse_name1)
+          .first();
+      }
 
       if (warehouseUser) {
         const warehouseManagerUserId = warehouseUser.user_id;
+        console.log(
+          `  ✅ Found warehouse manager user: ${warehouseManagerUserId}`
+        );
 
         // Find existing approval flow record
         const approvalFlow = await trx("approval_flow_trans")
@@ -1920,15 +1937,43 @@ const updateWarehouse = async (req, res) => {
           .first();
 
         if (approvalFlow) {
+          // Determine pending approver (opposite Product Owner)
+          const creatorUserId = existingWarehouse.created_by;
+          let pendingWithUserId = null;
+          let pendingWithName = null;
+
+          if (creatorUserId === "PO001") {
+            const po2 = await trx("user_master")
+              .where("user_id", "PO002")
+              .first();
+            pendingWithUserId = "PO002";
+            pendingWithName = po2?.user_full_name || "Product Owner 2";
+          } else if (creatorUserId === "PO002") {
+            const po1 = await trx("user_master")
+              .where("user_id", "PO001")
+              .first();
+            pendingWithUserId = "PO001";
+            pendingWithName = po1?.user_full_name || "Product Owner 1";
+          } else {
+            // Default to PO001
+            const po1 = await trx("user_master")
+              .where("user_id", "PO001")
+              .first();
+            pendingWithUserId = "PO001";
+            pendingWithName = po1?.user_full_name || "Product Owner 1";
+          }
+
           // Update approval flow to restart from Level 1
           await trx("approval_flow_trans")
             .where(
-              "approval_flow_unique_id",
-              approvalFlow.approval_flow_unique_id
+              "approval_flow_trans_id",
+              approvalFlow.approval_flow_trans_id
             )
             .update({
               s_status: "PENDING",
               approver_level: 1,
+              pending_with_user_id: pendingWithUserId,
+              pending_with_name: pendingWithName,
               actioned_by_id: null,
               actioned_by_name: null,
               approved_on: null,
@@ -1937,20 +1982,28 @@ const updateWarehouse = async (req, res) => {
             });
 
           console.log(
-            `✅ Approval flow restarted for ${warehouseManagerUserId}`
+            `  ✅ Approval flow restarted: ${approvalFlow.approval_flow_trans_id}`
+          );
+          console.log(
+            `  ✅ Pending with: ${pendingWithName} (${pendingWithUserId})`
           );
         }
 
-        // Update user status to Pending for Approval
+        // Update user status to PENDING (matching user_master status values)
         await trx("user_master")
           .where("user_id", warehouseManagerUserId)
           .update({
-            status: "Pending for Approval",
+            status: "PENDING", // ✅ FIXED: Use "PENDING" not "Pending for Approval"
+            is_active: false,
             updated_at: knex.fn.now(),
           });
 
         console.log(
-          `✅ User status updated to Pending for Approval: ${warehouseManagerUserId}`
+          `  ✅ User status updated to PENDING: ${warehouseManagerUserId}`
+        );
+      } else {
+        console.warn(
+          `  ⚠️ No warehouse manager user found for resubmission of ${id}`
         );
       }
     }
@@ -2012,11 +2065,16 @@ const updateWarehouse = async (req, res) => {
             ? gate_out_checklist_auth
             : existingWarehouse.gate_out_checklist_auth,
         consignor_id: consignor_id || existingWarehouse.consignor_id,
+        // ✅ CRITICAL FIX: Update status if resubmission
+        status: isResubmission ? "PENDING" : existingWarehouse.status,
         updated_by: userId,
         updated_at: knex.fn.now(),
       });
 
     console.log("✅ Warehouse basic information updated");
+    if (isResubmission) {
+      console.log("  ✅ Status updated from INACTIVE to PENDING");
+    }
 
     // Update address if provided
     if (address && Object.keys(address).length > 0) {
@@ -2139,15 +2197,42 @@ const updateWarehouse = async (req, res) => {
                 (d) => d.document_unique_id === doc.documentUniqueId
               );
               if (existingDoc && existingDoc.document_id) {
-                await trx("document_upload")
-                  .where("document_id", existingDoc.document_id)
-                  .update({
+                // Check if document upload record exists
+                const existingUpload = await trx("document_upload")
+                  .where("system_reference_id", doc.documentUniqueId)
+                  .first();
+
+                if (existingUpload) {
+                  // Update existing document upload
+                  await trx("document_upload")
+                    .where("system_reference_id", doc.documentUniqueId)
+                    .update({
+                      file_name: doc.fileName,
+                      file_type: doc.fileType || "application/pdf",
+                      file_xstring_value: doc.fileData,
+                      updated_by: userId,
+                      updated_at: knex.fn.now(),
+                    });
+                  console.log(
+                    `  ✅ Document upload updated for ${doc.documentUniqueId}`
+                  );
+                } else {
+                  // Insert new document upload record
+                  const uploadId = await generateDocumentUploadId(trx);
+                  await trx("document_upload").insert({
+                    document_id: uploadId,
+                    system_reference_id: doc.documentUniqueId, // ✅ CRITICAL: Link to document
                     file_name: doc.fileName,
                     file_type: doc.fileType || "application/pdf",
                     file_xstring_value: doc.fileData,
-                    updated_by: userId,
-                    updated_at: knex.fn.now(),
+                    status: "ACTIVE",
+                    created_by: userId,
+                    created_at: knex.fn.now(),
                   });
+                  console.log(
+                    `  ✅ Document upload created for ${doc.documentUniqueId}`
+                  );
+                }
               }
             }
             console.log(`✅ Document ${doc.documentUniqueId} updated`);
@@ -2158,6 +2243,7 @@ const updateWarehouse = async (req, res) => {
               generatedDocumentIds
             );
             const documentUniqueId = documentId;
+            generatedDocumentIds.add(documentId); // Track generated IDs
 
             await trx("warehouse_documents").insert({
               document_unique_id: documentUniqueId,
@@ -2175,13 +2261,18 @@ const updateWarehouse = async (req, res) => {
 
             // Insert document file if provided
             if (doc.fileData && doc.fileName) {
+              const uploadId = await generateDocumentUploadId(trx);
               await trx("document_upload").insert({
-                document_id: documentId,
+                document_id: uploadId, // Unique upload ID
+                system_reference_id: documentUniqueId, // ✅ CRITICAL FIX: Link to warehouse document
                 file_name: doc.fileName,
                 file_type: doc.fileType || "application/pdf",
                 file_xstring_value: doc.fileData,
+                status: "ACTIVE",
                 created_by: userId,
                 created_at: knex.fn.now(),
+                updated_by: userId,
+                updated_at: knex.fn.now(),
               });
             }
             console.log(`✅ New document ${documentUniqueId} created`);
