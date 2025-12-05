@@ -919,6 +919,23 @@ const getWarehouseById = async (req, res) => {
       fileData: doc.file_data, // Base64 encoded file content
     }));
 
+    // 🔍 DEBUG: Log document mapping details
+    console.log(
+      `📄 Mapped ${mappedDocuments.length} documents for warehouse ${id}`
+    );
+    if (mappedDocuments.length > 0) {
+      console.log("📄 First document details:", {
+        documentUniqueId: mappedDocuments[0].documentUniqueId,
+        documentType: mappedDocuments[0].documentType,
+        fileName: mappedDocuments[0].fileName,
+        fileType: mappedDocuments[0].fileType,
+        hasFileData: !!mappedDocuments[0].fileData,
+        fileDataLength: mappedDocuments[0].fileData
+          ? mappedDocuments[0].fileData.length
+          : 0,
+      });
+    }
+
     // ========================================
     // FETCH USER APPROVAL STATUS
     // ========================================
