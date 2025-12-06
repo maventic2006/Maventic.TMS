@@ -221,8 +221,10 @@ const DriverDetailsPage = () => {
   // };
 
   // Initialize edit form data when driver loads
+  // ✅ FIX: Always initialize editFormData when entering edit mode, even if it already exists
+  // This prevents null/stale data from breaking the UI
   useEffect(() => {
-    if (selectedDriver && !editFormData && isEditMode) {
+    if (selectedDriver && isEditMode) {
       // Helper function to sanitize data (convert null to undefined/empty string)
       const sanitizeAddress = (addr) => ({
         ...addr,
@@ -275,11 +277,13 @@ const DriverDetailsPage = () => {
           documentNumber: doc.documentNumber,
           hasDocumentId: !!doc.documentId,
           documentIdType: typeof doc.documentId,
+          fileData: doc.fileData ? `${doc.fileData.substring(0, 50)}...` : null,
+          fileName: doc.fileName,
         });
       });
       console.log("📋 ========================================");
     }
-  }, [selectedDriver, isEditMode]); // ✅ FIX: Only initialize editFormData when entering edit mode, not on every selectedDriver update
+  }, [selectedDriver, isEditMode]); // ✅ FIX: Removed !editFormData condition to always refresh when entering edit mode
 
   // Handle errors
   useEffect(() => {

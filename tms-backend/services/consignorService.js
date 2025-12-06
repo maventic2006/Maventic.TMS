@@ -743,6 +743,7 @@ const getConsignorById = async (customerId) => {
             pendingWithUserId: approvalFlow.pending_with_user_id,
             createdByUserId: approvalFlow.created_by_user_id,
             createdByName: approvalFlow.created_by_name,
+            remarks: approvalFlow.remarks || null, // ✅ FIX: Include rejection remarks
           };
 
           console.log(

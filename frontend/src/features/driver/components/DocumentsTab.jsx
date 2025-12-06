@@ -413,11 +413,10 @@ import { Country, State } from "country-state-city";
 import ThemeTable from "../../../components/ui/ThemeTable";
 
 const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
+  // ✅ CRITICAL: All hooks MUST be called before any conditional returns (Rules of Hooks)
   const { masterData } = useSelector((state) => state.driver);
   const [mandatoryDocumentsInitialized, setMandatoryDocumentsInitialized] =
     useState(false);
-
-  const documents = formData.documents || [];
 
   // Document type options from master data (backend returns value/label format)
   const documentTypes = masterData?.documentTypes || [];
@@ -433,6 +432,17 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       label: country.name,
     }));
   }, []);
+
+  // ✅ FIX: Defensive check for null formData AFTER all hooks are called
+  if (!formData) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-gray-500">Loading form data...</div>
+      </div>
+    );
+  }
+
+  const documents = formData.documents || [];
 
   // Function to get state options for a specific country
   const getStateOptions = (countryCode) => {
