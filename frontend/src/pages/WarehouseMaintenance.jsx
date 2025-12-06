@@ -53,16 +53,23 @@ const WarehouseMaintenance = () => {
 
   // Helper: Read filters from URL query parameters
   const getFiltersFromURL = useCallback(() => {
+    // ✅ Convert URL string params to proper boolean values for checkboxes
+    const parseCheckboxParam = (paramName) => {
+      const value = searchParams.get(paramName);
+      if (value === null || value === "") return null;
+      return value === "true"; // Convert "true" string to boolean true, "false" to boolean false
+    };
+
     return {
       warehouseId: searchParams.get("warehouseId") || "",
       warehouseName: searchParams.get("warehouseName") || "",
       status: searchParams.get("status") || "",
       createdOnStart: searchParams.get("createdOnStart") || "",
       createdOnEnd: searchParams.get("createdOnEnd") || "",
-      weighBridge: searchParams.get("weighBridge") || null,
-      virtualYardIn: searchParams.get("virtualYardIn") || null,
-      fuelAvailability: searchParams.get("fuelAvailability") || null,
-      geoFencing: searchParams.get("geoFencing") || null,
+      weighBridge: parseCheckboxParam("weighBridge"),
+      virtualYardIn: parseCheckboxParam("virtualYardIn"),
+      fuelAvailability: parseCheckboxParam("fuelAvailability"),
+      geoFencing: parseCheckboxParam("geoFencing"),
     };
   }, [searchParams]);
 

@@ -499,7 +499,7 @@ const getWarehouseList = async (req, res) => {
         "w.material_type_id",
         "mtm.material_types as material_type_name",
         "w.warehouse_name1",
-        knex.raw("0 as geo_fencing"),
+        "w.geo_fencing",
         "w.weigh_bridge_availability",
         "w.virtual_yard_in",
         "w.gatepass_system_available",
@@ -648,6 +648,11 @@ const getWarehouseList = async (req, res) => {
             "w.fuel_availability",
             req.query.fuelAvailability === "true"
           );
+        }
+
+        // ✅ Add geo fencing filter to count query (was missing)
+        if (req.query.geoFencing !== undefined) {
+          builder.where("w.geo_fencing", req.query.geoFencing === "true");
         }
 
         // DATE FILTERS FOR COUNT
@@ -1447,6 +1452,13 @@ const createWarehouse = async (req, res) => {
     // ✅ FIX: Use currentTimestamp for all inserts to ensure consistent timestamps
     // This ensures the warehouse, user, and approval_flow_trans all have matching timestamps
     // which is required for the getWarehouseList JOIN to work correctly
+
+    // ✅ Determine geo_fencing flag based on subLocations data
+    const hasGeoFencing =
+      subLocations &&
+      subLocations.length > 0 &&
+      subLocations.some((sl) => sl.coordinates && sl.coordinates.length > 0);
+
     // Insert warehouse basic information
     await trx("warehouse_basic_information").insert({
       warehouse_id: warehouseId,
@@ -1467,6 +1479,7 @@ const createWarehouse = async (req, res) => {
       driver_waiting_area: facilities?.driverWaitingArea || false,
       gate_in_checklist_auth: facilities?.gateInChecklistAuth || false,
       gate_out_checklist_auth: facilities?.gateOutChecklistAuth || false,
+      geo_fencing: hasGeoFencing, // ✅ Set geo_fencing based on subLocations data
       status: "PENDING", // ✅ FIXED: Set to PENDING (will be updated to ACTIVE after approval)
       created_by: userId,
       created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
@@ -2411,6 +2424,27 @@ const updateWarehouse = async (req, res) => {
           }
         }
       }
+
+      // ✅ UPDATE geo_fencing flag after modifying geofencing data
+      const hasGeoFencingAfterUpdate = await trx(
+        "warehouse_sub_location_header"
+      )
+        .where("warehouse_unique_id", id)
+        .where("status", "ACTIVE")
+        .count("* as count")
+        .first();
+
+      await trx("warehouse_basic_information")
+        .where("warehouse_id", id)
+        .update({
+          geo_fencing: hasGeoFencingAfterUpdate.count > 0,
+          updated_by: userId,
+          updated_at: knex.fn.now(),
+        });
+
+      console.log(
+        `✅ Geo-fencing flag updated: ${hasGeoFencingAfterUpdate.count > 0}`
+      );
     }
 
     // Commit transaction
