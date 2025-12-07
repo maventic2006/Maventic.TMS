@@ -47,6 +47,18 @@ import AddressContactsTab from "./components/AddressContactsTab";
 import ServiceableAreaTab from "./components/ServiceableAreaTab";
 import DocumentsTab from "./components/DocumentsTab";
 
+// Import mapping components
+import ConsignorMappingTab from "./components/ConsignorMappingTab";
+import ConsignorMappingViewTab from "./components/ConsignorMappingViewTab";
+import VehicleMappingTab from "./components/VehicleMappingTab";
+import VehicleMappingViewTab from "./components/VehicleMappingViewTab";
+import DriverMappingTab from "./components/DriverMappingTab";
+import DriverMappingViewTab from "./components/DriverMappingViewTab";
+import OwnerMappingTab from "./components/OwnerMappingTab";
+import OwnerMappingViewTab from "./components/OwnerMappingViewTab";
+import BlacklistMappingTab from "./components/BlacklistMappingTab";
+import BlacklistMappingViewTab from "./components/BlacklistMappingViewTab";
+
 // Import approval component
 import ApprovalActionBar from "../../components/approval/ApprovalActionBar";
 
@@ -115,26 +127,36 @@ const TransporterDetailsPage = () => {
       id: 4,
       name: "Transporter and Consignor Mapping",
       icon: User,
+      viewComponent: ConsignorMappingViewTab,
+      editComponent: ConsignorMappingTab,
     },
     {
       id: 5,
       name: "Transporter and Vehicle Mapping",
       icon: Caravan,
+      viewComponent: VehicleMappingViewTab,
+      editComponent: VehicleMappingTab,
     },
     {
       id: 6,
       name: "Transporter and Driver Mapping",
       icon: User,
+      viewComponent: DriverMappingViewTab,
+      editComponent: DriverMappingTab,
     },
     {
       id: 7,
       name: "Transporter and Vehicle Owner Mapping",
       icon: User,
+      viewComponent: OwnerMappingViewTab,
+      editComponent: OwnerMappingTab,
     },
     {
       id: 8,
       name: "Blacklist Mapping",
       icon: User,
+      viewComponent: BlacklistMappingViewTab,
+      editComponent: BlacklistMappingTab,
     },
   ];
 
@@ -1144,7 +1166,7 @@ const TransporterDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`text-nowrap group relative px-6 py-4 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-3 ${
+                className={`text-nowrap group relative mx-0.5 px-6 py-4 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-4 ${
                   isActive
                     ? "bg-gradient-to-br from-white via-white to-gray-50 text-[#0D1A33] shadow-lg transform -translate-y-1 scale-105"
                     : "bg-white/5 backdrop-blur-sm text-blue-100/80 hover:bg-white/10 hover:text-white border border-white/10 hover:border-white/20"
@@ -1236,6 +1258,7 @@ const TransporterDetailsPage = () => {
                         }
                         isEditMode={isEditMode}
                         transporterData={selectedTransporter}
+                        transporterId={id}
                       />
                     </div>
                   )}
