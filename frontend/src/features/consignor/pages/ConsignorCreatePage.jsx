@@ -330,7 +330,7 @@ const ConsignorCreatePage = () => {
       const errorMessages = [];
 
       validation.error.issues.forEach((issue) => {
-        const path = issue.path.join(".");
+        const path = Array.isArray(issue.path) ? issue.path.join(".") : "unknown_field";
         if (!errors[path]) {
           errors[path] = issue.message;
           errorMessages.push(issue.message);
@@ -546,8 +546,81 @@ const ConsignorCreatePage = () => {
     }
 
     try {
+      // Extract files from formData (same logic as submit)
+      const files = {};
+      const cleanFormData = { ...formData };
+
+      // Process contacts to extract photo files
+      if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
+        cleanFormData.contacts = cleanFormData.contacts.map((contact, index) => {
+          const cleanContact = { ...contact };
+
+          // Extract photo file if it exists
+          if (cleanContact.photo instanceof File) {
+            files[`contact_${index}_photo`] = cleanContact.photo;
+            cleanContact.photo = null;
+          } else if (typeof cleanContact.photo === "string") {
+            cleanContact.photo = null;
+          }
+
+          // Remove preview URL
+          delete cleanContact.photo_preview;
+
+          return cleanContact;
+        });
+      }
+
+      // Process documents to extract file uploads
+      if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
+        cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
+          const cleanDoc = { ...doc };
+
+          // Map frontend field names to backend field names
+          const mappedDoc = {
+            document_type_id: cleanDoc.documentType || cleanDoc.document_type_id,
+            document_number: cleanDoc.documentNumber || cleanDoc.document_number,
+            valid_from: cleanDoc.validFrom || cleanDoc.valid_from,
+            valid_to: cleanDoc.validTo || cleanDoc.valid_to,
+            country: cleanDoc.country,
+            status: cleanDoc.status !== undefined ? cleanDoc.status : true,
+          };
+
+          // Extract document file if it exists
+          if (cleanDoc.fileUpload instanceof File) {
+            const fileKey = `document_${index}_file`;
+            files[fileKey] = cleanDoc.fileUpload;
+            mappedDoc.fileKey = fileKey;
+          } else {
+            mappedDoc.fileKey = null;
+          }
+
+          return mappedDoc;
+        });
+      }
+
+      // Process general section to extract NDA/MSA files
+      if (cleanFormData.general) {
+        // Handle NDA upload
+        if (cleanFormData.general.upload_nda instanceof File) {
+          files["general_nda"] = cleanFormData.general.upload_nda;
+          cleanFormData.general.upload_nda = null;
+        } else if (typeof cleanFormData.general.upload_nda === "string") {
+          cleanFormData.general.upload_nda = null;
+        }
+
+        // Handle MSA upload
+        if (cleanFormData.general.upload_msa instanceof File) {
+          files["general_msa"] = cleanFormData.general.upload_msa;
+          cleanFormData.general.upload_msa = null;
+        } else if (typeof cleanFormData.general.upload_msa === "string") {
+          cleanFormData.general.upload_msa = null;
+        }
+      }
+
+      console.log("🔍 Save as draft - files to upload:", Object.keys(files));
+
       const result = await dispatch(
-        saveConsignorAsDraft({ consignorData: formData })
+        saveConsignorAsDraft({ consignorData: cleanFormData, files })
       ).unwrap();
 
       dispatch(

@@ -31,6 +31,10 @@ const upload = multer({
   storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max file size
+    fieldSize: 50 * 1024 * 1024, // 50MB max field value size (for large JSON payloads)
+    fieldNameSize: 200, // Max field name size
+    fields: 50, // Max number of non-file fields
+    files: 20, // Max number of file fields
   },
   fileFilter: (req, file, cb) => {
     // Allowed file types

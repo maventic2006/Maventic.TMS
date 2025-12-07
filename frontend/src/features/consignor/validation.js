@@ -125,18 +125,6 @@ export const contactSchema = z.object({
     .min(1, "Role is required")
     .max(50, "Role must not exceed 50 characters"),
 
-  team: z
-    .string()
-    .max(50, "Team must not exceed 50 characters")
-    .optional()
-    .nullable(),
-
-  country_code: z
-    .string()
-    .max(5, "Country code must not exceed 5 characters")
-    .optional()
-    .nullable(),
-
   email: z
     .string()
     .email("Invalid email format")

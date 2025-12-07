@@ -30,7 +30,7 @@ const ThemeTable = ({
   // Handle ESC key to close preview modal
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && previewDocument) {
+      if (event.key === "Escape" && previewDocument) {
         closePreview();
       }
     };
@@ -416,6 +416,9 @@ const ThemeTable = ({
                       }`}
                     >
                       {column.label}
+                      {column.required && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
                     </th>
                   ))}
                   {canRemoveRows && <th className="pb-3 w-12"></th>}
@@ -482,7 +485,10 @@ const ThemeTable = ({
           />
           
           {/* Modal Content */}
-          <div className="relative bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-4 max-h-[95vh] flex flex-col">
+          <div 
+            className="relative bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-4 max-h-[95vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
@@ -495,9 +501,10 @@ const ThemeTable = ({
               </div>
               <button
                 onClick={closePreview}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors z-[60] relative bg-white shadow-lg border border-gray-200"
+                title="Close Preview"
               >
-                <X className="w-6 h-6 text-gray-500" />
+                <X className="w-6 h-6 text-gray-500 hover:text-gray-700" />
               </button>
             </div>
 

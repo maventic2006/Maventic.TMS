@@ -70,6 +70,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       placeholder: "Select Document Type",
       searchable: true,
       width: "min-w-[200px]",
+      required: true,
     },
     {
       key: "documentNumber",
@@ -77,6 +78,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       type: "text",
       placeholder: "Enter document number",
       width: "min-w-[200px]",
+      required: true,
     },
     {
       key: "country",
@@ -92,12 +94,14 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       label: "Valid From",
       type: "date",
       width: "min-w-[200px]",
+      required: true,
     },
     {
       key: "validTo",
       label: "Valid To",
       type: "date",
       width: "min-w-[200px]",
+      required: true,
     },
     {
       key: "fileUpload",
@@ -105,6 +109,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       type: "file",
       width: "min-w-[200px]",
       accept: ".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx",
+      required: true,
     },
   ];
 

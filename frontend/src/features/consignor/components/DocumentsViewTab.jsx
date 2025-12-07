@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   Calendar,
@@ -86,40 +86,94 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
     setSelectedFile(null);
   };
 
-  const handlePreviewDocument = (doc) => {
-    if (doc.fileData && doc.fileType) {
+  const handlePreviewDocument = async (doc) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      
+      // Use documentUniqueId which is the correct field for document lookup
+      // The backend service expects document_unique_id, not document_id
+      const documentId = doc.documentUniqueId || doc.document_unique_id;
+      
+      if (!documentId) {
+        console.error("❌ Document unique ID not found:", doc);
+        alert("Document ID is missing. Cannot preview document.");
+        return;
+      }
+      
+      console.log(`📄 Previewing document: ${documentId} for customer: ${consignor.customer_id}`);
+      console.log('📋 Full document object:', doc);
+      
+      const response = await fetch(
+        `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${documentId}/download`,
+        { credentials: "include" }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const base64String = btoa(
+        new Uint8Array(arrayBuffer).reduce(
+          (data, byte) => data + String.fromCharCode(byte),
+          ""
+        )
+      );
+
+      // Get file type from response headers or determine from file name
+      const contentType = response.headers.get("Content-Type") || 
+        doc.file_type || "application/octet-stream";
+
       setPreviewDocument({
-        fileName: doc.fileName || doc.documentType,
-        fileType: doc.fileType,
-        fileData: doc.fileData,
+        fileName: doc.file_name || doc.document_type || "Document",
+        fileType: contentType,
+        fileData: base64String,
       });
+    } catch (error) {
+      console.error("Error fetching document for preview:", error);
+      alert("Failed to load document for preview");
     }
   };
 
-  const handleDownloadDocument = (doc) => {
-    if (doc.fileData && doc.fileType) {
-      // Convert base64 to blob
-      const byteCharacters = atob(doc.fileData);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+  const handleDownloadDocument = async (doc) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      
+      // Use documentUniqueId which is the correct field for document lookup
+      const documentId = doc.documentUniqueId || doc.document_unique_id;
+      
+      if (!documentId) {
+        console.error("❌ Document unique ID not found:", doc);
+        alert("Document ID is missing. Cannot download document.");
+        return;
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: doc.fileType });
+      
+      console.log(`📥 Downloading document: ${documentId} for customer: ${consignor.customer_id}`);
+      console.log('📋 Full document object:', doc);
+      
+      const response = await fetch(
+        `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${documentId}/download`,
+        { credentials: "include" }
+      );
 
-      // Create download link
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download =
-        doc.fileName ||
-        `${doc.documentType}_${doc.documentNumber}.${
-          doc.fileType.split("/")[1]
-        }`;
+      link.download = doc.file_name || 
+        `${doc.document_type}_${doc.document_number}` ||
+        "document";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      alert("Failed to download document");
     }
   };
 
@@ -127,13 +181,30 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
     setPreviewDocument(null);
   };
 
+  // ESC key support for modal
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === "Escape") {
+        closePreview();
+      }
+    };
+
+    if (previewDocument) {
+      document.addEventListener("keydown", handleEscKey);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscKey);
+    };
+  }, [previewDocument]);
+
   // Mock statistics
   const totalDocs = documents.length;
   const expiredDocs = documents.filter((doc) =>
-    isExpired(doc.expiryDate)
+    isExpired(doc.valid_to)
   ).length;
   const expiringSoonDocs = documents.filter((doc) =>
-    isExpiringSoon(doc.expiryDate)
+    isExpiringSoon(doc.valid_to)
   ).length;
 
   return (
@@ -195,8 +266,8 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {documents.map((doc, index) => {
-            const expired = isExpired(doc.expiryDate);
-            const expiringSoon = isExpiringSoon(doc.expiryDate);
+            const expired = isExpired(doc.valid_to);
+            const expiringSoon = isExpiringSoon(doc.valid_to);
 
             return (
               <div
@@ -211,10 +282,10 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
                     </div>
                     <div>
                       <h4 className="font-semibold text-[#0D1A33] text-sm">
-                        {doc.documentType || "Untitled Document"}
+                        {doc.document_type || doc.documentType || "Untitled Document"}
                       </h4>
                       <p className="text-xs text-[#6B7280] mt-1">
-                        {doc.documentNumber || "No document number"}
+                        {doc.document_number || doc.documentNumber || "No document number"}
                       </p>
                     </div>
                   </div>
@@ -241,43 +312,47 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
                 {/* Document Details */}
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <InfoField 
-                    label="Issued Date" 
-                    value={doc.issuedDate ? formatDate(doc.issuedDate) : "Not specified"} 
+                    label="Valid From" 
+                    value={doc.valid_from ? formatDate(doc.valid_from) : "Not specified"} 
                   />
                   <InfoField 
-                    label="Expiry Date" 
-                    value={doc.expiryDate ? formatDate(doc.expiryDate) : "Not specified"} 
+                    label="Valid To" 
+                    value={doc.valid_to ? formatDate(doc.valid_to) : "Not specified"} 
                   />
                   <InfoField 
                     label="Country" 
                     value={doc.country || "Not specified"} 
                   />
                   <InfoField 
-                    label="Issuing Authority" 
-                    value={doc.issuingAuthority || "Not specified"} 
+                    label="Status" 
+                    value={doc.status || "Not specified"} 
+                  />
+                  <InfoField 
+                    label="File Name" 
+                    value={doc.file_name || "Not available"} 
+                  />
+                  <InfoField 
+                    label="File Type" 
+                    value={doc.file_type || "Not available"} 
                   />
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2 pt-4 border-t border-[#F3F4F6]">
-                  {doc.fileData && (
-                    <>
-                      <button
-                        onClick={() => handlePreviewDocument(doc)}
-                        className="flex items-center gap-2 px-3 py-1.5 text-[#6366F1] border border-[#6366F1] rounded-lg hover:bg-[#6366F1] hover:text-white transition-colors text-xs font-medium"
-                      >
-                        <Eye className="h-3 w-3" />
-                        Preview
-                      </button>
-                      <button
-                        onClick={() => handleDownloadDocument(doc)}
-                        className="flex items-center gap-2 px-3 py-1.5 text-[#10B981] border border-[#10B981] rounded-lg hover:bg-[#10B981] hover:text-white transition-colors text-xs font-medium"
-                      >
-                        <Download className="h-3 w-3" />
-                        Download
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handlePreviewDocument(doc)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-[#6366F1] border border-[#6366F1] rounded-lg hover:bg-[#6366F1] hover:text-white transition-colors text-xs font-medium"
+                  >
+                    <Eye className="h-3 w-3" />
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => handleDownloadDocument(doc)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-[#10B981] border border-[#10B981] rounded-lg hover:bg-[#10B981] hover:text-white transition-colors text-xs font-medium"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download
+                  </button>
                 </div>
 
                 {/* Remarks */}

@@ -10,6 +10,43 @@ const {
   consignorUpdateSchema,
   listQuerySchema,
 } = require("../validation/consignorValidation");
+const { uploadFile } = require("../utils/storageService");
+
+// ============================================================================
+// UTILITY FUNCTIONS FOR DATE FORMATTING
+// ============================================================================
+
+/**
+ * Convert ISO date string to MySQL date format (YYYY-MM-DD)
+ * Handles both date-only and datetime strings with timezone
+ * 
+ * @param {string} isoDateString - ISO date/datetime string (e.g., '2025-09-21T18:30:00.000Z')
+ * @returns {string|null} MySQL date format (YYYY-MM-DD) or null if invalid
+ */
+const formatDateForMySQL = (isoDateString) => {
+  if (!isoDateString || isoDateString === "") return null;
+  
+  try {
+    const date = new Date(isoDateString);
+    if (isNaN(date.getTime())) {
+      console.warn(`[Consignor Service] Invalid date string: ${isoDateString}`);
+      return null;
+    }
+
+    // Convert to MySQL date format (YYYY-MM-DD)
+    // Use UTC to maintain consistency
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+
+    const result = `${year}-${month}-${day}`;
+    console.log(`[Consignor Service] Date converted: ${isoDateString} → ${result}`);
+    return result;
+  } catch (error) {
+    console.warn(`[Consignor Service] Error formatting date ${isoDateString}:`, error.message);
+    return null;
+  }
+};
 
 /**
  * Transform frontend field names to backend field names
@@ -137,6 +174,44 @@ const isCompanyCodeUnique = async (companyCode, excludeCustomerId = null) => {
 
   const existing = await query.first();
   return !existing;
+};
+
+/**
+ * Generate suggested alternative company codes
+ */
+const generateCompanyCodeSuggestions = async (baseCode, maxSuggestions = 3) => {
+  const suggestions = [];
+  const cleanCode = baseCode.toUpperCase().trim();
+  
+  // Try adding numbers 1-9
+  for (let i = 1; i <= 9 && suggestions.length < maxSuggestions; i++) {
+    const suggestion = `${cleanCode}${i}`;
+    if (await isCompanyCodeUnique(suggestion)) {
+      suggestions.push(suggestion);
+    }
+  }
+  
+  // Try adding two-digit numbers 10-20
+  for (let i = 10; i <= 20 && suggestions.length < maxSuggestions; i++) {
+    const suggestion = `${cleanCode}${i}`;
+    if (await isCompanyCodeUnique(suggestion)) {
+      suggestions.push(suggestion);
+    }
+  }
+  
+  // Try alternative patterns if still no suggestions
+  if (suggestions.length < maxSuggestions) {
+    const patterns = ['_01', '_02', '_03', 'INC', 'LTD', 'CO'];
+    for (const pattern of patterns) {
+      if (suggestions.length >= maxSuggestions) break;
+      const suggestion = `${cleanCode}${pattern}`;
+      if (await isCompanyCodeUnique(suggestion)) {
+        suggestions.push(suggestion);
+      }
+    }
+  }
+  
+  return suggestions;
 };
 
 /**
@@ -307,7 +382,7 @@ const generateApprovalFlowId = async (trx = knex) => {
 //   }
 // };
 
-const getConsignorList = async (queryParams) => {
+const getConsignorList = async (queryParams, user = null) => {
   try {
     // Validate query parameters
     const { error, value } = listQuerySchema.validate(queryParams);
@@ -333,6 +408,9 @@ const getConsignorList = async (queryParams) => {
       createdOnStart,
       createdOnEnd,
     } = value;
+
+    // Get user ID for draft filtering
+    const currentUserId = user?.user_id;
 
     // Ensure numeric paging values (safe defaults)
     const pageNum = parseInt(page, 10) || 1;
@@ -365,7 +443,29 @@ const getConsignorList = async (queryParams) => {
     }
 
     if (status) {
-      baseQuery.where("consignor_basic_information.status", status);
+      if (status === "SAVE_AS_DRAFT") {
+        // 🔒 DRAFT PRIVACY: Only show drafts created by current user
+        if (currentUserId) {
+          baseQuery.where("consignor_basic_information.status", status)
+                   .where("consignor_basic_information.created_by", currentUserId);
+        } else {
+          // If no user context, exclude all drafts
+          baseQuery.where("consignor_basic_information.status", "!=", "SAVE_AS_DRAFT");
+        }
+      } else {
+        // For non-draft statuses, show all records regardless of creator
+        baseQuery.where("consignor_basic_information.status", status);
+      }
+    } else {
+      // 🔒 DEFAULT BEHAVIOR: Hide all drafts if no specific status filter is applied
+      // This ensures drafts don't appear in general lists unless explicitly requested
+      baseQuery.where(function() {
+        this.where("consignor_basic_information.status", "!=", "SAVE_AS_DRAFT")
+            .orWhere(function() {
+              this.where("consignor_basic_information.status", "SAVE_AS_DRAFT")
+                  .where("consignor_basic_information.created_by", currentUserId || "");
+            });
+      });
     }
 
     if (industry_type) {
@@ -463,6 +563,7 @@ const getConsignorList = async (queryParams) => {
         "consignor_basic_information.approved_date",
         "consignor_basic_information.created_at",
         "consignor_basic_information.updated_at",
+        "consignor_basic_information.created_by", // Add created_by for draft filtering verification
         // Use approval flow data if available, fallback to table columns
         knex.raw(
           "COALESCE(aft.actioned_by_name, aft.pending_with_name, consignor_basic_information.approved_by) as approver_name"
@@ -781,8 +882,11 @@ const getConsignorById = async (customerId) => {
         approved_by: consignor.approved_by,
         approved_date: consignor.approved_date,
         upload_nda: consignor.upload_nda, // NDA document ID
+        nda_validity: consignor.nda_validity, // NDA validity date
         upload_msa: consignor.upload_msa, // MSA document ID
+        msa_validity: consignor.msa_validity, // MSA validity date
         status: consignor.status,
+        created_by: consignor.created_by, // Add creator field for permission checks
       },
       // Map database column names to frontend field names
       contacts: contacts.map((c) => ({
@@ -806,19 +910,39 @@ const getConsignorById = async (customerId) => {
           }
         : null,
       documents: documents.map((d) => ({
-        documentUniqueId: d.document_unique_id, // Keep unique ID for reference
-        documentType: d.document_type_id, // Frontend expects "documentType" with ID
-        documentTypeName: d.document_type, // Document name from master table
-        documentNumber: d.document_number,
+        // ✅ PRIMARY IDENTIFIERS
+        document_unique_id: d.document_unique_id, // Backend snake_case format for DocumentsViewTab
+        documentUniqueId: d.document_unique_id, // Legacy camelCase format for backward compatibility
+        
+        // ✅ DOCUMENT TYPE INFORMATION  
+        document_type_id: d.document_type_id, // Backend field for edit mode
+        document_type: d.document_type, // Backend field for view mode (DocumentsViewTab expects this)
+        documentType: d.document_type_id, // Legacy frontend field
+        documentTypeName: d.document_type, // Human readable name
+        
+        // ✅ DOCUMENT IDENTIFICATION
+        document_number: d.document_number, // Backend field for DocumentsViewTab
+        documentNumber: d.document_number, // Legacy frontend field
         referenceNumber: "", // Not stored in database, return empty
         country: "", // Not stored in database, return empty
-        validFrom: d.valid_from,
-        validTo: d.valid_to,
-        documentId: d.document_id, // Document upload ID for download
-        fileName: d.file_name || "", // Original file name
-        fileType: d.file_type || "", // MIME type
+        
+        // ✅ VALIDITY DATES - DUAL FORMAT FOR COMPLETE COMPATIBILITY
+        valid_from: d.valid_from, // Backend snake_case format for DocumentsViewTab
+        valid_to: d.valid_to, // Backend snake_case format for DocumentsViewTab  
+        validFrom: d.valid_from, // Legacy camelCase format for edit mode
+        validTo: d.valid_to, // Legacy camelCase format for edit mode
+        
+        // ✅ FILE INFORMATION - DUAL FORMAT
+        file_name: d.file_name || "", // Backend snake_case format for DocumentsViewTab
+        file_type: d.file_type || "", // Backend snake_case format for DocumentsViewTab
+        fileName: d.file_name || "", // Legacy camelCase format for edit mode
+        fileType: d.file_type || "", // Legacy camelCase format for edit mode
+        
+        // ✅ METADATA
+        document_id: d.document_id, // Backend document upload ID for download
+        documentId: d.document_id, // Legacy field name
         fileData: "", // Not returned for security (use download endpoint)
-        status: d.status === "ACTIVE", // Convert to boolean for frontend
+        status: d.status === "ACTIVE" ? "ACTIVE" : d.status || "DRAFT", // Return actual status string for DocumentsViewTab
       })),
       userApprovalStatus: userApprovalStatus, // Add at top level for Redux to destructure
     };
@@ -902,13 +1026,24 @@ const createConsignor = async (payload, files, userId) => {
         organization.company_code
       );
       if (!isCompanyUnique) {
+        // Generate suggested alternative company codes
+        const suggestions = await generateCompanyCodeSuggestions(
+          organization.company_code,
+          3
+        );
+        
+        let message = "Company code already exists. Please use a different code.";
+        if (suggestions && Array.isArray(suggestions) && suggestions.length > 0) {
+          message += ` Suggested alternatives: ${suggestions.join(", ")}`;
+        }
+        
         throw {
           type: "VALIDATION_ERROR",
           details: [
             {
               field: "organization.company_code",
-              message:
-                "Company code already exists. Please use a different code.",
+              message: message,
+              suggestions: suggestions,
             },
           ],
           message: "Duplicate company code",
@@ -929,7 +1064,7 @@ const createConsignor = async (payload, files, userId) => {
         website_url: general.website_url || null,
         name_on_po: general.name_on_po || null,
         approved_by: general.approved_by || null,
-        approved_date: general.approved_date || null,
+        approved_date: formatDateForMySQL(general.approved_date), // ✅ Format date for MySQL
         status: "PENDING", // Set to PENDING when consignor is created (awaiting approval)
         created_by: userId,
         updated_by: userId,
@@ -1016,6 +1151,26 @@ const createConsignor = async (payload, files, userId) => {
             `  Uploading file: ${file.originalname}, size: ${file.size}, type: ${file.mimetype}`
           );
 
+          // ✅ VALIDATION: Ensure document_type_id is present
+          const documentTypeId = doc.document_type_id || doc.documentTypeId || doc.documentType;
+          
+          console.log(`  - document_type_id: ${doc.document_type_id}`);
+          console.log(`  - documentTypeId: ${doc.documentTypeId}`);
+          console.log(`  - documentType: ${doc.documentType}`);
+          console.log(`  - Final documentTypeId: ${documentTypeId}`);
+          
+          if (!documentTypeId) {
+            console.error(`❌ MISSING DOCUMENT TYPE ID for document ${i + 1}`);
+            throw {
+              type: "VALIDATION_ERROR",
+              details: [{
+                field: `documents[${i}].document_type_id`,
+                message: "Document type ID is required for file uploads",
+              }],
+              message: "Document validation failed - missing document type",
+            };
+          }
+
           // Convert file buffer to base64
           const base64Data = file.buffer.toString("base64");
 
@@ -1032,16 +1187,16 @@ const createConsignor = async (payload, files, userId) => {
             updated_at: knex.fn.now(),
           });
 
-          // Insert into consignor_documents table
+          // Insert into consignor_documents table with proper date formatting
           const documentUniqueId = await generateDocumentId(trx);
           await trx("consignor_documents").insert({
             document_unique_id: documentUniqueId,
             document_id: documentUploadId,
             customer_id: general.customer_id,
-            document_type_id: doc.document_type_id,
+            document_type_id: documentTypeId, // ✅ FIXED: Use validated documentTypeId
             document_number: doc.document_number || null,
-            valid_from: doc.valid_from,
-            valid_to: doc.valid_to || null,
+            valid_from: formatDateForMySQL(doc.valid_from), // ✅ Format date for MySQL
+            valid_to: formatDateForMySQL(doc.valid_to), // ✅ Format date for MySQL
             status: "ACTIVE",
             created_by: userId,
             updated_by: userId,
@@ -1572,11 +1727,40 @@ const updateConsignor = async (
 
     // 4. Handle document updates if provided
     if (documents && files) {
-      for (const doc of documents) {
+      console.log(`\n📄 ===== PROCESSING ${documents.length} DOCUMENTS =====`);
+      
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
         const file = files[doc.fileKey];
 
+        console.log(`\n📄 Document ${i + 1}:`);
+        console.log(`  - FileKey: ${doc.fileKey}`);
+        console.log(`  - File exists: ${!!file}`);
+        console.log(`  - document_type_id: ${doc.document_type_id}`);
+        console.log(`  - documentTypeId: ${doc.documentTypeId}`);
+        console.log(`  - documentType: ${doc.documentType}`);
+        console.log(`  - Raw doc object:`, JSON.stringify(doc, null, 2));
+
         if (file) {
+          // ✅ VALIDATION: Ensure document_type_id is present
+          const documentTypeId = doc.document_type_id || doc.documentTypeId || doc.documentType;
+          
+          if (!documentTypeId) {
+            console.error(`❌ MISSING DOCUMENT TYPE ID for document ${i + 1}`);
+            throw {
+              type: "VALIDATION_ERROR",
+              details: [{
+                field: `documents[${i}].document_type_id`,
+                message: "Document type ID is required for file uploads",
+              }],
+              message: "Document validation failed - missing document type",
+            };
+          }
+
+          console.log(`  ✅ Using document_type_id: ${documentTypeId}`);
+
           const uploadResult = await uploadFile(file, "consignor/documents");
+          console.log(`  ✅ File uploaded: ${uploadResult.filePath}`);
 
           const documentUploadId = await generateDocumentUploadId(trx);
           await trx("document_upload").insert({
@@ -1595,10 +1779,10 @@ const updateConsignor = async (
             document_unique_id: documentUniqueId,
             document_id: documentUploadId,
             customer_id: customerId,
-            document_type_id: doc.document_type_id || doc.documentTypeId,
+            document_type_id: documentTypeId, // ✅ FIXED: Use validated documentTypeId
             document_number: doc.document_number || doc.documentNumber || null,
-            valid_from: doc.valid_from || doc.validFrom,
-            valid_to: doc.valid_to || doc.validTo || null,
+            valid_from: formatDateForMySQL(doc.valid_from || doc.validFrom), // ✅ Format date for MySQL
+            valid_to: formatDateForMySQL(doc.valid_to || doc.validTo), // ✅ Format date for MySQL
             status: "ACTIVE",
             created_by: userId,
             updated_by: userId,
@@ -1858,4 +2042,11 @@ module.exports = {
   getContactPhoto,
   getGeneralDocument,
   getConsignorWarehouses,
+  // Utility functions for testing
+  isCompanyCodeUnique,
+  generateCompanyCodeSuggestions,
+  // Helper functions for save-as-draft
+  generateDocumentId,
+  generateDocumentUploadId,
+  generateContactId,
 };

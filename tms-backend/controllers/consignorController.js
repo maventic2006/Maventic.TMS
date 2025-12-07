@@ -14,6 +14,100 @@ const {
   getPaginationMeta,
 } = require("../utils/responseHelper");
 
+// ============================================================================
+// UTILITY FUNCTIONS FOR DATE FORMATTING
+// ============================================================================
+
+/**
+ * Convert ISO date string to MySQL date format (YYYY-MM-DD)
+ * Handles both date-only and datetime strings with timezone
+ * 
+ * @param {string} isoDateString - ISO date/datetime string (e.g., '2025-09-21T18:30:00.000Z')
+ * @returns {string|null} MySQL date format (YYYY-MM-DD) or null if invalid
+ */
+const formatDateForMySQL = (isoDateString) => {
+  if (!isoDateString || isoDateString === "") return null;
+  
+  try {
+    const date = new Date(isoDateString);
+    if (isNaN(date.getTime())) {
+      console.warn(`[Consignor Controller] Invalid date string: ${isoDateString}`);
+      return null;
+    }
+
+    // Convert to MySQL date format (YYYY-MM-DD)
+    // Use UTC to maintain consistency
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+
+    const result = `${year}-${month}-${day}`;
+    console.log(`[Consignor Controller] Date converted: ${isoDateString} → ${result}`);
+    return result;
+  } catch (error) {
+    console.warn(`[Consignor Controller] Error formatting date ${isoDateString}:`, error.message);
+    return null;
+  }
+};
+
+/**
+ * Validate and map document type (name to ID) to ensure foreign key constraints are satisfied
+ * 
+ * @param {string} documentTypeInput - Can be document name (e.g., "Any License") or ID (e.g., "DTCONS006")
+ * @returns {Promise<string>} - Valid document_type_id for CONSIGNOR
+ */
+const validateAndMapDocumentType = async (documentTypeInput) => {
+  if (!documentTypeInput) {
+    throw new Error("Document type is required");
+  }
+
+  const knex = require("../config/database");
+
+  try {
+    // First, check if the input is already a valid document_type_id for CONSIGNOR
+    const validId = await knex("doc_type_configuration")
+      .where("document_type_id", documentTypeInput)
+      .where("user_type", "CONSIGNOR")
+      .where("status", "ACTIVE")
+      .first();
+
+    if (validId) {
+      console.log(`✅ Document type ID is valid: ${documentTypeInput}`);
+      return documentTypeInput;
+    }
+
+    // If not a valid ID, try to find by document name
+    console.log(`🔍 Looking up document type by name: "${documentTypeInput}"`);
+    const documentMapping = await knex("doc_type_configuration as dtc")
+      .leftJoin("document_name_master as dnm", "dtc.doc_name_master_id", "dnm.doc_name_master_id")
+      .select("dtc.document_type_id")
+      .where("dnm.document_name", documentTypeInput)
+      .where("dtc.user_type", "CONSIGNOR")
+      .where("dtc.status", "ACTIVE")
+      .first();
+
+    if (documentMapping) {
+      console.log(`✅ Mapped document name "${documentTypeInput}" → "${documentMapping.document_type_id}"`);
+      return documentMapping.document_type_id;
+    }
+
+    // If still not found, get all valid consignor document types for error message
+    const validTypes = await knex("doc_type_configuration as dtc")
+      .leftJoin("document_name_master as dnm", "dtc.doc_name_master_id", "dnm.doc_name_master_id")
+      .select("dtc.document_type_id", "dnm.document_name")
+      .where("dtc.user_type", "CONSIGNOR")
+      .where("dtc.status", "ACTIVE")
+      .orderBy("dnm.document_name");
+
+    const validTypesList = validTypes.map(t => `"${t.document_name}" (${t.document_type_id})`).join(", ");
+    
+    throw new Error(`Invalid document type: "${documentTypeInput}". Valid CONSIGNOR document types are: ${validTypesList}`);
+  } catch (error) {
+    console.error("❌ Document type validation error:", error.message);
+    throw error;
+  }
+};
+
 /**
  * GET /api/consignors
  * Get list of consignors with filters, search, and pagination
@@ -22,8 +116,10 @@ const getConsignors = async (req, res) => {
   try {
     console.log("\n📋 ===== GET CONSIGNORS LIST =====");
     console.log("Query params:", req.query);
+    console.log("User ID:", req.user.user_id);
 
-    const result = await consignorService.getConsignorList(req.query);
+    // Pass user context along with query parameters
+    const result = await consignorService.getConsignorList(req.query, req.user);
 
     console.log(`✅ Retrieved ${result.data.length} consignors`);
     return successResponse(res, result.data, result.meta, 200);
@@ -451,6 +547,40 @@ const saveConsignorAsDraft = async (req, res) => {
       }
     }
 
+    // 🔍 DETAILED FILE DEBUG LOGGING FOR DRAFT
+    console.log("\n🔍 ===== DRAFT FILE DEBUG INFO =====");
+    console.log("req.files type:", typeof req.files);
+    console.log("req.files is array?", Array.isArray(req.files));
+    console.log("req.files exists?", !!req.files);
+
+    if (req.files) {
+      if (Array.isArray(req.files)) {
+        console.log(`📎 Total files received: ${req.files.length}`);
+        req.files.forEach((file, idx) => {
+          console.log(`  File ${idx}:`);
+          console.log(`    - fieldname: ${file.fieldname}`);
+          console.log(`    - originalname: ${file.originalname}`);
+          console.log(`    - mimetype: ${file.mimetype}`);
+          console.log(`    - size: ${file.size} bytes`);
+          console.log(`    - buffer exists: ${!!file.buffer}`);
+        });
+      } else {
+        console.log("req.files keys:", Object.keys(req.files));
+      }
+    } else {
+      console.log("❌ No files received!");
+    }
+    console.log("===========================\n");
+
+    // Convert array to object keyed by fieldname for easier access
+    const filesObj = {};
+    if (req.files && Array.isArray(req.files)) {
+      req.files.forEach((file) => {
+        filesObj[file.fieldname] = file;
+      });
+      console.log("📦 Files object created with keys:", Object.keys(filesObj));
+    }
+
     // Extract customer_name from general section (frontend sends nested structure)
     const customerName =
       payload.general?.customer_name ||
@@ -545,7 +675,7 @@ const saveConsignorAsDraft = async (req, res) => {
         remark: general.remark || null,
         name_on_po: general.name_on_po || null,
         approved_by: general.approved_by || null,
-        approved_date: general.approved_date || null,
+        approved_date: formatDateForMySQL(general.approved_date), // ✅ Format date for MySQL
         upload_nda: null, // File uploads handled separately
         upload_msa: null, // File uploads handled separately
         address_id: general.address_id || null,
@@ -650,6 +780,179 @@ const saveConsignorAsDraft = async (req, res) => {
         }
       }
 
+      // ===== HANDLE FILE UPLOADS FOR DRAFT =====
+      console.log("📄 Processing files for draft...");
+
+      // Import helper functions from consignorService
+      const { generateDocumentId, generateDocumentUploadId } = require("../services/consignorService");
+
+      // Handle document uploads
+      if (payload.documents && Array.isArray(payload.documents)) {
+        console.log(`📄 Processing ${payload.documents.length} documents with files...`);
+
+        for (let i = 0; i < payload.documents.length; i++) {
+          const doc = payload.documents[i];
+          console.log(
+            `  Document ${i}: fileKey=${doc.fileKey}, has file=${!!filesObj[
+              doc.fileKey
+            ]}`
+          );
+
+          // Find corresponding file if fileKey is specified
+          if (doc.fileKey && filesObj[doc.fileKey]) {
+            const file = filesObj[doc.fileKey];
+            console.log(
+              `  Uploading file: ${file.originalname}, size: ${file.size}, type: ${file.mimetype}`
+            );
+
+            const fileBase64 = file.buffer.toString("base64");
+            const documentUploadId = await generateDocumentUploadId(trx);
+
+            // Insert document upload record (FIXED FIELD NAMES)
+            await trx("document_upload").insert({
+              document_id: documentUploadId,
+              file_name: file.originalname, // ✅ Use file_name instead of document_name
+              file_type: file.mimetype, // ✅ Use file_type instead of document_type
+              file_xstring_value: fileBase64, // ✅ Use file_xstring_value instead of document_data
+              created_by: req.user.user_id,
+              updated_by: req.user.user_id,
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+
+            // ✅ VALIDATION: Ensure document_type_id is present and valid
+            const documentTypeInput = doc.document_type_id || doc.documentType || doc.documentTypeId;
+            
+            if (!documentTypeInput) {
+              console.error(`❌ MISSING DOCUMENT TYPE ID for document in saveConsignorAsDraft`);
+              throw new Error("Document type ID is required for file uploads");
+            }
+
+            // ✅ VALIDATE AND MAP document type (name → ID)
+            const validDocumentTypeId = await validateAndMapDocumentType(documentTypeInput);
+            console.log(`  ✅ Using validated document_type_id: ${validDocumentTypeId}`);
+
+            // Insert document record linking to consignor (FIXED RELATIONSHIP - REMOVED INVALID COUNTRY FIELD)
+            const documentUniqueId = await generateDocumentId(trx);
+            await trx("consignor_documents").insert({
+              document_unique_id: documentUniqueId,
+              document_id: documentUploadId, // ✅ This should match document_upload.document_id
+              customer_id: customerId,
+              document_type_id: validDocumentTypeId, // ✅ FIXED: Use validated documentTypeId
+              document_number: doc.document_number,
+              valid_from: formatDateForMySQL(doc.valid_from), // ✅ Format date for MySQL
+              valid_to: formatDateForMySQL(doc.valid_to), // ✅ Format date for MySQL
+              status: doc.status !== undefined ? (doc.status ? "ACTIVE" : "INACTIVE") : "ACTIVE",
+              created_by: req.user.user_id,
+              created_at: new Date(),
+              updated_by: req.user.user_id,
+              updated_at: new Date(),
+            });
+          }
+        }
+      }
+
+      // Handle NDA/MSA uploads
+      if (payload.general) {
+        // Handle NDA upload
+        if (filesObj["general_nda"]) {
+          const ndaFile = filesObj["general_nda"];
+          console.log(`📄 Uploading NDA: ${ndaFile.originalname}`);
+
+          const ndaBase64 = ndaFile.buffer.toString("base64");
+          const ndaDocId = await generateDocumentUploadId(trx);
+
+          await trx("document_upload").insert({
+            document_id: ndaDocId,
+            file_name: ndaFile.originalname, // ✅ Use file_name
+            file_type: ndaFile.mimetype, // ✅ Use file_type
+            file_xstring_value: ndaBase64, // ✅ Use file_xstring_value
+            created_by: req.user.user_id,
+            updated_by: req.user.user_id,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+
+          // Update consignor basic info with NDA reference
+          await trx("consignor_basic_information")
+            .where("customer_id", customerId)
+            .update({ 
+              upload_nda: ndaDocId,
+              updated_at: new Date(),
+              updated_by: req.user.user_id
+            });
+        }
+
+        // Handle MSA upload
+        if (filesObj["general_msa"]) {
+          const msaFile = filesObj["general_msa"];
+          console.log(`📄 Uploading MSA: ${msaFile.originalname}`);
+
+          const msaBase64 = msaFile.buffer.toString("base64");
+          const msaDocId = await generateDocumentUploadId(trx);
+
+          await trx("document_upload").insert({
+            document_id: msaDocId,
+            file_name: msaFile.originalname, // ✅ Use file_name
+            file_type: msaFile.mimetype, // ✅ Use file_type
+            file_xstring_value: msaBase64, // ✅ Use file_xstring_value
+            created_by: req.user.user_id,
+            updated_by: req.user.user_id,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+
+          // Update consignor basic info with MSA reference
+          await trx("consignor_basic_information")
+            .where("customer_id", customerId)
+            .update({ 
+              upload_msa: msaDocId,
+              updated_at: new Date(),
+              updated_by: req.user.user_id
+            });
+        }
+      }
+
+      // Handle contact photo uploads
+      if (payload.contacts && Array.isArray(payload.contacts)) {
+        for (let i = 0; i < payload.contacts.length; i++) {
+          const contact = payload.contacts[i];
+          const photoKey = `contact_${i}_photo`;
+
+          if (filesObj[photoKey]) {
+            const photoFile = filesObj[photoKey];
+            console.log(`📷 Uploading contact ${i} photo: ${photoFile.originalname}`);
+
+            const photoBase64 = photoFile.buffer.toString("base64");
+            const photoDocId = await generateDocumentUploadId(trx);
+
+            await trx("document_upload").insert({
+              document_id: photoDocId,
+              file_name: photoFile.originalname, // ✅ Use file_name
+              file_type: photoFile.mimetype, // ✅ Use file_type
+              file_xstring_value: photoBase64, // ✅ Use file_xstring_value
+              created_by: req.user.user_id,
+              updated_by: req.user.user_id,
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+
+            // Update contact with photo reference
+            const contactName = contact.contact_name || contact.name;
+            if (contactName) {
+              await trx("contact")
+                .where("customer_id", customerId)
+                .andWhere("contact_name", contactName)
+                .update({ 
+                  contact_photo: photoDocId,
+                  updated_at: new Date(),
+                  updated_by: req.user.user_id
+                });
+            }
+          }
+        }
+      }
+
       return { customerId };
     });
 
@@ -692,6 +995,37 @@ const updateConsignorDraft = async (req, res) => {
     }
 
     console.log("📦 Payload structure:", JSON.stringify(payload, null, 2));
+
+    // 🔍 DETAILED FILE DEBUG LOGGING
+    console.log("\n🔍 ===== FILE DEBUG INFO =====");
+    console.log("req.files type:", typeof req.files);
+    console.log("req.files is array?", Array.isArray(req.files));
+    console.log("req.files exists?", !!req.files);
+
+    if (req.files) {
+      if (Array.isArray(req.files)) {
+        console.log(`📁 Files array: ${req.files.length} files`);
+        req.files.forEach((file, index) => {
+          console.log(`  ${index}: fieldname=${file.fieldname}, originalname=${file.originalname}`);
+          console.log(`    - size: ${file.size} bytes`);
+          console.log(`    - buffer exists: ${!!file.buffer}`);
+        });
+      } else {
+        console.log("req.files keys:", Object.keys(req.files));
+      }
+    } else {
+      console.log("❌ No files received!");
+    }
+    console.log("===========================\n");
+
+    // Convert array to object keyed by fieldname for easier access
+    const filesObj = {};
+    if (req.files && Array.isArray(req.files)) {
+      req.files.forEach((file) => {
+        filesObj[file.fieldname] = file;
+      });
+      console.log("📦 Files object created with keys:", Object.keys(filesObj));
+    }
 
     // Extract data from nested structure (frontend sends { general, contacts, organization, documents })
     const generalData = payload.general || payload;
@@ -749,6 +1083,22 @@ const updateConsignorDraft = async (req, res) => {
         updateFields.remark = generalData.remark;
       if (generalData.name_on_po !== undefined)
         updateFields.name_on_po = generalData.name_on_po;
+      
+      // ✅ ADD MISSING DATE FIELDS WITH PROPER MySQL DATE FORMATTING
+      if (generalData.approved_by !== undefined)
+        updateFields.approved_by = generalData.approved_by;
+      if (generalData.approved_date !== undefined) {
+        updateFields.approved_date = formatDateForMySQL(generalData.approved_date);
+        console.log("🗓️ Formatted approved_date:", generalData.approved_date, "→", updateFields.approved_date);
+      }
+      if (generalData.nda_validity !== undefined) {
+        updateFields.nda_validity = formatDateForMySQL(generalData.nda_validity);
+        console.log("🗓️ Formatted nda_validity:", generalData.nda_validity, "→", updateFields.nda_validity);
+      }
+      if (generalData.msa_validity !== undefined) {
+        updateFields.msa_validity = formatDateForMySQL(generalData.msa_validity);
+        console.log("🗓️ Formatted msa_validity:", generalData.msa_validity, "→", updateFields.msa_validity);
+      }
 
       updateFields.updated_by = req.user.user_id;
       updateFields.updated_at = new Date();
@@ -879,76 +1229,102 @@ const updateConsignorDraft = async (req, res) => {
         }
       }
 
-      // Update documents if provided (metadata updates only, no file uploads in draft mode)
-      const documentsData = payload.documents || [];
-      if (
-        documentsData &&
-        Array.isArray(documentsData) &&
-        documentsData.length > 0
-      ) {
-        console.log(
-          `📄 Processing ${documentsData.length} document metadata updates...`
-        );
+      // ===== HANDLE FILE UPLOADS FOR DRAFT UPDATE (SAME AS SAVE AS DRAFT) =====
+      console.log("📄 Processing files for draft update...");
 
-        // Helper to generate unique document ID
-        const generateDocumentId = async () => {
-          let attempts = 0;
-          const maxAttempts = 10;
+      // Import helper functions from consignorService
+      const { generateDocumentId, generateDocumentUploadId } = require("../services/consignorService");
 
-          // Get all existing document IDs to find the max numeric value
-          const existingIds = await trx("consignor_documents").select(
-            "document_unique_id"
-          );
+      // Handle document uploads (same logic as saveConsignorAsDraft)
+      if (payload.documents && Array.isArray(payload.documents)) {
+        console.log(`📄 Processing ${payload.documents.length} documents with files...`);
 
-          let maxNumericId = 0;
-          existingIds.forEach((row) => {
-            const match = row.document_unique_id?.match(/^CDOC(\d+)$/);
-            if (match) {
-              const numericPart = parseInt(match[1], 10);
-              if (numericPart > maxNumericId) {
-                maxNumericId = numericPart;
-              }
-            }
-          });
-
-          while (attempts < maxAttempts) {
-            const nextId = maxNumericId + 1 + attempts;
-            const newId = `CDOC${nextId.toString().padStart(5, "0")}`;
-
-            const exists = await trx("consignor_documents")
-              .where({ document_unique_id: newId })
-              .first();
-
-            if (!exists) {
-              return newId;
-            }
-            attempts++;
-          }
-
-          throw new Error("Failed to generate unique document ID");
-        };
-
-        // Delete existing documents for this consignor
+        // Delete existing documents for this consignor before re-inserting
         await trx("consignor_documents").where({ customer_id: id }).del();
 
-        // Re-insert documents with updated metadata
-        for (const doc of documentsData) {
-          // Only process if document has required fields
-          if (doc.documentType && doc.documentNumber && doc.validFrom) {
+        for (let i = 0; i < payload.documents.length; i++) {
+          const doc = payload.documents[i];
+          console.log(
+            `  Document ${i}: fileKey=${doc.fileKey}, has file=${!!filesObj[
+              doc.fileKey
+            ]}`
+          );
+
+          // Find corresponding file if fileKey is specified
+          if (doc.fileKey && filesObj[doc.fileKey]) {
+            const file = filesObj[doc.fileKey];
+            console.log(
+              `  Uploading file: ${file.originalname}, size: ${file.size}, type: ${file.mimetype}`
+            );
+
+            const fileBase64 = file.buffer.toString("base64");
+            const documentUploadId = await generateDocumentUploadId(trx);
+
+            // Insert document upload record (same as saveConsignorAsDraft)
+            await trx("document_upload").insert({
+              document_id: documentUploadId,
+              file_name: file.originalname,
+              file_type: file.mimetype,
+              file_xstring_value: fileBase64,
+              created_by: req.user.user_id,
+              updated_by: req.user.user_id,
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+
+            // ✅ VALIDATION: Ensure document_type_id is present and valid
+            const documentTypeInput = doc.document_type_id || doc.documentType || doc.documentTypeId;
+            
+            if (!documentTypeInput) {
+              console.error(`❌ MISSING DOCUMENT TYPE ID for document in updateConsignorDraft`);
+              throw new Error("Document type ID is required for file uploads");
+            }
+
+            // ✅ VALIDATE AND MAP document type (name → ID)
+            const validDocumentTypeId = await validateAndMapDocumentType(documentTypeInput);
+            console.log(`  ✅ Using validated document_type_id: ${validDocumentTypeId}`);
+
+            // Insert document record linking to consignor with proper date formatting
+            const documentUniqueId = await generateDocumentId(trx);
+            await trx("consignor_documents").insert({
+              document_unique_id: documentUniqueId,
+              document_id: documentUploadId,
+              customer_id: id,
+              document_type_id: validDocumentTypeId,
+              document_number: doc.document_number,
+              valid_from: formatDateForMySQL(doc.valid_from), // ✅ Format date for MySQL
+              valid_to: formatDateForMySQL(doc.valid_to), // ✅ Format date for MySQL
+              status: doc.status !== undefined ? (doc.status ? "ACTIVE" : "INACTIVE") : "ACTIVE",
+              created_by: req.user.user_id,
+              created_at: new Date(),
+              updated_by: req.user.user_id,
+              updated_at: new Date(),
+            });
+          } else {
+            // Handle documents without file uploads (metadata only)
+            // ✅ VALIDATION: Ensure document_type_id is present and valid
+            const documentTypeInput = doc.document_type_id || doc.documentType || doc.documentTypeId;
+            
+            if (!documentTypeInput) {
+              console.error(`❌ MISSING DOCUMENT TYPE ID for document in updateConsignorDraft`);
+              throw new Error("Document type ID is required for document updates");
+            }
+
+            // ✅ VALIDATE AND MAP document type (name → ID)
+            const validDocumentTypeId = await validateAndMapDocumentType(documentTypeInput);
+            console.log(`  ✅ Using validated document_type_id: ${validDocumentTypeId}`);
+
             const documentUniqueId = await generateDocumentId();
 
-            // Build insert object conditionally
+            // Insert document metadata only with proper date formatting
             const insertData = {
               document_unique_id: documentUniqueId,
               customer_id: id,
-              document_type_id: doc.documentType, // Frontend sends "documentType"
-              document_number: doc.documentNumber,
-              valid_from: doc.validFrom,
-              valid_to: doc.validTo || null,
-              status:
-                doc.status === true || doc.status === "ACTIVE"
-                  ? "ACTIVE"
-                  : "DRAFT",
+              document_type_id: validDocumentTypeId,
+              document_number: doc.document_number,
+              valid_from: formatDateForMySQL(doc.valid_from), // ✅ Format date for MySQL
+              valid_to: formatDateForMySQL(doc.valid_to), // ✅ Format date for MySQL
+              status: doc.status === true || doc.status === "ACTIVE" ? "ACTIVE" : "DRAFT",
               created_by: req.user.user_id,
               created_at: new Date(),
               updated_by: req.user.user_id,
@@ -963,8 +1339,109 @@ const updateConsignorDraft = async (req, res) => {
             await trx("consignor_documents").insert(insertData);
 
             console.log(
-              `  ✅ Document saved: ${documentUniqueId} (${doc.documentType} - ${doc.documentNumber})`
+              `  ✅ Document saved: ${documentUniqueId} (${validDocumentTypeId} - ${doc.document_number})`
             );
+          }
+        }
+      }
+
+      // Handle NDA/MSA uploads (same logic as saveConsignorAsDraft)
+      if (payload.general) {
+        // Handle NDA upload
+        if (filesObj["general_nda"]) {
+          const ndaFile = filesObj["general_nda"];
+          console.log(`📄 Uploading NDA: ${ndaFile.originalname}`);
+
+          const ndaBase64 = ndaFile.buffer.toString("base64");
+          const ndaDocId = await generateDocumentUploadId(trx);
+
+          await trx("document_upload").insert({
+            document_id: ndaDocId,
+            file_name: ndaFile.originalname,
+            file_type: ndaFile.mimetype,
+            file_xstring_value: ndaBase64,
+            created_by: req.user.user_id,
+            updated_by: req.user.user_id,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+
+          // Update general table with NDA document reference
+          await trx("consignor_basic_information")
+            .where({ customer_id: id })
+            .update({
+              upload_nda: ndaDocId,
+              updated_by: req.user.user_id,
+              updated_at: new Date(),
+            });
+        }
+
+        // Handle MSA upload
+        if (filesObj["general_msa"]) {
+          const msaFile = filesObj["general_msa"];
+          console.log(`📄 Uploading MSA: ${msaFile.originalname}`);
+
+          const msaBase64 = msaFile.buffer.toString("base64");
+          const msaDocId = await generateDocumentUploadId(trx);
+
+          await trx("document_upload").insert({
+            document_id: msaDocId,
+            file_name: msaFile.originalname,
+            file_type: msaFile.mimetype,
+            file_xstring_value: msaBase64,
+            created_by: req.user.user_id,
+            updated_by: req.user.user_id,
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+
+          // Update general table with MSA document reference
+          await trx("consignor_basic_information")
+            .where({ customer_id: id })
+            .update({
+              upload_msa: msaDocId,
+              updated_by: req.user.user_id,
+              updated_at: new Date(),
+            });
+        }
+      }
+
+      // Handle contact photo uploads (same logic as saveConsignorAsDraft)
+      if (payload.contacts && Array.isArray(payload.contacts)) {
+        for (let i = 0; i < payload.contacts.length; i++) {
+          const contact = payload.contacts[i];
+          const photoKey = `contact_${i}_photo`;
+
+          if (filesObj[photoKey]) {
+            const photoFile = filesObj[photoKey];
+            console.log(`📷 Uploading contact ${i} photo: ${photoFile.originalname}`);
+
+            const photoBase64 = photoFile.buffer.toString("base64");
+            const photoDocId = await generateDocumentUploadId(trx);
+
+            await trx("document_upload").insert({
+              document_id: photoDocId,
+              file_name: photoFile.originalname,
+              file_type: photoFile.mimetype,
+              file_xstring_value: photoBase64,
+              created_by: req.user.user_id,
+              updated_by: req.user.user_id,
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+
+            // Update contact with photo reference
+            const contactName = contact.contact_name || contact.name;
+            if (contactName) {
+              await trx("contact")
+                .where("customer_id", id)
+                .andWhere("contact_name", contactName)
+                .update({ 
+                  contact_photo: photoDocId,
+                  updated_at: new Date(),
+                  updated_by: req.user.user_id
+                });
+            }
           }
         }
       }
@@ -1064,10 +1541,51 @@ const submitConsignorFromDraft = async (req, res) => {
 
     console.log("📦 Payload for submit:", JSON.stringify(payload, null, 2));
 
+    // ========================================
+    // SANITIZE PAYLOAD FOR VALIDATION
+    // ========================================
+    
+    /**
+     * Sanitize payload to fix validation issues:
+     * 1. Convert organization.status from "Active" to "ACTIVE"
+     * 2. Convert document.status from "ACTIVE" to boolean true
+     * 3. Remove backend-only fields that cause validation errors
+     */
+    const sanitizePayload = (data) => {
+      const sanitized = JSON.parse(JSON.stringify(data)); // Deep clone
+      
+      // Fix organization status
+      if (sanitized.organization && sanitized.organization.status) {
+        const orgStatus = sanitized.organization.status;
+        if (orgStatus === "Active") sanitized.organization.status = "ACTIVE";
+        if (orgStatus === "Inactive") sanitized.organization.status = "INACTIVE";
+      }
+      
+      // Fix document status and remove backend fields
+      if (sanitized.documents && Array.isArray(sanitized.documents)) {
+        sanitized.documents = sanitized.documents.map(doc => {
+          const cleanDoc = { ...doc };
+          
+          // Convert status to boolean
+          if (cleanDoc.status === "ACTIVE") cleanDoc.status = true;
+          if (cleanDoc.status === "INACTIVE") cleanDoc.status = false;
+          
+          // Keep backend fields for now (they're allowed in schema)
+          
+          return cleanDoc;
+        });
+      }
+      
+      return sanitized;
+    };
+
+    const sanitizedPayload = sanitizePayload(payload);
+    console.log("🧹 Sanitized payload for validation:", JSON.stringify(sanitizedPayload, null, 2));
+
     // Update using service (which has full validation)
     const consignor = await consignorService.updateConsignor(
       id,
-      payload,
+      sanitizedPayload,
       filesObj,
       req.user.user_id
     );

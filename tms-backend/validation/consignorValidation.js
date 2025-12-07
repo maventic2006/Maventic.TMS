@@ -152,21 +152,21 @@ const generalSchema = Joi.object({
 
 /**
  * Contact Section Validation Schema
- * Updated to match frontend ContactTab field names
+ * Updated to match current database column limits and frontend field names
  */
 const contactSchema = Joi.object({
   contact_id: Joi.string().trim().max(10).optional().allow(null, "").messages({
     "string.max": "Contact ID cannot exceed 10 characters",
   }),
 
-  // Frontend uses 'designation' instead of 'contact_designation'
+  // Frontend uses 'designation', maps to 'contact_designation' (VARCHAR(50))
   designation: Joi.string().trim().max(50).required().messages({
     "string.empty": "Designation is required",
     "string.max": "Designation cannot exceed 50 characters",
     "any.required": "Designation is required",
   }),
 
-  // Frontend uses 'name' instead of 'contact_name'
+  // Frontend uses 'name', maps to 'contact_name' (VARCHAR(100))
   name: Joi.string().trim().min(2).max(100).required().messages({
     "string.empty": "Contact name is required",
     "string.min": "Contact name must be at least 2 characters long",
@@ -174,29 +174,31 @@ const contactSchema = Joi.object({
     "any.required": "Contact name is required",
   }),
 
-  // Frontend uses 'number' instead of 'contact_number'
+  // Frontend uses 'number', maps to 'contact_number' (VARCHAR(15))
   number: Joi.string()
     .trim()
+    .max(15)
     .pattern(/^\+?[1-9]\d{6,14}$/)
     .required()
     .messages({
       "string.empty": "Phone number is required",
-      "string.pattern.base":
-        "Please enter a valid phone number with 7-15 digits",
+      "string.max": "Phone number cannot exceed 15 characters",
+      "string.pattern.base": "Please enter a valid phone number with 7-15 digits",
       "any.required": "Phone number is required",
     }),
 
   country_code: Joi.string()
     .trim()
+    .max(10)
     .pattern(/^\+[1-9]\d{0,3}$/)
     .optional()
     .allow(null, "")
     .messages({
-      "string.pattern.base":
-        "Please enter a valid country code (e.g., +1, +91)",
+      "string.max": "Country code cannot exceed 10 characters",
+      "string.pattern.base": "Please enter a valid country code (e.g., +1, +91)",
     }),
 
-  // Frontend uses 'email' instead of 'email_id'
+  // Frontend uses 'email', maps to 'email_id' (VARCHAR(100))
   email: Joi.string()
     .trim()
     .email()
@@ -211,23 +213,23 @@ const contactSchema = Joi.object({
   linkedin_link: Joi.string()
     .trim()
     .uri()
-    .max(200)
+    .max(500)
     .optional()
     .allow(null, "")
     .messages({
       "string.uri": "Please enter a valid LinkedIn URL",
-      "string.max": "LinkedIn URL cannot exceed 200 characters",
+      "string.max": "LinkedIn URL cannot exceed 500 characters",
     }),
 
-  // Frontend uses 'team' instead of 'contact_team'
-  team: Joi.string().trim().max(20).optional().allow(null, "").messages({
-    "string.max": "Team name cannot exceed 20 characters",
+  // Frontend uses 'team', maps to 'contact_team' (VARCHAR(100) - increased)
+  team: Joi.string().trim().max(100).optional().allow(null, "").messages({
+    "string.max": "Team name cannot exceed 100 characters",
   }),
 
-  // Frontend uses 'role' instead of 'contact_role'
-  role: Joi.string().trim().max(40).required().messages({
+  // Frontend uses 'role', maps to 'contact_role' (VARCHAR(100) - increased)
+  role: Joi.string().trim().max(100).required().messages({
     "string.empty": "Role is required",
-    "string.max": "Role cannot exceed 40 characters",
+    "string.max": "Role cannot exceed 100 characters",
     "any.required": "Role is required",
   }),
 
@@ -278,16 +280,17 @@ const contactSchema = Joi.object({
 
 /**
  * Organization Section Validation Schema
- * Updated to require array of states for business_area
+ * Updated to match database schema: company_code (VARCHAR(20)), business_area (TEXT/JSON)
  */
 const organizationSchema = Joi.object({
+  // Maps to 'company_code' (VARCHAR(20))
   company_code: Joi.string().trim().max(20).required().messages({
     "string.empty": "Company code is required",
     "string.max": "Company code cannot exceed 20 characters",
     "any.required": "Company code is required",
   }),
 
-  // Updated: business_area now MUST be an array of state names
+  // Maps to 'business_area' (TEXT - JSON array of state names)
   business_area: Joi.array()
     .items(
       Joi.string().trim().min(2).max(50).messages({
@@ -410,9 +413,16 @@ const documentSchema = Joi.object({
     "string.max": "Country cannot exceed 50 characters",
   }),
 
-  status: Joi.boolean().optional().default(true).messages({
-    "boolean.base": "Status must be a boolean value",
-  }),
+  status: Joi.alternatives()
+    .try(
+      Joi.boolean(),
+      Joi.string().valid("ACTIVE", "INACTIVE", "Active", "Inactive")
+    )
+    .optional()
+    .default(true)
+    .messages({
+      "alternatives.types": "Status must be a boolean value or valid status string (ACTIVE/INACTIVE)",
+    }),
 
   fileKey: Joi.string().optional().allow(null, "").messages({
     "string.base": "File key must be a string",
@@ -429,6 +439,15 @@ const documentSchema = Joi.object({
 
   fileData: Joi.string().optional().allow(null, "").messages({
     "string.base": "File data must be a string",
+  }),
+
+  // Backend fields added during processing (should be allowed)
+  _backend_document_id: Joi.string().optional().allow(null, "").messages({
+    "string.base": "Backend document ID must be a string",
+  }),
+
+  _backend_document_unique_id: Joi.string().optional().allow(null, "").messages({
+    "string.base": "Backend document unique ID must be a string",
   }),
 });
 

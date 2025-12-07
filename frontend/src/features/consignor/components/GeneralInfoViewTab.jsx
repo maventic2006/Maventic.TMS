@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Building2,
   Globe,
@@ -11,9 +11,12 @@ import {
   Hash,
   DollarSign,
   Briefcase,
+  Eye,
+  X,
 } from "lucide-react";
 
 const GeneralInfoViewTab = ({ consignor }) => {
+  const [previewDocument, setPreviewDocument] = useState(null);
   // Format date
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -28,6 +31,97 @@ const GeneralInfoViewTab = ({ consignor }) => {
       return "N/A";
     }
   };
+
+  const handlePreviewNDA = async () => {
+    if (!consignor?.upload_nda) return;
+    
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const response = await fetch(
+        `${apiUrl}/api/consignors/${consignor.customer_id}/general/nda/download`,
+        { credentials: "include" }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const base64String = btoa(
+        new Uint8Array(arrayBuffer).reduce(
+          (data, byte) => data + String.fromCharCode(byte),
+          ""
+        )
+      );
+
+      const contentType = response.headers.get("Content-Type") || "application/pdf";
+
+      setPreviewDocument({
+        fileName: `NDA_${consignor.customer_id}`,
+        fileType: contentType,
+        fileData: base64String,
+      });
+    } catch (error) {
+      console.error("Error fetching NDA for preview:", error);
+      alert("Failed to load NDA document for preview");
+    }
+  };
+
+  const handlePreviewMSA = async () => {
+    if (!consignor?.upload_msa) return;
+    
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const response = await fetch(
+        `${apiUrl}/api/consignors/${consignor.customer_id}/general/msa/download`,
+        { credentials: "include" }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const base64String = btoa(
+        new Uint8Array(arrayBuffer).reduce(
+          (data, byte) => data + String.fromCharCode(byte),
+          ""
+        )
+      );
+
+      const contentType = response.headers.get("Content-Type") || "application/pdf";
+
+      setPreviewDocument({
+        fileName: `MSA_${consignor.customer_id}`,
+        fileType: contentType,
+        fileData: base64String,
+      });
+    } catch (error) {
+      console.error("Error fetching MSA for preview:", error);
+      alert("Failed to load MSA document for preview");
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
+  };
+
+  // ESC key support for modal
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === "Escape") {
+        closePreview();
+      }
+    };
+
+    if (previewDocument) {
+      document.addEventListener("keydown", handleEscKey);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscKey);
+    };
+  }, [previewDocument]);
 
   return (
     <div className="space-y-6 p-6">
@@ -170,41 +264,50 @@ const GeneralInfoViewTab = ({ consignor }) => {
                     </span>
                   </div>
                 )}
-                <button
-                  className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
-                  onClick={async () => {
-                    try {
-                      const apiUrl =
-                        import.meta.env.VITE_API_URL || "http://localhost:5000";
-                      const response = await fetch(
-                        `${apiUrl}/api/consignors/${consignor.customer_id}/general/nda/download`,
-                        { credentials: "include" }
-                      );
-
-                      if (!response.ok) {
-                        throw new Error(
-                          `HTTP error! status: ${response.status}`
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePreviewNDA}
+                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 transition-colors"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    Preview NDA
+                  </button>
+                  <button
+                    className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
+                    onClick={async () => {
+                      try {
+                        const apiUrl =
+                          import.meta.env.VITE_API_URL || "http://localhost:5000";
+                        const response = await fetch(
+                          `${apiUrl}/api/consignors/${consignor.customer_id}/general/nda/download`,
+                          { credentials: "include" }
                         );
-                      }
 
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `NDA_${consignor.customer_id}`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      window.URL.revokeObjectURL(url);
-                    } catch (error) {
-                      console.error("Error downloading NDA:", error);
-                      alert("Failed to download NDA document");
-                    }
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  Download NDA
-                </button>
+                        if (!response.ok) {
+                          throw new Error(
+                            `HTTP error! status: ${response.status}`
+                          );
+                        }
+
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `NDA_${consignor.customer_id}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                      } catch (error) {
+                        console.error("Error downloading NDA:", error);
+                        alert("Failed to download NDA document");
+                      }
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Download NDA
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex items-center text-xs text-gray-400">
@@ -236,41 +339,50 @@ const GeneralInfoViewTab = ({ consignor }) => {
                     </span>
                   </div>
                 )}
-                <button
-                  className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
-                  onClick={async () => {
-                    try {
-                      const apiUrl =
-                        import.meta.env.VITE_API_URL || "http://localhost:5000";
-                      const response = await fetch(
-                        `${apiUrl}/api/consignors/${consignor.customer_id}/general/msa/download`,
-                        { credentials: "include" }
-                      );
-
-                      if (!response.ok) {
-                        throw new Error(
-                          `HTTP error! status: ${response.status}`
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePreviewMSA}
+                    className="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 transition-colors"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    Preview MSA
+                  </button>
+                  <button
+                    className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
+                    onClick={async () => {
+                      try {
+                        const apiUrl =
+                          import.meta.env.VITE_API_URL || "http://localhost:5000";
+                        const response = await fetch(
+                          `${apiUrl}/api/consignors/${consignor.customer_id}/general/msa/download`,
+                          { credentials: "include" }
                         );
-                      }
 
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `MSA_${consignor.customer_id}`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      window.URL.revokeObjectURL(url);
-                    } catch (error) {
-                      console.error("Error downloading MSA:", error);
-                      alert("Failed to download MSA document");
-                    }
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  Download MSA
-                </button>
+                        if (!response.ok) {
+                          throw new Error(
+                            `HTTP error! status: ${response.status}`
+                          );
+                        }
+
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `MSA_${consignor.customer_id}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                      } catch (error) {
+                        console.error("Error downloading MSA:", error);
+                        alert("Failed to download MSA document");
+                      }
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Download MSA
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex items-center text-xs text-gray-400">
@@ -350,6 +462,68 @@ const GeneralInfoViewTab = ({ consignor }) => {
           </div>
         </div>
       </div>
+
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#E0E7FF] rounded-lg">
+                  <FileText className="h-5 w-5 text-[#6366F1]" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {previewDocument.fileName}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-4">
+              {previewDocument.fileType?.startsWith("image/") ? (
+                <img
+                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  alt={previewDocument.fileName}
+                  className="max-w-full h-auto mx-auto"
+                />
+              ) : previewDocument.fileType === "application/pdf" ? (
+                <iframe
+                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  className="w-full h-[600px] border-0"
+                  title={previewDocument.fileName}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    You can still download the file
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={closePreview}
+                className="px-6 py-2.5 border border-[#E5E7EB] text-[#4A5568] rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -56,9 +56,14 @@ const ConsignorDetailsPage = () => {
   const dispatch = useDispatch();
 
   const { user, role } = useSelector((state) => state.auth);
-  const { currentConsignor, isFetching, isUpdating, error } = useSelector(
-    (state) => state.consignor
-  );
+  const { 
+    currentConsignor, 
+    isFetching, 
+    isUpdating, 
+    isUpdatingDraft,
+    isSubmittingDraft,
+    error 
+  } = useSelector((state) => state.consignor);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -135,24 +140,91 @@ const ConsignorDetailsPage = () => {
       console.log("📋 ===== CONSIGNOR DETAILS PAGE DEBUG =====");
       console.log("currentConsignor from Redux:", currentConsignor);
 
-      // Transform currentConsignor data into nested structure expected by edit components
-      // Extract contacts, organization, documents from currentConsignor
-      const { contacts, organization, documents, ...generalFields } =
-        currentConsignor;
+      // The Redux slice already flattened the backend response 
+      // Backend returns: { general: {...}, contacts: [...], documents: [...] }
+      // Redux flattens to: { ...general, contacts: [...], documents: [...] }
+      // We need to reconstruct the nested structure for edit components
 
-      // Create nested formData structure
+      const { 
+        contacts, 
+        organization, 
+        documents, 
+        userApprovalStatus, 
+        ...generalFields 
+      } = currentConsignor;
+
+      // 🔄 MAP BACKEND CONTACT FIELDS TO FRONTEND FIELD NAMES
+      const mappedContacts = (contacts || []).map(contact => ({
+        // Map backend field names to frontend field names expected by ContactTab
+        contact_id: contact.contact_id,
+        designation: contact.contact_designation || contact.designation || "",
+        name: contact.contact_name || contact.name || "",
+        number: contact.contact_number || contact.number || "",
+        photo: contact.contact_photo || contact.photo || null,
+        role: contact.contact_role || contact.role || "",
+        email: contact.email_id || contact.email || "",
+        linkedin_link: contact.linkedin_link || "",
+        status: contact.status || "ACTIVE",
+        // Add backend-specific fields for download functionality
+        _backend_photo_id: contact.contact_photo,
+        _backend_number: contact.contact_number,
+        _backend_name: contact.contact_name,
+        // 📸 ADD EXISTING PHOTO PREVIEW FOR THEMETABLE
+        photo_preview: contact.contact_photo ? 
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${currentConsignor.customer_id}/contacts/${contact.contact_id}/photo` : 
+          null,
+        // Add metadata for ThemeTable to recognize existing files
+        fileName: contact.contact_photo ? `${contact.contact_name || 'Contact'}_Photo` : "",
+        fileType: contact.contact_photo ? "image/jpeg" : "", // Assume JPEG for contact photos
+        fileData: null // ThemeTable expects this for preview mode
+      }));
+
+      // 🔄 MAP BACKEND DOCUMENT FIELDS TO FRONTEND FIELD NAMES
+      const mappedDocuments = (documents || []).map(document => ({
+        // Map backend field names to frontend field names expected by DocumentsTab
+        documentType: document.document_type || document.documentType || "",
+        documentNumber: document.document_number || document.documentNumber || "",
+        referenceNumber: document.reference_number || document.referenceNumber || "",
+        country: document.country || "",
+        validFrom: document.valid_from || document.validFrom || "",
+        validTo: document.valid_to || document.validTo || "",
+        status: document.status || true,
+        fileName: document.file_name || document.fileName || "",
+        fileType: document.file_type || document.fileType || "",
+        fileData: "",
+        fileUpload: null,
+        documentProvider: document.document_provider || document.documentProvider || "",
+        premiumAmount: document.premium_amount || document.premiumAmount || 0,
+        remarks: document.remarks || "",
+        // Keep original backend fields for reference
+        _backend_document_id: document.document_id,
+        _backend_document_unique_id: document.document_unique_id
+      }));
+
+      // Create proper nested formData structure with field mapping
       const transformedData = {
-        general: generalFields,
-        contacts: contacts || [],
+        general: generalFields, // All general fields (customer_name, upload_nda, upload_msa, approved_date, etc.)
+        contacts: mappedContacts,
         organization: organization || {
           company_code: "",
           business_area: "",
           status: "ACTIVE",
         },
-        documents: documents || [],
+        documents: mappedDocuments,
       };
 
-      console.log("📋 Transformed data for edit mode:", transformedData);
+      console.log("📋 Transformed data for edit mode:");
+      console.log("  general:", transformedData.general);
+      console.log("  ✅ approved_date:", transformedData.general?.approved_date);
+      console.log("  contacts (mapped):", transformedData.contacts);
+      console.log("  ✅ First contact phone:", transformedData.contacts[0]?.number);
+      console.log("  ✅ First contact photo:", transformedData.contacts[0]?.photo);
+      console.log("  organization:", transformedData.organization);
+      console.log("  documents (mapped):", transformedData.documents);
+      console.log("  ✅ First document country:", transformedData.documents[0]?.country);
+      console.log("  ✅ First document validFrom:", transformedData.documents[0]?.validFrom);
+      console.log("🔍 NDA Document ID:", transformedData.general?.upload_nda);
+      console.log("🔍 MSA Document ID:", transformedData.general?.upload_msa);
       console.log("==========================================");
 
       setEditFormData(transformedData);
@@ -197,9 +269,9 @@ const ConsignorDetailsPage = () => {
   // Check if current user is the creator of this consignor
   // Use String() to ensure type consistency in comparison
   const isCreator =
-    currentConsignor?.createdBy &&
+    currentConsignor?.created_by &&
     user?.user_id &&
-    String(currentConsignor.createdBy) === String(user.user_id);
+    String(currentConsignor.created_by) === String(user.user_id);
 
   // Check if current user is an approver
   // Check both role and user_type_id for Product Owner detection
@@ -215,12 +287,12 @@ const ConsignorDetailsPage = () => {
   console.log("  Current User Type ID:", user?.user_type_id);
   console.log(
     "  Consignor Created By:",
-    currentConsignor?.createdBy,
-    typeof currentConsignor?.createdBy
+    currentConsignor?.created_by,
+    typeof currentConsignor?.created_by
   );
   console.log(
     "  String Comparison:",
-    String(currentConsignor?.createdBy),
+    String(currentConsignor?.created_by),
     "===",
     String(user?.user_id)
   );
@@ -427,47 +499,79 @@ const ConsignorDetailsPage = () => {
       const files = {};
       const cleanFormData = { ...editFormData };
 
-      // Process contacts to extract photo files
+      // Process contacts to extract photo files but KEEP frontend field names
       if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
         cleanFormData.contacts = cleanFormData.contacts.map(
           (contact, index) => {
-            const cleanContact = { ...contact };
+            // ✅ KEEP Frontend field names for validation (backend expects these)
+            const cleanContact = {
+              contact_id: contact.contact_id || null,
+              designation: contact.designation || "",
+              name: contact.name || "",
+              number: contact.number || "",
+              email: contact.email || "",
+              linkedin_link: contact.linkedin_link || "",
+              team: contact.team || "",
+              role: contact.role || "",
+              status: contact.status || "ACTIVE",
+              // Keep existing photo logic
+              photo: contact.photo
+            };
 
             // Extract photo file if it exists
             if (cleanContact.photo instanceof File) {
               files[`contact_${index}_photo`] = cleanContact.photo;
               cleanContact.photo = null;
             } else if (typeof cleanContact.photo === "string") {
-              cleanContact.photo = null;
+              // Keep existing photo ID for update
+              cleanContact.photo = contact._backend_photo_id || cleanContact.photo;
             }
 
-            // Remove preview URL (not needed for backend)
+            // Remove preview URL and frontend-specific fields
             delete cleanContact.photo_preview;
+            delete cleanContact._backend_photo_id;
+            delete cleanContact._backend_number;
+            delete cleanContact._backend_name;
 
             return cleanContact;
           }
         );
       }
 
-      // Process documents to extract file uploads
+      // Process documents to extract file uploads but KEEP frontend field names
       if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
         cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
-          const cleanDoc = { ...doc };
+          // ✅ KEEP Frontend field names for validation (backend expects these)
+          const cleanDoc = {
+            document_unique_id: doc._backend_document_unique_id || null,
+            document_type_id: doc.document_type_id || null, 
+            documentType: doc.documentType || "",
+            documentNumber: doc.documentNumber || "",
+            referenceNumber: doc.referenceNumber || "",
+            country: doc.country || "",
+            validFrom: doc.validFrom || "",
+            validTo: doc.validTo || "",
+            status: doc.status !== undefined ? doc.status : true,
+            fileName: doc.fileName || "",
+            fileType: doc.fileType || "",
+            fileData: doc.fileData || "",
+            document_id: doc._backend_document_id || null
+          };
 
           // Extract document file if it exists
           // Check for File instance OR File-like object (has name, size, type properties)
           const isFileOrFileLike =
-            cleanDoc.fileUpload &&
-            (cleanDoc.fileUpload instanceof File ||
-              cleanDoc.fileUpload instanceof Blob ||
-              (typeof cleanDoc.fileUpload === "object" &&
-                "name" in cleanDoc.fileUpload &&
-                "size" in cleanDoc.fileUpload &&
-                "type" in cleanDoc.fileUpload));
+            doc.fileUpload &&
+            (doc.fileUpload instanceof File ||
+              doc.fileUpload instanceof Blob ||
+              (typeof doc.fileUpload === "object" &&
+                "name" in doc.fileUpload &&
+                "size" in doc.fileUpload &&
+                "type" in doc.fileUpload));
 
           if (isFileOrFileLike) {
             const fileKey = `document_${index}_file`;
-            files[fileKey] = cleanDoc.fileUpload;
+            files[fileKey] = doc.fileUpload;
             // Add fileKey reference for backend
             cleanDoc.fileKey = fileKey;
           } else {
@@ -475,12 +579,22 @@ const ConsignorDetailsPage = () => {
             cleanDoc.fileKey = null;
           }
 
-          // Remove fields not accepted by backend validation
+          // Remove fields not accepted by backend and frontend-specific fields
           delete cleanDoc.fileUpload_preview;
           delete cleanDoc.fileUpload;
           delete cleanDoc.documentProvider; // Not in backend schema
           delete cleanDoc.premiumAmount; // Not in backend schema
           delete cleanDoc.remarks; // Not in backend schema
+          delete cleanDoc._backend_document_id;
+          delete cleanDoc._backend_document_unique_id;
+
+          return cleanDoc;
+          delete cleanDoc.referenceNumber;
+          delete cleanDoc.validFrom;
+          delete cleanDoc.validTo;
+          delete cleanDoc.fileName;
+          delete cleanDoc.fileType;
+          delete cleanDoc.fileData;
 
           return cleanDoc;
         });
@@ -503,6 +617,13 @@ const ConsignorDetailsPage = () => {
         } else if (typeof cleanFormData.general.upload_msa === "string") {
           cleanFormData.general.upload_msa = null;
         }
+
+        // Remove database audit fields not allowed in validation schema
+        delete cleanFormData.general.created_by; // Database audit field, not user input
+        delete cleanFormData.general.updated_by; // Database audit field, not user input  
+        delete cleanFormData.general.created_at; // Database audit field, not user input
+        delete cleanFormData.general.updated_at; // Database audit field, not user input
+        delete cleanFormData.general.consignor_unique_id; // Database primary key, not user input
       }
 
       // Prepare data for backend API (needs nested structure)
@@ -686,29 +807,46 @@ const ConsignorDetailsPage = () => {
       }
       console.log("===========================\n");
 
-      // Process contacts to extract photo files
+      // Process contacts to extract photo files but KEEP frontend field names for validation
       if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
         cleanFormData.contacts = cleanFormData.contacts.map(
           (contact, index) => {
-            const cleanContact = { ...contact };
+            // ✅ KEEP Frontend field names (backend validation expects these)
+            const cleanContact = {
+              contact_id: contact.contact_id || null,
+              designation: contact.designation || "",
+              name: contact.name || "",
+              number: contact.number || "",
+              email: contact.email || "",
+              linkedin_link: contact.linkedin_link || "",
+              team: contact.team || "",
+              role: contact.role || "",
+              status: contact.status || "ACTIVE",
+              // Keep existing photo logic
+              photo: contact.photo
+            };
 
             // Extract photo file if it exists
             if (cleanContact.photo instanceof File) {
               files[`contact_${index}_photo`] = cleanContact.photo;
               cleanContact.photo = null;
             } else if (typeof cleanContact.photo === "string") {
-              cleanContact.photo = null;
+              // Keep existing photo ID for update
+              cleanContact.photo = contact._backend_photo_id || cleanContact.photo;
             }
 
-            // Remove preview URL (not needed for backend)
+            // Remove preview URL and frontend-specific fields
             delete cleanContact.photo_preview;
+            delete cleanContact._backend_photo_id;
+            delete cleanContact._backend_number;
+            delete cleanContact._backend_name;
 
             return cleanContact;
           }
         );
       }
 
-      // Process documents to extract file uploads
+      // Process documents to extract file uploads and map field names (same as saveConsignorAsDraft)
       if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
         cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
           const cleanDoc = { ...doc };
@@ -722,7 +860,19 @@ const ConsignorDetailsPage = () => {
             constructor: cleanDoc.fileUpload?.constructor?.name || "N/A",
             hasNameProp: cleanDoc.fileUpload && "name" in cleanDoc.fileUpload,
             hasSizeProp: cleanDoc.fileUpload && "size" in cleanDoc.fileUpload,
+            documentType: cleanDoc.documentType,
+            documentNumber: cleanDoc.documentNumber,
           });
+
+          // ✅ FIXED: Map frontend field names to backend field names (same as saveConsignorAsDraft)
+          const mappedDoc = {
+            document_type_id: cleanDoc.documentType || cleanDoc.document_type_id,
+            document_number: cleanDoc.documentNumber || cleanDoc.document_number,
+            valid_from: cleanDoc.validFrom || cleanDoc.valid_from,
+            valid_to: cleanDoc.validTo || cleanDoc.valid_to,
+            country: cleanDoc.country,
+            status: cleanDoc.status !== undefined ? cleanDoc.status : true,
+          };
 
           // Extract document file if it exists
           // Check for File instance OR File-like object (has name, size, type properties)
@@ -739,26 +889,24 @@ const ConsignorDetailsPage = () => {
             const fileKey = `document_${index}_file`;
             files[fileKey] = cleanDoc.fileUpload;
             // Add fileKey reference for backend
-            cleanDoc.fileKey = fileKey;
+            mappedDoc.fileKey = fileKey;
             console.log(
               `✅ File extracted: ${fileKey} -> ${cleanDoc.fileUpload.name} (${cleanDoc.fileUpload.constructor.name})`
             );
           } else {
             // If no file uploaded, set fileKey to null
-            cleanDoc.fileKey = null;
+            mappedDoc.fileKey = null;
             console.log(
               `⚠️  No file to extract (fileUpload is ${typeof cleanDoc.fileUpload})`
             );
           }
 
-          // Remove fields not accepted by backend validation
-          delete cleanDoc.fileUpload_preview;
-          delete cleanDoc.fileUpload;
-          delete cleanDoc.documentProvider; // Not in backend schema
-          delete cleanDoc.premiumAmount; // Not in backend schema
-          delete cleanDoc.remarks; // Not in backend schema
+          console.log(`✅ Document mapped:`, {
+            original: { documentType: cleanDoc.documentType, documentNumber: cleanDoc.documentNumber },
+            mapped: { document_type_id: mappedDoc.document_type_id, document_number: mappedDoc.document_number }
+          });
 
-          return cleanDoc;
+          return mappedDoc;
         });
       }
 
@@ -839,22 +987,50 @@ const ConsignorDetailsPage = () => {
       const files = {};
       const cleanFormData = { ...editFormData };
 
-      // Process contacts to extract photo files
+      // Process contacts to extract photo files but KEEP frontend field names for validation
       if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
         cleanFormData.contacts = cleanFormData.contacts.map(
           (contact, index) => {
-            const cleanContact = { ...contact };
+            // ✅ KEEP Frontend field names (backend validation expects these)
+            const cleanContact = {
+              contact_id: contact.contact_id || null,
+              designation: contact.designation || "",
+              name: contact.name || "",
+              number: contact.number || "",
+              email: contact.email || "",
+              linkedin_link: contact.linkedin_link || "",
+              team: contact.team || "",
+              role: contact.role || "",
+              status: contact.status || "ACTIVE",
+              country_code: contact.country_code || "",
+              // Keep existing photo logic
+              photo: contact.photo
+            };
+
+            // Fix contact number field - ensure it's a string (required by validation)
+            if (cleanContact.number === null || cleanContact.number === undefined) {
+              cleanContact.number = ""; // Convert null to empty string to prevent validation error
+            }
+
+            // Ensure country_code is properly handled  
+            if (cleanContact.country_code === null || cleanContact.country_code === undefined) {
+              cleanContact.country_code = ""; // Convert null to empty string
+            }
 
             // Extract photo file if it exists
             if (cleanContact.photo instanceof File) {
               files[`contact_${index}_photo`] = cleanContact.photo;
               cleanContact.photo = null;
             } else if (typeof cleanContact.photo === "string") {
-              cleanContact.photo = null;
+              // ⭐ CRITICAL: Preserve existing photo ID for submit (don't nullify!)
+              cleanContact.photo = contact._backend_photo_id || cleanContact.photo;
             }
 
-            // Remove preview URL (not needed for backend)
+            // Remove preview URL and frontend-specific fields
             delete cleanContact.photo_preview;
+            delete cleanContact._backend_photo_id;
+            delete cleanContact._backend_number;
+            delete cleanContact._backend_name;
 
             return cleanContact;
           }
@@ -893,6 +1069,11 @@ const ConsignorDetailsPage = () => {
           delete cleanDoc.documentProvider; // Not in backend schema
           delete cleanDoc.premiumAmount; // Not in backend schema
           delete cleanDoc.remarks; // Not in backend schema
+          
+          // Remove frontend-only fields that cause validation errors
+          delete cleanDoc.documentUniqueId; // Frontend display field, not allowed in backend
+          delete cleanDoc.documentTypeName; // Frontend display field, not allowed in backend  
+          delete cleanDoc.documentId; // Frontend reference field, not allowed in backend
 
           return cleanDoc;
         });
@@ -915,6 +1096,13 @@ const ConsignorDetailsPage = () => {
         } else if (typeof cleanFormData.general.upload_msa === "string") {
           cleanFormData.general.upload_msa = null;
         }
+
+        // Remove database audit fields not allowed in validation schema
+        delete cleanFormData.general.created_by; // Database audit field, not user input
+        delete cleanFormData.general.updated_by; // Database audit field, not user input  
+        delete cleanFormData.general.created_at; // Database audit field, not user input
+        delete cleanFormData.general.updated_at; // Database audit field, not user input
+        delete cleanFormData.general.consignor_unique_id; // Database primary key, not user input
       }
 
       // Prepare data for backend API (needs nested structure)
