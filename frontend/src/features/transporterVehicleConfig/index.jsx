@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Layout } from "../../components/layout/Layout";
+import TMSHeader from "../../components/layout/TMSHeader";
 import { getPageTheme } from "../../theme.config";
 import { Plus, Edit2, Trash2 } from "lucide-react";
 import ConfigurationFormModal from "./ConfigurationFormModal";
@@ -137,7 +137,11 @@ const TransporterVehicleConfigPage = () => {
   };
 
   return (
-    <Layout>
+    <div
+      className="min-h-screen"
+      style={{ backgroundColor: listTheme.colors.primary.background }}
+    >
+      <TMSHeader theme={listTheme} />
       <div className="p-6">
         {/* Header with Add Button */}
         <div className="flex items-center justify-between mb-6">
@@ -879,7 +883,7 @@ const TransporterVehicleConfigPage = () => {
           </div>
         )}
       </div>
-    </Layout>
+    </div>
   );
 };
 
