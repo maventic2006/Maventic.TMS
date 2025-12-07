@@ -271,9 +271,9 @@ const AppRoutes = () => {
       {/* Unauthorized Access Page */}
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-      {/* Transporter Vehicle Configuration */}
+      {/* Transporter Configuration - Transporter Vehicle Configured Data */}
       <Route
-        path="/configuration/transporter-vehicle-config"
+        path="/transporter-configuration/tv-config-data"
         element={
           <ProtectedRoute roles={["product_owner"]}>
             <TransporterVehicleConfigPage />
