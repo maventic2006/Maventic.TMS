@@ -851,7 +851,7 @@ const WarehouseDetails = () => {
         return;
       }
     }
-    navigate("/warehouse");
+    navigate(-1);
   };
 
   const handleTabChange = (tabId) => {
