@@ -556,9 +556,9 @@ const WarehouseListViewTab = ({ consignor, isEditMode = false }) => {
                         color: theme.colors.text.secondary,
                       }}
                     >
-                      {[warehouse.city, warehouse.state, warehouse.country]
+                      {warehouse ? [warehouse.city, warehouse.state, warehouse.country]
                         .filter(Boolean)
-                        .join(", ") || "Location not specified"}
+                        .join(", ") || "Location not specified" : "Location not specified"}
                     </span>
                   </div>
 

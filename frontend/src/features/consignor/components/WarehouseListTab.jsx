@@ -622,7 +622,7 @@ const WarehouseListTab = ({ consignor, formData, handleInputChange }) => {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <MapPin size={14} style={{ color: theme.colors.text.secondary }} />
                     <span style={{ fontSize: "13px", color: theme.colors.text.secondary }}>
-                      {[warehouse.city, warehouse.state, warehouse.country].filter(Boolean).join(', ') || 'Location not specified'}
+                      {warehouse ? [warehouse.city, warehouse.state, warehouse.country].filter(Boolean).join(', ') || 'Location not specified' : 'Location not specified'}
                     </span>
                   </div>
                   

@@ -42,21 +42,28 @@ const OrganizationTab = ({ formData, setFormData, errors = {} }) => {
             onChange={(e) =>
               handleInputChange("company_code", e.target.value.toUpperCase())
             }
+            maxLength={20}
             className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors uppercase ${
               errors.organization?.company_code
                 ? "border-red-500 focus:border-red-500"
                 : "border-[#E5E7EB] focus:border-[#3B82F6]"
             }`}
-            placeholder="e.g., ACME-MFG-001"
+            placeholder="Company code (max 20 chars)"
           />
-          {errors.organization?.company_code && (
-            <p className="text-sm text-red-500 flex items-center gap-1">
-              ⚠️ {errors.organization.company_code}
-            </p>
-          )}
-          <p className="text-xs text-gray-400 mt-1">
-            Must be uppercase alphanumeric with hyphens (e.g., ABC-123-XYZ)
-          </p>
+          <div className="flex justify-between items-center">
+            {errors.organization?.company_code ? (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors.organization.company_code}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400">
+                Uppercase alphanumeric with hyphens (e.g., ABC-123-XYZ)
+              </p>
+            )}
+            <span className="text-xs text-gray-500">
+              {(formData.organization?.company_code || "").length}/20
+            </span>
+          </div>
         </div>
 
         {/* Business Area - Multi-Select States */}

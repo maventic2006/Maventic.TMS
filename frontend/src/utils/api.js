@@ -32,12 +32,24 @@ if (import.meta.env.NODE_ENV === "development") {
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 seconds (increased from 10s for file uploads and bulk operations)
+  timeout: 30000, // 30 seconds default
   withCredentials: true, // Include cookies in requests
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+// Create a separate instance for file uploads with longer timeout
+export const createFileUploadAPI = (timeoutMs = 120000) => {
+  return axios.create({
+    baseURL: API_BASE_URL,
+    timeout: timeoutMs, // 2 minutes for file uploads by default
+    withCredentials: true,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};
 
 // Request interceptor for debugging
 api.interceptors.request.use(

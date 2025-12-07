@@ -5,6 +5,7 @@
  */
 
 import api from "../utils/api";
+import { createFileUploadAPI } from "../utils/api";
 
 /**
  * Get all consignors with pagination and filters
@@ -296,7 +297,9 @@ export const saveConsignorAsDraft = async (consignorData, files = {}) => {
       }
     });
 
-    const response = await api.post("/consignors/save-draft", formData, {
+    // Use extended timeout API instance for draft saves with files
+    const uploadAPI = createFileUploadAPI(120000); // 2 minutes timeout
+    const response = await uploadAPI.post("/consignors/save-draft", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

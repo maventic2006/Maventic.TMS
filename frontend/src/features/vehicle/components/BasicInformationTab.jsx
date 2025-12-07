@@ -364,9 +364,9 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">
             Registration Number <span className="text-red-500">*</span>
-            <span className="text-xs font-normal text-gray-500 ml-2">
+            {/* <span className="text-xs font-normal text-gray-500 ml-2">
               (Auto-fetches vehicle details from RC database)
-            </span>
+            </span> */}
           </label>
           <div className="relative">
             <input
@@ -413,11 +413,11 @@ const BasicInformationTab = ({ formData, setFormData, errors, masterData }) => {
               {lookupMessage}
             </p>
           )}
-          {isLookingUp && (
+          {/* {isLookingUp && (
             <p className="mt-1 text-xs text-blue-600">
               Fetching vehicle details from RC database...
             </p>
-          )}
+          )} */}
         </div>
 
         {/* Make/Brand */}
