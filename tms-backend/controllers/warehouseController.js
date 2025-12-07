@@ -475,11 +475,7 @@ const getWarehouseList = async (req, res) => {
       )
       .leftJoin(
         knex.raw(`(
-          SELECT 
-            aft1.*,
-            um.user_id as warehouse_user_id,
-            um.consignor_id,
-            um.created_at as user_created_at
+          SELECT aft1.*
           FROM approval_flow_trans aft1
           INNER JOIN (
             SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
@@ -489,16 +485,11 @@ const getWarehouseList = async (req, res) => {
             GROUP BY user_id_reference_id
           ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
                AND aft1.approval_flow_unique_id = aft2.max_id
-          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
-            AND um.user_type_id = 'UT007'
         ) as aft`),
-        function () {
-          this.on("aft.consignor_id", "=", "w.consignor_id").andOn(
-            knex.raw(
-              "ABS(TIMESTAMPDIFF(SECOND, aft.user_created_at, w.created_at)) < 60"
-            )
-          );
-        }
+        knex.raw(
+          "CONCAT('WH', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED), 3, '0'))"
+        ),
+        "w.warehouse_id"
       )
       .select(
         "w.warehouse_id",
@@ -508,7 +499,7 @@ const getWarehouseList = async (req, res) => {
         "w.material_type_id",
         "mtm.material_types as material_type_name",
         "w.warehouse_name1",
-        knex.raw("0 as geo_fencing"),
+        "w.geo_fencing",
         "w.weigh_bridge_availability",
         "w.virtual_yard_in",
         "w.gatepass_system_available",
@@ -537,6 +528,18 @@ const getWarehouseList = async (req, res) => {
     if (consignorId) {
       query.where("w.consignor_id", consignorId);
     }
+
+    // ✅ FILTER: Drafts should only be visible to their creator
+    // For SAVE_AS_DRAFT status, filter by created_by (user_id)
+    // This ensures super admin can only see their own drafts
+    query.where(function () {
+      this.where("w.status", "!=", "SAVE_AS_DRAFT").orWhere(function () {
+        this.where("w.status", "=", "SAVE_AS_DRAFT").andWhere(
+          "w.created_by",
+          req.user.user_id
+        );
+      });
+    });
 
     // FILTERS
     if (req.query.warehouseId) {
@@ -600,6 +603,16 @@ const getWarehouseList = async (req, res) => {
           builder.where("w.consignor_id", consignorId);
         }
 
+        // ✅ FILTER: Drafts should only be visible to their creator
+        builder.where(function () {
+          this.where("w.status", "!=", "SAVE_AS_DRAFT").orWhere(function () {
+            this.where("w.status", "=", "SAVE_AS_DRAFT").andWhere(
+              "w.created_by",
+              req.user.user_id
+            );
+          });
+        });
+
         if (req.query.warehouseId) {
           builder.where("w.warehouse_id", "like", `%${req.query.warehouseId}%`);
         }
@@ -635,6 +648,11 @@ const getWarehouseList = async (req, res) => {
             "w.fuel_availability",
             req.query.fuelAvailability === "true"
           );
+        }
+
+        // ✅ Add geo fencing filter to count query (was missing)
+        if (req.query.geoFencing !== undefined) {
+          builder.where("w.geo_fencing", req.query.geoFencing === "true");
         }
 
         // DATE FILTERS FOR COUNT
@@ -825,9 +843,20 @@ const getWarehouseById = async (req, res) => {
     }
 
     // Fetch documents with LEFT JOIN to document_upload and document_name_master
+    // ✅ FIX: Use subquery to get only the LATEST document_upload per warehouse_documents
+    // This prevents duplicates when multiple document_upload records exist for same system_reference_id
     const documents = await knex("warehouse_documents as wd")
       .leftJoin(
-        "document_upload as du",
+        knex.raw(`(
+          SELECT du1.*
+          FROM document_upload du1
+          INNER JOIN (
+            SELECT system_reference_id, MAX(created_at) as max_created_at
+            FROM document_upload
+            GROUP BY system_reference_id
+          ) du2 ON du1.system_reference_id = du2.system_reference_id 
+               AND du1.created_at = du2.max_created_at
+        ) as du`),
         "wd.document_unique_id",
         "du.system_reference_id"
       )
@@ -919,74 +948,75 @@ const getWarehouseById = async (req, res) => {
       fileData: doc.file_data, // Base64 encoded file content
     }));
 
+    // 🔍 DEBUG: Log document mapping details
+    console.log(
+      `📄 Mapped ${mappedDocuments.length} documents for warehouse ${id}`
+    );
+    if (mappedDocuments.length > 0) {
+      console.log("📄 First document details:", {
+        documentUniqueId: mappedDocuments[0].documentUniqueId,
+        documentType: mappedDocuments[0].documentType,
+        fileName: mappedDocuments[0].fileName,
+        fileType: mappedDocuments[0].fileType,
+        hasFileData: !!mappedDocuments[0].fileData,
+        fileDataLength: mappedDocuments[0].fileData
+          ? mappedDocuments[0].fileData.length
+          : 0,
+      });
+    }
+
     // ========================================
     // FETCH USER APPROVAL STATUS
     // ========================================
+    // ✅ USING TRANSPORTER PATTERN: ID derivation with fallback for robustness
 
-    // Find associated Warehouse Manager user by warehouse creation time and consignor_id
     console.log(`🔍 Fetching approval status for warehouse ${id}`);
 
     let userApprovalStatus = null;
     let approvalHistory = [];
 
-    // Get warehouse manager user created for this warehouse
-    // Match by consignor_id and user_type_id, and created around same time as warehouse
-    const warehouseManagerUser = await knex("user_master")
-      .where("user_type_id", "UT007") // Consignor WH Manager
-      .where("consignor_id", warehouse.consignor_id)
-      .whereBetween("created_at", [
-        knex.raw(
-          "DATE_SUB(?, INTERVAL 1 MINUTE)",
-          warehouse.created_at || warehouse.created_on
-        ),
-        knex.raw(
-          "DATE_ADD(?, INTERVAL 1 MINUTE)",
-          warehouse.created_at || warehouse.created_on
-        ),
-      ])
-      .orderBy("created_at", "desc")
-      .first();
+    try {
+      // STEP 1: Derive CW (Consignor Warehouse Manager) user ID from warehouse ID
+      // WH001 → CW0001, WH002 → CW0002, etc.
+      const warehouseNumber = id.substring(2); // Remove 'WH' prefix
+      const warehouseManagerUserId = `CW${warehouseNumber.padStart(4, "0")}`;
 
-    if (warehouseManagerUser) {
       console.log(
-        `  ✅ Found associated user: ${warehouseManagerUser.user_id}`
+        `  🔍 Looking for warehouse manager user: ${warehouseManagerUserId}`
       );
 
-      // Get approval flow status for this user
-      const approvalFlow = await knex("approval_flow_trans")
-        .where("user_id_reference_id", warehouseManagerUser.user_id)
-        .where("approval_type_id", "AT005") // Warehouse Manager
-        .orderBy("created_at", "desc")
+      // STEP 2: Primary lookup - Derived ID (most reliable)
+      let warehouseManagerUser = await knex("user_master")
+        .where("user_id", warehouseManagerUserId)
         .first();
 
-      if (approvalFlow) {
-        userApprovalStatus = {
-          userId: warehouseManagerUser.user_id,
-          userEmail: warehouseManagerUser.email_id,
-          userName: warehouseManagerUser.user_full_name,
-          userStatus: warehouseManagerUser.status,
-          isActive: warehouseManagerUser.is_active,
-          approvalFlowTransId: approvalFlow.approval_flow_trans_id, // ✅ CRITICAL: Include for approval API
-          currentApprovalStatus: approvalFlow.s_status, // Match consignor pattern
-          approvalStatus: approvalFlow.s_status,
-          approverLevel: approvalFlow.approver_level,
-          pendingWith: approvalFlow.pending_with_name, // Match consignor pattern
-          pendingWithUserId: approvalFlow.pending_with_user_id,
-          pendingWithName: approvalFlow.pending_with_name,
-          createdByUserId: approvalFlow.created_by_user_id,
-          createdByName: approvalFlow.created_by_name,
-          actionedByUserId: approvalFlow.actioned_by_id,
-          actionedByName: approvalFlow.actioned_by_name,
-          approvedOn: approvalFlow.approved_on,
-          remarks: approvalFlow.remarks,
-        };
+      // STEP 3: Fallback - Name and consignor matching (backward compatibility)
+      if (!warehouseManagerUser) {
+        console.log(`  ⚠️ No user found with derived ID, searching by name...`);
+        console.log(`     - user_type_id: UT007`);
+        console.log(`     - consignor_id: ${warehouse.consignor_id}`);
+        console.log(`     - user_full_name: ${warehouse.warehouse_name1}`);
 
+        warehouseManagerUser = await knex("user_master")
+          .where("user_type_id", "UT007") // Consignor WH Manager
+          .where("consignor_id", warehouse.consignor_id)
+          .where("user_full_name", warehouse.warehouse_name1)
+          .first();
+      }
+
+      // STEP 4: If user found, fetch ALL approval flows
+      if (warehouseManagerUser) {
         console.log(
-          `📋 Approval Flow Trans ID: ${approvalFlow.approval_flow_trans_id}`
+          `  ✅ Found associated user: ${warehouseManagerUser.user_id}`
         );
+        console.log(
+          `     - User Full Name: ${warehouseManagerUser.user_full_name}`
+        );
+        console.log(`     - User Status: ${warehouseManagerUser.status}`);
+        console.log(`     - Created At: ${warehouseManagerUser.created_at}`);
 
-        // Get complete approval history for this user
-        approvalHistory = await knex("approval_flow_trans as aft")
+        // Fetch ALL approval flows (not just first) ordered by most recent
+        const approvalFlows = await knex("approval_flow_trans as aft")
           .leftJoin(
             "approval_type_master as atm",
             "aft.approval_type_id",
@@ -998,14 +1028,83 @@ const getWarehouseById = async (req, res) => {
             "atm.approval_type as approval_category",
             "atm.approval_name"
           )
-          .orderBy("aft.created_at", "desc");
+          .orderBy("aft.created_at", "desc"); // Get ALL flows, ordered
 
+        console.log(`  ✅ Found ${approvalFlows.length} approval flow records`);
+
+        // STEP 5: Use most recent approval flow (array [0], not .first())
+        if (approvalFlows.length > 0) {
+          console.log(
+            `  ✅ Most recent approval flow: ${approvalFlows[0]?.approval_flow_trans_id}`
+          );
+          console.log(`     - Status: ${approvalFlows[0]?.s_status}`);
+          console.log(
+            `     - Pending With: ${approvalFlows[0]?.pending_with_name} (${approvalFlows[0]?.pending_with_user_id})`
+          );
+          console.log(
+            `     - Created By: ${approvalFlows[0]?.created_by_name} (${approvalFlows[0]?.created_by_user_id})`
+          );
+
+          userApprovalStatus = {
+            approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id, // ✅ CRITICAL: Include for approval API
+            userId: warehouseManagerUser.user_id,
+            userEmail: warehouseManagerUser.email_id,
+            userName: warehouseManagerUser.user_full_name,
+            userStatus: warehouseManagerUser.status,
+            isActive: warehouseManagerUser.is_active,
+            currentApprovalStatus: approvalFlows[0]?.s_status, // Match consignor pattern
+            approvalStatus: approvalFlows[0]?.s_status,
+            approverLevel: approvalFlows[0]?.approver_level,
+            pendingWith: approvalFlows[0]?.pending_with_name, // Match consignor pattern
+            pendingWithUserId: approvalFlows[0]?.pending_with_user_id,
+            pendingWithName: approvalFlows[0]?.pending_with_name,
+            createdByUserId: approvalFlows[0]?.created_by_user_id,
+            createdByName: approvalFlows[0]?.created_by_name,
+            actionedByUserId: approvalFlows[0]?.actioned_by_id,
+            actionedByName: approvalFlows[0]?.actioned_by_name,
+            approvedOn: approvalFlows[0]?.approved_on,
+            remarks: approvalFlows[0]?.remarks,
+          };
+
+          // Save complete approval history
+          approvalHistory = approvalFlows;
+
+          console.log(
+            `📋 User Approval Status Object:`,
+            JSON.stringify(userApprovalStatus, null, 2)
+          );
+          console.log(
+            `📋 Approval status: ${approvalFlows[0]?.s_status}, Level: ${approvalFlows[0]?.approver_level}`
+          );
+        }
+      } else {
+        console.log(`  ⚠️ No associated user found for warehouse ${id}`);
+        console.log(`  ℹ️  This usually means:`);
         console.log(
-          `  📋 Approval status: ${approvalFlow.s_status}, Level: ${approvalFlow.approver_level}`
+          `     1. Warehouse has not been submitted for approval yet (still in SAVE_AS_DRAFT)`
+        );
+        console.log(
+          `     2. Warehouse manager user was not created during submission`
+        );
+        console.log(
+          `     3. Neither derived ID (${warehouseManagerUserId}) nor name matching worked`
         );
       }
-    } else {
-      console.log(`  ⚠️ No associated user found for warehouse ${id}`);
+    } catch (approvalError) {
+      console.error("Error fetching warehouse approval status:", approvalError);
+      // Don't fail entire request if approval fetch fails
+    }
+
+    console.log(`📤 Sending response for warehouse ${id}:`);
+    console.log(`   - Warehouse Status: ${warehouse.status}`);
+    console.log(
+      `   - User Approval Status: ${userApprovalStatus ? "YES" : "NO"}`
+    );
+    if (userApprovalStatus) {
+      console.log(
+        `   - Approval Status: ${userApprovalStatus.currentApprovalStatus}`
+      );
+      console.log(`   - Pending With: ${userApprovalStatus.pendingWith}`);
     }
 
     res.json({
@@ -1133,22 +1232,48 @@ const createWarehouse = async (req, res) => {
       });
     }
 
-    if (
-      !address.vatNumber ||
-      !/^[A-Z0-9]{8,20}$/.test(address.vatNumber.trim().toUpperCase())
-    ) {
+    // Validate GST/VAT number format
+    if (!address.vatNumber) {
       return res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: "VAT number must be 8-20 alphanumeric characters",
+          message: "GST/VAT number is required",
           field: "vatNumber",
         },
       });
     }
 
+    const normalizedVat = address.vatNumber.trim().toUpperCase();
+
+    // Indian GST format: 15 characters
+    // Pattern: 2 digits (state) + 10 chars (PAN) + 1 digit (entity) + 1 letter (Z) + 1 digit (checksum)
+    // Example: 27AAPFU0939F1ZV
+    const gstRegex =
+      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+
+    // International VAT format: 2 letter country code + 8-15 alphanumeric
+    // Examples: GB123456789, DE123456789, FR12345678901
+    const vatRegex = /^[A-Z]{2}[A-Z0-9]{8,15}$/;
+
+    if (!gstRegex.test(normalizedVat) && !vatRegex.test(normalizedVat)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message:
+            "Invalid GST/VAT format. Indian GST must be 15 characters (e.g., 27AAPFU0939F1ZV). International VAT: Country code + 8-15 alphanumeric characters",
+          field: "vatNumber",
+          expectedFormats: [
+            "Indian GST: 27AAPFU0939F1ZV (15 characters)",
+            "International VAT: GB123456789 (2 letter country code + 8-15 chars)",
+          ],
+        },
+      });
+    }
+
     // Normalize VAT number to uppercase
-    address.vatNumber = address.vatNumber.trim().toUpperCase();
+    address.vatNumber = normalizedVat;
 
     // Validate postal code (must be exactly 6 digits)
     if (!address.postalCode || !/^\d{6}$/.test(address.postalCode)) {
@@ -1174,23 +1299,6 @@ const createWarehouse = async (req, res) => {
               "TIN/PAN must match format: 5 letters + 4 digits + 1 letter (e.g., ABCDE1234F)",
             field: "tinPan",
             expectedFormat: "ABCDE1234F",
-          },
-        });
-      }
-    }
-
-    // Validate TAN if provided (optional, but must match TAN format if entered)
-    if (address.tan && address.tan.trim() !== "") {
-      const tanRegex = /^[A-Z]{4}\d{5}[A-Z]$/;
-      if (!tanRegex.test(address.tan.trim().toUpperCase())) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message:
-              "TAN must match format: 4 letters + 5 digits + 1 letter (e.g., ASDF12345N)",
-            field: "tan",
-            expectedFormat: "ASDF12345N",
           },
         });
       }
@@ -1318,11 +1426,18 @@ const createWarehouse = async (req, res) => {
       }
     }
 
-    // Get consignor ID from logged-in user
-    const consignorId = req.user.consignor_id || "SYSTEM";
+    // Get consignor ID - prioritize from request body (for super admin), fallback to logged-in user
+    // Super admin can select any consignor, regular consignor uses their own ID
+    const consignorId =
+      generalDetails.consignorId || req.user.consignor_id || "SYSTEM";
     const userId = req.user.user_id || "SYSTEM";
 
     console.log("✅ Validation passed, starting database transaction");
+    console.log(
+      "✅ Using consignor ID:",
+      consignorId,
+      "(from request body or user token)"
+    );
 
     // ========================================
     // PHASE 2: DATABASE OPERATIONS
@@ -1333,6 +1448,16 @@ const createWarehouse = async (req, res) => {
     // Generate unique warehouse ID
     const warehouseId = await generateWarehouseId(trx);
     console.log("✅ Generated warehouse ID:", warehouseId);
+
+    // ✅ FIX: Use currentTimestamp for all inserts to ensure consistent timestamps
+    // This ensures the warehouse, user, and approval_flow_trans all have matching timestamps
+    // which is required for the getWarehouseList JOIN to work correctly
+
+    // ✅ Determine geo_fencing flag based on subLocations data
+    const hasGeoFencing =
+      subLocations &&
+      subLocations.length > 0 &&
+      subLocations.some((sl) => sl.coordinates && sl.coordinates.length > 0);
 
     // Insert warehouse basic information
     await trx("warehouse_basic_information").insert({
@@ -1354,9 +1479,10 @@ const createWarehouse = async (req, res) => {
       driver_waiting_area: facilities?.driverWaitingArea || false,
       gate_in_checklist_auth: facilities?.gateInChecklistAuth || false,
       gate_out_checklist_auth: facilities?.gateOutChecklistAuth || false,
+      geo_fencing: hasGeoFencing, // ✅ Set geo_fencing based on subLocations data
       status: "PENDING", // ✅ FIXED: Set to PENDING (will be updated to ACTIVE after approval)
       created_by: userId,
-      created_at: knex.fn.now(),
+      created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
     });
 
     console.log("✅ Warehouse basic information inserted");
@@ -1377,12 +1503,10 @@ const createWarehouse = async (req, res) => {
       street_2: address.street2 || null,
       postal_code: address.postalCode || null,
       vat_number: address.vatNumber,
-      tin_pan: address.tinPan || null,
-      tan: address.tan || null,
       is_primary: address.isPrimary !== false,
       status: "ACTIVE",
       created_by: userId,
-      created_at: knex.fn.now(),
+      created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
     });
 
     console.log("✅ Address inserted");
@@ -1412,7 +1536,7 @@ const createWarehouse = async (req, res) => {
             valid_to: formatDateForMySQL(doc.validTo),
             active: doc.status !== false,
             created_by: userId,
-            created_at: knex.fn.now(),
+            created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
             status: "ACTIVE",
           });
 
@@ -1431,8 +1555,8 @@ const createWarehouse = async (req, res) => {
               valid_to: formatDateForMySQL(doc.validTo),
               created_by: userId,
               updated_by: userId,
-              created_at: knex.fn.now(),
-              updated_at: knex.fn.now(),
+              created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
+              updated_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
             });
           }
         }
@@ -1456,7 +1580,7 @@ const createWarehouse = async (req, res) => {
             description: subLoc.description || null,
             status: "ACTIVE",
             created_by: userId,
-            created_at: knex.fn.now(),
+            created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
           });
 
           // Insert coordinates
@@ -1470,7 +1594,7 @@ const createWarehouse = async (req, res) => {
               sequence: j + 1,
               status: "ACTIVE",
               created_by: userId,
-              created_at: knex.fn.now(),
+              created_at: currentTimestamp, // ✅ Use currentTimestamp instead of knex.fn.now()
             });
           }
         }
@@ -1486,9 +1610,13 @@ const createWarehouse = async (req, res) => {
 
     console.log("📝 Creating Warehouse Manager user for approval workflow...");
 
-    // Generate user ID for Warehouse Manager
-    const warehouseManagerUserId = await generateWarehouseManagerUserId(trx);
-    console.log(`  Generated user ID: ${warehouseManagerUserId}`);
+    // ✅ FIXED: Derive user ID from warehouse ID (WH001 -> CW0001)
+    // This ensures consistent lookup in getWarehouseById (matching transporter pattern)
+    const warehouseNumber = warehouseId.substring(2); // Remove 'WH' prefix
+    const warehouseManagerUserId = `CW${warehouseNumber.padStart(4, "0")}`;
+    console.log(
+      `  Generated user ID: ${warehouseManagerUserId} (derived from ${warehouseId})`
+    );
 
     // Get creator details from request (current logged-in Product Owner)
     const creatorUserId = req.user?.user_id || "SYSTEM";
@@ -1750,7 +1878,7 @@ const updateWarehouse = async (req, res) => {
 
     // ACTIVE entities: Only approvers can edit
     if (currentStatus === "ACTIVE") {
-      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      const isApprover = userRole === "product_owner" || userRole === "admin";
       if (!isApprover) {
         return res.status(403).json({
           success: false,
@@ -1797,17 +1925,34 @@ const updateWarehouse = async (req, res) => {
     if (isResubmission) {
       console.log(`🔄 Resubmission detected for warehouse ${id}`);
 
-      // Get warehouse manager user ID via user_master lookup
-      const warehouseUser = await trx("user_master")
-        .where("user_type_id", "UT007") // Consignor WH Manager
-        .where("consignor_id", existingWarehouse.consignor_id)
-        .whereRaw("ABS(TIMESTAMPDIFF(SECOND, created_at, ?)) < 60", [
-          existingWarehouse.created_at,
-        ])
+      // ✅ FIXED: Derive user ID from warehouse ID (WH056 → CW0056)
+      const warehouseNumber = id.substring(2); // Remove 'WH' prefix
+      const warehouseManagerUserId = `CW${warehouseNumber.padStart(4, "0")}`;
+
+      console.log(
+        `  Looking for warehouse manager user: ${warehouseManagerUserId}`
+      );
+
+      // Primary lookup by derived ID
+      let warehouseUser = await trx("user_master")
+        .where("user_id", warehouseManagerUserId)
         .first();
+
+      // Fallback to name matching for backward compatibility
+      if (!warehouseUser) {
+        console.log(`  Fallback: Searching by name and consignor`);
+        warehouseUser = await trx("user_master")
+          .where("user_type_id", "UT007") // Consignor WH Manager
+          .where("consignor_id", existingWarehouse.consignor_id)
+          .where("user_full_name", existingWarehouse.warehouse_name1)
+          .first();
+      }
 
       if (warehouseUser) {
         const warehouseManagerUserId = warehouseUser.user_id;
+        console.log(
+          `  ✅ Found warehouse manager user: ${warehouseManagerUserId}`
+        );
 
         // Find existing approval flow record
         const approvalFlow = await trx("approval_flow_trans")
@@ -1817,15 +1962,43 @@ const updateWarehouse = async (req, res) => {
           .first();
 
         if (approvalFlow) {
+          // Determine pending approver (opposite Product Owner)
+          const creatorUserId = existingWarehouse.created_by;
+          let pendingWithUserId = null;
+          let pendingWithName = null;
+
+          if (creatorUserId === "PO001") {
+            const po2 = await trx("user_master")
+              .where("user_id", "PO002")
+              .first();
+            pendingWithUserId = "PO002";
+            pendingWithName = po2?.user_full_name || "Product Owner 2";
+          } else if (creatorUserId === "PO002") {
+            const po1 = await trx("user_master")
+              .where("user_id", "PO001")
+              .first();
+            pendingWithUserId = "PO001";
+            pendingWithName = po1?.user_full_name || "Product Owner 1";
+          } else {
+            // Default to PO001
+            const po1 = await trx("user_master")
+              .where("user_id", "PO001")
+              .first();
+            pendingWithUserId = "PO001";
+            pendingWithName = po1?.user_full_name || "Product Owner 1";
+          }
+
           // Update approval flow to restart from Level 1
           await trx("approval_flow_trans")
             .where(
-              "approval_flow_unique_id",
-              approvalFlow.approval_flow_unique_id
+              "approval_flow_trans_id",
+              approvalFlow.approval_flow_trans_id
             )
             .update({
               s_status: "PENDING",
               approver_level: 1,
+              pending_with_user_id: pendingWithUserId,
+              pending_with_name: pendingWithName,
               actioned_by_id: null,
               actioned_by_name: null,
               approved_on: null,
@@ -1834,20 +2007,28 @@ const updateWarehouse = async (req, res) => {
             });
 
           console.log(
-            `✅ Approval flow restarted for ${warehouseManagerUserId}`
+            `  ✅ Approval flow restarted: ${approvalFlow.approval_flow_trans_id}`
+          );
+          console.log(
+            `  ✅ Pending with: ${pendingWithName} (${pendingWithUserId})`
           );
         }
 
-        // Update user status to Pending for Approval
+        // Update user status to PENDING (matching user_master status values)
         await trx("user_master")
           .where("user_id", warehouseManagerUserId)
           .update({
-            status: "Pending for Approval",
+            status: "PENDING", // ✅ FIXED: Use "PENDING" not "Pending for Approval"
+            is_active: false,
             updated_at: knex.fn.now(),
           });
 
         console.log(
-          `✅ User status updated to Pending for Approval: ${warehouseManagerUserId}`
+          `  ✅ User status updated to PENDING: ${warehouseManagerUserId}`
+        );
+      } else {
+        console.warn(
+          `  ⚠️ No warehouse manager user found for resubmission of ${id}`
         );
       }
     }
@@ -1909,14 +2090,51 @@ const updateWarehouse = async (req, res) => {
             ? gate_out_checklist_auth
             : existingWarehouse.gate_out_checklist_auth,
         consignor_id: consignor_id || existingWarehouse.consignor_id,
+        // ✅ CRITICAL FIX: Update status if resubmission
+        status: isResubmission ? "PENDING" : existingWarehouse.status,
         updated_by: userId,
         updated_at: knex.fn.now(),
       });
 
     console.log("✅ Warehouse basic information updated");
+    if (isResubmission) {
+      console.log("  ✅ Status updated from INACTIVE to PENDING");
+    }
 
     // Update address if provided
     if (address && Object.keys(address).length > 0) {
+      // Validate GST/VAT number format if provided
+      if (address.vat_number) {
+        const normalizedVat = address.vat_number.trim().toUpperCase();
+
+        // Indian GST format: 15 characters
+        const gstRegex =
+          /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+
+        // International VAT format: 2 letter country code + 8-15 alphanumeric
+        const vatRegex = /^[A-Z]{2}[A-Z0-9]{8,15}$/;
+
+        if (!gstRegex.test(normalizedVat) && !vatRegex.test(normalizedVat)) {
+          await trx.rollback();
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "Invalid GST/VAT format. Indian GST must be 15 characters (e.g., 27AAPFU0939F1ZV). International VAT: Country code + 8-15 alphanumeric characters",
+              field: "vatNumber",
+              expectedFormats: [
+                "Indian GST: 27AAPFU0939F1ZV (15 characters)",
+                "International VAT: GB123456789 (2 letter country code + 8-15 chars)",
+              ],
+            },
+          });
+        }
+
+        // Normalize VAT number to uppercase
+        address.vat_number = normalizedVat;
+      }
+
       const existingAddress = await trx("tms_address")
         .where("user_reference_id", id)
         .where("user_type", "WH")
@@ -1938,8 +2156,6 @@ const updateWarehouse = async (req, res) => {
             street_2: address.street_2 || existingAddress.street_2,
             postal_code: address.postal_code || existingAddress.postal_code,
             vat_number: address.vat_number || existingAddress.vat_number,
-            tin_pan: address.tin_pan || existingAddress.tin_pan,
-            tan: address.tan || existingAddress.tan,
             updated_by: userId,
             updated_at: knex.fn.now(),
           });
@@ -1960,8 +2176,6 @@ const updateWarehouse = async (req, res) => {
           street_2: address.street_2 || null,
           postal_code: address.postal_code || null,
           vat_number: address.vat_number,
-          tin_pan: address.tin_pan || null,
-          tan: address.tan || null,
           is_primary: true,
           status: "ACTIVE",
           created_by: userId,
@@ -2036,15 +2250,42 @@ const updateWarehouse = async (req, res) => {
                 (d) => d.document_unique_id === doc.documentUniqueId
               );
               if (existingDoc && existingDoc.document_id) {
-                await trx("document_upload")
-                  .where("document_id", existingDoc.document_id)
-                  .update({
+                // Check if document upload record exists
+                const existingUpload = await trx("document_upload")
+                  .where("system_reference_id", doc.documentUniqueId)
+                  .first();
+
+                if (existingUpload) {
+                  // Update existing document upload
+                  await trx("document_upload")
+                    .where("system_reference_id", doc.documentUniqueId)
+                    .update({
+                      file_name: doc.fileName,
+                      file_type: doc.fileType || "application/pdf",
+                      file_xstring_value: doc.fileData,
+                      updated_by: userId,
+                      updated_at: knex.fn.now(),
+                    });
+                  console.log(
+                    `  ✅ Document upload updated for ${doc.documentUniqueId}`
+                  );
+                } else {
+                  // Insert new document upload record
+                  const uploadId = await generateDocumentUploadId(trx);
+                  await trx("document_upload").insert({
+                    document_id: uploadId,
+                    system_reference_id: doc.documentUniqueId, // ✅ CRITICAL: Link to document
                     file_name: doc.fileName,
                     file_type: doc.fileType || "application/pdf",
                     file_xstring_value: doc.fileData,
-                    updated_by: userId,
-                    updated_at: knex.fn.now(),
+                    status: "ACTIVE",
+                    created_by: userId,
+                    created_at: knex.fn.now(),
                   });
+                  console.log(
+                    `  ✅ Document upload created for ${doc.documentUniqueId}`
+                  );
+                }
               }
             }
             console.log(`✅ Document ${doc.documentUniqueId} updated`);
@@ -2055,6 +2296,7 @@ const updateWarehouse = async (req, res) => {
               generatedDocumentIds
             );
             const documentUniqueId = documentId;
+            generatedDocumentIds.add(documentId); // Track generated IDs
 
             await trx("warehouse_documents").insert({
               document_unique_id: documentUniqueId,
@@ -2072,13 +2314,18 @@ const updateWarehouse = async (req, res) => {
 
             // Insert document file if provided
             if (doc.fileData && doc.fileName) {
+              const uploadId = await generateDocumentUploadId(trx);
               await trx("document_upload").insert({
-                document_id: documentId,
+                document_id: uploadId, // Unique upload ID
+                system_reference_id: documentUniqueId, // ✅ CRITICAL FIX: Link to warehouse document
                 file_name: doc.fileName,
                 file_type: doc.fileType || "application/pdf",
                 file_xstring_value: doc.fileData,
+                status: "ACTIVE",
                 created_by: userId,
                 created_at: knex.fn.now(),
+                updated_by: userId,
+                updated_at: knex.fn.now(),
               });
             }
             console.log(`✅ New document ${documentUniqueId} created`);
@@ -2177,6 +2424,27 @@ const updateWarehouse = async (req, res) => {
           }
         }
       }
+
+      // ✅ UPDATE geo_fencing flag after modifying geofencing data
+      const hasGeoFencingAfterUpdate = await trx(
+        "warehouse_sub_location_header"
+      )
+        .where("warehouse_unique_id", id)
+        .where("status", "ACTIVE")
+        .count("* as count")
+        .first();
+
+      await trx("warehouse_basic_information")
+        .where("warehouse_id", id)
+        .update({
+          geo_fencing: hasGeoFencingAfterUpdate.count > 0,
+          updated_by: userId,
+          updated_at: knex.fn.now(),
+        });
+
+      console.log(
+        `✅ Geo-fencing flag updated: ${hasGeoFencingAfterUpdate.count > 0}`
+      );
     }
 
     // Commit transaction
@@ -2267,8 +2535,19 @@ const getMasterData = async (req, res) => {
       .where("status", "ACTIVE")
       .orderBy("document_name");
 
+    // Fetch consignors (for super admin dropdown)
+    const consignors = await knex("consignor_basic_information")
+      .select(
+        "customer_id as value",
+        "customer_name as label",
+        "customer_id",
+        "customer_name"
+      )
+      .where("status", "ACTIVE")
+      .orderBy("customer_name");
+
     console.log(
-      `✅ Found ${warehouseTypes.length} warehouse types, ${materialTypes.length} material types, ${addressTypes.length} address types, ${subLocationTypes.length} sub-location types, ${documentTypes.length} document types, ${documentNames.length} document names`
+      `✅ Found ${warehouseTypes.length} warehouse types, ${materialTypes.length} material types, ${addressTypes.length} address types, ${subLocationTypes.length} sub-location types, ${documentTypes.length} document types, ${documentNames.length} document names, ${consignors.length} consignors`
     );
 
     res.json({
@@ -2279,6 +2558,7 @@ const getMasterData = async (req, res) => {
       subLocationTypes,
       documentTypes,
       documentNames,
+      consignors,
     });
   } catch (error) {
     console.error("❌ Error fetching master data:", error);
@@ -2378,12 +2658,21 @@ const saveWarehouseAsDraft = async (req, res) => {
     console.log("User consignor_id:", req.user.consignor_id);
     console.log("Payload:", JSON.stringify(req.body, null, 2));
 
-    // ✅ Get consignorId from authenticated user's JWT token
-    const consignorId = req.user.consignor_id || "SYSTEM";
-    const userId = req.user.user_id;
-
     // Extract warehouse data from request body
     const { generalDetails } = req.body;
+
+    // ✅ Get consignorId - prioritize from request body (for super admin), fallback to logged-in user
+    // Super admin can select any consignor, regular consignor uses their own ID
+    const consignorId =
+      generalDetails?.consignorId || req.user.consignor_id || "SYSTEM";
+    const userId = req.user.user_id;
+
+    console.log(
+      "✅ Using consignor ID:",
+      consignorId,
+      "(from request body or user token)"
+    );
+
     const warehouse_name =
       generalDetails?.warehouseName || req.body.warehouse_name;
 
@@ -2774,24 +3063,28 @@ const updateWarehouseDraft = async (req, res) => {
 
       // Update documents if provided (delete & re-insert)
       if (req.body.documents && Array.isArray(req.body.documents)) {
-        // Get existing document IDs to delete from document_upload table
+        // ✅ FIX: Get document_unique_id to properly delete uploads
         const existingDocs = await trx("warehouse_documents")
           .where({ warehouse_id: id })
-          .select("document_id"); // ✅ Fixed: Use document_id instead of document_upload_file_id
+          .select("document_unique_id");
 
-        const documentIds = existingDocs
-          .map((doc) => doc.document_id)
+        const documentUniqueIds = existingDocs
+          .map((doc) => doc.document_unique_id)
           .filter(Boolean);
 
-        // Delete from document_upload table (cleanup uploaded files)
-        if (documentIds.length > 0) {
+        // Delete from document_upload table using system_reference_id (FK to warehouse_documents)
+        if (documentUniqueIds.length > 0) {
           await trx("document_upload")
-            .whereIn("document_id", documentIds)
+            .whereIn("system_reference_id", documentUniqueIds)
             .del();
+          console.log(
+            `  🗑️ Deleted ${documentUniqueIds.length} old document uploads`
+          );
         }
 
         // Delete from warehouse_documents
         await trx("warehouse_documents").where({ warehouse_id: id }).del();
+        console.log(`  🗑️ Deleted old warehouse documents`);
 
         // Insert new documents
         const generatedDocIds = new Set();
@@ -3123,6 +3416,39 @@ const submitWarehouseFromDraft = async (req, res) => {
     // ========================================
     // STEP 2: Delete and re-insert address
     // ========================================
+
+    // Validate GST/VAT number format if address is provided
+    if (address && address.vat_number) {
+      const normalizedVat = address.vat_number.trim().toUpperCase();
+
+      // Indian GST format: 15 characters
+      const gstRegex =
+        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+
+      // International VAT format: 2 letter country code + 8-15 alphanumeric
+      const vatRegex = /^[A-Z]{2}[A-Z0-9]{8,15}$/;
+
+      if (!gstRegex.test(normalizedVat) && !vatRegex.test(normalizedVat)) {
+        await trx.rollback();
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message:
+              "Invalid GST/VAT format. Indian GST must be 15 characters (e.g., 27AAPFU0939F1ZV). International VAT: Country code + 8-15 alphanumeric characters",
+            field: "vatNumber",
+            expectedFormats: [
+              "Indian GST: 27AAPFU0939F1ZV (15 characters)",
+              "International VAT: GB123456789 (2 letter country code + 8-15 chars)",
+            ],
+          },
+        });
+      }
+
+      // Normalize VAT number to uppercase
+      address.vat_number = normalizedVat;
+    }
+
     await trx("tms_address")
       .where({ user_reference_id: id, user_type: "WH" })
       .del();
@@ -3142,8 +3468,6 @@ const submitWarehouseFromDraft = async (req, res) => {
         street_2: address.street_2 || null,
         postal_code: address.postal_code || null,
         vat_number: address.vat_number || null,
-        tin_pan: address.tin_pan || null,
-        tan: address.tan || null,
         is_primary: true,
         status: "ACTIVE",
         created_by: userId,
@@ -3158,15 +3482,25 @@ const submitWarehouseFromDraft = async (req, res) => {
     // ========================================
     // STEP 3: Delete and re-insert documents
     // ========================================
-    const existingDocIds = await trx("warehouse_documents")
-      .where({ warehouse_id: id })
-      .pluck("document_id");
 
-    if (existingDocIds.length > 0) {
-      await trx("document_upload").whereIn("document_id", existingDocIds).del();
+    // ✅ FIX: Get document_unique_id (not document_id) to properly delete uploads
+    const existingDocUniqueIds = await trx("warehouse_documents")
+      .where({ warehouse_id: id })
+      .pluck("document_unique_id");
+
+    // Delete document uploads using system_reference_id (the FK to warehouse_documents)
+    if (existingDocUniqueIds.length > 0) {
+      await trx("document_upload")
+        .whereIn("system_reference_id", existingDocUniqueIds)
+        .del();
+      console.log(
+        `  🗑️ Deleted ${existingDocUniqueIds.length} old document uploads`
+      );
     }
 
+    // Delete warehouse documents
     await trx("warehouse_documents").where({ warehouse_id: id }).del();
+    console.log(`  🗑️ Deleted old warehouse documents`);
 
     if (documents && documents.length > 0) {
       const generatedDocIds = new Set();
@@ -3217,8 +3551,13 @@ const submitWarehouseFromDraft = async (req, res) => {
     // STEP 4: Create Warehouse Manager User (like transporter pattern)
     // ========================================
 
-    // Generate warehouse manager user ID (format: CW0001, CW0002, etc.)
-    const warehouseManagerUserId = await generateWarehouseManagerUserId(trx);
+    // ✅ FIXED: Derive user ID from warehouse ID (WH054 -> CW0054)
+    // This ensures consistent lookup in getWarehouseById
+    const warehouseNumber = id.substring(2); // Remove 'WH' prefix
+    const warehouseManagerUserId = `CW${warehouseNumber.padStart(4, "0")}`;
+    console.log(
+      `  Generated user ID: ${warehouseManagerUserId} (derived from ${id})`
+    );
 
     // Get creator information
     const creator = await trx("user_master").where("user_id", userId).first();

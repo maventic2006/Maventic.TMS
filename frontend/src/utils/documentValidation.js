@@ -34,22 +34,22 @@ export const documentValidationPatterns = {
     description: "8-15 alphanumeric characters",
   },
   "Driving License": {
-    regex: /^[A-Z]{2}[0-9]{2}[0-9]{11}$/,
-    format: "DL0120230012345",
+    regex: /^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,}$/,
+    format: "DL0120230012345 or MP15B20197896787",
     description:
-      "State Code (2 letters) + RTO Code (2 digits) + Issue Year (4 digits) + Unique Number (7 digits)",
+      "State Code (2 letters) + RTO Code (2 digits) + Alphanumeric sequence (11+ characters)",
   },
   "Driver License": {
-    regex: /^[A-Z]{2}[0-9]{2}[0-9]{11}$/,
-    format: "DL0120230012345",
+    regex: /^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,}$/,
+    format: "DL0120230012345 or MP15B20197896787",
     description:
-      "State Code (2 letters) + RTO Code (2 digits) + Issue Year (4 digits) + Unique Number (7 digits)",
+      "State Code (2 letters) + RTO Code (2 digits) + Alphanumeric sequence (11+ characters)",
   },
   License: {
-    regex: /^[A-Z]{2}[0-9]{2}[0-9]{11}$/,
-    format: "DL0120230012345",
+    regex: /^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,}$/,
+    format: "DL0120230012345 or MP15B20197896787",
     description:
-      "State Code (2 letters) + RTO Code (2 digits) + Issue Year (4 digits) + Unique Number (7 digits)",
+      "State Code (2 letters) + RTO Code (2 digits) + Alphanumeric sequence (11+ characters)",
   },
 };
 

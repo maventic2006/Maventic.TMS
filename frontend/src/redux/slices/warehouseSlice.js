@@ -78,6 +78,7 @@ const initialState = {
     addressTypes: [],
     subLocationTypes: [],
     documentTypes: [],
+    consignors: [],
   },
   loading: false,
   isCreating: false,

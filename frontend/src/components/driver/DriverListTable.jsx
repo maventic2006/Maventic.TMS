@@ -23,6 +23,7 @@ import {
 } from "../ui/Table";
 import { Card, CardContent } from "../ui/Card";
 import { Button } from "../ui/Button";
+import { Country, State } from "country-state-city";
 
 // Helper function to display N/A for empty or null values
 const displayValue = (value) => {
@@ -35,6 +36,20 @@ const displayValue = (value) => {
     return "N/A";
   }
   return value;
+};
+
+// Helper function to convert ISO code to country name
+const getCountryName = (isoCode) => {
+  if (!isoCode) return "N/A";
+  const country = Country.getCountryByCode(isoCode);
+  return country ? country.name : isoCode;
+};
+
+// Helper function to convert ISO code to state name
+const getStateName = (countryCode, stateCode) => {
+  if (!countryCode || !stateCode) return "N/A";
+  const state = State.getStateByCodeAndCountry(stateCode, countryCode);
+  return state ? state.name : stateCode;
 };
 
 // Status pill component
@@ -240,7 +255,7 @@ const DriverListTable = ({
                     </span>
                   </div>
                   <p className="text-sm text-[#0D1A33]">
-                    {displayValue(driver.country)}
+                    {getCountryName(driver.country)}
                   </p>
                 </div>
                 <div>
@@ -251,7 +266,7 @@ const DriverListTable = ({
                     </span>
                   </div>
                   <p className="text-sm text-[#0D1A33]">
-                    {displayValue(driver.state)}
+                    {getStateName(driver.country, driver.state)}
                   </p>
                 </div>
                 <div>
@@ -418,12 +433,12 @@ const DriverListTable = ({
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-[#4A5568]">
-                      {displayValue(driver.state)}
+                      {getStateName(driver.country, driver.state)}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-[#4A5568]">
-                      {displayValue(driver.country)}
+                      {getCountryName(driver.country)}
                     </span>
                   </TableCell>
                   <TableCell className="px-4 py-3 whitespace-nowrap">

@@ -67,44 +67,21 @@ export const addressSchema = z.object({
     .min(1, "Postal code is required"),
   vatNumber: z
     .string()
-    .min(1, "VAT number is required")
+    .min(1, "GST/VAT number is required")
     .transform((val) => val.trim().toUpperCase()) // Convert to uppercase
-    .refine(
-      (val) => /^[A-Z0-9]{8,20}$/.test(val),
-      "VAT number must be 8-20 alphanumeric characters"
-    ),
-  tinPan: z
-    .string()
-    .optional()
-    .refine(
-      (val) => {
-        // If empty or not provided, it's valid
-        if (!val || val.trim() === "") return true;
-        // If provided, must match PAN Card format: ABCDE1234F
-        const panRegex = /^[A-Z]{5}\d{4}[A-Z]$/;
-        return panRegex.test(val.trim().toUpperCase());
-      },
-      {
-        message:
-          "TIN/PAN must match format: 5 letters + 4 digits + 1 letter (e.g., ABCDE1234F)",
-      }
-    ),
-  tan: z
-    .string()
-    .optional()
-    .refine(
-      (val) => {
-        // If empty or not provided, it's valid
-        if (!val || val.trim() === "") return true;
-        // If provided, must match TAN format: ASDF12345N
-        const tanRegex = /^[A-Z]{4}\d{5}[A-Z]$/;
-        return tanRegex.test(val.trim().toUpperCase());
-      },
-      {
-        message:
-          "TAN must match format: 4 letters + 5 digits + 1 letter (e.g., ASDF12345N)",
-      }
-    ),
+    .refine((val) => {
+      // Indian GST format: 15 characters
+      // Pattern: 2 digits (state) + 10 chars (PAN) + 1 digit (entity) + 1 letter (Z) + 1 digit (checksum)
+      // Example: 27AAPFU0939F1ZV
+      const gstRegex =
+        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+
+      // International VAT format: 2 letter country code + 8-15 alphanumeric
+      // Examples: GB123456789, DE123456789, FR12345678901
+      const vatRegex = /^[A-Z]{2}[A-Z0-9]{8,15}$/;
+
+      return gstRegex.test(val) || vatRegex.test(val);
+    }, "Invalid GST/VAT format. Indian GST: 15 chars (e.g., 27AAPFU0939F1ZV), International VAT: Country code + 8-15 chars"),
   addressType: z.string().min(1, "Please select address type"),
   isPrimary: z.boolean().default(true),
 });

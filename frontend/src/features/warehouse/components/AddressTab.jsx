@@ -20,8 +20,6 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
     street2: "",
     postalCode: "",
     vatNumber: "",
-    tinPan: "",
-    tan: "",
     addressType: "",
   };
 
@@ -240,7 +238,7 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
                 )
               }
               placeholder="Enter VAT/GST number"
-              maxLength={15}
+              maxLength={17}
               className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
                 errors?.["address.vatNumber"]
                   ? "border-red-500 focus:border-red-500"
@@ -253,44 +251,8 @@ const AddressTab = ({ formData, setFormData, errors, masterData }) => {
               </p>
             )}
             <p className="text-xs text-gray-500">
-              Format: 15 alphanumeric characters (auto-uppercase, special
-              characters stripped)
-            </p>
-          </div>
-
-          {/* TIN/PAN - Optional */}
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-[#0D1A33]">
-              TIN/PAN
-            </label>
-            <input
-              type="text"
-              value={address.tinPan || ""}
-              onChange={(e) => handleChange("tinPan", e.target.value)}
-              placeholder="Enter TIN/PAN number"
-              maxLength={15}
-              className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
-            />
-            <p className="text-xs text-gray-500">
-              Tax Identification Number (TIN) / Permanent Account Number (PAN)
-            </p>
-          </div>
-
-          {/* TAN - Optional */}
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-[#0D1A33]">
-              TAN
-            </label>
-            <input
-              type="text"
-              value={address.tan || ""}
-              onChange={(e) => handleChange("tan", e.target.value)}
-              placeholder="Enter TAN number"
-              maxLength={15}
-              className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
-            />
-            <p className="text-xs text-gray-500">
-              Tax Deduction and Collection Account Number
+              Indian GST: 15 chars (e.g., 27AAPFU0939F1ZV) | International VAT:
+              Country code + 8-15 chars (e.g., GB123456789)
             </p>
           </div>
 

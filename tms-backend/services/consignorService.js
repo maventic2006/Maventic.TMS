@@ -844,6 +844,7 @@ const getConsignorById = async (customerId) => {
             pendingWithUserId: approvalFlow.pending_with_user_id,
             createdByUserId: approvalFlow.created_by_user_id,
             createdByName: approvalFlow.created_by_name,
+            remarks: approvalFlow.remarks || null, // ✅ FIX: Include rejection remarks
           };
 
           console.log(
@@ -1514,7 +1515,7 @@ const updateConsignor = async (
 
     // ACTIVE entities: Only approvers can edit
     if (currentStatus === "ACTIVE") {
-      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      const isApprover = userRole === "product_owner" || userRole === "admin";
       if (!isApprover) {
         throw {
           type: "FORBIDDEN",

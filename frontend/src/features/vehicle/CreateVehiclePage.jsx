@@ -1148,8 +1148,7 @@
 
 // export default CreateVehiclePage;
 
-
-﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -1202,7 +1201,7 @@ const getInitialFormData = (userId = "ADMIN001") => ({
     transporterName: "",
     make: "",
     model: "",
-    year: new Date().getFullYear(),
+    year: new Date().getFullYear(), // Default to current year
     leasingFlag: false,
     leasedFrom: "",
     leaseStartDate: "",
@@ -1247,8 +1246,8 @@ const getInitialFormData = (userId = "ADMIN001") => ({
   serviceFrequency: [],
   documents: [],
   status: "PENDING_APPROVAL",
-  createdBy: userId,
-  createdAt: new Date().toISOString(),
+  createdBy: userId, // User ID from logged-in user
+  createdAt: new Date().toISOString(), // Current timestamp
 });
 
 const CreateVehiclePage = () => {
@@ -1261,9 +1260,10 @@ const CreateVehiclePage = () => {
   const { user } = useSelector((state) => state.auth);
 
   const [activeTab, setActiveTab] = useState(0);
-  const [formData, setFormData] = useState(() =>
-    getInitialFormData(user?.userId)
-  );
+
+  // Create initial form data ONCE and reuse for both state and dirty tracking
+  const [initialFormState] = useState(() => getInitialFormData(user?.userId));
+  const [formData, setFormData] = useState(initialFormState);
 
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
@@ -1321,8 +1321,8 @@ const CreateVehiclePage = () => {
     },
   ];
 
-  // Dirty tracking hook for unsaved changes
-  const initialFormData = getInitialFormData(user?.userId);
+  // Use the same object reference for dirty tracking to prevent false positives
+  const initialFormData = initialFormState;
   const { isDirty, currentData, setCurrentData, resetDirty } =
     useFormDirtyTracking(initialFormData);
 
@@ -1330,6 +1330,17 @@ const CreateVehiclePage = () => {
   useEffect(() => {
     setCurrentData(formData);
   }, [formData, setCurrentData]);
+
+  // Reset dirty state after component mounts with pre-filled data
+  // This ensures that pre-filled default values (year, createdBy, createdAt) don't trigger dirty state on page load
+  useEffect(() => {
+    // Run only once on mount after initial render
+    const timer = setTimeout(() => {
+      resetDirty(formData);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array - runs only once on mount
 
   const validateFuelTypeId = useCallback(
     (fuelType) => {
@@ -1612,15 +1623,15 @@ const CreateVehiclePage = () => {
                 if (/^DN\d{3}$/.test(documentTypeDescription)) {
                   return documentTypeDescription;
                 }
-                
+
                 // Map common document type descriptions to their ID codes
                 const documentTypeMap = {
                   "Vehicle Registration Certificate": "DN001",
-                  "Vehicle Insurance": "DN009", 
+                  "Vehicle Insurance": "DN009",
                   "PUC certificate": "DN010",
                   "Fitness Certificate": "DN012",
                   "Tax Certificate": "DN005",
-                  "Permit": "DN006",
+                  Permit: "DN006",
                   "Driver License": "DN007",
                   "Road Tax": "DN008",
                   "Commercial Vehicle License": "DN011",
@@ -1636,19 +1647,26 @@ const CreateVehiclePage = () => {
                 }
 
                 // If no mapping found, log warning
-                console.warn("⚠️ Unknown document type description:", documentTypeDescription);
-                
+                console.warn(
+                  "⚠️ Unknown document type description:",
+                  documentTypeDescription
+                );
+
                 // Return the original value as fallback
                 return documentTypeDescription;
               };
 
               return {
-                documentType: getDocumentTypeId(doc.documentType || doc.documentTypeId || ""),
-                referenceNumber: doc.documentNumber || doc.referenceNumber || "",
+                documentType: getDocumentTypeId(
+                  doc.documentType || doc.documentTypeId || ""
+                ),
+                referenceNumber:
+                  doc.documentNumber || doc.referenceNumber || "",
                 vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
                 permitCategory: doc.permitCategory || "",
                 permitCode: doc.permitCode || "",
-                documentProvider: doc.documentProvider || doc.issuingAuthority || "",
+                documentProvider:
+                  doc.documentProvider || doc.issuingAuthority || "",
                 coverageType: doc.coverageType || "",
                 premiumAmount: doc.premiumAmount || 0,
                 validFrom: formatDate(doc.issueDate || doc.validFrom),
@@ -2315,4 +2333,4 @@ const CreateVehiclePage = () => {
   );
 };
 
-export default CreateVehiclePage; 
+export default CreateVehiclePage;

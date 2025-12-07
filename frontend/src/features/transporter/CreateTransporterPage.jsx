@@ -68,66 +68,74 @@ const CreateTransporterPage = () => {
   const theme = getPageTheme("general");
 
   const [activeTab, setActiveTab] = useState(0);
-  const [formData, setFormData] = useState({
-    transporterId: null,
-    generalDetails: {
-      businessName: "",
-      fromDate: new Date().toISOString().split("T")[0], // Auto-filled with current date
-      toDate: "",
-      avgRating: 0,
-      transMode: {
-        road: false,
-        rail: false,
-        air: false,
-        sea: false,
+
+  // Create initial form data with current date - MUST be created once and reused
+  const [initialFormState] = useState(() => {
+    const currentDate = new Date().toISOString().split("T")[0];
+    return {
+      transporterId: null,
+      generalDetails: {
+        businessName: "",
+        fromDate: currentDate, // Default to today's date
+        toDate: "",
+        avgRating: 0,
+        transMode: {
+          road: false,
+          rail: false,
+          air: false,
+          sea: false,
+        },
+        activeFlag: true,
       },
-      activeFlag: true,
-    },
-    addresses: [
-      {
-        vatNumber: "",
-        country: "",
-        state: "",
-        city: "",
-        district: "",
-        street1: "",
-        street2: "",
-        postalCode: "",
-        isPrimary: true,
-        contacts: [
-          {
-            name: "",
-            role: "",
-            phoneNumber: "",
-            alternatePhoneNumber: "",
-            email: "",
-            alternateEmail: "",
-            whatsappNumber: "",
-          },
-        ],
-      },
-    ],
-    serviceableAreas: [
-      {
-        country: "",
-        states: [],
-      },
-    ],
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        referenceNumber: "",
-        country: "",
-        validFrom: "",
-        validTo: "",
-        status: true,
-        fileName: "",
-        fileType: "",
-        fileData: "",
-      },
-    ],
+      addresses: [
+        {
+          vatNumber: "",
+          country: "",
+          state: "",
+          city: "",
+          district: "",
+          street1: "",
+          street2: "",
+          postalCode: "",
+          isPrimary: true,
+          contacts: [
+            {
+              name: "",
+              role: "",
+              phoneNumber: "",
+              alternatePhoneNumber: "",
+              email: "",
+              alternateEmail: "",
+              whatsappNumber: "",
+            },
+          ],
+        },
+      ],
+      serviceableAreas: [
+        {
+          country: "",
+          states: [],
+        },
+      ],
+      documents: [
+        {
+          documentType: "",
+          documentNumber: "",
+          referenceNumber: "",
+          country: "",
+          validFrom: "",
+          validTo: "",
+          status: true,
+          fileName: "",
+          fileType: "",
+          fileData: "",
+        },
+      ],
+    };
   });
+
+  // Use the same initial state for formData
+  const [formData, setFormData] = useState(initialFormState);
 
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
@@ -141,67 +149,8 @@ const CreateTransporterPage = () => {
   // DRAFT MANAGEMENT HOOKS
   // ============================================
 
-  // Initial form data for dirty tracking
-  const initialFormData = {
-    transporterId: null,
-    generalDetails: {
-      businessName: "",
-      fromDate: new Date().toISOString().split("T")[0], // Auto-filled with current date
-      toDate: "",
-      avgRating: 0,
-      transMode: {
-        road: false,
-        rail: false,
-        air: false,
-        sea: false,
-      },
-      activeFlag: true,
-    },
-    addresses: [
-      {
-        vatNumber: "",
-        country: "",
-        state: "",
-        city: "",
-        district: "",
-        street1: "",
-        street2: "",
-        postalCode: "",
-        isPrimary: true,
-        contacts: [
-          {
-            name: "",
-            role: "",
-            phoneNumber: "",
-            alternatePhoneNumber: "",
-            email: "",
-            alternateEmail: "",
-            whatsappNumber: "",
-          },
-        ],
-      },
-    ],
-    serviceableAreas: [
-      {
-        country: "",
-        states: [],
-      },
-    ],
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        referenceNumber: "",
-        country: "",
-        validFrom: "",
-        validTo: "",
-        status: true,
-        fileName: "",
-        fileType: "",
-        fileData: "",
-      },
-    ],
-  };
+  // Use the same object reference for dirty tracking to prevent false positives
+  const initialFormData = initialFormState;
 
   // Form dirty tracking - Pass INITIAL form data (empty baseline) to the hook
   const { isDirty, setCurrentData, resetDirty } =
@@ -211,6 +160,17 @@ const CreateTransporterPage = () => {
   useEffect(() => {
     setCurrentData(formData);
   }, [formData, setCurrentData]);
+
+  // Reset dirty state after component mounts with pre-filled data
+  // This ensures that pre-filled default values (fromDate) don't trigger dirty state on page load
+  useEffect(() => {
+    // Run only once on mount after initial render
+    const timer = setTimeout(() => {
+      resetDirty(formData);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array - runs only once on mount
 
   // Save as draft hook
   const {

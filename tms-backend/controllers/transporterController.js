@@ -1271,7 +1271,7 @@ const updateTransporter = async (req, res) => {
 
     // ACTIVE entities: Only approvers can edit
     if (currentStatus === "ACTIVE") {
-      const isApprover = userRole === "Product Owner" || userRole === "admin";
+      const isApprover = userRole === "product_owner" || userRole === "admin";
       if (!isApprover) {
         await trx.rollback();
         return res.status(403).json({
@@ -2251,6 +2251,26 @@ const getMasterData = async (req, res) => {
       .where("status", "ACTIVE")
       .orderBy("address");
 
+    // Get mandatory documents for TRANSPORTER user type
+    const mandatoryDocuments = await knex("doc_type_configuration as dtc")
+      .join(
+        "document_name_master as dnm",
+        "dtc.doc_name_master_id",
+        "dnm.doc_name_master_id"
+      )
+      .select(
+        "dtc.doc_name_master_id as value",
+        "dnm.document_name as label",
+        "dtc.is_mandatory",
+        "dtc.is_expiry_required",
+        "dtc.is_verification_required"
+      )
+      .where("dtc.user_type", "TRANSPORTER")
+      .where("dtc.status", "ACTIVE")
+      .where("dnm.status", "ACTIVE")
+      .where("dtc.is_mandatory", 1)
+      .orderBy("dnm.document_name");
+
     res.json({
       success: true,
       data: {
@@ -2258,6 +2278,7 @@ const getMasterData = async (req, res) => {
         documentTypes,
         documentNames,
         addressTypes,
+        mandatoryDocuments,
       },
       timestamp: new Date().toISOString(),
     });
@@ -2400,27 +2421,27 @@ const getTransporters = async (req, res) => {
         "tgi.transporter_id",
         "tc.transporter_id"
       )
-      // LEFT JOIN for PAN document
+      // LEFT JOIN for PAN document (DN001)
       .leftJoin(
         knex.raw(`(
           SELECT 
             SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
             document_number as pan_number
           FROM transporter_documents
-          WHERE document_type_id = 'PAN Card'
+          WHERE document_type_id = 'DN001'
             AND status = 'ACTIVE'
         ) as pan_doc`),
         "tgi.transporter_id",
         "pan_doc.transporter_id"
       )
-      // LEFT JOIN for TAN document
+      // LEFT JOIN for TAN document (DN003)
       .leftJoin(
         knex.raw(`(
           SELECT 
             SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
             document_number as tan_number
           FROM transporter_documents
-          WHERE document_type_id = 'TAN'
+          WHERE document_type_id = 'DN003'
             AND status = 'ACTIVE'
         ) as tan_doc`),
         "tgi.transporter_id",
@@ -2642,7 +2663,7 @@ const getTransporters = async (req, res) => {
     if (vatGst)
       countQuery = countQuery.where("addr.vat_number", "like", `%${vatGst}%`);
     // Filter by TAN from transporter_documents instead of tms_address
-    if (tan) 
+    if (tan)
       countQuery = countQuery.where("tan_doc.tan_number", "like", `%${tan}%`);
 
     if (transportMode) {
@@ -2960,10 +2981,11 @@ const getTransporterById = async (req, res) => {
       return acc;
     }, {});
 
-    // Build addresses with their contacts - convert country ISO codes to country names
+    // Build addresses with their contacts - convert country ISO codes to country names and state ISO codes to state names
     const addressesWithContacts = addresses.map((address) => {
       // Convert country ISO code to country name
       let countryName = address.country;
+      let countryIsoCode = address.country;
       if (address.country && address.country.length <= 3) {
         // It's an ISO code, convert to name
         const countryData = Country.getAllCountries().find(
@@ -2971,6 +2993,19 @@ const getTransporterById = async (req, res) => {
         );
         if (countryData) {
           countryName = countryData.name;
+          countryIsoCode = countryData.isoCode;
+        }
+      }
+
+      // Convert state ISO code to state name (for GST validation)
+      let stateName = address.state;
+      if (address.state && countryIsoCode) {
+        // Try to find state by ISO code
+        const stateData = State.getStatesOfCountry(countryIsoCode).find(
+          (s) => s.isoCode === address.state
+        );
+        if (stateData) {
+          stateName = stateData.name;
         }
       }
 
@@ -2978,7 +3013,7 @@ const getTransporterById = async (req, res) => {
         addressId: address.address_id, // Include address ID for updates
         vatNumber: address.vat_number,
         country: countryName,
-        state: address.state,
+        state: stateName, // Now returns full state name instead of ISO code
         city: address.city,
         street1: address.street_1,
         street2: address.street_2,
@@ -3086,8 +3121,9 @@ const getTransporterById = async (req, res) => {
       serviceableAreas: groupedServiceableAreas,
       documents: documents.map((doc) => ({
         documentUniqueId: doc.document_unique_id,
-        documentType: doc.documentTypeName || doc.document_type_id,
+        documentType: doc.document_type_id, // Use ID (DN001) instead of name for frontend compatibility
         documentTypeId: doc.document_type_id,
+        documentTypeName: doc.documentTypeName || doc.document_type_id, // Keep name for display
         documentNumber: doc.document_number,
         referenceNumber: doc.reference_number,
         country: doc.country,
@@ -3096,6 +3132,8 @@ const getTransporterById = async (req, res) => {
         status: doc.active,
         fileName: doc.file_name,
         fileType: doc.file_type,
+        fileData: "", // Initialize empty for edit mode
+        fileUpload: null, // Initialize for file uploads
         // Don't send file data in the list to reduce response size
         // fileData: doc.file_data,
       })),
@@ -4290,6 +4328,7 @@ const submitTransporterFromDraft = async (req, res) => {
         .first();
 
       if (docTypeInfo) {
+        // Store the resolved document type ID for database insertion
         doc.documentTypeId = docTypeInfo.doc_name_master_id;
 
         const validation = validateDocumentNumber(
@@ -4411,10 +4450,20 @@ const submitTransporterFromDraft = async (req, res) => {
         }
 
         // Validate GST-PAN match
+        console.log("🔍 [GST VALIDATION DEBUG]:");
+        console.log("  GST Number:", gstPrimaryAddrDraft.vatNumber);
+        console.log("  PAN Number:", panDocument.documentNumber);
+        console.log("  State from Address:", gstPrimaryAddrDraft.state);
+
         const gstValidation = validateGSTPAN(
           gstPrimaryAddrDraft.vatNumber,
           panDocument.documentNumber,
           gstPrimaryAddrDraft.state
+        );
+
+        console.log(
+          "  Validation Result:",
+          JSON.stringify(gstValidation, null, 2)
         );
 
         if (!gstValidation.isValid) {
