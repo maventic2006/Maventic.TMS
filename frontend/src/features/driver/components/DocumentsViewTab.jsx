@@ -28,17 +28,17 @@ const DocumentsViewTab = ({ driver }) => {
   // Handle ESC key to close preview modal
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && previewDocument) {
+      if (event.key === "Escape" && previewDocument) {
         closePreview();
       }
     };
 
     if (previewDocument) {
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener("keydown", handleKeyDown);
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [previewDocument]);
 
@@ -129,8 +129,8 @@ const DocumentsViewTab = ({ driver }) => {
     // For files uploaded via File objects (in create mode)
     if (doc.fileUpload instanceof File) {
       const reader = new FileReader();
-      reader.onload = function(e) {
-        const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+      reader.onload = function (e) {
+        const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
         setPreviewDocument({
           fileName: doc.fileUpload.name,
           fileType: doc.fileUpload.type,
@@ -165,8 +165,8 @@ const DocumentsViewTab = ({ driver }) => {
 
       if (response.data.success && response.data.data.fileData) {
         setPreviewDocument({
-          fileName: document.fileName || 'Document',
-          fileType: document.fileType || 'application/octet-stream',
+          fileName: document.fileName || "Document",
+          fileType: document.fileType || "application/octet-stream",
           fileData: response.data.data.fileData,
         });
       } else {
@@ -181,15 +181,36 @@ const DocumentsViewTab = ({ driver }) => {
   };
 
   const handleDownload = (document) => {
-    if (!document.fileData || !document.fileName) return;
+    if (!document.fileData || !document.fileName) {
+      alert("No file data available for download");
+      return;
+    }
 
-    // Create a download link
-    const link = document.createElement("a");
-    link.href = document.fileData;
-    link.download = document.fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Convert base64 to blob
+      const byteCharacters = atob(document.fileData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], {
+        type: document.fileType || "application/octet-stream",
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = document.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      alert("Failed to download document. Please try again.");
+    }
   };
 
   const closePreview = () => {
@@ -532,13 +553,13 @@ const DocumentsViewTab = ({ driver }) => {
             <div className="flex-1 overflow-auto p-6">
               {previewDocument.fileType === "application/pdf" ? (
                 <iframe
-                  src={previewDocument.fileData}
+                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
                   className="w-full h-full min-h-[600px]"
                   title="Document Preview"
                 />
               ) : previewDocument.fileType?.startsWith("image/") ? (
                 <img
-                  src={previewDocument.fileData}
+                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
                   alt={previewDocument.fileName}
                   className="max-w-full h-auto mx-auto"
                 />

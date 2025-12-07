@@ -49,10 +49,12 @@ exports.uploadFile = async (req, res) => {
       });
     }
 
-    // Get user ID from auth middleware - must be numeric for database
+    // Get user ID and consignor ID from auth middleware
     const userId = req.user?.id || 1; // Default to 1 for testing
+    const userConsignorId = req.user?.consignor_id || null; // User's consignor ID for auto-fill
 
     console.log("📤 Warehouse file upload received:", req.file.originalname);
+    console.log("📤 User ID:", userId, "Consignor ID:", userConsignorId);
 
     // Generate unique batch ID
     const batchId = `WAREHOUSE-BATCH-${Date.now()}-${Math.random()
@@ -88,6 +90,7 @@ exports.uploadFile = async (req, res) => {
           batchId,
           filePath: req.file.path,
           userId,
+          userConsignorId, // Pass user's consignor ID for auto-fill
           originalName: req.file.originalname,
         });
         console.log(`✅ Warehouse batch processing completed: ${batchId}`);
@@ -147,10 +150,26 @@ exports.getBatchStatus = async (req, res) => {
       statusCounts[w.validation_status] = parseInt(w.count);
     });
 
+    // Transform batch to camelCase for frontend consistency
+    const batchData = {
+      batchId: batch.batch_id,
+      uploadedBy: batch.uploaded_by,
+      filename: batch.filename,
+      totalRows: batch.total_rows,
+      validCount: batch.total_valid,
+      invalidCount: batch.total_invalid,
+      totalCreated: batch.total_created || 0,
+      totalCreationFailed: batch.total_creation_failed || 0,
+      status: batch.status,
+      uploadedTimestamp: batch.upload_timestamp,
+      processedTimestamp: batch.processed_timestamp,
+      errorReportPath: batch.error_report_path,
+    };
+
     res.json({
       success: true,
       data: {
-        batch,
+        batch: batchData,
         statusCounts,
       },
     });
@@ -190,10 +209,26 @@ exports.getUploadHistory = async (req, res) => {
       .limit(limit)
       .offset(offset);
 
+    // Transform batches to camelCase for frontend consistency
+    const transformedBatches = batches.map((batch) => ({
+      batchId: batch.batch_id,
+      uploadedBy: batch.uploaded_by,
+      filename: batch.filename,
+      totalRows: batch.total_rows,
+      validCount: batch.total_valid,
+      invalidCount: batch.total_invalid,
+      totalCreated: batch.total_created || 0,
+      totalCreationFailed: batch.total_creation_failed || 0,
+      status: batch.status,
+      uploadedTimestamp: batch.upload_timestamp,
+      processedTimestamp: batch.processed_timestamp,
+      errorReportPath: batch.error_report_path,
+    }));
+
     res.json({
       success: true,
       data: {
-        batches,
+        batches: transformedBatches,
         pagination: {
           page,
           limit,

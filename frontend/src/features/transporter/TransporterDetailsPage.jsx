@@ -172,12 +172,20 @@ const TransporterDetailsPage = () => {
     dispatch(fetchMasterData());
   }, [dispatch]);
 
-  // Set edit form data when transporter data is loaded
+  // Clear editFormData when transporter ID changes
   useEffect(() => {
-    if (selectedTransporter && !editFormData) {
+    setEditFormData(null);
+    setIsEditMode(false);
+    setHasUnsavedChanges(false);
+    setValidationErrors({});
+  }, [id]);
+
+  // Re-transform when selectedTransporter changes
+  useEffect(() => {
+    if (selectedTransporter) {
       setEditFormData(selectedTransporter);
     }
-  }, [selectedTransporter, editFormData]);
+  }, [selectedTransporter?.transporterId, selectedTransporter]);
 
   // Debug logging for approval data
   useEffect(() => {
@@ -607,9 +615,10 @@ const TransporterDetailsPage = () => {
       dispatch(clearError());
 
       // Check if it's a validation error from backend (400 Bad Request)
+      // Backend returns: { success: false, error: { code, message, field } }
       if (
-        err.code === "VALIDATION_ERROR" ||
-        err.message?.includes("required")
+        err.error?.code === "VALIDATION_ERROR" ||
+        err.error?.message?.includes("required")
       ) {
         // Backend validation error - show inline errors and stay in edit mode
 
@@ -617,9 +626,11 @@ const TransporterDetailsPage = () => {
         let tabWithError = null;
         const backendErrors = {};
 
-        if (err.field) {
+        if (err.error?.field) {
           // Parse field path like "documents[0].documentNumber"
-          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+          const fieldMatch = err.error.field.match(
+            /^(\w+)(?:\[(\d+)\])?\.?(.+)?$/
+          );
 
           if (fieldMatch) {
             const [, section, index, field] = fieldMatch;
@@ -640,12 +651,12 @@ const TransporterDetailsPage = () => {
               if (!backendErrors[section][index])
                 backendErrors[section][index] = {};
               if (field) {
-                backendErrors[section][index][field] = err.message;
+                backendErrors[section][index][field] = err.error.message;
               }
             } else if (field) {
               // Object field error (e.g., generalDetails.businessName)
               if (!backendErrors[section]) backendErrors[section] = {};
-              backendErrors[section][field] = err.message;
+              backendErrors[section][field] = err.error.message;
             }
           }
         }
@@ -667,12 +678,14 @@ const TransporterDetailsPage = () => {
           setActiveTab(tabWithError);
         }
 
-        // Show error toast
+        // Show error toast with validation details
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
             message:
-              err.message || "Please fix validation errors before submitting.",
+              err.error.message ||
+              "Please fix validation errors before submitting.",
+            details: err.error.expectedFormats || undefined,
           })
         );
 
@@ -684,7 +697,10 @@ const TransporterDetailsPage = () => {
       dispatch(
         addToast({
           type: TOAST_TYPES.ERROR,
-          message: err.message || "Failed to submit draft. Please try again.",
+          message:
+            err.error?.message ||
+            err.message ||
+            "Failed to submit draft. Please try again.",
         })
       );
     }
@@ -856,9 +872,10 @@ const TransporterDetailsPage = () => {
       dispatch(clearError());
 
       // Check if it's a validation error from backend (400 Bad Request)
+      // Backend returns: { success: false, error: { code, message, field } }
       if (
-        err.code === "VALIDATION_ERROR" ||
-        err.message?.includes("required")
+        err.error?.code === "VALIDATION_ERROR" ||
+        err.error?.message?.includes("required")
       ) {
         // Backend validation error - show inline errors and stay in edit mode
 
@@ -866,9 +883,11 @@ const TransporterDetailsPage = () => {
         let tabWithError = null;
         const backendErrors = {};
 
-        if (err.field) {
+        if (err.error?.field) {
           // Parse field path like "documents[0].documentNumber"
-          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+          const fieldMatch = err.error.field.match(
+            /^(\w+)(?:\[(\d+)\])?\.?(.+)?$/
+          );
 
           if (fieldMatch) {
             const [, section, index, field] = fieldMatch;
@@ -889,12 +908,12 @@ const TransporterDetailsPage = () => {
               if (!backendErrors[section][index])
                 backendErrors[section][index] = {};
               if (field) {
-                backendErrors[section][index][field] = err.message;
+                backendErrors[section][index][field] = err.error.message;
               }
             } else if (field) {
               // Object field error (e.g., generalDetails.businessName)
               if (!backendErrors[section]) backendErrors[section] = {};
-              backendErrors[section][field] = err.message;
+              backendErrors[section][field] = err.error.message;
             }
           }
         }
@@ -916,12 +935,14 @@ const TransporterDetailsPage = () => {
           setActiveTab(tabWithError);
         }
 
-        // Show error toast
+        // Show error toast with validation details
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
             message:
-              err.message || "Please fix validation errors before saving.",
+              err.error.message ||
+              "Please fix validation errors before saving.",
+            details: err.error.expectedFormats || undefined,
           })
         );
 
@@ -934,7 +955,9 @@ const TransporterDetailsPage = () => {
         addToast({
           type: TOAST_TYPES.ERROR,
           message:
-            err.message || "Failed to update transporter. Please try again.",
+            err.error?.message ||
+            err.message ||
+            "Failed to update transporter. Please try again.",
         })
       );
     }

@@ -104,7 +104,8 @@ async function generateWarehouseBulkUploadTemplate() {
   const instructionRow = basicInfoSheet.addRow({
     warehouse_unique_id: "Leave blank - Auto-generated",
     warehouse_id: "Leave blank - Auto-generated",
-    consignor_id: "Leave blank - Auto-filled from your login",
+    consignor_id:
+      "Optional - Leave blank to auto-fill from your login, or provide consignor ID",
     warehouse_type: "Select from master data",
     warehouse_name1: "Required - Max 30 chars, must be unique",
     warehouse_name2: "Required - Max 30 chars",

@@ -141,12 +141,12 @@ const WarehouseBulkUploadHistory = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {batches.map((batch) => (
                   <tr
-                    key={batch.batch_id}
+                    key={batch.batchId}
                     className="hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className="text-sm font-mono text-gray-900">
-                        {batch.batch_id}
+                        {batch.batchId}
                       </span>
                     </td>
                     <td className="px-4 py-4">
@@ -164,14 +164,14 @@ const WarehouseBulkUploadHistory = () => {
                       <div className="text-sm">
                         <div className="flex items-center gap-2">
                           <span className="text-green-600 font-medium">
-                            {batch.total_created || 0}
+                            {batch.totalCreated || 0}
                           </span>
                           <span className="text-gray-400">created</span>
                         </div>
-                        {batch.total_invalid > 0 && (
+                        {batch.invalidCount > 0 && (
                           <div className="flex items-center gap-2">
                             <span className="text-red-600 font-medium">
-                              {batch.total_invalid}
+                              {batch.invalidCount}
                             </span>
                             <span className="text-gray-400">invalid</span>
                           </div>
@@ -180,15 +180,15 @@ const WarehouseBulkUploadHistory = () => {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-600">
-                        {formatDate(batch.upload_timestamp)}
+                        {formatDate(batch.uploadedTimestamp)}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      {batch.total_invalid > 0 && (
+                      {batch.invalidCount > 0 && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDownloadError(batch.batch_id)}
+                          onClick={() => handleDownloadError(batch.batchId)}
                           className="text-xs"
                         >
                           <Download className="h-3 w-3 mr-1" />

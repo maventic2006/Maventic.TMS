@@ -101,7 +101,9 @@ async function parseWarehouseExcel(filePath) {
 
   // Parse Sheet 1: Warehouse Basic Information
   basicInfoSheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1 || rowNumber === 2 || rowNumber === 3) return; // Skip header + sample + instructions
+    // Skip header row (1) and sample data row (2)
+    // Row 3 onwards contains actual user data
+    if (rowNumber === 1 || rowNumber === 2) return;
 
     const warehouseName1 = row.getCell(5).value; // Column E
     if (!warehouseName1) return;
@@ -112,29 +114,50 @@ async function parseWarehouseExcel(filePath) {
     warehouses[refId] = {
       refId: refId, // Use row number as reference (guaranteed unique and short)
       basicInfo: {
+        consignorId: row.getCell(3).value || null, // Column C - Consignor_ID (can be from Excel or auto-filled later)
         warehouseType: row.getCell(4).value, // Column D
         warehouseName1: row.getCell(5).value, // Column E
         warehouseName2: row.getCell(6).value, // Column F
         language: row.getCell(7).value || "EN", // Column G
         vehicleCapacity: parseInt(row.getCell(8).value) || 0, // Column H
         virtualYardIn:
-          row.getCell(9).value === "TRUE" || row.getCell(9).value === true,
+          row.getCell(9).value === "TRUE" ||
+          row.getCell(9).value === "Yes" ||
+          row.getCell(9).value === true,
         radiusVirtualYardIn: parseInt(row.getCell(10).value) || 0,
         speedLimit: parseInt(row.getCell(11).value) || 20,
         weighBridge:
-          row.getCell(12).value === "TRUE" || row.getCell(12).value === true,
+          row.getCell(12).value === "TRUE" ||
+          row.getCell(12).value === "Yes" ||
+          row.getCell(12).value === true,
         gatepassSystem:
-          row.getCell(13).value === "TRUE" || row.getCell(13).value === true,
+          row.getCell(13).value === "TRUE" ||
+          row.getCell(13).value === "Yes" ||
+          row.getCell(13).value === true,
         fuelAvailability:
-          row.getCell(14).value === "TRUE" || row.getCell(14).value === true,
+          row.getCell(14).value === "TRUE" ||
+          row.getCell(14).value === "Yes" ||
+          row.getCell(14).value === true,
         stagingArea:
-          row.getCell(15).value === "TRUE" || row.getCell(15).value === true,
+          row.getCell(15).value === "TRUE" ||
+          row.getCell(15).value === "Yes" ||
+          row.getCell(15).value === true,
         driverWaitingArea:
-          row.getCell(16).value === "TRUE" || row.getCell(16).value === true,
-        gateInChecklist:
-          row.getCell(17).value === "TRUE" || row.getCell(17).value === true,
-        gateOutChecklist:
-          row.getCell(18).value === "TRUE" || row.getCell(18).value === true,
+          row.getCell(16).value === "TRUE" ||
+          row.getCell(16).value === "Yes" ||
+          row.getCell(16).value === true,
+        gateInChecklist: !!(
+          row.getCell(17).value === "TRUE" ||
+          row.getCell(17).value === "Yes" ||
+          row.getCell(17).value === true ||
+          row.getCell(17).value === "Admin"
+        ),
+        gateOutChecklist: !!(
+          row.getCell(18).value === "TRUE" ||
+          row.getCell(18).value === "Yes" ||
+          row.getCell(18).value === true ||
+          row.getCell(18).value === "Admin"
+        ),
         country: row.getCell(19).value, // Column S
         state: row.getCell(20).value, // Column T
         city: row.getCell(21).value, // Column U
@@ -224,6 +247,19 @@ async function parseWarehouseExcel(filePath) {
 function validateWarehouseData(warehouse) {
   const errors = [];
   const { basicInfo, subLocationHeaders } = warehouse;
+
+  // Validate consignor_id (required after auto-fill)
+  if (
+    !basicInfo.consignorId ||
+    basicInfo.consignorId.toString().trim().length === 0
+  ) {
+    errors.push({
+      field: "Consignor_ID",
+      message:
+        "Consignor ID is required. Please fill it in Excel or ensure you're logged in as a consignor.",
+      sheet: "Warehouse Basic Information",
+    });
+  }
 
   // Validate warehouse name
   if (!basicInfo.warehouseName1 || basicInfo.warehouseName1.trim().length < 2) {
@@ -354,6 +390,133 @@ function validateWarehouseData(warehouse) {
   }
 
   return errors;
+}
+
+/**
+ * Generate error report Excel file for invalid warehouses
+ */
+async function generateWarehouseErrorReport(invalidWarehouses, batchId) {
+  try {
+    console.log(`📄 Generating warehouse error report for batch ${batchId}...`);
+
+    const workbook = new ExcelJS.Workbook();
+
+    // Sheet 1: Error Summary
+    const summarySheet = workbook.addWorksheet("Error Summary");
+
+    // Title
+    summarySheet.mergeCells("A1:D1");
+    const titleCell = summarySheet.getCell("A1");
+    titleCell.value = `Warehouse Bulk Upload Error Report - Batch ${batchId}`;
+    titleCell.font = { size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+    titleCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFD32F2F" },
+    };
+    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+    summarySheet.getRow(1).height = 30;
+
+    // Stats
+    summarySheet.getCell("A3").value = "Total Invalid Records:";
+    summarySheet.getCell("B3").value = invalidWarehouses.length;
+    summarySheet.getCell("A3").font = { bold: true };
+
+    // Headers for error list
+    summarySheet.getCell("A5").value = "Row Number";
+    summarySheet.getCell("B5").value = "Warehouse Name";
+    summarySheet.getCell("C5").value = "Warehouse Type";
+    summarySheet.getCell("D5").value = "Error Count";
+    summarySheet.getRow(5).font = { bold: true };
+    summarySheet.getRow(5).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE0E0E0" },
+    };
+
+    // Error list
+    let row = 6;
+    invalidWarehouses.forEach((item) => {
+      summarySheet.getCell(`A${row}`).value =
+        item.warehouse.excelRowNumber || "N/A";
+      summarySheet.getCell(`B${row}`).value =
+        item.warehouse.basicInfo?.warehouseName1 || "N/A";
+      summarySheet.getCell(`C${row}`).value =
+        item.warehouse.basicInfo?.warehouseType || "N/A";
+      summarySheet.getCell(`D${row}`).value = item.errors.length;
+      row++;
+    });
+
+    // Column widths
+    summarySheet.getColumn("A").width = 15;
+    summarySheet.getColumn("B").width = 35;
+    summarySheet.getColumn("C").width = 25;
+    summarySheet.getColumn("D").width = 15;
+
+    // Sheet 2: Detailed Errors
+    const detailSheet = workbook.addWorksheet("Detailed Errors");
+
+    // Headers
+    detailSheet.getCell("A1").value = "Row Number";
+    detailSheet.getCell("B1").value = "Warehouse Name";
+    detailSheet.getCell("C1").value = "Sheet";
+    detailSheet.getCell("D1").value = "Field";
+    detailSheet.getCell("E1").value = "Error Message";
+    detailSheet.getRow(1).font = { bold: true };
+    detailSheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE0E0E0" },
+    };
+
+    // Detailed error list
+    row = 2;
+    invalidWarehouses.forEach((item) => {
+      item.errors.forEach((error) => {
+        detailSheet.getCell(`A${row}`).value =
+          item.warehouse.excelRowNumber || "N/A";
+        detailSheet.getCell(`B${row}`).value =
+          item.warehouse.basicInfo?.warehouseName1 || "N/A";
+        detailSheet.getCell(`C${row}`).value = error.sheet || "N/A";
+        detailSheet.getCell(`D${row}`).value = error.field || "N/A";
+        detailSheet.getCell(`E${row}`).value = error.message || "N/A";
+
+        // Highlight error rows
+        detailSheet.getRow(row).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFF0F0" },
+        };
+
+        row++;
+      });
+    });
+
+    // Column widths
+    detailSheet.getColumn("A").width = 15;
+    detailSheet.getColumn("B").width = 35;
+    detailSheet.getColumn("C").width = 30;
+    detailSheet.getColumn("D").width = 30;
+    detailSheet.getColumn("E").width = 60;
+
+    // Save to file
+    const errorReportsDir = path.join(__dirname, "../uploads/error-reports");
+    if (!fs.existsSync(errorReportsDir)) {
+      fs.mkdirSync(errorReportsDir, { recursive: true });
+    }
+
+    const filename = `warehouse-error-report-${batchId}-${Date.now()}.xlsx`;
+    const filePath = path.join(errorReportsDir, filename);
+
+    await workbook.xlsx.writeFile(filePath);
+
+    console.log(`✅ Warehouse error report generated: ${filename}`);
+
+    return filePath;
+  } catch (error) {
+    console.error("Error generating warehouse error report:", error);
+    throw error;
+  }
 }
 
 /**
@@ -531,15 +694,51 @@ async function createWarehouseFromBulk(warehouseData, userId) {
   try {
     const { basicInfo, subLocationHeaders } = warehouseData;
 
+    // Look up warehouse_type_id from warehouse_type name if needed
+    let warehouseTypeId = basicInfo.warehouseType;
+    if (warehouseTypeId && !warehouseTypeId.startsWith("WT")) {
+      // It's a name, not an ID - look up the ID
+      const warehouseType = await trx("warehouse_type_master")
+        .where("warehouse_type", warehouseTypeId)
+        .first();
+      if (warehouseType) {
+        warehouseTypeId = warehouseType.warehouse_type_id;
+      }
+    }
+
+    // Look up material_type_id from material_type name if needed
+    let materialTypeId = basicInfo.materialType;
+    if (materialTypeId && !materialTypeId.startsWith("MT")) {
+      // It's a name, not an ID - look up the ID
+      const materialType = await trx("material_types_master")
+        .where("material_types", materialTypeId)
+        .first();
+      if (materialType) {
+        materialTypeId = materialType.material_types_id;
+      }
+    }
+
+    // Look up address_type_id from address_type name if needed
+    let addressTypeId = basicInfo.addressType || "AT001";
+    if (addressTypeId && !addressTypeId.startsWith("AT")) {
+      // It's a name, not an ID - look up the ID
+      const addressType = await trx("address_type_master")
+        .where("address_type", addressTypeId)
+        .first();
+      if (addressType) {
+        addressTypeId = addressType.address_type_id;
+      }
+    }
+
     // Generate warehouse ID
     const warehouseId = await generateWarehouseId(trx);
 
     // Insert warehouse basic information
     await trx("warehouse_basic_information").insert({
       warehouse_id: warehouseId,
-      consignor_id: userId.toString(), // Convert to string for database
-      warehouse_type: basicInfo.warehouseType,
-      material_type_id: basicInfo.materialType,
+      consignor_id: basicInfo.consignorId, // Use consignor_id from Excel or auto-filled
+      warehouse_type: warehouseTypeId,
+      material_type_id: materialTypeId,
       warehouse_name1: basicInfo.warehouseName1,
       warehouse_name2: basicInfo.warehouseName2 || null,
       language: basicInfo.language || "EN",
@@ -565,7 +764,7 @@ async function createWarehouseFromBulk(warehouseData, userId) {
       address_id: addressId,
       user_reference_id: warehouseId,
       user_type: "WH",
-      address_type_id: basicInfo.addressType || "AT001",
+      address_type_id: addressTypeId,
       country: basicInfo.country,
       state: basicInfo.state,
       city: basicInfo.city,
@@ -592,7 +791,7 @@ async function createWarehouseFromBulk(warehouseData, userId) {
           await trx("warehouse_sub_location_header").insert({
             sub_location_hdr_id: subLocationHdrId,
             warehouse_unique_id: warehouseId,
-            consignor_id: userId.toString(),
+            consignor_id: basicInfo.consignorId, // Use consignor_id from basicInfo
             sub_location_id: subLoc.subLocationType,
             description: subLoc.description || null,
             status: "ACTIVE",
@@ -633,13 +832,24 @@ async function createWarehouseFromBulk(warehouseData, userId) {
  * Main processing function
  */
 async function processWarehouseBulkUpload(jobData) {
-  const { batchId, filePath, userId } = jobData;
+  const { batchId, filePath, userId, userConsignorId } = jobData;
 
   try {
     console.log(`📝 Step 1: Parsing Excel file for batch ${batchId}`);
+    console.log(`👤 User ID: ${userId}, Consignor ID: ${userConsignorId}`);
     const warehouses = await parseWarehouseExcel(filePath);
 
     console.log(`📊 Found ${warehouses.length} warehouse(s)`);
+
+    // Auto-fill consignor_id if not provided in Excel
+    warehouses.forEach((warehouse) => {
+      if (!warehouse.basicInfo.consignorId && userConsignorId) {
+        warehouse.basicInfo.consignorId = userConsignorId;
+        console.log(
+          `  ✅ Auto-filled consignor_id for warehouse row ${warehouse.excelRowNumber}: ${userConsignorId}`
+        );
+      }
+    });
 
     // Update batch with total rows
     await knex("tms_warehouse_bulk_upload_batches")
@@ -752,12 +962,33 @@ async function processWarehouseBulkUpload(jobData) {
       `✅ Validation complete: ${validCount} valid, ${invalidCount} invalid`
     );
 
+    // Generate error report if there are invalid warehouses
+    let errorReportPath = null;
+    if (invalidCount > 0) {
+      console.log("📄 Generating error report for invalid warehouses...");
+
+      // Prepare invalid warehouses data for error report
+      const invalidWarehousesData = warehouses
+        .filter((warehouse) => allValidationErrors[warehouse.refId])
+        .map((warehouse) => ({
+          warehouse: warehouse,
+          errors: allValidationErrors[warehouse.refId],
+        }));
+
+      errorReportPath = await generateWarehouseErrorReport(
+        invalidWarehousesData,
+        batchId
+      );
+      console.log(`✅ Error report saved: ${errorReportPath}`);
+    }
+
     // Update batch counts
     await knex("tms_warehouse_bulk_upload_batches")
       .where({ batch_id: batchId })
       .update({
         total_valid: validCount,
         total_invalid: invalidCount,
+        error_report_path: errorReportPath, // Save error report path
       });
 
     console.log(`🏗️ Step 3: Creating valid warehouses`);
@@ -829,6 +1060,7 @@ async function processWarehouseBulkUpload(jobData) {
         total_invalid: parseInt(finalInvalidCount.count) || 0,
         total_created: createdCount,
         total_creation_failed: creationFailedCount,
+        error_report_path: errorReportPath, // Preserve error report path
         status: "completed",
         processed_timestamp: knex.fn.now(),
       });
