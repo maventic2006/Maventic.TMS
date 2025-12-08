@@ -137,7 +137,8 @@ const ContactTab = ({ formData, setFormData, errors = {} }) => {
 
       {/* Validation Error Summary */}
       {errors && typeof errors === "string" && (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <div className="mt-3 
+        3 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-xs text-red-700 flex items-center gap-2">
             {errors}
           </p>

@@ -1301,10 +1301,10 @@ const ConsignorDetailsPage = () => {
             The requested consignor could not be found.
           </p>
           <button
-            onClick={() => navigate("/consignor")}
+            onClick={() => navigate(-1)}
             className="px-4 py-2 bg-[#10B981] text-white rounded-lg hover:bg-[#059669] transition-colors"
           >
-            Back to Consignors
+            Go Back
           </button>
         </div>
       </div>
@@ -1556,7 +1556,7 @@ const ConsignorDetailsPage = () => {
                   {!TabComponent ? (
                     <EmptyState message="No data available" />
                   ) : (
-                    <div className="p-4">
+                    <div className="p-4" style="665px;">
                       <TabComponent
                         // For edit mode, pass formData. For view mode, pass consignor
                         {...(isEditMode

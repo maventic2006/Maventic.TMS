@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { CustomSelect } from "../../../components/ui/Select";
 import { formatDate } from "../../../utils/helpers";
+import api from "../../../utils/api";
 
 const InfoField = ({ label, value }) => (
   <div className="space-y-1">
@@ -88,8 +89,6 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
 
   const handlePreviewDocument = async (doc) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      
       // Use documentUniqueId which is the correct field for document lookup
       // The backend service expects document_unique_id, not document_id
       const documentId = doc.documentUniqueId || doc.document_unique_id;
@@ -103,25 +102,24 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
       console.log(`📄 Previewing document: ${documentId} for customer: ${consignor.customer_id}`);
       console.log('📋 Full document object:', doc);
       
-      const response = await fetch(
-        `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${documentId}/download`,
-        { credentials: "include" }
+      // Use axios instance with proper authentication instead of fetch
+      const response = await api.get(
+        `/consignors/${consignor.customer_id}/documents/${documentId}/download`,
+        { 
+          responseType: 'arraybuffer',
+          timeout: 10000
+        }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
       const base64String = btoa(
-        new Uint8Array(arrayBuffer).reduce(
+        new Uint8Array(response.data).reduce(
           (data, byte) => data + String.fromCharCode(byte),
           ""
         )
       );
 
       // Get file type from response headers or determine from file name
-      const contentType = response.headers.get("Content-Type") || 
+      const contentType = response.headers['content-type'] || 
         doc.file_type || "application/octet-stream";
 
       setPreviewDocument({
@@ -137,8 +135,6 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
 
   const handleDownloadDocument = async (doc) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      
       // Use documentUniqueId which is the correct field for document lookup
       const documentId = doc.documentUniqueId || doc.document_unique_id;
       
@@ -151,16 +147,13 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
       console.log(`📥 Downloading document: ${documentId} for customer: ${consignor.customer_id}`);
       console.log('📋 Full document object:', doc);
       
-      const response = await fetch(
-        `${apiUrl}/api/consignors/${consignor.customer_id}/documents/${documentId}/download`,
-        { credentials: "include" }
+      // Use axios instance with proper authentication instead of fetch
+      const response = await api.get(
+        `/consignors/${consignor.customer_id}/documents/${documentId}/download`,
+        { responseType: 'blob' }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const blob = await response.blob();
+      const blob = response.data;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
