@@ -649,22 +649,50 @@ const createTransporter = async (req, res) => {
     // Only for India (country code 'IN' or country name 'India')
     const gstPrimaryAddress = addresses.find((addr) => addr.isPrimary === true);
 
+    console.log("🔍 [CREATE TRANSPORTER] GST-PAN Validation Check:");
+    console.log("  Primary Address Found:", !!gstPrimaryAddress);
+    if (gstPrimaryAddress) {
+      console.log("  Country:", gstPrimaryAddress.country);
+      console.log("  VAT Number:", gstPrimaryAddress.vatNumber);
+      console.log("  State:", gstPrimaryAddress.state);
+    }
+
     if (gstPrimaryAddress) {
       const isIndia =
         gstPrimaryAddress.country === "IN" ||
         gstPrimaryAddress.country === "India" ||
         gstPrimaryAddress.country.toLowerCase().includes("india");
 
+      console.log("  Is India:", isIndia);
+
       if (isIndia && gstPrimaryAddress.vatNumber) {
         console.log("🔍 Validating GST-PAN for primary address in India");
 
         // Find PAN card document (DN001 is PAN/TIN)
+        // Use robust check with string conversion to avoid type issues
         const panDocument = documents.find((doc) => {
           const docTypeId = doc.documentTypeId || doc.documentType;
+          if (!docTypeId) return false;
+
+          // Convert to string and compare safely
+          const docTypeStr = String(docTypeId).toUpperCase();
+          const docTypeLower = String(docTypeId).toLowerCase();
+
           return (
-            docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+            docTypeStr === "DN001" ||
+            docTypeLower.includes("pan") ||
+            docTypeLower.includes("tin")
           );
         });
+
+        console.log("  PAN Document Found:", !!panDocument);
+        if (panDocument) {
+          console.log(
+            "  PAN Document Type:",
+            panDocument.documentTypeId || panDocument.documentType
+          );
+          console.log("  PAN Document Number:", panDocument.documentNumber);
+        }
 
         if (!panDocument) {
           return res.status(400).json({
@@ -1704,11 +1732,21 @@ const updateTransporter = async (req, res) => {
       // Validate primary address GST number against PAN card
       const gstPrimaryAddr = addresses.find((addr) => addr.isPrimary === true);
 
+      console.log("🔍 [UPDATE TRANSPORTER] GST-PAN Validation Check:");
+      console.log("  Primary Address Found:", !!gstPrimaryAddr);
+      if (gstPrimaryAddr) {
+        console.log("  Country:", gstPrimaryAddr.country);
+        console.log("  VAT Number:", gstPrimaryAddr.vatNumber);
+        console.log("  State:", gstPrimaryAddr.state);
+      }
+
       if (gstPrimaryAddr) {
         const isIndia =
           gstPrimaryAddr.country === "IN" ||
           gstPrimaryAddr.country === "India" ||
           gstPrimaryAddr.country.toLowerCase().includes("india");
+
+        console.log("  Is India:", isIndia);
 
         if (isIndia && gstPrimaryAddr.vatNumber) {
           console.log(
@@ -1716,12 +1754,30 @@ const updateTransporter = async (req, res) => {
           );
 
           // Find PAN card document (DN001 is PAN/TIN)
+          // Use robust check with string conversion to avoid type issues
           const panDocument = documents.find((doc) => {
             const docTypeId = doc.documentTypeId || doc.documentType;
+            if (!docTypeId) return false;
+
+            // Convert to string and compare safely
+            const docTypeStr = String(docTypeId).toUpperCase();
+            const docTypeLower = String(docTypeId).toLowerCase();
+
             return (
-              docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+              docTypeStr === "DN001" ||
+              docTypeLower.includes("pan") ||
+              docTypeLower.includes("tin")
             );
           });
+
+          console.log("  PAN Document Found:", !!panDocument);
+          if (panDocument) {
+            console.log(
+              "  PAN Document Type:",
+              panDocument.documentTypeId || panDocument.documentType
+            );
+            console.log("  PAN Document Number:", panDocument.documentNumber);
+          }
 
           if (!panDocument) {
             await trx.rollback();
@@ -4413,9 +4469,18 @@ const submitTransporterFromDraft = async (req, res) => {
     // GST-PAN VALIDATION (India Only) - SUBMIT DRAFT FOR APPROVAL
     // ========================================
     // Validate primary address GST number against PAN card
+    // Only for India (country code 'IN' or country name 'India')
     const gstPrimaryAddrDraft = addresses.find(
       (addr) => addr.isPrimary === true
     );
+
+    console.log("🔍 [SUBMIT DRAFT] GST-PAN Validation Check:");
+    console.log("  Primary Address Found:", !!gstPrimaryAddrDraft);
+    if (gstPrimaryAddrDraft) {
+      console.log("  Country:", gstPrimaryAddrDraft.country);
+      console.log("  VAT Number:", gstPrimaryAddrDraft.vatNumber);
+      console.log("  State:", gstPrimaryAddrDraft.state);
+    }
 
     if (gstPrimaryAddrDraft) {
       const isIndia =
@@ -4423,18 +4488,38 @@ const submitTransporterFromDraft = async (req, res) => {
         gstPrimaryAddrDraft.country === "India" ||
         gstPrimaryAddrDraft.country.toLowerCase().includes("india");
 
+      console.log("  Is India:", isIndia);
+
       if (isIndia && gstPrimaryAddrDraft.vatNumber) {
         console.log(
           "🔍 [SUBMIT DRAFT] Validating GST-PAN for primary address in India"
         );
 
         // Find PAN card document (DN001 is PAN/TIN)
+        // Use robust check with string conversion to avoid type issues
         const panDocument = documents.find((doc) => {
           const docTypeId = doc.documentTypeId || doc.documentType;
+          if (!docTypeId) return false;
+
+          // Convert to string and compare safely
+          const docTypeStr = String(docTypeId).toUpperCase();
+          const docTypeLower = String(docTypeId).toLowerCase();
+
           return (
-            docTypeId === "DN001" || docTypeId.toLowerCase().includes("pan")
+            docTypeStr === "DN001" ||
+            docTypeLower.includes("pan") ||
+            docTypeLower.includes("tin")
           );
         });
+
+        console.log("  PAN Document Found:", !!panDocument);
+        if (panDocument) {
+          console.log(
+            "  PAN Document Type:",
+            panDocument.documentTypeId || panDocument.documentType
+          );
+          console.log("  PAN Document Number:", panDocument.documentNumber);
+        }
 
         if (!panDocument) {
           return res.status(400).json({
@@ -5728,13 +5813,11 @@ const getBlacklistMappings = async (req, res) => {
           .first();
         mapping.entity_name = vehicle?.registration_number || "Unknown Vehicle";
       } else if (mapping.user_type === "driver") {
-        const driver = await knex("driver_basic_info")
+        const driver = await knex("driver_basic_information")
           .where("driver_id", mapping.user_id)
-          .select("first_name", "last_name")
+          .select("full_name")
           .first();
-        mapping.entity_name = driver
-          ? `${driver.first_name} ${driver.last_name}`
-          : "Unknown Driver";
+        mapping.entity_name = driver?.full_name || "Unknown Driver";
       }
     }
 
