@@ -1556,7 +1556,8 @@ const ConsignorDetailsPage = () => {
                   {!TabComponent ? (
                     <EmptyState message="No data available" />
                   ) : (
-                    <div className="p-4" style="665px;">
+                    <div className="p-4" style={{ height: "fit-content" }}>
+                    {/* <div className="p-4" style={{height: "665px"}}> */}
                       <TabComponent
                         // For edit mode, pass formData. For view mode, pass consignor
                         {...(isEditMode

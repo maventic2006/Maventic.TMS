@@ -2,6 +2,9 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 
+// Import error boundaries
+import ConsignorErrorBoundary from "../components/error-boundaries/ConsignorErrorBoundary";
+
 // Import pages
 import TMSLandingPage from "../pages/TMSLandingPage";
 import TransporterMaintenance from "../pages/TransporterMaintenance";
@@ -205,7 +208,9 @@ const AppRoutes = () => {
         path="/consignor/details/:id"
         element={
           <ProtectedRoute roles={["product_owner"]}>
-            <ConsignorDetailsPage />
+            <ConsignorErrorBoundary>
+              <ConsignorDetailsPage />
+            </ConsignorErrorBoundary>
           </ProtectedRoute>
         }
       />

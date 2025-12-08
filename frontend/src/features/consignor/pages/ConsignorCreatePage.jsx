@@ -799,7 +799,7 @@ const ConsignorCreatePage = () => {
                 }`}
               >
                 <div className="bg-white/60 backdrop-blur-sm rounded-b-3xl shadow-xl border border-white/40 overflow-hidden">
-                  <div className="p-4">
+                  <div className="p-4" style={{ height: "850px" }}>
                     <TabComponent
                       formData={formData}
                       setFormData={setFormData}

@@ -1,45 +1,57 @@
+const knex = require("knex");
+const bcrypt = require("bcrypt");
 require("dotenv").config();
-const bcrypt = require("bcryptjs");
-const knex = require("knex")(require("./knexfile").development);
+
+const db = knex({
+  client: "mysql2",
+  connection: {
+    host: process.env.DB_HOST || "localhost",
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASSWORD || "password123",
+    database: process.env.DB_NAME || "tms_dev",
+  },
+});
 
 async function createTestUser() {
   try {
-    console.log("üîß Creating test user...");
-
-    // Check if test user already exists
-    const existingUser = await knex("user_master")
-      .where({ user_id: "test" })
-      .first();
-
-    // if (existingUser) {
-    //   console.log("üë§ Test user already exists");
-    //   return;
-    // }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash("test456", 12);
-
-    // Create test user
-    await knex("user_master").insert({
-      user_id: "test1",
-      user_full_name: "Test User 1",
-      user_type_id: "UT001", // Consignor
-      email_id: "test1@example.com",
+    console.log("Ì±§ Creating test user for access control testing...\n");
+    
+    // Hash the password
+    const hashedPassword = await bcrypt.hash('test123', 10);
+    
+    // Create test user with UT006 type (Consignor Admin)
+    await db("user_master").insert({
+      user_id: 'TESTUSER',
+      user_full_name: 'Test User for Access Control',
+      user_type_id: 'UT006',
+      email_id: 'testuser@test.com',
       password: hashedPassword,
-      password_type: "initial", // Set to initial to require password reset
-      status: "ACTIVE",
-      is_active: true,
+      status: 'ACTIVE',
       created_at: new Date(),
-      created_by: "system",
+      created_by: 'SYSTEM'
     });
+    
+    console.log("‚úÖ Test user created successfully!");
+    console.log("Ì≥ã User Details:");
+    console.log("   ID: TESTUSER");
+    console.log("   Password: test123");
+    console.log("   Type: UT006 (Consignor Admin)");
+    console.log("   Status: ACTIVE");
+    console.log("\nÌ∑™ You can now test login with these credentials");
 
-    console.log("‚úÖ Test user created successfully");
-    console.log("üìù Credentials: test1 / test456");
   } catch (error) {
-    console.error("‚ùå Error creating test user:", error.message);
+    if (error.code === 'ER_DUP_ENTRY') {
+      console.log("‚ÑπÔ∏è  Test user already exists, using existing user");
+      console.log("Ì≥ã User Details:");
+      console.log("   ID: TESTUSER");
+      console.log("   Password: test123");
+      console.log("   Type: UT006 (Consignor Admin)");
+    } else {
+      console.error("‚ùå Error:", error.message);
+    }
   } finally {
-    await knex.destroy();
-    process.exit(0);
+    await db.destroy();
   }
 }
 
