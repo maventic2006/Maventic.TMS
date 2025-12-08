@@ -299,20 +299,20 @@ const WarehouseBulkUploadModal = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-3 bg-green-50 rounded-lg">
                   <p className="text-2xl font-bold text-green-600">
-                    {currentBatch.total_created || 0}
+                    {currentBatch.totalCreated || 0}
                   </p>
                   <p className="text-sm text-green-700">Created</p>
                 </div>
                 <div className="text-center p-3 bg-red-50 rounded-lg">
                   <p className="text-2xl font-bold text-red-600">
-                    {currentBatch.total_invalid || 0}
+                    {currentBatch.invalidCount || 0}
                   </p>
                   <p className="text-sm text-red-700">Failed</p>
                 </div>
               </div>
             </div>
 
-            {currentBatch.total_invalid > 0 && (
+            {currentBatch.invalidCount > 0 && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertCircle className="h-5 w-5 text-yellow-600" />
@@ -321,7 +321,7 @@ const WarehouseBulkUploadModal = () => {
                   </h4>
                 </div>
                 <p className="text-sm text-yellow-800 mb-3">
-                  {currentBatch.total_invalid} record(s) have validation errors.
+                  {currentBatch.invalidCount} record(s) have validation errors.
                   Download the error report to view details and fix the issues.
                 </p>
                 <Button
@@ -329,7 +329,7 @@ const WarehouseBulkUploadModal = () => {
                   className="border-yellow-600 text-yellow-700 hover:bg-yellow-100"
                   onClick={() => {
                     window.open(
-                      `/api/warehouse-bulk-upload/error-report/${currentBatch.batch_id}`,
+                      `/api/warehouse-bulk-upload/error-report/${currentBatch.batchId}`,
                       "_blank"
                     );
                   }}
@@ -340,15 +340,15 @@ const WarehouseBulkUploadModal = () => {
               </div>
             )}
 
-            {currentBatch.total_created > 0 &&
-              currentBatch.total_invalid === 0 && (
+            {currentBatch.totalCreated > 0 &&
+              currentBatch.invalidCount === 0 && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-green-600" />
                     <div>
                       <h4 className="font-semibold text-green-900">Success!</h4>
                       <p className="text-sm text-green-800">
-                        All {currentBatch.total_created} warehouse(s) have been
+                        All {currentBatch.totalCreated} warehouse(s) have been
                         created successfully.
                       </p>
                     </div>

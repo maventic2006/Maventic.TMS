@@ -298,11 +298,14 @@ const VehicleDetailsPage = () => {
       // Use transformedVehicle (already flattened) to populate form data
       // We need to restructure it into the nested format that the form components expect
       console.log("📊 About to populate formData with:");
-      console.log("📝 registrationNumber:", transformedVehicle.registrationNumber);
+      console.log(
+        "📝 registrationNumber:",
+        transformedVehicle.registrationNumber
+      );
       console.log("📝 make:", transformedVehicle.make);
       console.log("📝 model:", transformedVehicle.model);
       console.log("📝 vin:", transformedVehicle.vin);
-      
+
       setFormData({
         basicInformation: {
           registrationNumber: transformedVehicle.registrationNumber || "",
@@ -383,10 +386,10 @@ const VehicleDetailsPage = () => {
           "You have unsaved changes. Are you sure you want to leave?"
         )
       ) {
-        navigate("/vehicles");
+        navigate(-1);
       }
     } else {
-      navigate("/vehicles");
+      navigate(-1);
     }
   };
 
@@ -613,15 +616,15 @@ const VehicleDetailsPage = () => {
             if (/^DN\d{3}$/.test(documentTypeDescription)) {
               return documentTypeDescription;
             }
-            
+
             // Map common document type descriptions to their ID codes
             const documentTypeMap = {
               "Vehicle Registration Certificate": "DN001",
-              "Vehicle Insurance": "DN009", 
+              "Vehicle Insurance": "DN009",
               "PUC certificate": "DN010",
               "Fitness Certificate": "DN012",
               "Tax Certificate": "DN005",
-              "Permit": "DN006",
+              Permit: "DN006",
               "Driver License": "DN007",
               "Road Tax": "DN008",
               "Commercial Vehicle License": "DN011",
@@ -638,19 +641,25 @@ const VehicleDetailsPage = () => {
 
             // If no mapping found, try to find it in master data
             // This requires access to masterData, but it might not be available here
-            console.warn("⚠️ Unknown document type description:", documentTypeDescription);
-            
+            console.warn(
+              "⚠️ Unknown document type description:",
+              documentTypeDescription
+            );
+
             // Return the original value as fallback
             return documentTypeDescription;
           };
 
           return {
-            documentType: getDocumentTypeId(doc.documentType || doc.documentTypeId || ""),
+            documentType: getDocumentTypeId(
+              doc.documentType || doc.documentTypeId || ""
+            ),
             referenceNumber: doc.documentNumber || doc.referenceNumber || "",
             vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
             permitCategory: doc.permitCategory || "",
             permitCode: doc.permitCode || "",
-            documentProvider: doc.documentProvider || doc.issuingAuthority || "",
+            documentProvider:
+              doc.documentProvider || doc.issuingAuthority || "",
             coverageType: doc.coverageType || "",
             premiumAmount: doc.premiumAmount || 0,
             validFrom: formatDate(doc.issueDate || doc.validFrom),
@@ -920,7 +929,7 @@ const VehicleDetailsPage = () => {
 
         // Close modal and navigate back to list
         setShowDeleteModal(false);
-        navigate("/vehicles");
+        navigate(-1);
       } else {
         const errorMessage =
           resultAction.payload?.message || "Failed to delete vehicle draft";

@@ -213,6 +213,14 @@ const DriverDetailsPage = () => {
     }
   }, [id, dispatch]);
 
+  // Clear editFormData when driver ID changes
+  useEffect(() => {
+    setEditFormData(null);
+    setIsEditMode(false);
+    setHasUnsavedChanges(false);
+    setValidationErrors({});
+  }, [id]);
+
   // Refresh data function for approval actions
   // const handleRefreshData = () => {
   //   if (id) {
@@ -651,33 +659,42 @@ const DriverDetailsPage = () => {
       console.error("Error submitting draft:", err);
 
       // Parse and display validation errors
+      // Backend returns: { success: false, error: { code, message, field } }
       let errorMessage = "Failed to submit driver for approval";
       let errorDetails = [];
 
       if (err && typeof err === "object") {
-        if (err.message) {
-          errorMessage = err.message;
+        // Extract error from nested structure
+        const error = err.error || err;
+
+        if (error.message) {
+          errorMessage = error.message;
         }
 
         // Handle validation error with field information
-        if (err.code === "VALIDATION_ERROR" && err.field) {
-          const fieldPath = err.field
+        if (error.code === "VALIDATION_ERROR" && error.field) {
+          const fieldPath = error.field
             .replace(/\[(\d+)\]/g, " $1")
             .replace(/\./g, " - ");
-          errorDetails.push(`${fieldPath}: ${err.message}`);
+          errorDetails.push(`${fieldPath}: ${error.message}`);
         }
 
         // Handle duplicate errors
         if (
-          (err.code === "DUPLICATE_PHONE" ||
-            err.code === "DUPLICATE_EMAIL" ||
-            err.code === "DUPLICATE_DOCUMENT") &&
-          err.field
+          (error.code === "DUPLICATE_PHONE" ||
+            error.code === "DUPLICATE_EMAIL" ||
+            error.code === "DUPLICATE_DOCUMENT") &&
+          error.field
         ) {
-          const fieldPath = err.field
+          const fieldPath = error.field
             .replace(/\[(\d+)\]/g, " $1")
             .replace(/\./g, " - ");
-          errorDetails.push(`${fieldPath}: ${err.message}`);
+          errorDetails.push(`${fieldPath}: ${error.message}`);
+        }
+
+        // Add expectedFormats if available
+        if (error.expectedFormats && Array.isArray(error.expectedFormats)) {
+          errorDetails.push(...error.expectedFormats);
         }
       }
 

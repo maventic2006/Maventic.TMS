@@ -21,6 +21,12 @@ export const API_ENDPOINTS = {
     MASTER_DATA: "/transporter/master-data",
     STATES: "/transporter/states",
     CITIES: "/transporter/cities",
+    MAPPING_MASTER_DATA: "/transporter/mapping-master-data",
+    CONSIGNOR_MAPPINGS: "/transporter/:id/consignor-mappings",
+    VEHICLE_MAPPINGS: "/transporter/:id/vehicle-mappings",
+    DRIVER_MAPPINGS: "/transporter/:id/driver-mappings",
+    OWNER_MAPPINGS: "/transporter/:id/owner-mappings",
+    BLACKLIST_MAPPINGS: "/transporter/:id/blacklist-mappings",
   },
   WAREHOUSE: {
     LIST: "/warehouse",

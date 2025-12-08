@@ -650,7 +650,11 @@ const warehouseSlice = createSlice({
       .addCase(createWarehouse.rejected, (state, action) => {
         state.isCreating = false;
         // ✅ Don't set error state for validation errors (they'll be shown as toast)
-        if (action.payload?.code !== "VALIDATION_ERROR") {
+        // Backend returns nested structure: { success: false, error: { code, message, field } }
+        if (
+          action.payload?.error?.code !== "VALIDATION_ERROR" &&
+          action.payload?.code !== "VALIDATION_ERROR"
+        ) {
           state.error = action.payload;
         }
       })
@@ -683,7 +687,11 @@ const warehouseSlice = createSlice({
       .addCase(updateWarehouse.rejected, (state, action) => {
         state.loading = false;
         // ✅ Don't set error state for validation errors (they'll be shown as toast)
-        if (action.payload?.code !== "VALIDATION_ERROR") {
+        // Backend returns nested structure: { success: false, error: { code, message, field } }
+        if (
+          action.payload?.error?.code !== "VALIDATION_ERROR" &&
+          action.payload?.code !== "VALIDATION_ERROR"
+        ) {
           state.error = action.payload;
         }
       })
@@ -750,7 +758,11 @@ const warehouseSlice = createSlice({
       .addCase(saveWarehouseAsDraft.rejected, (state, action) => {
         state.isSavingDraft = false;
         // ✅ Don't set error state for validation errors (they'll be shown as toast)
-        if (action.payload?.code !== "VALIDATION_ERROR") {
+        // Backend returns nested structure: { success: false, error: { code, message, field } }
+        if (
+          action.payload?.error?.code !== "VALIDATION_ERROR" &&
+          action.payload?.code !== "VALIDATION_ERROR"
+        ) {
           state.error = action.payload;
         }
       })
@@ -767,7 +779,11 @@ const warehouseSlice = createSlice({
       .addCase(updateWarehouseDraft.rejected, (state, action) => {
         state.isUpdatingDraft = false;
         // ✅ Don't set error state for validation errors (they'll be shown as toast)
-        if (action.payload?.code !== "VALIDATION_ERROR") {
+        // Backend returns nested structure: { success: false, error: { code, message, field } }
+        if (
+          action.payload?.error?.code !== "VALIDATION_ERROR" &&
+          action.payload?.code !== "VALIDATION_ERROR"
+        ) {
           state.error = action.payload;
         }
       })
@@ -784,8 +800,12 @@ const warehouseSlice = createSlice({
       .addCase(submitWarehouseFromDraft.rejected, (state, action) => {
         state.isSubmittingDraft = false;
         // ✅ Don't set error state for validation errors (they'll be shown as toast)
+        // Backend returns nested structure: { success: false, error: { code, message, field } }
         // Only set error state for critical errors (server errors, network errors, etc.)
-        if (action.payload?.code !== "VALIDATION_ERROR") {
+        if (
+          action.payload?.error?.code !== "VALIDATION_ERROR" &&
+          action.payload?.code !== "VALIDATION_ERROR"
+        ) {
           state.error = action.payload;
         }
       })

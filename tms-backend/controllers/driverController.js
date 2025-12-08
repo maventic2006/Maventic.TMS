@@ -4259,7 +4259,39 @@ const saveDriverAsDraft = async (req, res) => {
   const trx = await knex.transaction();
 
   try {
-    const { basicInfo, addresses, documents } = req.body;
+    // ✅ FIX: Accept both "history"/"employmentHistory" and "accidents"/"accidentsViolations"
+    // Frontend sends "history" and "accidents" from DriverCreatePage
+    // DriverDetailsPage sends "employmentHistory" and "accidentsViolations"
+    const {
+      basicInfo,
+      addresses,
+      documents,
+      employmentHistory,
+      accidentsViolations,
+      history,
+      accidents,
+    } = req.body;
+
+    // Use whichever field name was provided
+    const historyData = employmentHistory || history || [];
+    const accidentsData = accidentsViolations || accidents || [];
+
+    console.log("📝 SAVE AS DRAFT - Payload Analysis:");
+    console.log(
+      "  - employmentHistory:",
+      employmentHistory ? employmentHistory.length : "not provided"
+    );
+    console.log("  - history:", history ? history.length : "not provided");
+    console.log(
+      "  - accidentsViolations:",
+      accidentsViolations ? accidentsViolations.length : "not provided"
+    );
+    console.log(
+      "  - accidents:",
+      accidents ? accidents.length : "not provided"
+    );
+    console.log("  - Using historyData:", historyData.length, "records");
+    console.log("  - Using accidentsData:", accidentsData.length, "records");
 
     const timestamp = new Date();
     const user = req.user?.user_id || "SYSTEM";
@@ -4391,6 +4423,91 @@ const saveDriverAsDraft = async (req, res) => {
       }
     }
 
+    // ===========================================================
+    // 6️⃣ INSERT HISTORY  (driver_history_information)
+    // ===========================================================
+    if (historyData && historyData.length > 0) {
+      console.log(`✅ Saving ${historyData.length} history record(s)...`);
+      for (const history of historyData) {
+        // Only insert if meaningful data present
+        // ✅ FIX: Accept both 'employer' and 'employerName' field names
+        if (history.employer || history.employerName || history.fromDate) {
+          const historyId = await generateHistoryId(trx);
+
+          await trx("driver_history_information").insert({
+            driver_history_id: historyId,
+            driver_id: driverId,
+            employer: history.employer || history.employerName || null,
+            employment_status: history.employmentStatus || null,
+            from_date: history.fromDate || null,
+            to_date: history.toDate || null,
+            job_title: history.jobTitle || null,
+            created_at: timestamp,
+            created_on: timestamp,
+            created_by: user,
+            updated_at: timestamp,
+            updated_on: timestamp,
+            updated_by: user,
+            status: "DRAFT",
+          });
+          console.log(
+            `  ✓ History saved: ${historyId} - ${
+              history.employer || history.employerName
+            }`
+          );
+        }
+      }
+    } else {
+      console.log("⚠️ No history data to save");
+    }
+
+    // ===========================================================
+    // 7️⃣ INSERT ACCIDENTS/VIOLATIONS  (driver_accident_violation)
+    // ===========================================================
+    if (accidentsData && accidentsData.length > 0) {
+      console.log(
+        `✅ Saving ${accidentsData.length} accident/violation record(s)...`
+      );
+      for (const incident of accidentsData) {
+        // Only insert if meaningful data present
+        // ✅ FIX: Accept both 'date'/'incidentDate' and 'type'/'violationType' field names
+        if (
+          incident.date ||
+          incident.incidentDate ||
+          incident.type ||
+          incident.violationType
+        ) {
+          const accidentId = await generateAccidentId(trx);
+
+          await trx("driver_accident_violation").insert({
+            driver_violation_id: accidentId,
+            driver_id: driverId,
+            type: incident.type || incident.violationType || null,
+            date: incident.date || incident.incidentDate || null,
+            vehicle_regn_number:
+              incident.vehicleRegnNumber ||
+              incident.vehicleRegistrationNumber ||
+              null,
+            description: incident.description || null,
+            created_at: timestamp,
+            created_on: timestamp,
+            created_by: user,
+            updated_at: timestamp,
+            updated_on: timestamp,
+            updated_by: user,
+            status: "DRAFT",
+          });
+          console.log(
+            `  ✓ Accident saved: ${accidentId} - ${
+              incident.type || incident.violationType
+            } on ${incident.date || incident.incidentDate}`
+          );
+        }
+      }
+    } else {
+      console.log("⚠️ No accident/violation data to save");
+    }
+
     await trx.commit();
     return res.status(201).json({
       success: true,
@@ -4422,18 +4539,41 @@ const saveDriverAsDraft = async (req, res) => {
 const updateDriverDraft = async (req, res) => {
   try {
     const { id } = req.params;
+    // ✅ FIX: Accept both "history"/"employmentHistory" and "accidents"/"accidentsViolations"
     const {
       basicInfo,
       addresses,
       documents,
       employmentHistory,
       accidentsViolations,
+      history,
+      accidents,
     } = req.body;
+
+    // Use whichever field name was provided
+    const historyData = employmentHistory || history || [];
+    const accidentsData = accidentsViolations || accidents || [];
+
     const userId = req.user?.user_id;
 
     const currentTimestamp = new Date();
 
     console.log("📝 Updating driver draft:", id, "User:", userId);
+    console.log(
+      "  - employmentHistory:",
+      employmentHistory ? employmentHistory.length : "not provided"
+    );
+    console.log("  - history:", history ? history.length : "not provided");
+    console.log(
+      "  - accidentsViolations:",
+      accidentsViolations ? accidentsViolations.length : "not provided"
+    );
+    console.log(
+      "  - accidents:",
+      accidents ? accidents.length : "not provided"
+    );
+    console.log("  - Using historyData:", historyData.length, "records");
+    console.log("  - Using accidentsData:", accidentsData.length, "records");
 
     // Verify driver exists
     const existing = await knex("driver_basic_information")
@@ -4638,16 +4778,18 @@ const updateDriverDraft = async (req, res) => {
       // ---------------------------
       // Re-insert history (driver_history_information)
       // ---------------------------
-      if (employmentHistory && employmentHistory.length > 0) {
-        for (const history of employmentHistory) {
+      if (historyData && historyData.length > 0) {
+        console.log(`✅ Updating ${historyData.length} history record(s)...`);
+        for (const history of historyData) {
           // Only insert if meaningful data present
-          if (history.employerName || history.fromDate) {
+          // ✅ FIX: Accept both 'employer' and 'employerName' field names
+          if (history.employer || history.employerName || history.fromDate) {
             const historyId = await generateHistoryId(trx);
 
             await trx("driver_history_information").insert({
               driver_history_id: historyId,
               driver_id: id,
-              employer: history.employerName || null,
+              employer: history.employer || history.employerName || null,
               employment_status: history.employmentStatus || null,
               from_date: history.fromDate || null,
               to_date: history.toDate || null,
@@ -4660,24 +4802,40 @@ const updateDriverDraft = async (req, res) => {
               updated_by: userId,
               status: "DRAFT",
             });
+            console.log(
+              `  ✓ History updated: ${historyId} - ${
+                history.employer || history.employerName
+              }`
+            );
           }
         }
+      } else {
+        console.log("⚠️ No history data to update");
       }
 
       // ---------------------------
       // Re-insert accidents/violations (driver_accident_violation)
       // ---------------------------
-      if (accidentsViolations && accidentsViolations.length > 0) {
-        for (const incident of accidentsViolations) {
+      if (accidentsData && accidentsData.length > 0) {
+        console.log(
+          `✅ Updating ${accidentsData.length} accident/violation record(s)...`
+        );
+        for (const incident of accidentsData) {
           // Only insert if meaningful data present
-          if (incident.incidentDate || incident.violationType) {
+          // ✅ FIX: Accept both 'date'/'incidentDate' and 'type'/'violationType' field names
+          if (
+            incident.date ||
+            incident.incidentDate ||
+            incident.type ||
+            incident.violationType
+          ) {
             const accidentId = await generateAccidentId(trx);
 
             await trx("driver_accident_violation").insert({
               driver_violation_id: accidentId,
               driver_id: id,
-              type: incident.violationType || null,
-              date: incident.incidentDate || null,
+              type: incident.type || incident.violationType || null,
+              date: incident.date || incident.incidentDate || null,
               vehicle_regn_number:
                 incident.vehicleRegnNumber ||
                 incident.vehicleRegistrationNumber ||
@@ -4691,8 +4849,15 @@ const updateDriverDraft = async (req, res) => {
               updated_by: userId,
               status: "DRAFT",
             });
+            console.log(
+              `  ✓ Accident updated: ${accidentId} - ${
+                incident.type || incident.violationType
+              } on ${incident.date || incident.incidentDate}`
+            );
           }
         }
+      } else {
+        console.log("⚠️ No accident/violation data to update");
       }
 
       await trx.commit();
@@ -4730,13 +4895,21 @@ const updateDriverDraft = async (req, res) => {
 const submitDriverFromDraft = async (req, res) => {
   try {
     const { id } = req.params;
+    // ✅ FIX: Accept both "history"/"employmentHistory" and "accidents"/"accidentsViolations"
     const {
       basicInfo,
       addresses,
       documents,
       employmentHistory,
       accidentsViolations,
+      history,
+      accidents,
     } = req.body;
+
+    // Use whichever field name was provided
+    const historyData = employmentHistory || history || [];
+    const accidentsData = accidentsViolations || accidents || [];
+
     const userId = req.user?.user_id;
 
     const currentTimestamp = new Date();
@@ -4747,6 +4920,21 @@ const submitDriverFromDraft = async (req, res) => {
       "User:",
       userId
     );
+    console.log(
+      "  - employmentHistory:",
+      employmentHistory ? employmentHistory.length : "not provided"
+    );
+    console.log("  - history:", history ? history.length : "not provided");
+    console.log(
+      "  - accidentsViolations:",
+      accidentsViolations ? accidentsViolations.length : "not provided"
+    );
+    console.log(
+      "  - accidents:",
+      accidents ? accidents.length : "not provided"
+    );
+    console.log("  - Using historyData:", historyData.length, "records");
+    console.log("  - Using accidentsData:", accidentsData.length, "records");
 
     // Verify it's a draft and belongs to the user
     const existing = await knex("driver_basic_information")
@@ -5309,8 +5497,11 @@ const submitDriverFromDraft = async (req, res) => {
       }
 
       // Re-insert employment history if provided
-      if (employmentHistory && employmentHistory.length > 0) {
-        for (const history of employmentHistory) {
+      if (historyData && historyData.length > 0) {
+        console.log(
+          `✅ Submitting ${historyData.length} history record(s) for approval...`
+        );
+        for (const history of historyData) {
           const historyId = await generateHistoryId(trx);
 
           await trx("driver_history_information").insert({
@@ -5329,12 +5520,22 @@ const submitDriverFromDraft = async (req, res) => {
             created_on: currentTimestamp,
             updated_on: currentTimestamp,
           });
+          console.log(
+            `  ✓ History submitted: ${historyId} - ${
+              history.employer || history.employerName
+            }`
+          );
         }
+      } else {
+        console.log("⚠️ No history data to submit");
       }
 
       // Re-insert accidents/violations if provided
-      if (accidentsViolations && accidentsViolations.length > 0) {
-        for (const incident of accidentsViolations) {
+      if (accidentsData && accidentsData.length > 0) {
+        console.log(
+          `✅ Submitting ${accidentsData.length} accident/violation record(s) for approval...`
+        );
+        for (const incident of accidentsData) {
           const accidentId = await generateAccidentId(trx);
 
           await trx("driver_accident_violation").insert({
@@ -5342,7 +5543,10 @@ const submitDriverFromDraft = async (req, res) => {
             driver_id: id,
             type: incident.type || incident.violationType || null,
             date: incident.date || incident.incidentDate || null,
-            vehicle_regn_number: incident.vehicleRegistrationNumber || null,
+            vehicle_regn_number:
+              incident.vehicleRegistrationNumber ||
+              incident.vehicleRegnNumber ||
+              null,
             description: incident.description || null,
             status: "ACTIVE",
             created_by: userId,
@@ -5352,7 +5556,14 @@ const submitDriverFromDraft = async (req, res) => {
             created_on: currentTimestamp,
             updated_on: currentTimestamp,
           });
+          console.log(
+            `  ✓ Accident submitted: ${accidentId} - ${
+              incident.type || incident.violationType
+            } on ${incident.date || incident.incidentDate}`
+          );
         }
+      } else {
+        console.log("⚠️ No accident/violation data to submit");
       }
 
       // ========================================

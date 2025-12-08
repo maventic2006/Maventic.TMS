@@ -238,13 +238,21 @@ const WarehouseDetails = () => {
     dispatch(fetchMasterData());
   }, [dispatch]);
 
-  // Set edit form data when warehouse data is loaded
+  // ✅ Clear editFormData when warehouse ID changes (prevents stale data)
   useEffect(() => {
-    if (currentWarehouse && !editFormData) {
-      // Transform flat backend structure to nested frontend structure
+    setEditFormData(null);
+    setIsEditMode(false);
+    setHasUnsavedChanges(false);
+    setValidationErrors({});
+  }, [id]);
+
+  // ✅ Set edit form data when warehouse data is loaded or warehouse ID changes
+  useEffect(() => {
+    if (currentWarehouse) {
+      // Always re-transform when currentWarehouse changes (different warehouse_id or fresh data)
       setEditFormData(transformToEditFormat(currentWarehouse));
     }
-  }, [currentWarehouse, editFormData]);
+  }, [currentWarehouse?.warehouse_id, currentWarehouse]);
 
   // Refresh data function for error recovery
   const handleRefreshData = () => {
@@ -758,9 +766,10 @@ const WarehouseDetails = () => {
       dispatch(clearError());
 
       // Check if it's a validation error from backend (400 Bad Request)
+      // Backend returns: { success: false, error: { code, message, field } }
       if (
-        err.code === "VALIDATION_ERROR" ||
-        err.message?.includes("required")
+        err.error?.code === "VALIDATION_ERROR" ||
+        err.error?.message?.includes("required")
       ) {
         // Backend validation error - show inline errors and stay in edit mode
 
@@ -768,36 +777,64 @@ const WarehouseDetails = () => {
         let tabWithError = null;
         const backendErrors = {};
 
-        if (err.field) {
-          // Parse field path like "warehouse_name1"
-          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+        if (err.error?.field) {
+          // Map field name to tab index
+          const fieldName = err.error.field;
 
-          if (fieldMatch) {
-            const [, section, index, field] = fieldMatch;
+          // Field to tab mapping (based on which tab contains the field)
+          const fieldToTabMapping = {
+            // General Details Tab (0)
+            warehouseName: 0,
+            warehouse_name1: 0,
+            warehouse_name2: 0,
+            warehouseType: 0,
+            warehouse_type: 0,
+            materialType: 0,
+            material_type_id: 0,
+            // Address Tab (1)
+            vatNumber: 1,
+            vat_number: 1,
+            gstNumber: 1,
+            addressLine1: 1,
+            address_line1: 1,
+            addressLine2: 1,
+            address_line2: 1,
+            city: 1,
+            state: 1,
+            country: 1,
+            pincode: 1,
+            region: 1,
+            zone: 1,
+            // Documents Tab (2)
+            documentType: 2,
+            documentNumber: 2,
+            // Geofencing Tab (3)
+            latitude: 3,
+            longitude: 3,
+            radius: 3,
+          };
 
-            // Map section to tab index
-            const tabMapping = {
-              general: 0,
-              facilities: 1,
-              address: 2,
-              documents: 3,
-            };
+          // Determine which tab the error belongs to
+          tabWithError = fieldToTabMapping[fieldName] ?? 0;
 
-            tabWithError = tabMapping[section] || 0;
+          // Store error in validation errors object
+          if (!backendErrors.address) backendErrors.address = {};
 
-            if (index !== undefined) {
-              // Array field error
-              if (!backendErrors[section]) backendErrors[section] = {};
-              if (!backendErrors[section][index])
-                backendErrors[section][index] = {};
-              if (field) {
-                backendErrors[section][index][field] = err.message;
-              }
-            } else if (field) {
-              // Object field error
-              if (!backendErrors[section]) backendErrors[section] = {};
-              backendErrors[section][field] = err.message;
-            }
+          // Map vatNumber errors to address section
+          if (fieldName === "vatNumber" || fieldName === "vat_number") {
+            backendErrors.address.vatNumber = err.error.message;
+          } else {
+            // For other fields, store in appropriate section
+            const section =
+              tabWithError === 0
+                ? "general"
+                : tabWithError === 1
+                ? "address"
+                : tabWithError === 2
+                ? "documents"
+                : "geofencing";
+            if (!backendErrors[section]) backendErrors[section] = {};
+            backendErrors[section][fieldName] = err.error.message;
           }
         }
 
@@ -818,12 +855,14 @@ const WarehouseDetails = () => {
           setActiveTab(tabWithError);
         }
 
-        // Show error toast
+        // Show error toast with validation details
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
             message:
-              err.message || "Please fix validation errors before saving.",
+              err.error.message ||
+              "Please fix validation errors before saving.",
+            details: err.error.expectedFormats || undefined,
           })
         );
 
@@ -836,7 +875,9 @@ const WarehouseDetails = () => {
         addToast({
           type: TOAST_TYPES.ERROR,
           message:
-            err.message || "Failed to update warehouse. Please try again.",
+            err.error?.message ||
+            err.message ||
+            "Failed to update warehouse. Please try again.",
         })
       );
     }
@@ -851,7 +892,7 @@ const WarehouseDetails = () => {
         return;
       }
     }
-    navigate("/warehouse");
+    navigate(-1);
   };
 
   const handleTabChange = (tabId) => {

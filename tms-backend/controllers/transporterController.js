@@ -2174,7 +2174,7 @@ const updateTransporter = async (req, res) => {
 
         // Handle file upload if present
         if (document.fileData) {
-          const docUploadId = await generateDocumentUploadId();
+          const docUploadId = await generateDocumentUploadId(trx);
 
           await trx("document_upload").insert({
             document_id: docUploadId,
@@ -4954,6 +4954,1006 @@ const deleteTransporterDraft = async (req, res) => {
   }
 };
 
+// ========================================
+// MAPPING MANAGEMENT CONTROLLERS
+// ========================================
+
+// Helper function to generate mapping IDs
+const generateMappingId = async (prefix, tableName, idColumn, trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx(tableName).count("* as count").first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `${prefix}${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx(tableName).where(idColumn, newId).first();
+    if (!existing) {
+      return newId;
+    }
+    attempts++;
+  }
+
+  throw new Error(`Failed to generate unique ${prefix} ID after 100 attempts`);
+};
+
+// ========================================
+// CONSIGNOR MAPPING CONTROLLERS
+// ========================================
+const getConsignorMappings = async (req, res) => {
+  try {
+    const { id } = req.params; // transporter_id
+
+    const mappings = await knex("transporter_consignor_mapping as tcm")
+      .where("tcm.transporter_id", id)
+      .where("tcm.status", "ACTIVE")
+      .leftJoin(
+        "consignor_basic_information as cbi",
+        "tcm.consignor_id",
+        "cbi.customer_id"
+      )
+      .select("tcm.*", "cbi.customer_name as consignor_name")
+      .orderBy("tcm.created_at", "desc");
+
+    // Fetch items for each mapping
+    for (const mapping of mappings) {
+      const items = await knex("transporter_consignor_mapping_item")
+        .where("tc_mapping_hdr_id", mapping.tc_mapping_id)
+        .where("status", "ACTIVE")
+        .select("*")
+        .orderBy("created_at", "desc");
+
+      mapping.items = items;
+    }
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching consignor mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch consignor mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createConsignorMapping = async (req, res) => {
+  const trx = await knex.transaction();
+
+  try {
+    const { id } = req.params; // transporter_id
+    const { consignor_id, valid_from, valid_to, active_flag, remark, items } =
+      req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate mapping
+    const existingMapping = await trx("transporter_consignor_mapping")
+      .where({ transporter_id: id, consignor_id, status: "ACTIVE" })
+      .first();
+
+    if (existingMapping) {
+      await trx.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: "This consignor is already mapped to this transporter",
+        },
+      });
+    }
+
+    // Generate mapping ID
+    const mappingId = await generateMappingId(
+      "TCM",
+      "transporter_consignor_mapping",
+      "tc_mapping_id",
+      trx
+    );
+
+    // Insert header
+    await trx("transporter_consignor_mapping").insert({
+      tc_mapping_id: mappingId,
+      transporter_id: id,
+      consignor_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      active_flag: active_flag !== undefined ? active_flag : true,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    // Insert items if provided
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const itemId = await generateMappingId(
+          "TCMI",
+          "transporter_consignor_mapping_item",
+          "tc_mapping_item_id",
+          trx
+        );
+
+        await trx("transporter_consignor_mapping_item").insert({
+          tc_mapping_item_id: itemId,
+          tc_mapping_hdr_id: mappingId,
+          contract_id: item.contract_id,
+          contract_name: item.contract_name,
+          valid_from: item.valid_from || knex.fn.now(),
+          valid_to: item.valid_to,
+          active_flag: item.active_flag !== undefined ? item.active_flag : true,
+          remark: item.remark,
+          created_by: userId,
+          updated_by: userId,
+          status: "ACTIVE",
+        });
+      }
+    }
+
+    await trx.commit();
+
+    res.status(201).json({
+      success: true,
+      data: { tc_mapping_id: mappingId },
+      message: "Consignor mapping created successfully",
+    });
+  } catch (error) {
+    await trx.rollback();
+    console.error("Error creating consignor mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create consignor mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateConsignorMapping = async (req, res) => {
+  const trx = await knex.transaction();
+
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, active_flag, remark, items } = req.body;
+    const userId = req.user?.user_id;
+
+    // Update header
+    await trx("transporter_consignor_mapping")
+      .where({ tc_mapping_id: mappingId, transporter_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        active_flag,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    // Delete existing items
+    await trx("transporter_consignor_mapping_item")
+      .where("tc_mapping_hdr_id", mappingId)
+      .update({ status: "INACTIVE" });
+
+    // Insert new items
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const itemId = await generateMappingId(
+          "TCMI",
+          "transporter_consignor_mapping_item",
+          "tc_mapping_item_id",
+          trx
+        );
+
+        await trx("transporter_consignor_mapping_item").insert({
+          tc_mapping_item_id: itemId,
+          tc_mapping_hdr_id: mappingId,
+          contract_id: item.contract_id,
+          contract_name: item.contract_name,
+          valid_from: item.valid_from || knex.fn.now(),
+          valid_to: item.valid_to,
+          active_flag: item.active_flag !== undefined ? item.active_flag : true,
+          remark: item.remark,
+          created_by: userId,
+          updated_by: userId,
+          status: "ACTIVE",
+        });
+      }
+    }
+
+    await trx.commit();
+
+    res.json({
+      success: true,
+      message: "Consignor mapping updated successfully",
+    });
+  } catch (error) {
+    await trx.rollback();
+    console.error("Error updating consignor mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update consignor mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteConsignorMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_consignor_mapping")
+      .where({ tc_mapping_id: mappingId, transporter_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    // Also inactivate items
+    await knex("transporter_consignor_mapping_item")
+      .where("tc_mapping_hdr_id", mappingId)
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Consignor mapping deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting consignor mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to delete consignor mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// VEHICLE MAPPING CONTROLLERS
+// ========================================
+const getVehicleMappings = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const mappings = await knex("transporter_vehicle_mapping as tvm")
+      .where("tvm.transporter_id", id)
+      .where("tvm.status", "ACTIVE")
+      .leftJoin(
+        "vehicle_basic_information_hdr as vbih",
+        "tvm.vehicle_id",
+        "vbih.vehicle_id_code_hdr"
+      )
+      .leftJoin(
+        "vehicle_ownership_details as vod",
+        "vbih.vehicle_id_code_hdr",
+        "vod.vehicle_id_code"
+      )
+      .select("tvm.*", "vod.registration_number as vehicle_registration")
+      .orderBy("tvm.created_at", "desc");
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching vehicle mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch vehicle mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createVehicleMapping = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { vehicle_id, valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate
+    const existingMapping = await knex("transporter_vehicle_mapping")
+      .where({ transporter_id: id, vehicle_id, status: "ACTIVE" })
+      .first();
+
+    if (existingMapping) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: "This vehicle is already mapped to this transporter",
+        },
+      });
+    }
+
+    const mappingId = await generateMappingId(
+      "TVM",
+      "transporter_vehicle_mapping",
+      "tv_mapping_id"
+    );
+
+    await knex("transporter_vehicle_mapping").insert({
+      tv_mapping_id: mappingId,
+      transporter_id: id,
+      vehicle_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      active_flag: active_flag !== undefined ? active_flag : true,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { tv_mapping_id: mappingId },
+      message: "Vehicle mapping created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating vehicle mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create vehicle mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateVehicleMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_vehicle_mapping")
+      .where({ tv_mapping_id: mappingId, transporter_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        active_flag,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Vehicle mapping updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating vehicle mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update vehicle mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteVehicleMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_vehicle_mapping")
+      .where({ tv_mapping_id: mappingId, transporter_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Vehicle mapping deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting vehicle mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to delete vehicle mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// DRIVER MAPPING CONTROLLERS
+// ========================================
+const getDriverMappings = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const mappings = await knex("transporter_driver_mapping as tdm")
+      .where("tdm.transporter_id", id)
+      .where("tdm.status", "ACTIVE")
+      .leftJoin(
+        "driver_basic_information as dbi",
+        "tdm.driver_id",
+        "dbi.driver_id"
+      )
+      .select("tdm.*", "dbi.full_name as driver_name")
+      .orderBy("tdm.created_at", "desc");
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching driver mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch driver mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createDriverMapping = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { driver_id, valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate
+    const existingMapping = await knex("transporter_driver_mapping")
+      .where({ transporter_id: id, driver_id, status: "ACTIVE" })
+      .first();
+
+    if (existingMapping) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: "This driver is already mapped to this transporter",
+        },
+      });
+    }
+
+    const mappingId = await generateMappingId(
+      "TDM",
+      "transporter_driver_mapping",
+      "td_mapping_id"
+    );
+
+    await knex("transporter_driver_mapping").insert({
+      td_mapping_id: mappingId,
+      transporter_id: id,
+      driver_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      active_flag: active_flag !== undefined ? active_flag : true,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { td_mapping_id: mappingId },
+      message: "Driver mapping created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating driver mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create driver mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateDriverMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_driver_mapping")
+      .where({ td_mapping_id: mappingId, transporter_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        active_flag,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Driver mapping updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating driver mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update driver mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteDriverMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_driver_mapping")
+      .where({ td_mapping_id: mappingId, transporter_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Driver mapping deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting driver mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to delete driver mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// OWNER MAPPING CONTROLLERS
+// ========================================
+const getOwnerMappings = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const mappings = await knex("transporter_owner_mapping as tom")
+      .where("tom.transporter_id", id)
+      .where("tom.status", "ACTIVE")
+      .leftJoin(
+        "vehicle_ownership_details as vod",
+        "tom.owner_id",
+        "vod.vehicle_ownership_id"
+      )
+      .select("tom.*", "vod.ownership_name as owner_name")
+      .orderBy("tom.created_at", "desc");
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching owner mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch owner mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createOwnerMapping = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { owner_id, valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate
+    const existingMapping = await knex("transporter_owner_mapping")
+      .where({ transporter_id: id, owner_id, status: "ACTIVE" })
+      .first();
+
+    if (existingMapping) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: "This owner is already mapped to this transporter",
+        },
+      });
+    }
+
+    const mappingId = await generateMappingId(
+      "TOM",
+      "transporter_owner_mapping",
+      "to_mapping_id"
+    );
+
+    await knex("transporter_owner_mapping").insert({
+      to_mapping_id: mappingId,
+      transporter_id: id,
+      owner_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      active_flag: active_flag !== undefined ? active_flag : true,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { to_mapping_id: mappingId },
+      message: "Owner mapping created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating owner mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create owner mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateOwnerMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_owner_mapping")
+      .where({ to_mapping_id: mappingId, transporter_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        active_flag,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Owner mapping updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating owner mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update owner mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteOwnerMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_owner_mapping")
+      .where({ to_mapping_id: mappingId, transporter_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Owner mapping deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting owner mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to delete owner mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// BLACKLIST MAPPING CONTROLLERS
+// ========================================
+const getBlacklistMappings = async (req, res) => {
+  try {
+    const { id } = req.params; // transporter_id
+
+    // Get blacklist entries where this transporter is the one who blacklisted
+    const mappings = await knex("blacklist_mapping as bm")
+      .where("bm.blacklisted_by", "transporter")
+      .where("bm.blacklisted_by_id", id)
+      .where("bm.status", "ACTIVE")
+      .select("bm.*")
+      .orderBy("bm.created_at", "desc");
+
+    // Enrich with entity names
+    for (const mapping of mappings) {
+      if (mapping.user_type === "vehicle") {
+        const vehicle = await knex("vehicle_ownership_details")
+          .where("vehicle_ownership_id", mapping.user_id)
+          .select("registration_number")
+          .first();
+        mapping.entity_name = vehicle?.registration_number || "Unknown Vehicle";
+      } else if (mapping.user_type === "driver") {
+        const driver = await knex("driver_basic_info")
+          .where("driver_id", mapping.user_id)
+          .select("first_name", "last_name")
+          .first();
+        mapping.entity_name = driver
+          ? `${driver.first_name} ${driver.last_name}`
+          : "Unknown Driver";
+      }
+    }
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching blacklist mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch blacklist mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createBlacklistMapping = async (req, res) => {
+  try {
+    const { id } = req.params; // transporter_id
+    const { user_type, user_id, valid_from, valid_to, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate
+    const existingMapping = await knex("blacklist_mapping")
+      .where({
+        blacklisted_by: "transporter",
+        blacklisted_by_id: id,
+        user_type,
+        user_id,
+        status: "ACTIVE",
+      })
+      .first();
+
+    if (existingMapping) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: `This ${user_type} is already blacklisted`,
+        },
+      });
+    }
+
+    const mappingId = await generateMappingId(
+      "BLM",
+      "blacklist_mapping",
+      "blacklist_mapping_id"
+    );
+
+    await knex("blacklist_mapping").insert({
+      blacklist_mapping_id: mappingId,
+      blacklisted_by: "transporter",
+      blacklisted_by_id: id,
+      user_type,
+      user_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { blacklist_mapping_id: mappingId },
+      message: "Blacklist mapping created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating blacklist mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create blacklist mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateBlacklistMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    await knex("blacklist_mapping")
+      .where({ blacklist_mapping_id: mappingId, blacklisted_by_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Blacklist mapping updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating blacklist mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update blacklist mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteBlacklistMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("blacklist_mapping")
+      .where({ blacklist_mapping_id: mappingId, blacklisted_by_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Blacklist mapping removed successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting blacklist mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to remove blacklist mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// DROPDOWN MASTER DATA FOR MAPPINGS
+// ========================================
+const getMappingMasterData = async (req, res) => {
+  try {
+    // Get active consignors
+    const consignors = await knex("consignor_basic_information")
+      .where("status", "ACTIVE")
+      .select("customer_id as value", "customer_name as label")
+      .orderBy("customer_name");
+
+    // Get active vehicles
+    const vehicles = await knex("vehicle_basic_information_hdr as vbih")
+      .leftJoin(
+        "vehicle_ownership_details as vod",
+        "vbih.vehicle_id_code_hdr",
+        "vod.vehicle_id_code"
+      )
+      .where("vbih.status", "ACTIVE")
+      .select(
+        "vbih.vehicle_id_code_hdr as value",
+        knex.raw(
+          "CONCAT(COALESCE(vod.registration_number, 'No Reg'), ' - ', vbih.vehicle_id_code_hdr) as label"
+        )
+      )
+      .orderBy("vod.registration_number");
+
+    // Get active drivers
+    const drivers = await knex("driver_basic_information")
+      .where("status", "ACTIVE")
+      .select(
+        "driver_id as value",
+        knex.raw("CONCAT(full_name, ' (', driver_id, ')') as label")
+      )
+      .orderBy("full_name");
+
+    // Get active owners
+    const owners = await knex("vehicle_ownership_details")
+      .where("status", "ACTIVE")
+      .select("vehicle_ownership_id as value", "ownership_name as label")
+      .orderBy("ownership_name");
+
+    // User types for blacklist
+    const userTypes = [
+      { value: "vehicle", label: "Vehicle" },
+      { value: "driver", label: "Driver" },
+    ];
+
+    res.json({
+      success: true,
+      data: {
+        consignors,
+        vehicles,
+        drivers,
+        owners,
+        userTypes,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching mapping master data:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch mapping master data",
+        details: error.message,
+      },
+    });
+  }
+};
+
 module.exports = {
   createTransporter,
   updateTransporter,
@@ -4967,4 +5967,26 @@ module.exports = {
   updateTransporterDraft,
   deleteTransporterDraft,
   submitTransporterFromDraft,
+  // Mapping controllers
+  getConsignorMappings,
+  createConsignorMapping,
+  updateConsignorMapping,
+  deleteConsignorMapping,
+  getVehicleMappings,
+  createVehicleMapping,
+  updateVehicleMapping,
+  deleteVehicleMapping,
+  getDriverMappings,
+  createDriverMapping,
+  updateDriverMapping,
+  deleteDriverMapping,
+  getOwnerMappings,
+  createOwnerMapping,
+  updateOwnerMapping,
+  deleteOwnerMapping,
+  getBlacklistMappings,
+  createBlacklistMapping,
+  updateBlacklistMapping,
+  deleteBlacklistMapping,
+  getMappingMasterData,
 };
