@@ -687,6 +687,7 @@ const saveConsignorAsDraft = async (req, res) => {
       });
 
       // Optional: Insert contacts if provided
+      const contactIds = []; // 🔥 FIX: Store contact IDs for photo linking
       if (payload.contacts && Array.isArray(payload.contacts)) {
         for (let i = 0; i < payload.contacts.length; i++) {
           const contact = payload.contacts[i];
@@ -739,6 +740,7 @@ const saveConsignorAsDraft = async (req, res) => {
               contact_number:
                 contact.contact_number ||
                 contact.phone_number ||
+                contact.number ||  // 🔥 FIX: Add 'number' field mapping
                 contact.phone ||
                 null,
               email_id: contact.email_id || contact.email || null,
@@ -753,6 +755,9 @@ const saveConsignorAsDraft = async (req, res) => {
               updated_by: req.user.user_id,
               updated_at: new Date(),
             });
+
+            // 🔥 FIX: Store contact ID and index for photo linking
+            contactIds.push({ contactId, index: i });
           }
         }
       }
@@ -913,15 +918,14 @@ const saveConsignorAsDraft = async (req, res) => {
         }
       }
 
-      // Handle contact photo uploads
-      if (payload.contacts && Array.isArray(payload.contacts)) {
-        for (let i = 0; i < payload.contacts.length; i++) {
-          const contact = payload.contacts[i];
-          const photoKey = `contact_${i}_photo`;
+      // Handle contact photo uploads - 🔥 FIX: Use contact IDs instead of name matching
+      if (payload.contacts && Array.isArray(payload.contacts) && contactIds.length > 0) {
+        for (const { contactId, index } of contactIds) {
+          const photoKey = `contact_${index}_photo`;
 
           if (filesObj[photoKey]) {
             const photoFile = filesObj[photoKey];
-            console.log(`📷 Uploading contact ${i} photo: ${photoFile.originalname}`);
+            console.log(`📷 Uploading contact ${index} photo: ${photoFile.originalname}`);
 
             const photoBase64 = photoFile.buffer.toString("base64");
             const photoDocId = await generateDocumentUploadId(trx);
@@ -937,18 +941,16 @@ const saveConsignorAsDraft = async (req, res) => {
               updated_at: new Date(),
             });
 
-            // Update contact with photo reference
-            const contactName = contact.contact_name || contact.name;
-            if (contactName) {
-              await trx("contact")
-                .where("customer_id", customerId)
-                .andWhere("contact_name", contactName)
-                .update({ 
-                  contact_photo: photoDocId,
-                  updated_at: new Date(),
-                  updated_by: req.user.user_id
-                });
-            }
+            // 🔥 FIX: Update contact using contact_id instead of name-based lookup
+            await trx("contact")
+              .where("contact_id", contactId)
+              .update({ 
+                contact_photo: photoDocId,
+                updated_at: new Date(),
+                updated_by: req.user.user_id
+              });
+
+            console.log(`✅ Photo linked to contact ID: ${contactId}`);
           }
         }
       }
@@ -1107,13 +1109,14 @@ const updateConsignorDraft = async (req, res) => {
         .where({ customer_id: id })
         .update(updateFields);
 
-      // Update contacts if provided (delete & re-insert)
+      // Update contacts if provided - 🔥 FIX: Store contact IDs for photo linking
+      const contactIds = []; // Store for photo updates
       if (
         contactsData &&
         Array.isArray(contactsData) &&
         contactsData.length > 0
       ) {
-        // Delete existing contacts
+        // Delete existing contacts (will improve this to UPSERT in future)
         await trx("contact").where({ customer_id: id }).del();
 
         // Generate unique contact ID helper (same as saveConsignorAsDraft)
@@ -1152,8 +1155,9 @@ const updateConsignorDraft = async (req, res) => {
           throw new Error("Failed to generate unique contact ID");
         };
 
-        // Insert new contacts
-        for (const contact of contactsData) {
+        // Insert new contacts - 🔥 FIX: Store contact IDs for photo linking
+        for (let index = 0; index < contactsData.length; index++) {
+          const contact = contactsData[index];
           if (contact.contact_name || contact.name) {
             const contactId = await generateUniqueContactId();
 
@@ -1166,8 +1170,8 @@ const updateConsignorDraft = async (req, res) => {
               contact_number:
                 contact.contact_number ||
                 contact.phone_number ||
+                contact.number ||  // 🔥 FIX: Add 'number' field mapping
                 contact.phone ||
-                contact.number ||
                 null,
               email_id: contact.email_id || contact.email || null,
               contact_role: contact.contact_role || contact.role || null,
@@ -1181,6 +1185,9 @@ const updateConsignorDraft = async (req, res) => {
               updated_by: req.user.user_id,
               updated_at: new Date(),
             });
+
+            // 🔥 FIX: Store contact ID and index for photo linking
+            contactIds.push({ contactId, index });
           }
         }
       }
@@ -1406,15 +1413,14 @@ const updateConsignorDraft = async (req, res) => {
         }
       }
 
-      // Handle contact photo uploads (same logic as saveConsignorAsDraft)
-      if (payload.contacts && Array.isArray(payload.contacts)) {
-        for (let i = 0; i < payload.contacts.length; i++) {
-          const contact = payload.contacts[i];
-          const photoKey = `contact_${i}_photo`;
+      // Handle contact photo uploads - 🔥 FIX: Use contact IDs instead of name matching
+      if (payload.contacts && Array.isArray(payload.contacts) && contactIds.length > 0) {
+        for (const { contactId, index } of contactIds) {
+          const photoKey = `contact_${index}_photo`;
 
           if (filesObj[photoKey]) {
             const photoFile = filesObj[photoKey];
-            console.log(`📷 Uploading contact ${i} photo: ${photoFile.originalname}`);
+            console.log(`📷 Uploading contact ${index} photo: ${photoFile.originalname}`);
 
             const photoBase64 = photoFile.buffer.toString("base64");
             const photoDocId = await generateDocumentUploadId(trx);
@@ -1430,18 +1436,16 @@ const updateConsignorDraft = async (req, res) => {
               updated_at: new Date(),
             });
 
-            // Update contact with photo reference
-            const contactName = contact.contact_name || contact.name;
-            if (contactName) {
-              await trx("contact")
-                .where("customer_id", id)
-                .andWhere("contact_name", contactName)
-                .update({ 
-                  contact_photo: photoDocId,
-                  updated_at: new Date(),
-                  updated_by: req.user.user_id
-                });
-            }
+            // 🔥 FIX: Update contact using contact_id instead of name-based lookup
+            await trx("contact")
+              .where("contact_id", contactId)
+              .update({ 
+                contact_photo: photoDocId,
+                updated_at: new Date(),
+                updated_by: req.user.user_id
+              });
+
+            console.log(`✅ Photo linked to contact ID: ${contactId}`);
           }
         }
       }
@@ -1715,7 +1719,7 @@ const submitConsignorFromDraft = async (req, res) => {
 
     // Check if approval flow already exists
     const existingApprovalFlow = await db("approval_flow_trans")
-      .where("user_id_reference_id", consignorAdminUserId)
+      .where("user_id_reference_id", id) // 🔥 FIX: Check by actual consignor entity ID
       .where("approval_type_id", "AT002") // Consignor Admin
       .first();
 
@@ -1783,7 +1787,7 @@ const submitConsignorFromDraft = async (req, res) => {
         approval_flow_trans_id: approvalFlowId,
         approval_config_id: approvalConfig.approval_config_id,
         approval_type_id: "AT002", // Consignor Admin
-        user_id_reference_id: consignorAdminUserId,
+        user_id_reference_id: id, // 🔥 FIX: Store actual consignor entity ID instead of admin user ID
         s_status: "Pending for Approval",
         approver_level: 1,
         pending_with_role_id: "RL001", // Product Owner role

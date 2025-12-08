@@ -14,6 +14,7 @@ import {
   Eye,
   X,
 } from "lucide-react";
+import api from "../../../utils/api";
 
 const GeneralInfoViewTab = ({ consignor }) => {
   const [previewDocument, setPreviewDocument] = useState(null);
@@ -36,25 +37,23 @@ const GeneralInfoViewTab = ({ consignor }) => {
     if (!consignor?.upload_nda) return;
     
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const response = await fetch(
-        `${apiUrl}/api/consignors/${consignor.customer_id}/general/nda/download`,
-        { credentials: "include" }
+      // Use axios instance with proper authentication instead of fetch
+      const response = await api.get(
+        `/consignors/${consignor.customer_id}/general/nda/download`,
+        { 
+          responseType: 'arraybuffer',
+          timeout: 10000
+        }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
       const base64String = btoa(
-        new Uint8Array(arrayBuffer).reduce(
+        new Uint8Array(response.data).reduce(
           (data, byte) => data + String.fromCharCode(byte),
           ""
         )
       );
 
-      const contentType = response.headers.get("Content-Type") || "application/pdf";
+      const contentType = response.headers['content-type'] || "application/pdf";
 
       setPreviewDocument({
         fileName: `NDA_${consignor.customer_id}`,
@@ -71,25 +70,23 @@ const GeneralInfoViewTab = ({ consignor }) => {
     if (!consignor?.upload_msa) return;
     
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const response = await fetch(
-        `${apiUrl}/api/consignors/${consignor.customer_id}/general/msa/download`,
-        { credentials: "include" }
+      // Use axios instance with proper authentication instead of fetch
+      const response = await api.get(
+        `/consignors/${consignor.customer_id}/general/msa/download`,
+        { 
+          responseType: 'arraybuffer',
+          timeout: 10000
+        }
       );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
       const base64String = btoa(
-        new Uint8Array(arrayBuffer).reduce(
+        new Uint8Array(response.data).reduce(
           (data, byte) => data + String.fromCharCode(byte),
           ""
         )
       );
 
-      const contentType = response.headers.get("Content-Type") || "application/pdf";
+      const contentType = response.headers['content-type'] || "application/pdf";
 
       setPreviewDocument({
         fileName: `MSA_${consignor.customer_id}`,
@@ -276,20 +273,13 @@ const GeneralInfoViewTab = ({ consignor }) => {
                     className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
                     onClick={async () => {
                       try {
-                        const apiUrl =
-                          import.meta.env.VITE_API_URL || "http://localhost:5000";
-                        const response = await fetch(
-                          `${apiUrl}/api/consignors/${consignor.customer_id}/general/nda/download`,
-                          { credentials: "include" }
+                        // Use axios instance with proper authentication
+                        const response = await api.get(
+                          `/consignors/${consignor.customer_id}/general/nda/download`,
+                          { responseType: 'blob' }
                         );
 
-                        if (!response.ok) {
-                          throw new Error(
-                            `HTTP error! status: ${response.status}`
-                          );
-                        }
-
-                        const blob = await response.blob();
+                        const blob = response.data;
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement("a");
                         a.href = url;
@@ -351,20 +341,13 @@ const GeneralInfoViewTab = ({ consignor }) => {
                     className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
                     onClick={async () => {
                       try {
-                        const apiUrl =
-                          import.meta.env.VITE_API_URL || "http://localhost:5000";
-                        const response = await fetch(
-                          `${apiUrl}/api/consignors/${consignor.customer_id}/general/msa/download`,
-                          { credentials: "include" }
+                        // Use axios instance with proper authentication
+                        const response = await api.get(
+                          `/consignors/${consignor.customer_id}/general/msa/download`,
+                          { responseType: 'blob' }
                         );
 
-                        if (!response.ok) {
-                          throw new Error(
-                            `HTTP error! status: ${response.status}`
-                          );
-                        }
-
-                        const blob = await response.blob();
+                        const blob = response.data;
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement("a");
                         a.href = url;

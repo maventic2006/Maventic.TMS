@@ -1022,7 +1022,7 @@ const getWarehouseById = async (req, res) => {
             "aft.approval_type_id",
             "atm.approval_type_id"
           )
-          .where("aft.user_id_reference_id", warehouseManagerUser.user_id)
+          .where("aft.user_id_reference_id", id) // 🔥 FIX: Use warehouse entity ID instead of manager user ID
           .select(
             "aft.*",
             "atm.approval_type as approval_category",
@@ -1702,7 +1702,7 @@ const createWarehouse = async (req, res) => {
       approval_flow_trans_id: approvalFlowId,
       approval_config_id: approvalConfig.approval_config_id,
       approval_type_id: "AT005", // Warehouse Manager
-      user_id_reference_id: warehouseManagerUserId, // FIXED: Use Warehouse Manager user ID, not warehouse ID
+      user_id_reference_id: warehouseId, // 🔥 FIX: Store actual warehouse entity ID instead of manager user ID
       s_status: "PENDING",
       approver_level: 1,
       pending_with_role_id: "RL001", // Product Owner role
@@ -1956,7 +1956,7 @@ const updateWarehouse = async (req, res) => {
 
         // Find existing approval flow record
         const approvalFlow = await trx("approval_flow_trans")
-          .where("user_id_reference_id", warehouseManagerUserId)
+          .where("user_id_reference_id", id) // 🔥 FIX: Use warehouse entity ID instead of manager user ID
           .where("approval_type_id", "AT005") // Warehouse Manager
           .orderBy("created_at", "desc")
           .first();
@@ -3660,7 +3660,7 @@ const submitWarehouseFromDraft = async (req, res) => {
       approval_flow_trans_id: approvalFlowId,
       approval_config_id: approvalConfig.approval_config_id,
       approval_type_id: "AT005", // Warehouse Manager
-      user_id_reference_id: warehouseManagerUserId,
+      user_id_reference_id: id, // 🔥 FIX: Store actual warehouse entity ID instead of manager user ID
       s_status: "PENDING",
       approver_level: 1,
       pending_with_role_id: "RL001", // Product Owner role

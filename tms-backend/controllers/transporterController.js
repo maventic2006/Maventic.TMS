@@ -1158,7 +1158,7 @@ const createTransporter = async (req, res) => {
         approval_flow_trans_id: approvalFlowId,
         approval_config_id: approvalConfig.approval_config_id,
         approval_type_id: "AT001", // Transporter Admin
-        user_id_reference_id: transporterAdminUserId, // FIXED: Use Transporter Admin user ID, not transporter ID
+        user_id_reference_id: transporterId, // 🔥 FIX: Store actual transporter entity ID instead of admin user ID
         s_status: "PENDING",
         approver_level: 1,
         pending_with_role_id: "RL001", // Product Owner role
@@ -1875,7 +1875,7 @@ const updateTransporter = async (req, res) => {
 
       // Find existing approval flow record
       const approvalFlow = await trx("approval_flow_trans")
-        .where("user_id_reference_id", transporterAdminUserId)
+        .where("user_id_reference_id", id) // 🔥 FIX: Use transporter entity ID instead of admin user ID
         .where("approval_type_id", "AT001") // Transporter Admin
         .orderBy("created_at", "desc")
         .first();
@@ -3119,7 +3119,7 @@ const getTransporterById = async (req, res) => {
       // Get latest approval record for this transporter's admin user
       // Include PENDING to show assigned approver for pending transporters
       const latestApproval = await knex("approval_flow_trans")
-        .where("user_id_reference_id", transporterAdminUserId)
+        .where("user_id_reference_id", id) // 🔥 FIX: Use transporter entity ID instead of admin user ID
         .where("approval_type_id", "AT001")
         .whereIn("s_status", ["Approve", "Reject", "PENDING"])
         .orderBy("approval_flow_unique_id", "desc")
@@ -4879,7 +4879,7 @@ const submitTransporterFromDraft = async (req, res) => {
         approval_flow_trans_id: approvalFlowId,
         approval_config_id: approvalConfig.approval_config_id,
         approval_type_id: "AT001", // Transporter Admin
-        user_id_reference_id: transporterAdminUserId, // Use the TA user ID (matches createTransporter pattern)
+        user_id_reference_id: id, // 🔥 FIX: Store actual transporter entity ID instead of admin user ID
         s_status: "PENDING",
         approver_level: 1,
         pending_with_role_id: "RL001", // Product Owner role

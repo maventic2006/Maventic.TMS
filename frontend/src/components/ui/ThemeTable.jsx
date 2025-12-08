@@ -503,39 +503,29 @@ const ThemeTable = ({
 
       {/* Document Preview Modal */}
       {previewDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={closePreview}
-          />
-
-          {/* Modal Content */}
-          <div 
-            className="relative bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-4 max-h-[95vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] min-h-[600px] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-[#E0E7FF] rounded-lg">
                   {getFileIcon(previewDocument.fileType)}
                 </div>
-                <h3 className="text-xl font-semibold text-gray-800">
+                <h3 className="text-lg font-semibold text-gray-800">
                   {previewDocument.fileName}
                 </h3>
               </div>
               <button
                 onClick={closePreview}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors z-[60] relative bg-white shadow-lg border border-gray-200"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Close Preview"
               >
-                <X className="w-6 h-6 text-gray-500 hover:text-gray-700" />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
-            {/* Modal Body - Preview Area */}
-            <div className="flex-1 overflow-auto p-6">
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-6 min-h-[400px] flex items-center justify-center">
               {previewDocument.fileType?.startsWith("image/") ? (
                 <img
                   src={
@@ -544,7 +534,7 @@ const ThemeTable = ({
                       : `data:${previewDocument.fileType};base64,${previewDocument.fileData}`
                   }
                   alt={previewDocument.fileName}
-                  className="max-w-full h-auto mx-auto"
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
                 />
               ) : previewDocument.fileType === "application/pdf" ? (
                 <iframe
@@ -553,7 +543,7 @@ const ThemeTable = ({
                       ? previewDocument.fileData
                       : `data:application/pdf;base64,${previewDocument.fileData}`
                   }
-                  className="w-full h-[75vh] border-0"
+                  className="w-full h-[600px] border-0"
                   title={previewDocument.fileName}
                 />
               ) : (
@@ -570,10 +560,10 @@ const ThemeTable = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
               <button
                 onClick={closePreview}
-                className="px-6 py-2.5 border border-[#E5E7EB] text-[#4A5568] rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Close
               </button>

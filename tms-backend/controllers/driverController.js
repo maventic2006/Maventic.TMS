@@ -1269,7 +1269,7 @@ const createDriver = async (req, res) => {
       approval_flow_trans_id: approvalFlowId,
       approval_config_id: approvalConfig.approval_config_id,
       approval_type_id: "AT003", // Driver User
-      user_id_reference_id: driverAdminUserId, // Use Driver Admin user ID
+      user_id_reference_id: driverId, // 🔥 FIX: Store actual driver entity ID instead of admin user ID
       s_status: "PENDING",
       approver_level: 1,
       pending_with_role_id: "RL001", // Product Owner role
@@ -1801,7 +1801,7 @@ const updateDriver = async (req, res) => {
 
         // Find existing approval flow record
         const approvalFlow = await trx("approval_flow_trans")
-          .where("user_id_reference_id", driverAdminUserId)
+          .where("user_id_reference_id", id) // 🔥 FIX: Use driver entity ID instead of admin user ID
           .where("approval_type_id", "AT003") // Driver Admin
           .orderBy("created_at", "desc")
           .first();
@@ -5672,7 +5672,7 @@ const submitDriverFromDraft = async (req, res) => {
           approval_flow_trans_id: approvalFlowId,
           approval_config_id: approvalConfig.approval_config_id,
           approval_type_id: "AT003", // Driver User
-          user_id_reference_id: driverAdminUserId, // Use Driver Admin user ID
+          user_id_reference_id: id, // 🔥 FIX: Store actual driver entity ID instead of admin user ID
           s_status: "PENDING",
           approver_level: 1,
           pending_with_role_id: "RL001", // Product Owner role
