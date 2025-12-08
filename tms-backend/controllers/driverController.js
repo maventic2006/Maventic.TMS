@@ -5578,7 +5578,7 @@ const submitDriverFromDraft = async (req, res) => {
         `  Generated user ID: ${driverAdminUserId} (derived from ${id})`
       );
 
-      // Check if user already exists (in case this is a re-submission)
+      // Check if user already exists (in case this is a re-submission or update)
       const existingUser = await trx("user_master")
         .where("user_id", driverAdminUserId)
         .first();
@@ -5697,100 +5697,118 @@ const submitDriverFromDraft = async (req, res) => {
           `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
         );
       } else {
+        // User already exists - update status and ensure approval flow exists
         console.log(`  ✅ User account already exists: ${driverAdminUserId}`);
 
-        // Update existing user status to PENDING if it's currently DRAFT
-        if (existingUser.status === "DRAFT") {
-          await trx("user_master").where("user_id", driverAdminUserId).update({
+        // Always update user status to PENDING when submitting draft
+        await trx("user_master")
+          .where("user_id", driverAdminUserId)
+          .update({
             status: "PENDING",
+            full_name: basicInfo.fullName, // Update with latest data
+            email_id: basicInfo.emailId || existingUser.email_id,
+            mobile_number: basicInfo.phoneNumber || existingUser.mobile_number,
             updated_by: userId,
             updated_at: currentTimestamp,
             updated_on: currentTimestamp,
           });
-          console.log(
-            `  ✅ Updated user status to PENDING: ${driverAdminUserId}`
-          );
-        }
+        console.log(
+          `  ✅ Updated user status to PENDING: ${driverAdminUserId}`
+        );
+      }
 
-        // Check if approval flow already exists
-        const existingApprovalFlow = await trx("approval_flow_trans")
-          .where("user_id_reference_id", driverAdminUserId)
-          .where("s_status", "PENDING")
+      // ========================================
+      // ENSURE APPROVAL FLOW EXISTS (ALWAYS)
+      // ========================================
+      // Check if approval flow already exists for this user
+      const existingApprovalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", driverAdminUserId)
+        .where("s_status", "PENDING")
+        .where("status", "ACTIVE")
+        .first();
+
+      if (!existingApprovalFlow) {
+        console.log(
+          `  🔄 Creating approval flow for driver user: ${driverAdminUserId}`
+        );
+
+        // Get current user details
+        const creatorUserId = userId;
+        const creatorName = req.user?.user_full_name || "Product Owner";
+
+        // Get approval configuration
+        const approvalConfig = await trx("approval_configuration")
+          .where({
+            approval_type_id: "AT003", // Driver User
+            approver_level: 1,
+            status: "ACTIVE",
+          })
           .first();
 
-        if (!existingApprovalFlow) {
-          console.log(`  🔄 Creating missing approval flow for existing user`);
-
-          // Get approval configuration
-          const approvalConfig = await trx("approval_configuration")
-            .where({
-              approval_type_id: "AT003", // Driver User
-              approver_level: 1,
-              status: "ACTIVE",
-            })
-            .first();
-
-          if (approvalConfig) {
-            // Determine pending approver
-            const creatorUserId = userId;
-            const creatorName = req.user?.user_full_name || "Product Owner";
-
-            let pendingWithUserId = null;
-            let pendingWithName = null;
-
-            if (creatorUserId === "PO001") {
-              const po2 = await trx("user_master")
-                .where("user_id", "PO002")
-                .first();
-              pendingWithUserId = "PO002";
-              pendingWithName = po2?.user_full_name || "Product Owner 2";
-            } else if (creatorUserId === "PO002") {
-              const po1 = await trx("user_master")
-                .where("user_id", "PO001")
-                .first();
-              pendingWithUserId = "PO001";
-              pendingWithName = po1?.user_full_name || "Product Owner 1";
-            } else {
-              const po1 = await trx("user_master")
-                .where("user_id", "PO001")
-                .first();
-              pendingWithUserId = "PO001";
-              pendingWithName = po1?.user_full_name || "Product Owner 1";
-            }
-
-            // Generate approval flow trans ID
-            const approvalFlowId = await generateApprovalFlowId(trx);
-
-            // Create approval flow transaction entry
-            await trx("approval_flow_trans").insert({
-              approval_flow_trans_id: approvalFlowId,
-              approval_config_id: approvalConfig.approval_config_id,
-              approval_type_id: "AT003", // Driver User
-              user_id_reference_id: driverAdminUserId,
-              s_status: "PENDING",
-              approver_level: 1,
-              pending_with_role_id: "RL001", // Product Owner role
-              pending_with_user_id: pendingWithUserId,
-              pending_with_name: pendingWithName,
-              created_by_user_id: creatorUserId,
-              created_by_name: creatorName,
-              created_by: creatorUserId,
-              updated_by: creatorUserId,
-              created_at: currentTimestamp,
-              updated_at: currentTimestamp,
-              created_on: currentTimestamp,
-              updated_on: currentTimestamp,
-              status: "ACTIVE",
-            });
-
-            console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
-            console.log(
-              `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
-            );
-          }
-        } else {
-          console.log(`  ✅ Approval flow already exists for user`);
+        if (!approvalConfig) {
+          throw new Error("Approval configuration not found for Driver User");
         }
+
+        // Determine pending approver (Product Owner who did NOT create this)
+        let pendingWithUserId = null;
+        let pendingWithName = null;
+
+        if (creatorUserId === "PO001") {
+          const po2 = await trx("user_master")
+            .where("user_id", "PO002")
+            .first();
+          pendingWithUserId = "PO002";
+          pendingWithName = po2?.user_full_name || "Product Owner 2";
+        } else if (creatorUserId === "PO002") {
+          const po1 = await trx("user_master")
+            .where("user_id", "PO001")
+            .first();
+          pendingWithUserId = "PO001";
+          pendingWithName = po1?.user_full_name || "Product Owner 1";
+        } else {
+          // If creator is neither PO1 nor PO2, default to PO001
+          const po1 = await trx("user_master")
+            .where("user_id", "PO001")
+            .first();
+          pendingWithUserId = "PO001";
+          pendingWithName = po1?.user_full_name || "Product Owner 1";
+        }
+
+        // Generate approval flow trans ID
+        const approvalFlowId = await generateApprovalFlowId(trx);
+
+        // Create approval flow transaction entry
+        await trx("approval_flow_trans").insert({
+          approval_flow_trans_id: approvalFlowId,
+          approval_config_id: approvalConfig.approval_config_id,
+          approval_type_id: "AT003", // Driver User
+          user_id_reference_id: driverAdminUserId,
+          s_status: "PENDING",
+          approver_level: 1,
+          pending_with_role_id: "RL001", // Product Owner role
+          pending_with_user_id: pendingWithUserId,
+          pending_with_name: pendingWithName,
+          created_by_user_id: creatorUserId,
+          created_by_name: creatorName,
+          created_by: creatorUserId,
+          updated_by: creatorUserId,
+          created_at: currentTimestamp,
+          updated_at: currentTimestamp,
+          created_on: currentTimestamp,
+          updated_on: currentTimestamp,
+          status: "ACTIVE",
+        });
+
+        console.log(
+          `  ✅ Created approval workflow: ${approvalFlowId} for ${driverAdminUserId}`
+        );
+        console.log(
+          `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
+        );
+      } else {
+        console.log(
+          `  ✅ Approval flow already exists: ${existingApprovalFlow.approval_flow_trans_id}`
+        );
       }
 
       await trx.commit();
