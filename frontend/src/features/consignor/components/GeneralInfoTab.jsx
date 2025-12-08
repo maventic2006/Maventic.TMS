@@ -115,20 +115,70 @@ const GeneralInfoTab = ({
     }
   };
 
-  const handlePreviewDocument = (type) => {
-    const file = type === "nda" ? ndaFile : msaFile;
-    if (!file) return;
+  const handlePreviewDocument = async (type) => {
+    try {
+      const localFile = type === "nda" ? ndaFile : msaFile;
+      const existingDoc = type === "nda" ? existingNdaDoc : existingMsaDoc;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
-      setPreviewDocument({
-        fileName: file.name,
-        fileType: file.type,
-        fileData: base64Data,
-      });
-    };
-    reader.readAsDataURL(file);
+      // Case 1: Local file object (newly uploaded)
+      if (localFile) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: localFile.name,
+            fileType: localFile.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(localFile);
+        return;
+      }
+
+      // Case 2: Existing document from backend (draft edit mode)
+      if (existingDoc?.documentId) {
+        console.log(`📋 Fetching ${type.toUpperCase()} document for preview:`, existingDoc.documentId);
+        
+        const consignorId = formData?.general?.customer_id || formData?.customer_id;
+        if (!consignorId) {
+          console.error("Cannot preview document: Missing consignor ID");
+          alert("Cannot preview document: Missing consignor information");
+          return;
+        }
+
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${consignorId}/general/${type}/download`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${type.toUpperCase()} document: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: existingDoc.fileName || `${type.toUpperCase()} Document`,
+            fileType: blob.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+
+      // Case 3: No document available
+      console.log(`No ${type.toUpperCase()} document available for preview`);
+      alert(`No ${type.toUpperCase()} document available for preview`);
+    } catch (error) {
+      console.error(`Error previewing ${type.toUpperCase()} document:`, error);
+      alert(`Failed to load ${type.toUpperCase()} document for preview: ${error.message}`);
+    }
   };
 
   const closePreview = () => {
@@ -431,6 +481,14 @@ const GeneralInfoTab = ({
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
+                        onClick={() => handlePreviewDocument("nda")}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        title="Preview Document"
+                      >
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleDownloadExistingDocument("nda")}
                         className="p-1.5 hover:bg-blue-100 rounded transition-colors"
                         title="Download Document"
@@ -533,6 +591,14 @@ const GeneralInfoTab = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewDocument("msa")}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        title="Preview Document"
+                      >
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleDownloadExistingDocument("msa")}

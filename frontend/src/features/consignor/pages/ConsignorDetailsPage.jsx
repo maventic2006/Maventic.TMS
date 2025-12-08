@@ -165,10 +165,9 @@ const ConsignorDetailsPage = () => {
         email: contact.email_id || contact.email || "",
         linkedin_link: contact.linkedin_link || "",
         status: contact.status || "ACTIVE",
-        // Add backend-specific fields for download functionality
-        _backend_photo_id: contact.contact_photo,
-        _backend_number: contact.contact_number,
-        _backend_name: contact.contact_name,
+        // ✅ ADD REQUIRED FIELDS FOR THEMETABLE CONTACT PHOTO PREVIEW
+        contact_photo: contact.contact_photo, // Required for ThemeTable photo preview logic
+        _backend_customer_id: currentConsignor.customer_id, // Required for API call
         // 📸 ADD EXISTING PHOTO PREVIEW FOR THEMETABLE
         photo_preview: contact.contact_photo ? 
           `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${currentConsignor.customer_id}/contacts/${contact.contact_id}/photo` : 
@@ -191,14 +190,19 @@ const ConsignorDetailsPage = () => {
         status: document.status || true,
         fileName: document.file_name || document.fileName || "",
         fileType: document.file_type || document.fileType || "",
-        fileData: "",
+        fileData: "", // Will be populated on preview request
         fileUpload: null,
         documentProvider: document.document_provider || document.documentProvider || "",
         premiumAmount: document.premium_amount || document.premiumAmount || 0,
         remarks: document.remarks || "",
+        // 📎 ADD EXISTING DOCUMENT PREVIEW DATA FOR THEMETABLE
+        fileUpload_preview: document.document_unique_id ? 
+          `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"}/consignors/${currentConsignor.customer_id}/documents/${document.document_unique_id}/download` : 
+          null,
         // Keep original backend fields for reference
         _backend_document_id: document.document_id,
-        _backend_document_unique_id: document.document_unique_id
+        _backend_document_unique_id: document.document_unique_id,
+        _backend_customer_id: currentConsignor.customer_id
       }));
 
       // Create proper nested formData structure with field mapping
@@ -1556,7 +1560,7 @@ const ConsignorDetailsPage = () => {
                   {!TabComponent ? (
                     <EmptyState message="No data available" />
                   ) : (
-                    <div className="p-4" style={{ height: "fit-content" }}>
+                    <div className="p-4" style={{ height: "775px" }}>
                     {/* <div className="p-4" style={{height: "665px"}}> */}
                       <TabComponent
                         // For edit mode, pass formData. For view mode, pass consignor

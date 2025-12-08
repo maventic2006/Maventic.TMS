@@ -1904,7 +1904,7 @@ const getDocumentFile = async (customerId, documentId) => {
       .join("document_upload as du", "cd.document_id", "du.document_id")
       .where("cd.customer_id", customerId)
       .where("cd.document_unique_id", documentId)
-      .where("cd.status", "ACTIVE")
+      .whereIn("cd.status", ["ACTIVE", "DRAFT"]) // Include DRAFT status for draft editing
       .select("du.file_name", "du.file_type", "du.file_xstring_value")
       .first();
 
@@ -1942,7 +1942,7 @@ const getContactPhoto = async (customerId, contactId) => {
     const contact = await knex("contact")
       .where("customer_id", customerId)
       .where("contact_id", contactId)
-      .where("status", "ACTIVE")
+      .whereIn("status", ["ACTIVE", "DRAFT"]) // Include DRAFT status for draft editing
       .first();
 
     if (!contact || !contact.contact_photo) {

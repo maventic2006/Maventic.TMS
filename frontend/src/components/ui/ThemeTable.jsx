@@ -175,33 +175,97 @@ const ThemeTable = ({
     }
   };
 
-  const handlePreviewDocument = (row) => {
-    const fileValue = row.fileUpload || row.photo || null;
-    const isFileObject = fileValue instanceof File;
+  const handlePreviewDocument = async (row) => {
+    try {
+      const fileValue = row.fileUpload || row.photo || null;
+      const isFileObject = fileValue instanceof File;
 
-    let previewData = {};
-
-    if (isFileObject) {
-      // For File objects, convert to base64 for preview
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+      if (isFileObject) {
+        // Case 1: New File objects - convert to base64 for preview
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: fileValue.name,
+            fileType: fileValue.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(fileValue);
+      } else if (row.fileData && row.fileType && row.fileName) {
+        // Case 2: Existing uploaded documents with base64 data already available
         setPreviewDocument({
-          fileName: fileValue.name,
-          fileType: fileValue.type,
-          fileData: base64Data,
+          fileName: row.fileName,
+          fileType: row.fileType,
+          fileData: row.fileData,
         });
-      };
-      reader.readAsDataURL(fileValue);
-    } else if (row.fileData && row.fileType && row.fileName) {
-      // For existing uploaded documents with base64 data
-      setPreviewDocument({
-        fileName: row.fileName,
-        fileType: row.fileType,
-        fileData: row.fileData,
-      });
-    } else {
-      console.log("No valid file data for preview:", row);
+      } else if (row._backend_document_unique_id && row._backend_customer_id) {
+        // Case 3: Backend documents - fetch from API
+        console.log("📋 Fetching document from backend for preview:", {
+          documentId: row._backend_document_unique_id,
+          customerId: row._backend_customer_id
+        });
+
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${row._backend_customer_id}/documents/${row._backend_document_unique_id}/download`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch document: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: row.fileName || "Document",
+            fileType: blob.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(blob);
+      } else if (row.contact_photo && row.contact_id && row._backend_customer_id) {
+        // Case 4: Contact photos - fetch from API
+        console.log("📋 Fetching contact photo from backend for preview:", {
+          contactId: row.contact_id,
+          customerId: row._backend_customer_id
+        });
+
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${row._backend_customer_id}/contacts/${row.contact_id}/photo`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch contact photo: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: `${row.name || 'Contact'} Photo`,
+            fileType: blob.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(blob);
+      } else {
+        console.log("📋 No valid file data for preview:", row);
+        alert("No document available for preview");
+      }
+    } catch (error) {
+      console.error("Error previewing document:", error);
+      alert(`Failed to load document for preview: ${error.message}`);
     }
   };
 
@@ -264,10 +328,12 @@ const ThemeTable = ({
               <span className="text-sm text-gray-700 truncate flex-1">
                 {fileName}
               </span>
-              {/* Preview button - show if we have file data or an uploaded file */}
+              {/* Preview button - show if we have file data, uploaded file, or backend document */}
               {(isFileObject ||
                 (row.fileData && row.fileType) ||
-                (row.fileName && row.fileType)) && (
+                (row.fileName && row.fileType) ||
+                row._backend_document_unique_id ||
+                (row.contact_photo && row.contact_id)) && (
                 <button
                   onClick={() => handlePreviewDocument(row)}
                   className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
