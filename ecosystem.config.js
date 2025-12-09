@@ -4,11 +4,11 @@ module.exports = {
       name: "frontend-server",
       cwd: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/frontend",
       script: "npx",
-      args: "serve -s dist -l 5174",
+      args: "serve -s dist -l 5173",
       env_file: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/frontend/.env",
       env: {
         NODE_ENV: "development",
-        PORT: 5174
+        PORT: 5173
       }
     },
     {
@@ -19,7 +19,7 @@ module.exports = {
       env_file: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/tms-backend/.env",
       env: {
         NODE_ENV: "development",
-        PORT: 5001
+        PORT: 5000
       }
     }
   ]
