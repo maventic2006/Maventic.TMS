@@ -25,7 +25,9 @@ docs/                             # All implementation documentation
 ├── TRANSPORTER_LIST_NAVIGATION_FIX.md
 ├── FUZZY_SEARCH_FIX.md
 ├── TRANSPORTER_LIST_TAN_NA_UPDATE.md
-└── WAREHOUSE_CREATE_COMPLETE_FIX.md
+├── WAREHOUSE_CREATE_COMPLETE_FIX.md
+├── DOCUMENT_PREVIEW_ISSUE_COMPLETE_FIX.md
+└── CONSIGNOR_*.md                # Multiple consignor implementation docs
 
 frontend/                         # React + Vite frontend application
 ├── src/
@@ -51,6 +53,14 @@ frontend/                         # React + Vite frontend application
 │   │   │   ├── components/       # 5 Edit tabs (General, Facilities, Address, Documents, Geofencing)
 │   │   │   ├── pages/            # Create & Details pages
 │   │   │   └── validation.js
+│   │   ├── consignor/            # Consignor CRUD module
+│   │   │   ├── components/       # 4 Edit + 4 View tabs
+│   │   │   ├── pages/            # Create & Details pages
+│   │   │   └── validation.js
+│   │   ├── vehicle/              # Vehicle CRUD module (Phase 1A-C complete)
+│   │   │   ├── components/       # List, filter, pagination components
+│   │   │   ├── pages/            # Create & Details pages
+│   │   │   └── validation.js
 │   │   ├── dashboard/
 │   │   ├── indent/
 │   │   ├── rfq/
@@ -61,6 +71,8 @@ frontend/                         # React + Vite frontend application
 │   │   ├── TransporterMaintenance.jsx
 │   │   ├── DriverMaintenance.jsx
 │   │   ├── WarehouseMaintenance.jsx
+│   │   ├── VehicleMaintenance.jsx
+│   │   ├── ConsignorMaintenance.jsx
 │   │   └── WarehouseDetails.jsx
 │   ├── redux/                    # State management with RTK
 │   │   ├── slices/               # Feature slices
@@ -74,11 +86,17 @@ backend/                      # Node.js + Express backend API
 ├── controllers/                  # Business logic layer
 │   ├── authController.js
 │   ├── transporterController.js
-│   └── driverController.js
+│   ├── driverController.js
+│   ├── warehouseController.js
+│   ├── consignorController.js
+│   └── vehicleController.js
 ├── routes/                       # REST API endpoints
 │   ├── auth.js
 │   ├── transporter.js
-│   └── driver.js
+│   ├── driver.js
+│   ├── warehouse.js
+│   ├── consignor.js
+│   └── vehicle.js
 ├── middleware/                   # Authentication & error handling
 │   └── auth.js
 ├── migrations/                   # Database schema migrations (140+ files)
@@ -169,6 +187,20 @@ backend/                      # Node.js + Express backend API
   - **Components**: 5 Edit tabs (General Details, Facilities, Address, Documents, Geofencing)
   - **View Tabs**: 4 tabs (GeneralDetailsViewTab, FacilitiesViewTab, AddressViewTab, DocumentsViewTab)
   - All view tabs have collapsible sections for better UX
+- **Consignor Management** (`features/consignor/`) - Complete CRUD with approval workflow
+  - Create Consignor Page with multi-step form (General, Contact, Organization, Documents)
+  - Details Page with view/edit modes and tab-based interface
+  - List/Maintenance page with filters, search, and pagination
+  - Draft saving and submission workflow (SAVE_AS_DRAFT → PENDING → ACTIVE/INACTIVE)
+  - **Components**: 4 Edit tabs + 4 View tabs + Warehouse List tab
+    - GeneralInfoTab / GeneralInfoViewTab
+    - ContactTab / ContactViewTab
+    - OrganizationTab / OrganizationViewTab
+    - DocumentsTab / DocumentsViewTab
+    - WarehouseListTab / WarehouseListViewTab
+  - Document and contact photo preview functionality
+  - Rejection remarks handling and resubmission workflow
+  - Comprehensive validation error handling with inline errors and toast notifications
 - **Vehicle Management** (`features/vehicle/`) - Complete vehicle master maintenance (Phase 1A-C COMPLETED + UI Modernization)
   - List Page with modern UI, proper table headers, and full pagination (25 vehicles per page)
   - Smart pagination with First/Previous/Next/Last controls and page number display
@@ -206,6 +238,8 @@ backend/                      # Node.js + Express backend API
 - **transporterSlice** - Transporter CRUD, master data, validation state
 - **driverSlice** - Driver CRUD, master data, validation state
 - **warehouseSlice** - Warehouse CRUD, master data, validation state
+- **consignorSlice** - Consignor CRUD, master data, validation state, draft management
+- **vehicleSlice** - Vehicle CRUD, master data, validation state
 - **uiSlice** - Sidebar state, toast notifications, theme preferences
 - **dashboardSlice** - Dashboard data and KPIs
 - **indentSlice** - Indent management state
@@ -224,6 +258,10 @@ backend/                      # Node.js + Express backend API
 - ✅ Driver details page collapsible sections - All view tabs implement collapsible sections with framer-motion
 - ✅ Driver create page completion - All 8 tabs have complete input fields for data entry
 - ✅ Warehouse create page complete - Backend route conflict fixed, full CRUD implementation with 5-table transaction
+- ✅ Document preview functionality - Complete implementation for consignor documents and contact photos
+- ✅ Consignor draft workflow - Save as draft, update draft, submit for approval
+- ✅ Vehicle management modernization - Enhanced UI with animations and smart pagination
+- ✅ Theme system enforcement - All components use theme.config.js instead of hardcoded colors
 
 ### Backend API (Node.js + Express)
 

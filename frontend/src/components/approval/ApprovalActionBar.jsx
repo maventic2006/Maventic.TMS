@@ -68,16 +68,14 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
   // 2. User is specifically assigned as approver AND
   // 3. User is NOT the creator (creators cannot approve their own entities)
   const showApprovalActions =
-    (currentApprovalStatus === "PENDING" ||
-      currentApprovalStatus === "Pending for Approval") &&
+    currentApprovalStatus === "PENDING" && // ✅ STANDARDIZED: Only check for "PENDING"
     isAssignedApprover &&
     !isCreator; // CRITICAL: Hide buttons if user is the creator
 
   // Determine status badge color and icon
   const getStatusBadge = (status) => {
     switch (status) {
-      case "PENDING":
-      case "Pending for Approval":
+      case "PENDING": // ✅ STANDARDIZED: Single "PENDING" status
         return {
           color: "bg-yellow-100 text-yellow-800 border-yellow-300",
           icon: Clock,
@@ -230,9 +228,7 @@ const ApprovalActionBar = ({ userApprovalStatus, entityId, onRefreshData }) => {
         </motion.div>
 
         {/* Pending With Info - Show different messages based on user role */}
-        {(currentApprovalStatus === "PENDING" ||
-          currentApprovalStatus === "Pending for Approval") &&
-          pendingWith && (
+        {currentApprovalStatus === "PENDING" && pendingWith && ( // ✅ STANDARDIZED: Only check "PENDING"
             <motion.div
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}

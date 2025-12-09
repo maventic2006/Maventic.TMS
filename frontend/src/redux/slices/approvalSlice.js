@@ -176,7 +176,7 @@ const initialState = {
     requestType: '',
     dateFrom: '',
     dateTo: '',
-    status: 'Pending for Approval' // Default to pending only
+    status: 'PENDING' // ✅ STANDARDIZED: Use single "PENDING" status
   },
   isFetching: false,
   isApproving: false,
@@ -202,7 +202,7 @@ const approvalSlice = createSlice({
         requestType: '',
         dateFrom: '',
         dateTo: '',
-        status: 'Pending for Approval'
+        status: 'PENDING' // ✅ STANDARDIZED: Use single "PENDING" status
       };
     },
 

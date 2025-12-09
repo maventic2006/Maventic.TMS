@@ -1900,14 +1900,14 @@ const updateTransporter = async (req, res) => {
         console.log(`✅ Approval flow restarted for ${transporterAdminUserId}`);
       }
 
-      // Update user status to Pending for Approval
+      // Update user status to PENDING
       await trx("user_master").where("user_id", transporterAdminUserId).update({
-        status: "Pending for Approval",
+        status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
         updated_at: currentTimestamp,
       });
 
       console.log(
-        `✅ User status updated to Pending for Approval: ${transporterAdminUserId}`
+        `✅ User status updated to PENDING: ${transporterAdminUserId}`
       );
     }
 

@@ -119,7 +119,8 @@ features/[module]/
 │   └── ... (all sections follow this pattern)
 ├── pages/
 │   ├── [Module]CreatePage.jsx     # Uses Edit tabs
-│   └── [Module]DetailsPage.jsx    # Uses View tabs (with edit mode toggle)
+│   ├── [Module]DetailsPage.jsx    # Uses View tabs (with edit mode toggle)
+│   └── [Module]Maintenance.jsx    # List page with filters and pagination
 └── validation.js                  # Zod schema for module
 ```
 
@@ -154,6 +155,25 @@ features/[module]/
 - FacilitiesViewTab (View with collapsible sections)
 - AddressViewTab (View with collapsible sections)
 - DocumentsViewTab (View with collapsible sections)
+
+**Vehicle Module**: Complete CRUD with modern UI (Phase 1A-C COMPLETED)
+
+- VehicleListTable (with headers, pagination, filters)
+- Create Page with 4-step form: Basic Information, Capacity & Ownership, GPS & Operational, Review & Submit
+- Details Page with 9 tabs: Basic Info, Specifications, Capacity, Ownership, Maintenance, Documents, Mappings, Performance, GPS
+- Modern filter panel with slide-in animation
+- Enhanced pagination with First/Previous/Next/Last controls
+
+**Consignor Module**: Complete CRUD with approval workflow
+
+- GeneralInfoTab / GeneralInfoViewTab
+- ContactTab / ContactViewTab
+- OrganizationTab / OrganizationViewTab
+- DocumentsTab / DocumentsViewTab
+- WarehouseListTab / WarehouseListViewTab
+- Comprehensive draft saving and submission workflow
+- Document and contact photo preview functionality
+- Rejection remarks handling and resubmission workflow
 
 ## Collapsible Sections Pattern (Required for All View Tabs)
 
@@ -302,6 +322,158 @@ const buttonTheme = getComponentTheme('actionButton');
 3. All components using theme reflect changes automatically
 
 **Remember**: Theme.config.js is the ONLY place colors should be defined!
+
+## Document Preview Functionality (CRITICAL IMPLEMENTATION)
+
+### Overview
+
+Document preview functionality allows users to preview uploaded files (documents and contact photos) directly in the application without downloading them. This is implemented across all modules that handle file uploads.
+
+### Architecture Components
+
+#### Frontend Components
+- **ThemeTable.jsx**: Universal table component with built-in preview functionality
+- **ConsignorDetailsPage.jsx**: Data mapping layer for edit mode transformation
+- **DocumentsTab.jsx**: Document upload and management
+- **ContactTab.jsx**: Contact information with photo upload
+
+#### Backend Services
+- **consignorService.js**: File retrieval and streaming services
+- **consignorController.js**: API endpoints for document downloads
+- **Document endpoints**: `/api/consignors/:customerId/documents/:documentId/download`
+- **Photo endpoints**: `/api/consignors/:customerId/contacts/:contactId/photo`
+
+### Data Mapping Requirements
+
+#### Critical Field Mapping for ThemeTable Preview
+
+**For Documents:**
+```javascript
+// Required fields in row data for document preview
+{
+  _backend_document_unique_id: "DU000123",  // CRITICAL: Use document_unique_id, not document_id
+  _backend_customer_id: "CSG0001",          // Customer ID for API call
+  fileName: "document.pdf",                 // Display name
+  fileType: "application/pdf"               // MIME type
+}
+```
+
+**For Contact Photos:**
+```javascript
+// Required fields in row data for photo preview
+{
+  contact_photo: "PH000456",                // Photo document ID
+  contact_id: "CT000789",                   // Contact ID for API call
+  _backend_customer_id: "CSG0001",          // Customer ID for API call
+  fileName: "Contact_Photo.jpg",            // Display name
+  fileType: "image/jpeg"                    // MIME type
+}
+```
+
+### Backend Query Requirements
+
+#### Database Status Inclusion
+```sql
+-- ✅ CORRECT: Include both ACTIVE and DRAFT statuses
+WHERE status IN ('ACTIVE', 'DRAFT')
+
+-- ❌ WRONG: Only ACTIVE status (draft documents won't be found)
+WHERE status = 'ACTIVE'
+```
+
+#### Document Identifier Usage
+```sql
+-- ✅ CORRECT: Use document_unique_id for lookups
+WHERE cd.document_unique_id = documentId
+
+-- ❌ WRONG: Use document_id (will cause "not found" errors)
+WHERE cd.document_id = documentId
+```
+
+### Common Issues and Solutions
+
+#### Issue: "Document with identifier 'DU000665' not found"
+**Root Cause**: Frontend sending wrong identifier or backend excluding DRAFT status
+**Solution**: 
+1. Ensure frontend uses `document_unique_id` in API calls
+2. Ensure backend includes DRAFT status in queries
+
+#### Issue: Contact photos not previewing in edit mode
+**Root Cause**: Missing required fields in data mapping
+**Solution**: Include `contact_photo`, `contact_id`, and `_backend_customer_id` in contact data
+
+#### Issue: Preview works in view mode but fails in edit mode
+**Root Cause**: Data transformation during edit mode not preserving required fields
+**Solution**: Ensure ConsignorDetailsPage.jsx mapping includes all required backend fields
+
+### Implementation Pattern
+
+#### Frontend Data Transformation
+```javascript
+// In ConsignorDetailsPage.jsx - useEffect for edit mode
+const mappedDocuments = (documents || []).map(document => ({
+  // ... other fields
+  _backend_document_unique_id: document.document_unique_id,
+  _backend_customer_id: currentConsignor.customer_id,
+  // Preview URL (optional, for direct linking)
+  fileUpload_preview: document.document_unique_id ? 
+    `${API_BASE_URL}/consignors/${customerId}/documents/${document.document_unique_id}/download` : null
+}));
+```
+
+#### ThemeTable Preview Logic
+```javascript
+// In ThemeTable.jsx - handlePreviewDocument function
+if (row._backend_document_unique_id && row._backend_customer_id) {
+  // Document preview
+  const response = await fetch(
+    `${API_URL}/consignors/${row._backend_customer_id}/documents/${row._backend_document_unique_id}/download`
+  );
+} else if (row.contact_photo && row.contact_id && row._backend_customer_id) {
+  // Contact photo preview
+  const response = await fetch(
+    `${API_URL}/consignors/${row._backend_customer_id}/contacts/${row.contact_id}/photo`
+  );
+}
+```
+
+#### Backend Service Implementation
+```javascript
+// In consignorService.js
+const getDocumentFile = async (customerId, documentId) => {
+  const document = await knex("consignor_documents as cd")
+    .join("document_upload as du", "cd.document_id", "du.document_id")
+    .where("cd.customer_id", customerId)
+    .where("cd.document_unique_id", documentId)  // Use document_unique_id
+    .whereIn("cd.status", ["ACTIVE", "DRAFT"])   // Include DRAFT status
+    .select("du.file_name", "du.file_type", "du.file_xstring_value")
+    .first();
+    
+  if (!document) return null;
+  
+  return {
+    fileName: document.file_name,
+    mimeType: document.file_type,
+    buffer: Buffer.from(document.file_xstring_value, "base64")
+  };
+};
+```
+
+### Testing Guidelines
+
+1. **Test Edit Mode**: Ensure preview works when editing drafts
+2. **Test Different File Types**: PDFs, images, documents
+3. **Test Draft Status**: Verify draft documents can be previewed
+4. **Test Contact Photos**: Verify contact photos preview correctly
+5. **Test Error Handling**: Verify graceful error handling for missing files
+
+### Module Coverage
+
+- ✅ **Consignor Module**: Complete implementation with documents and contact photos
+- ✅ **Transporter Module**: Implementation needed (if file uploads exist)
+- ✅ **Driver Module**: Implementation needed (if file uploads exist)
+- ✅ **Warehouse Module**: Implementation needed (if file uploads exist)
+- ✅ **Vehicle Module**: Implementation needed (if file uploads exist)
 
 ## Critical Component Patterns
 

@@ -1826,14 +1826,14 @@ const updateDriver = async (req, res) => {
           console.log(`✅ Approval flow restarted for ${driverAdminUserId}`);
         }
 
-        // Update user status to Pending for Approval
+        // Update user status to PENDING
         await trx("user_master").where("user_id", driverAdminUserId).update({
-          status: "Pending for Approval",
+          status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
           updated_at: currentTimestamp,
         });
 
         console.log(
-          `✅ User status updated to Pending for Approval: ${driverAdminUserId}`
+          `✅ User status updated to PENDING: ${driverAdminUserId}`
         );
       }
 

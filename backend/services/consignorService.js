@@ -823,9 +823,9 @@ const getConsignorById = async (customerId) => {
         .first();
 
       if (consignorUser) {
-        // Get approval flow information
+        // Get approval flow information using consignor entity ID (not user admin ID)
         const approvalFlow = await knex("approval_flow_trans")
-          .where("user_id_reference_id", consignorUser.user_id)
+          .where("user_id_reference_id", customerId) // ✅ FIXED: Use consignor entity ID (CON***) instead of admin user ID (CA***)
           .where("approval_type_id", "AT002") // Consignor Admin
           .orderBy("created_at", "desc")
           .first();
@@ -1355,7 +1355,7 @@ const createConsignor = async (payload, files, userId) => {
       `${general.customer_id.toLowerCase()}@consignor.com`;
     const userMobile = primaryContact?.number || "0000000000";
 
-    // Create user in user_master with Pending for Approval status
+    // Create user in user_master with PENDING status
     await trx("user_master").insert({
       user_id: consignorAdminUserId,
       user_type_id: "UT006", // Consignor Admin
@@ -1367,7 +1367,7 @@ const createConsignor = async (payload, files, userId) => {
       created_by_user_id: creatorUserId,
       password: hashedPassword,
       password_type: "initial",
-      status: "Pending for Approval", // Critical: Set to pending
+      status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
       created_by: creatorUserId,
       updated_by: creatorUserId,
       created_at: knex.fn.now(),
@@ -1375,7 +1375,7 @@ const createConsignor = async (payload, files, userId) => {
     });
 
     console.log(
-      `  ✅ Created user: ${consignorAdminUserId} (Pending for Approval)`
+      `  ✅ Created user: ${consignorAdminUserId} (PENDING)`
     );
 
     // Get approval configuration for Consignor Admin (Level 1 only)
@@ -1421,7 +1421,7 @@ const createConsignor = async (payload, files, userId) => {
       approval_flow_trans_id: approvalFlowId,
       approval_config_id: approvalConfig.approval_config_id,
       approval_type_id: "AT002", // Consignor Admin
-      user_id_reference_id: consignorAdminUserId,
+      user_id_reference_id: general.customer_id, // ✅ FIXED: Store consignor entity ID (CON***) instead of admin user ID (CA***)
       s_status: "PENDING",
       approver_level: 1,
       pending_with_role_id: "RL001", // Product Owner role
@@ -1455,7 +1455,7 @@ const createConsignor = async (payload, files, userId) => {
         userId: consignorAdminUserId,
         userEmail: userEmail,
         initialPassword: initialPassword,
-        approvalStatus: "Pending for Approval",
+        approvalStatus: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
         pendingWith: pendingWithName,
         pendingWithUserId: pendingWithUserId,
       },
@@ -1577,9 +1577,9 @@ const updateConsignor = async (
         if (consignorUser) {
           const consignorAdminUserId = consignorUser.user_id;
 
-          // Find existing approval flow record
+          // Find existing approval flow record using consignor entity ID (not user admin ID)
           const approvalFlow = await trx("approval_flow_trans")
-            .where("user_id_reference_id", consignorAdminUserId)
+            .where("user_id_reference_id", customerId) // ✅ FIXED: Use consignor entity ID (CON***) instead of admin user ID (CA***)
             .where("approval_type_id", "AT002") // Consignor Admin
             .orderBy("created_at", "desc")
             .first();
@@ -1606,16 +1606,16 @@ const updateConsignor = async (
             );
           }
 
-          // Update user status to Pending for Approval
+          // Update user status to PENDING
           await trx("user_master")
             .where("user_id", consignorAdminUserId)
             .update({
-              status: "Pending for Approval",
+              status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
               updated_at: knex.fn.now(),
             });
 
           console.log(
-            `✅ User status updated to Pending for Approval: ${consignorAdminUserId}`
+            `✅ User status updated to PENDING: ${consignorAdminUserId}`
           );
         }
       }
