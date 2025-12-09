@@ -5,6 +5,10 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const ERROR_MESSAGES = require("../utils/errorMessages");
 const { validateDocumentNumber } = require("../utils/documentValidation");
+const {
+  validateGSTPAN,
+  getGSTStateCode,
+} = require("../utils/gstPanValidation");
 
 // Helper function to generate unique IDs
 const generateTransporterId = async () => {
@@ -638,6 +642,95 @@ const createTransporter = async (req, res) => {
       }
     }
 
+    // ========================================
+    // GST-PAN VALIDATION (India Only)
+    // ========================================
+    // Validate primary address GST number against PAN card
+    // Only for India (country code 'IN' or country name 'India')
+    const gstPrimaryAddress = addresses.find((addr) => addr.isPrimary === true);
+
+    console.log("🔍 [CREATE TRANSPORTER] GST-PAN Validation Check:");
+    console.log("  Primary Address Found:", !!gstPrimaryAddress);
+    if (gstPrimaryAddress) {
+      console.log("  Country:", gstPrimaryAddress.country);
+      console.log("  VAT Number:", gstPrimaryAddress.vatNumber);
+      console.log("  State:", gstPrimaryAddress.state);
+    }
+
+    if (gstPrimaryAddress) {
+      const isIndia =
+        gstPrimaryAddress.country === "IN" ||
+        gstPrimaryAddress.country === "India" ||
+        gstPrimaryAddress.country.toLowerCase().includes("india");
+
+      console.log("  Is India:", isIndia);
+
+      if (isIndia && gstPrimaryAddress.vatNumber) {
+        console.log("🔍 Validating GST-PAN for primary address in India");
+
+        // Find PAN card document (DN001 is PAN/TIN)
+        // Use robust check with string conversion to avoid type issues
+        const panDocument = documents.find((doc) => {
+          const docTypeId = doc.documentTypeId || doc.documentType;
+          if (!docTypeId) return false;
+
+          // Convert to string and compare safely
+          const docTypeStr = String(docTypeId).toUpperCase();
+          const docTypeLower = String(docTypeId).toLowerCase();
+
+          return (
+            docTypeStr === "DN001" ||
+            docTypeLower.includes("pan") ||
+            docTypeLower.includes("tin")
+          );
+        });
+
+        console.log("  PAN Document Found:", !!panDocument);
+        if (panDocument) {
+          console.log(
+            "  PAN Document Type:",
+            panDocument.documentTypeId || panDocument.documentType
+          );
+          console.log("  PAN Document Number:", panDocument.documentNumber);
+        }
+
+        if (!panDocument) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+              field: "documents",
+              hint: "Please add a PAN card document in the Documents tab",
+            },
+          });
+        }
+
+        // Validate GST-PAN match
+        const gstValidation = validateGSTPAN(
+          gstPrimaryAddress.vatNumber,
+          panDocument.documentNumber,
+          gstPrimaryAddress.state
+        );
+
+        if (!gstValidation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: gstValidation.error,
+              field: gstValidation.field || "vatNumber",
+              validationCode: gstValidation.code,
+              hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+            },
+          });
+        }
+
+        console.log("✅ GST-PAN validation passed for primary address");
+      }
+    }
+
     // Check for duplicate VAT numbers (uses transaction for consistent reads)
     const vatNumbers = addresses.map((addr) => addr.vatNumber);
     const existingVATCheck = await knex("tms_address")
@@ -1065,7 +1158,7 @@ const createTransporter = async (req, res) => {
         approval_flow_trans_id: approvalFlowId,
         approval_config_id: approvalConfig.approval_config_id,
         approval_type_id: "AT001", // Transporter Admin
-        user_id_reference_id: transporterAdminUserId, // FIXED: Use Transporter Admin user ID, not transporter ID
+        user_id_reference_id: transporterId, // 🔥 FIX: Store actual transporter entity ID instead of admin user ID
         s_status: "PENDING",
         approver_level: 1,
         pending_with_role_id: "RL001", // Product Owner role
@@ -1154,6 +1247,8 @@ const updateTransporter = async (req, res) => {
   try {
     const { id } = req.params;
     const { generalDetails, addresses, serviceableAreas, documents } = req.body;
+    const userId = req.user?.user_id;
+    const userRole = req.user?.role;
 
     // Validate transporter exists
     const existingTransporter = await trx("transporter_general_info")
@@ -1170,6 +1265,52 @@ const updateTransporter = async (req, res) => {
         },
         timestamp: new Date().toISOString(),
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingTransporter.status;
+    const createdBy = existingTransporter.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Only the creator can edit rejected entities",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Cannot edit entity during approval process",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "product_owner" || userRole === "admin";
+      if (!isApprover) {
+        await trx.rollback();
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only approvers can edit active entities",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     // Validate general details (only if provided)
@@ -1256,21 +1397,46 @@ const updateTransporter = async (req, res) => {
           });
         }
 
-        // Validate VAT number format
-        const countryCode = Country.getAllCountries().find(
-          (c) => c.name === address.country
-        )?.isoCode;
-        if (countryCode && !validateVATNumber(address.vatNumber, countryCode)) {
-          await trx.rollback();
-          return res.status(400).json({
-            success: false,
-            error: {
-              code: "VALIDATION_ERROR",
-              message: `Invalid VAT number format for ${address.country}`,
-              field: `addresses[${i}].vatNumber`,
-            },
-            timestamp: new Date().toISOString(),
-          });
+        // Validate VAT number format - BUT skip validation for existing addresses with unchanged VAT
+        let shouldValidateVAT = true;
+
+        // Check if this is an existing address
+        if (address.addressId) {
+          const existingAddress = await trx("tms_address")
+            .where("address_id", address.addressId)
+            .first();
+
+          // If address exists and VAT number hasn't changed, skip validation
+          if (
+            existingAddress &&
+            existingAddress.vat_number === address.vatNumber
+          ) {
+            shouldValidateVAT = false;
+            console.log(
+              `✅ Skipping VAT validation for existing address ${address.addressId} - VAT unchanged`
+            );
+          }
+        }
+
+        if (shouldValidateVAT) {
+          const countryCode = Country.getAllCountries().find(
+            (c) => c.name === address.country
+          )?.isoCode;
+          if (
+            countryCode &&
+            !validateVATNumber(address.vatNumber, countryCode)
+          ) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: `Invalid VAT number format for ${address.country}`,
+                field: `addresses[${i}].vatNumber`,
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
 
         // Validate contacts
@@ -1560,6 +1726,102 @@ const updateTransporter = async (req, res) => {
         }
       }
 
+      // ========================================
+      // GST-PAN VALIDATION (India Only) - UPDATE TRANSPORTER
+      // ========================================
+      // Validate primary address GST number against PAN card
+      const gstPrimaryAddr = addresses.find((addr) => addr.isPrimary === true);
+
+      console.log("🔍 [UPDATE TRANSPORTER] GST-PAN Validation Check:");
+      console.log("  Primary Address Found:", !!gstPrimaryAddr);
+      if (gstPrimaryAddr) {
+        console.log("  Country:", gstPrimaryAddr.country);
+        console.log("  VAT Number:", gstPrimaryAddr.vatNumber);
+        console.log("  State:", gstPrimaryAddr.state);
+      }
+
+      if (gstPrimaryAddr) {
+        const isIndia =
+          gstPrimaryAddr.country === "IN" ||
+          gstPrimaryAddr.country === "India" ||
+          gstPrimaryAddr.country.toLowerCase().includes("india");
+
+        console.log("  Is India:", isIndia);
+
+        if (isIndia && gstPrimaryAddr.vatNumber) {
+          console.log(
+            "🔍 [UPDATE] Validating GST-PAN for primary address in India"
+          );
+
+          // Find PAN card document (DN001 is PAN/TIN)
+          // Use robust check with string conversion to avoid type issues
+          const panDocument = documents.find((doc) => {
+            const docTypeId = doc.documentTypeId || doc.documentType;
+            if (!docTypeId) return false;
+
+            // Convert to string and compare safely
+            const docTypeStr = String(docTypeId).toUpperCase();
+            const docTypeLower = String(docTypeId).toLowerCase();
+
+            return (
+              docTypeStr === "DN001" ||
+              docTypeLower.includes("pan") ||
+              docTypeLower.includes("tin")
+            );
+          });
+
+          console.log("  PAN Document Found:", !!panDocument);
+          if (panDocument) {
+            console.log(
+              "  PAN Document Type:",
+              panDocument.documentTypeId || panDocument.documentType
+            );
+            console.log("  PAN Document Number:", panDocument.documentNumber);
+          }
+
+          if (!panDocument) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message:
+                  "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+                field: "documents",
+                hint: "Please add a PAN card document in the Documents tab",
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Validate GST-PAN match
+          const gstValidation = validateGSTPAN(
+            gstPrimaryAddr.vatNumber,
+            panDocument.documentNumber,
+            gstPrimaryAddr.state
+          );
+
+          if (!gstValidation.isValid) {
+            await trx.rollback();
+            return res.status(400).json({
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: gstValidation.error,
+                field: gstValidation.field || "vatNumber",
+                validationCode: gstValidation.code,
+                hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          console.log(
+            "✅ [UPDATE] GST-PAN validation passed for primary address"
+          );
+        }
+      }
+
       // Check for duplicate document numbers (excluding current transporter's documents)
       for (let i = 0; i < documents.length; i++) {
         const document = documents[i];
@@ -1600,6 +1862,55 @@ const updateTransporter = async (req, res) => {
     const currentUser = req.user?.user_id || "SYSTEM";
     const currentTimestamp = new Date();
 
+    // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+    const isResubmission =
+      currentStatus === "INACTIVE" && generalDetails?.status === "PENDING";
+
+    if (isResubmission) {
+      console.log(`🔄 Resubmission detected for transporter ${id}`);
+
+      // Get transporter admin user ID (T001 → TA0001)
+      const transporterNumber = id.substring(1); // Remove 'T' prefix
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`; // TA0001
+
+      // Find existing approval flow record
+      const approvalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", id) // 🔥 FIX: Use transporter entity ID instead of admin user ID
+        .where("approval_type_id", "AT001") // Transporter Admin
+        .orderBy("created_at", "desc")
+        .first();
+
+      if (approvalFlow) {
+        // Update approval flow to restart from Level 1
+        await trx("approval_flow_trans")
+          .where(
+            "approval_flow_unique_id",
+            approvalFlow.approval_flow_unique_id
+          )
+          .update({
+            s_status: "PENDING",
+            approver_level: 1,
+            actioned_by_id: null,
+            actioned_by_name: null,
+            approved_on: null,
+            // Keep remarks from rejection for history
+            updated_at: currentTimestamp,
+          });
+
+        console.log(`✅ Approval flow restarted for ${transporterAdminUserId}`);
+      }
+
+      // Update user status to Pending for Approval
+      await trx("user_master").where("user_id", transporterAdminUserId).update({
+        status: "Pending for Approval",
+        updated_at: currentTimestamp,
+      });
+
+      console.log(
+        `✅ User status updated to Pending for Approval: ${transporterAdminUserId}`
+      );
+    }
+
     // Update general details if provided
     if (generalDetails) {
       await trx("transporter_general_info")
@@ -1614,6 +1925,7 @@ const updateTransporter = async (req, res) => {
           trans_mode_air: generalDetails.transMode.air ? 1 : 0,
           trans_mode_sea: generalDetails.transMode.sea ? 1 : 0,
           active_flag: generalDetails.activeFlag !== false ? 1 : 0,
+          status: generalDetails.status || currentStatus, // Update status if provided
           updated_at: currentTimestamp,
           updated_on: currentTimestamp,
           updated_by: currentUser,
@@ -1918,7 +2230,7 @@ const updateTransporter = async (req, res) => {
 
         // Handle file upload if present
         if (document.fileData) {
-          const docUploadId = await generateDocumentUploadId();
+          const docUploadId = await generateDocumentUploadId(trx);
 
           await trx("document_upload").insert({
             document_id: docUploadId,
@@ -1995,6 +2307,26 @@ const getMasterData = async (req, res) => {
       .where("status", "ACTIVE")
       .orderBy("address");
 
+    // Get mandatory documents for TRANSPORTER user type
+    const mandatoryDocuments = await knex("doc_type_configuration as dtc")
+      .join(
+        "document_name_master as dnm",
+        "dtc.doc_name_master_id",
+        "dnm.doc_name_master_id"
+      )
+      .select(
+        "dtc.doc_name_master_id as value",
+        "dnm.document_name as label",
+        "dtc.is_mandatory",
+        "dtc.is_expiry_required",
+        "dtc.is_verification_required"
+      )
+      .where("dtc.user_type", "TRANSPORTER")
+      .where("dtc.status", "ACTIVE")
+      .where("dnm.status", "ACTIVE")
+      .where("dtc.is_mandatory", 1)
+      .orderBy("dnm.document_name");
+
     res.json({
       success: true,
       data: {
@@ -2002,6 +2334,7 @@ const getMasterData = async (req, res) => {
         documentTypes,
         documentNames,
         addressTypes,
+        mandatoryDocuments,
       },
       timestamp: new Date().toISOString(),
     });
@@ -2144,6 +2477,50 @@ const getTransporters = async (req, res) => {
         "tgi.transporter_id",
         "tc.transporter_id"
       )
+      // LEFT JOIN for PAN document (DN001)
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as pan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'DN001'
+            AND status = 'ACTIVE'
+        ) as pan_doc`),
+        "tgi.transporter_id",
+        "pan_doc.transporter_id"
+      )
+      // LEFT JOIN for TAN document (DN003)
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as tan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'DN003'
+            AND status = 'ACTIVE'
+        ) as tan_doc`),
+        "tgi.transporter_id",
+        "tan_doc.transporter_id"
+      )
+      .leftJoin(
+        knex.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT001'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        knex.raw(
+          "CONCAT('T', CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED))"
+        ),
+        "tgi.transporter_id"
+      )
       .select(
         "tgi.transporter_id",
         "tgi.business_name",
@@ -2164,14 +2541,21 @@ const getTransporters = async (req, res) => {
         "addr.city",
         "addr.district",
         "addr.vat_number",
-        "addr.tin_pan",
-        "addr.tan",
+        // Get PAN and TAN from transporter_documents instead of tms_address
+        "pan_doc.pan_number as tin_pan",
+        "tan_doc.tan_number as tan",
         knex.raw(
           "CONCAT(COALESCE(addr.street_1, ''), ', ', COALESCE(addr.city, ''), ', ', COALESCE(addr.state, ''), ', ', COALESCE(addr.country, '')) as address"
         ),
         "tc.contact_person_name",
         "tc.phone_number",
-        "tc.email_id"
+        "tc.email_id",
+        // Get approver name - try actioned_by_name first, fallback to pending_with_name
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
       );
 
     // Search
@@ -2216,7 +2600,8 @@ const getTransporters = async (req, res) => {
     if (state) query = query.where("addr.state", "like", `%${state}%`);
     if (city) query = query.where("addr.city", "like", `%${city}%`);
     if (vatGst) query = query.where("addr.vat_number", "like", `%${vatGst}%`);
-    if (tan) query = query.where("addr.tan", "like", `%${tan}%`);
+    // Filter by TAN from transporter_documents (joined as tan_doc)
+    if (tan) query = query.where("tan_doc.tan_number", "like", `%${tan}%`);
 
     if (transportMode) {
       const modes = transportMode.split(",");
@@ -2249,13 +2634,17 @@ const getTransporters = async (req, res) => {
       query = query.where("tgi.created_on", ">=", createdOnStart);
     }
     if (createdOnEnd) {
-      query = query.where("tgi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      query = query.where("tgi.created_on", "<=", endDateWithTime);
     }
 
-    // Count query (with same date filters)
+    // Count query (with same date filters and document joins for TAN filter)
     let countQuery = knex("transporter_general_info as tgi");
 
-    if (search || state || city || vatGst || tan) {
+    if (search || state || city || vatGst) {
       countQuery = countQuery.leftJoin("tms_address as addr", function () {
         this.on("tgi.transporter_id", "=", "addr.user_reference_id").andOn(
           "addr.user_type",
@@ -2263,6 +2652,22 @@ const getTransporters = async (req, res) => {
           knex.raw("'TRANSPORTER'")
         );
       });
+    }
+
+    // Add TAN document join if filtering by TAN
+    if (tan) {
+      countQuery = countQuery.leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as tan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'TAN'
+            AND status = 'ACTIVE'
+        ) as tan_doc`),
+        "tgi.transporter_id",
+        "tan_doc.transporter_id"
+      );
     }
 
     // Reapply filters
@@ -2313,7 +2718,9 @@ const getTransporters = async (req, res) => {
     if (city) countQuery = countQuery.where("addr.city", "like", `%${city}%`);
     if (vatGst)
       countQuery = countQuery.where("addr.vat_number", "like", `%${vatGst}%`);
-    if (tan) countQuery = countQuery.where("addr.tan", "like", `%${tan}%`);
+    // Filter by TAN from transporter_documents instead of tms_address
+    if (tan)
+      countQuery = countQuery.where("tan_doc.tan_number", "like", `%${tan}%`);
 
     if (transportMode) {
       const modes = transportMode.split(",");
@@ -2346,7 +2753,11 @@ const getTransporters = async (req, res) => {
       countQuery = countQuery.where("tgi.created_on", ">=", createdOnStart);
     }
     if (createdOnEnd) {
-      countQuery = countQuery.where("tgi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      countQuery = countQuery.where("tgi.created_on", "<=", endDateWithTime);
     }
 
     const totalResult = await countQuery
@@ -2365,6 +2776,18 @@ const getTransporters = async (req, res) => {
       if (transporter.trans_mode_rail) transportModes.push("RL");
       if (transporter.trans_mode_air) transportModes.push("A");
       if (transporter.trans_mode_sea) transportModes.push("S");
+
+      // Debug approval data - show for PENDING and approved/rejected
+      if (transporter.approval_status) {
+        console.log(
+          `📊 ${transporter.transporter_id} approval (${transporter.approval_status}):`,
+          {
+            approver_name: transporter.approver_name,
+            approved_on: transporter.approved_on,
+            transporter_status: transporter.status,
+          }
+        );
+      }
 
       return {
         id: transporter.transporter_id,
@@ -2393,6 +2816,12 @@ const getTransporters = async (req, res) => {
         activeFlag: transporter.active_flag,
         fromDate: transporter.from_date,
         toDate: transporter.to_date,
+        // Approval data - show approver name for both Approve and Reject status
+        approver: transporter.approver_name || null,
+        approvedOn:
+          transporter.approved_on && transporter.approval_status === "Approve"
+            ? new Date(transporter.approved_on).toISOString().split("T")[0]
+            : null,
       };
     });
 
@@ -2608,10 +3037,11 @@ const getTransporterById = async (req, res) => {
       return acc;
     }, {});
 
-    // Build addresses with their contacts - convert country ISO codes to country names
+    // Build addresses with their contacts - convert country ISO codes to country names and state ISO codes to state names
     const addressesWithContacts = addresses.map((address) => {
       // Convert country ISO code to country name
       let countryName = address.country;
+      let countryIsoCode = address.country;
       if (address.country && address.country.length <= 3) {
         // It's an ISO code, convert to name
         const countryData = Country.getAllCountries().find(
@@ -2619,6 +3049,19 @@ const getTransporterById = async (req, res) => {
         );
         if (countryData) {
           countryName = countryData.name;
+          countryIsoCode = countryData.isoCode;
+        }
+      }
+
+      // Convert state ISO code to state name (for GST validation)
+      let stateName = address.state;
+      if (address.state && countryIsoCode) {
+        // Try to find state by ISO code
+        const stateData = State.getStatesOfCountry(countryIsoCode).find(
+          (s) => s.isoCode === address.state
+        );
+        if (stateData) {
+          stateName = stateData.name;
         }
       }
 
@@ -2626,7 +3069,7 @@ const getTransporterById = async (req, res) => {
         addressId: address.address_id, // Include address ID for updates
         vatNumber: address.vat_number,
         country: countryName,
-        state: address.state,
+        state: stateName, // Now returns full state name instead of ISO code
         city: address.city,
         street1: address.street_1,
         street2: address.street_2,
@@ -2639,13 +3082,78 @@ const getTransporterById = async (req, res) => {
     });
 
     // Helper function to format date to YYYY-MM-DD
+    // Fixed to handle timezone issues - prevents date shifting
     const formatDateForInput = (dateValue) => {
       if (!dateValue) return null;
+
+      // If already a string in YYYY-MM-DD format, return as-is
+      if (
+        typeof dateValue === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
+      ) {
+        return dateValue;
+      }
+
+      // Handle Date objects or datetime strings
       const date = new Date(dateValue);
       // Check if date is valid
       if (isNaN(date.getTime())) return null;
-      return date.toISOString().split("T")[0];
+
+      // Use UTC methods to avoid timezone shifts
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(date.getUTCDate()).padStart(2, "0");
+
+      return `${year}-${month}-${day}`;
     };
+
+    // Get latest approval data for this transporter
+    // Derive TA user ID from transporter ID (T132 -> TA0132)
+    const transporterNumber = id.substring(1); // Remove 'T' prefix
+    const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`;
+
+    let approverName = null;
+    let approvedDate = null;
+
+    try {
+      // Get latest approval record for this transporter's admin user
+      // Include PENDING to show assigned approver for pending transporters
+      const latestApproval = await knex("approval_flow_trans")
+        .where("user_id_reference_id", id) // 🔥 FIX: Use transporter entity ID instead of admin user ID
+        .where("approval_type_id", "AT001")
+        .whereIn("s_status", ["Approve", "Reject", "PENDING"])
+        .orderBy("approval_flow_unique_id", "desc")
+        .first();
+
+      if (latestApproval) {
+        // Try actioned_by_name first, fallback to pending_with_name
+        // For PENDING: pending_with_name shows who should approve
+        // For Approve/Reject: pending_with_name shows who approved/rejected
+        approverName =
+          latestApproval.actioned_by_name ||
+          latestApproval.pending_with_name ||
+          null;
+
+        // Only show approved date if status is Approve
+        approvedDate =
+          latestApproval.s_status === "Approve" && latestApproval.approved_on
+            ? formatDateForInput(latestApproval.approved_on)
+            : null;
+
+        console.log(`✅ Found approval data for ${transporterAdminUserId}:`, {
+          actioned_by_name: latestApproval.actioned_by_name,
+          pending_with_name: latestApproval.pending_with_name,
+          approverName,
+          approvedDate,
+          status: latestApproval.s_status,
+        });
+      } else {
+        console.log(`⚠️ No approval data found for ${transporterAdminUserId}`);
+      }
+    } catch (approvalError) {
+      console.error("Error fetching approval data:", approvalError);
+      // Don't fail the entire request
+    }
 
     // Build response
     const response = {
@@ -2662,13 +3170,16 @@ const getTransporterById = async (req, res) => {
         updatedBy: transporter.updated_by,
         updatedOn: formatDateForInput(transporter.updated_on),
         status: transporter.status,
+        approvedBy: approverName, // Frontend expects approvedBy
+        approvedOn: approvedDate, // Frontend expects approvedOn
       },
       addresses: addressesWithContacts,
       serviceableAreas: groupedServiceableAreas,
       documents: documents.map((doc) => ({
         documentUniqueId: doc.document_unique_id,
-        documentType: doc.documentTypeName || doc.document_type_id,
+        documentType: doc.document_type_id, // Use ID (DN001) instead of name for frontend compatibility
         documentTypeId: doc.document_type_id,
+        documentTypeName: doc.documentTypeName || doc.document_type_id, // Keep name for display
         documentNumber: doc.document_number,
         referenceNumber: doc.reference_number,
         country: doc.country,
@@ -2677,6 +3188,8 @@ const getTransporterById = async (req, res) => {
         status: doc.active,
         fileName: doc.file_name,
         fileType: doc.file_type,
+        fileData: "", // Initialize empty for edit mode
+        fileUpload: null, // Initialize for file uploads
         // Don't send file data in the list to reduce response size
         // fileData: doc.file_data,
       })),
@@ -2769,7 +3282,14 @@ const getTransporterById = async (req, res) => {
             pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
             createdByUserId: approvalFlows[0]?.created_by_user_id || null,
             createdByName: approvalFlows[0]?.created_by_name || null,
+            remarks: approvalFlows[0]?.remarks || null, // ✅ ADD REJECTION REMARKS
           };
+
+          console.log(
+            `📝 User Approval Status created with remarks: ${
+              userApprovalStatus.remarks ? "YES" : "NO"
+            }`
+          );
 
           approvalHistory = approvalFlows;
         } else {
@@ -3864,6 +4384,7 @@ const submitTransporterFromDraft = async (req, res) => {
         .first();
 
       if (docTypeInfo) {
+        // Store the resolved document type ID for database insertion
         doc.documentTypeId = docTypeInfo.doc_name_master_id;
 
         const validation = validateDocumentNumber(
@@ -3941,6 +4462,111 @@ const submitTransporterFromDraft = async (req, res) => {
             field: `documents[${i}].validTo`,
           },
         });
+      }
+    }
+
+    // ========================================
+    // GST-PAN VALIDATION (India Only) - SUBMIT DRAFT FOR APPROVAL
+    // ========================================
+    // Validate primary address GST number against PAN card
+    // Only for India (country code 'IN' or country name 'India')
+    const gstPrimaryAddrDraft = addresses.find(
+      (addr) => addr.isPrimary === true
+    );
+
+    console.log("🔍 [SUBMIT DRAFT] GST-PAN Validation Check:");
+    console.log("  Primary Address Found:", !!gstPrimaryAddrDraft);
+    if (gstPrimaryAddrDraft) {
+      console.log("  Country:", gstPrimaryAddrDraft.country);
+      console.log("  VAT Number:", gstPrimaryAddrDraft.vatNumber);
+      console.log("  State:", gstPrimaryAddrDraft.state);
+    }
+
+    if (gstPrimaryAddrDraft) {
+      const isIndia =
+        gstPrimaryAddrDraft.country === "IN" ||
+        gstPrimaryAddrDraft.country === "India" ||
+        gstPrimaryAddrDraft.country.toLowerCase().includes("india");
+
+      console.log("  Is India:", isIndia);
+
+      if (isIndia && gstPrimaryAddrDraft.vatNumber) {
+        console.log(
+          "🔍 [SUBMIT DRAFT] Validating GST-PAN for primary address in India"
+        );
+
+        // Find PAN card document (DN001 is PAN/TIN)
+        // Use robust check with string conversion to avoid type issues
+        const panDocument = documents.find((doc) => {
+          const docTypeId = doc.documentTypeId || doc.documentType;
+          if (!docTypeId) return false;
+
+          // Convert to string and compare safely
+          const docTypeStr = String(docTypeId).toUpperCase();
+          const docTypeLower = String(docTypeId).toLowerCase();
+
+          return (
+            docTypeStr === "DN001" ||
+            docTypeLower.includes("pan") ||
+            docTypeLower.includes("tin")
+          );
+        });
+
+        console.log("  PAN Document Found:", !!panDocument);
+        if (panDocument) {
+          console.log(
+            "  PAN Document Type:",
+            panDocument.documentTypeId || panDocument.documentType
+          );
+          console.log("  PAN Document Number:", panDocument.documentNumber);
+        }
+
+        if (!panDocument) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+              field: "documents",
+              hint: "Please add a PAN card document in the Documents tab before submitting for approval",
+            },
+          });
+        }
+
+        // Validate GST-PAN match
+        console.log("🔍 [GST VALIDATION DEBUG]:");
+        console.log("  GST Number:", gstPrimaryAddrDraft.vatNumber);
+        console.log("  PAN Number:", panDocument.documentNumber);
+        console.log("  State from Address:", gstPrimaryAddrDraft.state);
+
+        const gstValidation = validateGSTPAN(
+          gstPrimaryAddrDraft.vatNumber,
+          panDocument.documentNumber,
+          gstPrimaryAddrDraft.state
+        );
+
+        console.log(
+          "  Validation Result:",
+          JSON.stringify(gstValidation, null, 2)
+        );
+
+        if (!gstValidation.isValid) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: gstValidation.error,
+              field: gstValidation.field || "vatNumber",
+              validationCode: gstValidation.code,
+              hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+            },
+          });
+        }
+
+        console.log(
+          "✅ [SUBMIT DRAFT] GST-PAN validation passed for primary address"
+        );
       }
     }
 
@@ -4253,7 +4879,7 @@ const submitTransporterFromDraft = async (req, res) => {
         approval_flow_trans_id: approvalFlowId,
         approval_config_id: approvalConfig.approval_config_id,
         approval_type_id: "AT001", // Transporter Admin
-        user_id_reference_id: transporterAdminUserId, // Use the TA user ID (matches createTransporter pattern)
+        user_id_reference_id: id, // 🔥 FIX: Store actual transporter entity ID instead of admin user ID
         s_status: "PENDING",
         approver_level: 1,
         pending_with_role_id: "RL001", // Product Owner role
@@ -4413,6 +5039,1004 @@ const deleteTransporterDraft = async (req, res) => {
   }
 };
 
+// ========================================
+// MAPPING MANAGEMENT CONTROLLERS
+// ========================================
+
+// Helper function to generate mapping IDs
+const generateMappingId = async (prefix, tableName, idColumn, trx = knex) => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const result = await trx(tableName).count("* as count").first();
+    const count = parseInt(result.count) + 1 + attempts;
+    const newId = `${prefix}${count.toString().padStart(4, "0")}`;
+
+    const existing = await trx(tableName).where(idColumn, newId).first();
+    if (!existing) {
+      return newId;
+    }
+    attempts++;
+  }
+
+  throw new Error(`Failed to generate unique ${prefix} ID after 100 attempts`);
+};
+
+// ========================================
+// CONSIGNOR MAPPING CONTROLLERS
+// ========================================
+const getConsignorMappings = async (req, res) => {
+  try {
+    const { id } = req.params; // transporter_id
+
+    const mappings = await knex("transporter_consignor_mapping as tcm")
+      .where("tcm.transporter_id", id)
+      .where("tcm.status", "ACTIVE")
+      .leftJoin(
+        "consignor_basic_information as cbi",
+        "tcm.consignor_id",
+        "cbi.customer_id"
+      )
+      .select("tcm.*", "cbi.customer_name as consignor_name")
+      .orderBy("tcm.created_at", "desc");
+
+    // Fetch items for each mapping
+    for (const mapping of mappings) {
+      const items = await knex("transporter_consignor_mapping_item")
+        .where("tc_mapping_hdr_id", mapping.tc_mapping_id)
+        .where("status", "ACTIVE")
+        .select("*")
+        .orderBy("created_at", "desc");
+
+      mapping.items = items;
+    }
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching consignor mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch consignor mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createConsignorMapping = async (req, res) => {
+  const trx = await knex.transaction();
+
+  try {
+    const { id } = req.params; // transporter_id
+    const { consignor_id, valid_from, valid_to, active_flag, remark, items } =
+      req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate mapping
+    const existingMapping = await trx("transporter_consignor_mapping")
+      .where({ transporter_id: id, consignor_id, status: "ACTIVE" })
+      .first();
+
+    if (existingMapping) {
+      await trx.rollback();
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: "This consignor is already mapped to this transporter",
+        },
+      });
+    }
+
+    // Generate mapping ID
+    const mappingId = await generateMappingId(
+      "TCM",
+      "transporter_consignor_mapping",
+      "tc_mapping_id",
+      trx
+    );
+
+    // Insert header
+    await trx("transporter_consignor_mapping").insert({
+      tc_mapping_id: mappingId,
+      transporter_id: id,
+      consignor_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      active_flag: active_flag !== undefined ? active_flag : true,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    // Insert items if provided
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const itemId = await generateMappingId(
+          "TCMI",
+          "transporter_consignor_mapping_item",
+          "tc_mapping_item_id",
+          trx
+        );
+
+        await trx("transporter_consignor_mapping_item").insert({
+          tc_mapping_item_id: itemId,
+          tc_mapping_hdr_id: mappingId,
+          contract_id: item.contract_id,
+          contract_name: item.contract_name,
+          valid_from: item.valid_from || knex.fn.now(),
+          valid_to: item.valid_to,
+          active_flag: item.active_flag !== undefined ? item.active_flag : true,
+          remark: item.remark,
+          created_by: userId,
+          updated_by: userId,
+          status: "ACTIVE",
+        });
+      }
+    }
+
+    await trx.commit();
+
+    res.status(201).json({
+      success: true,
+      data: { tc_mapping_id: mappingId },
+      message: "Consignor mapping created successfully",
+    });
+  } catch (error) {
+    await trx.rollback();
+    console.error("Error creating consignor mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create consignor mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateConsignorMapping = async (req, res) => {
+  const trx = await knex.transaction();
+
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, active_flag, remark, items } = req.body;
+    const userId = req.user?.user_id;
+
+    // Update header
+    await trx("transporter_consignor_mapping")
+      .where({ tc_mapping_id: mappingId, transporter_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        active_flag,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    // Delete existing items
+    await trx("transporter_consignor_mapping_item")
+      .where("tc_mapping_hdr_id", mappingId)
+      .update({ status: "INACTIVE" });
+
+    // Insert new items
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const itemId = await generateMappingId(
+          "TCMI",
+          "transporter_consignor_mapping_item",
+          "tc_mapping_item_id",
+          trx
+        );
+
+        await trx("transporter_consignor_mapping_item").insert({
+          tc_mapping_item_id: itemId,
+          tc_mapping_hdr_id: mappingId,
+          contract_id: item.contract_id,
+          contract_name: item.contract_name,
+          valid_from: item.valid_from || knex.fn.now(),
+          valid_to: item.valid_to,
+          active_flag: item.active_flag !== undefined ? item.active_flag : true,
+          remark: item.remark,
+          created_by: userId,
+          updated_by: userId,
+          status: "ACTIVE",
+        });
+      }
+    }
+
+    await trx.commit();
+
+    res.json({
+      success: true,
+      message: "Consignor mapping updated successfully",
+    });
+  } catch (error) {
+    await trx.rollback();
+    console.error("Error updating consignor mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update consignor mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteConsignorMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_consignor_mapping")
+      .where({ tc_mapping_id: mappingId, transporter_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    // Also inactivate items
+    await knex("transporter_consignor_mapping_item")
+      .where("tc_mapping_hdr_id", mappingId)
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Consignor mapping deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting consignor mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to delete consignor mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// VEHICLE MAPPING CONTROLLERS
+// ========================================
+const getVehicleMappings = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const mappings = await knex("transporter_vehicle_mapping as tvm")
+      .where("tvm.transporter_id", id)
+      .where("tvm.status", "ACTIVE")
+      .leftJoin(
+        "vehicle_basic_information_hdr as vbih",
+        "tvm.vehicle_id",
+        "vbih.vehicle_id_code_hdr"
+      )
+      .leftJoin(
+        "vehicle_ownership_details as vod",
+        "vbih.vehicle_id_code_hdr",
+        "vod.vehicle_id_code"
+      )
+      .select("tvm.*", "vod.registration_number as vehicle_registration")
+      .orderBy("tvm.created_at", "desc");
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching vehicle mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch vehicle mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createVehicleMapping = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { vehicle_id, valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate
+    const existingMapping = await knex("transporter_vehicle_mapping")
+      .where({ transporter_id: id, vehicle_id, status: "ACTIVE" })
+      .first();
+
+    if (existingMapping) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: "This vehicle is already mapped to this transporter",
+        },
+      });
+    }
+
+    const mappingId = await generateMappingId(
+      "TVM",
+      "transporter_vehicle_mapping",
+      "tv_mapping_id"
+    );
+
+    await knex("transporter_vehicle_mapping").insert({
+      tv_mapping_id: mappingId,
+      transporter_id: id,
+      vehicle_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      active_flag: active_flag !== undefined ? active_flag : true,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { tv_mapping_id: mappingId },
+      message: "Vehicle mapping created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating vehicle mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create vehicle mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateVehicleMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_vehicle_mapping")
+      .where({ tv_mapping_id: mappingId, transporter_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        active_flag,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Vehicle mapping updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating vehicle mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update vehicle mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteVehicleMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_vehicle_mapping")
+      .where({ tv_mapping_id: mappingId, transporter_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Vehicle mapping deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting vehicle mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to delete vehicle mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// DRIVER MAPPING CONTROLLERS
+// ========================================
+const getDriverMappings = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const mappings = await knex("transporter_driver_mapping as tdm")
+      .where("tdm.transporter_id", id)
+      .where("tdm.status", "ACTIVE")
+      .leftJoin(
+        "driver_basic_information as dbi",
+        "tdm.driver_id",
+        "dbi.driver_id"
+      )
+      .select("tdm.*", "dbi.full_name as driver_name")
+      .orderBy("tdm.created_at", "desc");
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching driver mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch driver mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createDriverMapping = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { driver_id, valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate
+    const existingMapping = await knex("transporter_driver_mapping")
+      .where({ transporter_id: id, driver_id, status: "ACTIVE" })
+      .first();
+
+    if (existingMapping) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: "This driver is already mapped to this transporter",
+        },
+      });
+    }
+
+    const mappingId = await generateMappingId(
+      "TDM",
+      "transporter_driver_mapping",
+      "td_mapping_id"
+    );
+
+    await knex("transporter_driver_mapping").insert({
+      td_mapping_id: mappingId,
+      transporter_id: id,
+      driver_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      active_flag: active_flag !== undefined ? active_flag : true,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { td_mapping_id: mappingId },
+      message: "Driver mapping created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating driver mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create driver mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateDriverMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_driver_mapping")
+      .where({ td_mapping_id: mappingId, transporter_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        active_flag,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Driver mapping updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating driver mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update driver mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteDriverMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_driver_mapping")
+      .where({ td_mapping_id: mappingId, transporter_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Driver mapping deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting driver mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to delete driver mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// OWNER MAPPING CONTROLLERS
+// ========================================
+const getOwnerMappings = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const mappings = await knex("transporter_owner_mapping as tom")
+      .where("tom.transporter_id", id)
+      .where("tom.status", "ACTIVE")
+      .leftJoin(
+        "vehicle_ownership_details as vod",
+        "tom.owner_id",
+        "vod.vehicle_ownership_id"
+      )
+      .select("tom.*", "vod.ownership_name as owner_name")
+      .orderBy("tom.created_at", "desc");
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching owner mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch owner mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createOwnerMapping = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { owner_id, valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate
+    const existingMapping = await knex("transporter_owner_mapping")
+      .where({ transporter_id: id, owner_id, status: "ACTIVE" })
+      .first();
+
+    if (existingMapping) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: "This owner is already mapped to this transporter",
+        },
+      });
+    }
+
+    const mappingId = await generateMappingId(
+      "TOM",
+      "transporter_owner_mapping",
+      "to_mapping_id"
+    );
+
+    await knex("transporter_owner_mapping").insert({
+      to_mapping_id: mappingId,
+      transporter_id: id,
+      owner_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      active_flag: active_flag !== undefined ? active_flag : true,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { to_mapping_id: mappingId },
+      message: "Owner mapping created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating owner mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create owner mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateOwnerMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, active_flag, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_owner_mapping")
+      .where({ to_mapping_id: mappingId, transporter_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        active_flag,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Owner mapping updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating owner mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update owner mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteOwnerMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("transporter_owner_mapping")
+      .where({ to_mapping_id: mappingId, transporter_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Owner mapping deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting owner mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to delete owner mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// BLACKLIST MAPPING CONTROLLERS
+// ========================================
+const getBlacklistMappings = async (req, res) => {
+  try {
+    const { id } = req.params; // transporter_id
+
+    // Get blacklist entries where this transporter is the one who blacklisted
+    const mappings = await knex("blacklist_mapping as bm")
+      .where("bm.blacklisted_by", "transporter")
+      .where("bm.blacklisted_by_id", id)
+      .where("bm.status", "ACTIVE")
+      .select("bm.*")
+      .orderBy("bm.created_at", "desc");
+
+    // Enrich with entity names
+    for (const mapping of mappings) {
+      if (mapping.user_type === "vehicle") {
+        const vehicle = await knex("vehicle_ownership_details")
+          .where("vehicle_ownership_id", mapping.user_id)
+          .select("registration_number")
+          .first();
+        mapping.entity_name = vehicle?.registration_number || "Unknown Vehicle";
+      } else if (mapping.user_type === "driver") {
+        const driver = await knex("driver_basic_information")
+          .where("driver_id", mapping.user_id)
+          .select("full_name")
+          .first();
+        mapping.entity_name = driver?.full_name || "Unknown Driver";
+      }
+    }
+
+    res.json({
+      success: true,
+      data: mappings,
+    });
+  } catch (error) {
+    console.error("Error fetching blacklist mappings:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch blacklist mappings",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const createBlacklistMapping = async (req, res) => {
+  try {
+    const { id } = req.params; // transporter_id
+    const { user_type, user_id, valid_from, valid_to, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    // Check for duplicate
+    const existingMapping = await knex("blacklist_mapping")
+      .where({
+        blacklisted_by: "transporter",
+        blacklisted_by_id: id,
+        user_type,
+        user_id,
+        status: "ACTIVE",
+      })
+      .first();
+
+    if (existingMapping) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "DUPLICATE_MAPPING",
+          message: `This ${user_type} is already blacklisted`,
+        },
+      });
+    }
+
+    const mappingId = await generateMappingId(
+      "BLM",
+      "blacklist_mapping",
+      "blacklist_mapping_id"
+    );
+
+    await knex("blacklist_mapping").insert({
+      blacklist_mapping_id: mappingId,
+      blacklisted_by: "transporter",
+      blacklisted_by_id: id,
+      user_type,
+      user_id,
+      valid_from: valid_from || knex.fn.now(),
+      valid_to,
+      remark,
+      created_by: userId,
+      updated_by: userId,
+      status: "ACTIVE",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: { blacklist_mapping_id: mappingId },
+      message: "Blacklist mapping created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating blacklist mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "CREATE_ERROR",
+        message: "Failed to create blacklist mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const updateBlacklistMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const { valid_from, valid_to, remark } = req.body;
+    const userId = req.user?.user_id;
+
+    await knex("blacklist_mapping")
+      .where({ blacklist_mapping_id: mappingId, blacklisted_by_id: id })
+      .update({
+        valid_from,
+        valid_to,
+        remark,
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Blacklist mapping updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating blacklist mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "UPDATE_ERROR",
+        message: "Failed to update blacklist mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+const deleteBlacklistMapping = async (req, res) => {
+  try {
+    const { id, mappingId } = req.params;
+    const userId = req.user?.user_id;
+
+    await knex("blacklist_mapping")
+      .where({ blacklist_mapping_id: mappingId, blacklisted_by_id: id })
+      .update({
+        status: "INACTIVE",
+        updated_by: userId,
+        updated_at: knex.fn.now(),
+      });
+
+    res.json({
+      success: true,
+      message: "Blacklist mapping removed successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting blacklist mapping:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "DELETE_ERROR",
+        message: "Failed to remove blacklist mapping",
+        details: error.message,
+      },
+    });
+  }
+};
+
+// ========================================
+// DROPDOWN MASTER DATA FOR MAPPINGS
+// ========================================
+const getMappingMasterData = async (req, res) => {
+  try {
+    // Get active consignors
+    const consignors = await knex("consignor_basic_information")
+      .where("status", "ACTIVE")
+      .select("customer_id as value", "customer_name as label")
+      .orderBy("customer_name");
+
+    // Get active vehicles
+    const vehicles = await knex("vehicle_basic_information_hdr as vbih")
+      .leftJoin(
+        "vehicle_ownership_details as vod",
+        "vbih.vehicle_id_code_hdr",
+        "vod.vehicle_id_code"
+      )
+      .where("vbih.status", "ACTIVE")
+      .select(
+        "vbih.vehicle_id_code_hdr as value",
+        knex.raw(
+          "CONCAT(COALESCE(vod.registration_number, 'No Reg'), ' - ', vbih.vehicle_id_code_hdr) as label"
+        )
+      )
+      .orderBy("vod.registration_number");
+
+    // Get active drivers
+    const drivers = await knex("driver_basic_information")
+      .where("status", "ACTIVE")
+      .select(
+        "driver_id as value",
+        knex.raw("CONCAT(full_name, ' (', driver_id, ')') as label")
+      )
+      .orderBy("full_name");
+
+    // Get active owners
+    const owners = await knex("vehicle_ownership_details")
+      .where("status", "ACTIVE")
+      .select("vehicle_ownership_id as value", "ownership_name as label")
+      .orderBy("ownership_name");
+
+    // User types for blacklist
+    const userTypes = [
+      { value: "vehicle", label: "Vehicle" },
+      { value: "driver", label: "Driver" },
+    ];
+
+    res.json({
+      success: true,
+      data: {
+        consignors,
+        vehicles,
+        drivers,
+        owners,
+        userTypes,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching mapping master data:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch mapping master data",
+        details: error.message,
+      },
+    });
+  }
+};
+
 module.exports = {
   createTransporter,
   updateTransporter,
@@ -4426,4 +6050,26 @@ module.exports = {
   updateTransporterDraft,
   deleteTransporterDraft,
   submitTransporterFromDraft,
+  // Mapping controllers
+  getConsignorMappings,
+  createConsignorMapping,
+  updateConsignorMapping,
+  deleteConsignorMapping,
+  getVehicleMappings,
+  createVehicleMapping,
+  updateVehicleMapping,
+  deleteVehicleMapping,
+  getDriverMappings,
+  createDriverMapping,
+  updateDriverMapping,
+  deleteDriverMapping,
+  getOwnerMappings,
+  createOwnerMapping,
+  updateOwnerMapping,
+  deleteOwnerMapping,
+  getBlacklistMappings,
+  createBlacklistMapping,
+  updateBlacklistMapping,
+  deleteBlacklistMapping,
+  getMappingMasterData,
 };

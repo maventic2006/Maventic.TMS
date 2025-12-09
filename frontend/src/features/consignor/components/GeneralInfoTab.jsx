@@ -7,6 +7,8 @@ import {
   FileText,
   CheckCircle,
   X,
+  Eye,
+  Download,
 } from "lucide-react";
 import { getComponentTheme } from "../../../utils/theme";
 import { CustomSelect } from "@/components/ui/Select";
@@ -19,6 +21,41 @@ const GeneralInfoTab = ({
 }) => {
   const [ndaFile, setNdaFile] = useState(null);
   const [msaFile, setMsaFile] = useState(null);
+  const [previewDocument, setPreviewDocument] = useState(null);
+  
+  // State for existing documents (from draft API)
+  const [existingNdaDoc, setExistingNdaDoc] = useState(null);
+  const [existingMsaDoc, setExistingMsaDoc] = useState(null);
+
+  // Check for existing NDA/MSA documents when formData changes (draft edit mode)
+  useEffect(() => {
+    console.log("🔍 GeneralInfoTab: Checking for existing NDA/MSA documents");
+    console.log("formData.general:", formData?.general);
+    
+    // Check if upload_nda contains a document ID (string) indicating existing document
+    if (formData?.general?.upload_nda && typeof formData.general.upload_nda === "string") {
+      console.log("📄 Found existing NDA document ID:", formData.general.upload_nda);
+      setExistingNdaDoc({
+        documentId: formData.general.upload_nda,
+        fileName: "NDA Document", // Default name for existing docs
+        fileType: "application/pdf", // Default type
+      });
+    } else {
+      setExistingNdaDoc(null);
+    }
+
+    // Check if upload_msa contains a document ID (string) indicating existing document  
+    if (formData?.general?.upload_msa && typeof formData.general.upload_msa === "string") {
+      console.log("📄 Found existing MSA document ID:", formData.general.upload_msa);
+      setExistingMsaDoc({
+        documentId: formData.general.upload_msa,
+        fileName: "MSA Document", // Default name for existing docs
+        fileType: "application/pdf", // Default type
+      });
+    } else {
+      setExistingMsaDoc(null);
+    }
+  }, [formData?.general?.upload_nda, formData?.general?.upload_msa]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -35,9 +72,11 @@ const GeneralInfoTab = ({
     if (file) {
       if (type === "nda") {
         setNdaFile(file);
+        setExistingNdaDoc(null); // Clear existing doc when new file uploaded
         handleInputChange("upload_nda", file); // ✅ Store File object, not filename
       } else if (type === "msa") {
         setMsaFile(file);
+        setExistingMsaDoc(null); // Clear existing doc when new file uploaded
         handleInputChange("upload_msa", file); // ✅ Store File object, not filename
       }
     }
@@ -46,12 +85,122 @@ const GeneralInfoTab = ({
   const handleRemoveFile = (type) => {
     if (type === "nda") {
       setNdaFile(null);
+      setExistingNdaDoc(null); // Clear existing doc
       handleInputChange("upload_nda", null);
     } else if (type === "msa") {
       setMsaFile(null);
+      setExistingMsaDoc(null); // Clear existing doc
       handleInputChange("upload_msa", null);
     }
   };
+
+  const handleDownloadExistingDocument = async (type) => {
+    const doc = type === "nda" ? existingNdaDoc : existingMsaDoc;
+    if (!doc || !formData?.general?.customer_id) return;
+
+    try {
+      const customerId = formData.general.customer_id;
+      const fileType = type; // 'nda' or 'msa'
+      const downloadUrl = `/api/consignors/${customerId}/general/${fileType}/download`;
+      
+      // Create a temporary link to trigger download
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = doc.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error(`Error downloading ${type.toUpperCase()} document:`, error);
+    }
+  };
+
+  const handlePreviewDocument = async (type) => {
+    try {
+      const localFile = type === "nda" ? ndaFile : msaFile;
+      const existingDoc = type === "nda" ? existingNdaDoc : existingMsaDoc;
+
+      // Case 1: Local file object (newly uploaded)
+      if (localFile) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: localFile.name,
+            fileType: localFile.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(localFile);
+        return;
+      }
+
+      // Case 2: Existing document from backend (draft edit mode)
+      if (existingDoc?.documentId) {
+        console.log(`📋 Fetching ${type.toUpperCase()} document for preview:`, existingDoc.documentId);
+        
+        const consignorId = formData?.general?.customer_id || formData?.customer_id;
+        if (!consignorId) {
+          console.error("Cannot preview document: Missing consignor ID");
+          alert("Cannot preview document: Missing consignor information");
+          return;
+        }
+
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${consignorId}/general/${type}/download`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${type.toUpperCase()} document: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: existingDoc.fileName || `${type.toUpperCase()} Document`,
+            fileType: blob.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+
+      // Case 3: No document available
+      console.log(`No ${type.toUpperCase()} document available for preview`);
+      alert(`No ${type.toUpperCase()} document available for preview`);
+    } catch (error) {
+      console.error(`Error previewing ${type.toUpperCase()} document:`, error);
+      alert(`Failed to load ${type.toUpperCase()} document for preview: ${error.message}`);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
+  };
+
+  // ESC key support for modal
+  useEffect(() => {
+    const handleEscKey = (event) => {
+      if (event.key === "Escape") {
+        closePreview();
+      }
+    };
+
+    if (previewDocument) {
+      document.addEventListener("keydown", handleEscKey);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscKey);
+    };
+  }, [previewDocument]);
 
   return (
     <div className="bg-white rounded-xl p-4">
@@ -74,18 +223,24 @@ const GeneralInfoTab = ({
             type="text"
             value={formData.general?.customer_name || ""}
             onChange={(e) => handleInputChange("customer_name", e.target.value)}
+            maxLength={100}
             className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
               errors.general?.customer_name
                 ? "border-red-500 focus:border-red-500"
                 : "border-[#E5E7EB] focus:border-[#3B82F6]"
             }`}
-            placeholder="Enter customer name"
+            placeholder="Enter customer name (max 100 chars)"
           />
-          {errors.general?.customer_name && (
-            <p className="text-sm text-red-500 flex items-center gap-1">
-              ⚠️ {errors.general.customer_name}
-            </p>
-          )}
+          <div className="flex justify-between items-center">
+            {errors.general?.customer_name ? (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors.general.customer_name}
+              </p>
+            ) : <span></span>}
+            <span className="text-xs text-gray-500">
+              {(formData.general?.customer_name || "").length}/100
+            </span>
+          </div>
         </div>
 
         {/* Search Term */}
@@ -97,18 +252,24 @@ const GeneralInfoTab = ({
             type="text"
             value={formData.general?.search_term || ""}
             onChange={(e) => handleInputChange("search_term", e.target.value)}
+            maxLength={100}
             className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
               errors.general?.search_term
                 ? "border-red-500 focus:border-red-500"
                 : "border-[#E5E7EB] focus:border-[#3B82F6]"
             }`}
-            placeholder="Enter search term"
+            placeholder="Enter search term (max 100 chars)"
           />
-          {errors.general?.search_term && (
-            <p className="text-sm text-red-500 flex items-center gap-1">
-              ⚠️ {errors.general.search_term}
-            </p>
-          )}
+          <div className="flex justify-between items-center">
+            {errors.general?.search_term ? (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                ⚠️ {errors.general.search_term}
+              </p>
+            ) : <span></span>}
+            <span className="text-xs text-gray-500">
+              {(formData.general?.search_term || "").length}/100
+            </span>
+          </div>
         </div>
 
         {/* Industry Type */}
@@ -263,20 +424,87 @@ const GeneralInfoTab = ({
               onDragOver={(e) => e.preventDefault()}
             >
               {ndaFile ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm text-[#0D1A33]">
-                      {ndaFile.name}
-                    </span>
+                // New file uploaded
+                <div className="space-y-2">
+                  {/* File Info Display */}
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-green-800">
+                          {ndaFile.name}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-green-600">
+                          <span>{ndaFile.type}</span>
+                          <span>•</span>
+                          <span>{(ndaFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewDocument("nda")}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        title="Preview Document"
+                      >
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile("nda")}
+                        className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                        title="Remove File"
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveFile("nda")}
-                    className="p-1 hover:bg-red-50 rounded"
-                  >
-                    <X className="w-4 h-4 text-red-500" />
-                  </button>
+                </div>
+              ) : existingNdaDoc ? (
+                // Existing document from draft
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-blue-500" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-blue-800">
+                          {existingNdaDoc.fileName}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-blue-600">
+                          <span>Uploaded Document</span>
+                          <span>•</span>
+                          <span>Click to download or replace</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewDocument("nda")}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        title="Preview Document"
+                      >
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadExistingDocument("nda")}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        title="Download Document"
+                      >
+                        <Download className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile("nda")}
+                        className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                        title="Remove Document"
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <label className="cursor-pointer block">
@@ -308,20 +536,87 @@ const GeneralInfoTab = ({
               onDragOver={(e) => e.preventDefault()}
             >
               {msaFile ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-sm text-[#0D1A33]">
-                      {msaFile.name}
-                    </span>
+                // New file uploaded
+                <div className="space-y-2">
+                  {/* File Info Display */}
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-green-800">
+                          {msaFile.name}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-green-600">
+                          <span>{msaFile.type}</span>
+                          <span>•</span>
+                          <span>{(msaFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewDocument("msa")}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        title="Preview Document"
+                      >
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile("msa")}
+                        className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                        title="Remove File"
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveFile("msa")}
-                    className="p-1 hover:bg-red-50 rounded"
-                  >
-                    <X className="w-4 h-4 text-red-500" />
-                  </button>
+                </div>
+              ) : existingMsaDoc ? (
+                // Existing document from draft
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-blue-500" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-blue-800">
+                          {existingMsaDoc.fileName}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-blue-600">
+                          <span>Uploaded Document</span>
+                          <span>•</span>
+                          <span>Click to download or replace</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewDocument("msa")}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        title="Preview Document"
+                      >
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadExistingDocument("msa")}
+                        className="p-1.5 hover:bg-blue-100 rounded transition-colors"
+                        title="Download Document"
+                      >
+                        <Download className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile("msa")}
+                        className="p-1.5 hover:bg-red-100 rounded transition-colors"
+                        title="Remove Document"
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <label className="cursor-pointer block">
@@ -361,9 +656,13 @@ const GeneralInfoTab = ({
               type="text"
               value={formData.general?.name_on_po || ""}
               onChange={(e) => handleInputChange("name_on_po", e.target.value)}
+              maxLength={30}
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
-              placeholder="Enter name to appear on PO"
+              placeholder="Name on PO (max 30 chars)"
             />
+            <span className="text-xs text-gray-500">
+              {(formData.general?.name_on_po || "").length}/30
+            </span>
           </div>
 
           {/* Approved By */}
@@ -375,9 +674,13 @@ const GeneralInfoTab = ({
               type="text"
               value={formData.general?.approved_by || ""}
               onChange={(e) => handleInputChange("approved_by", e.target.value)}
+              maxLength={30}
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
-              placeholder="Enter approver name"
+              placeholder="Approved by (max 30 chars)"
             />
+            <span className="text-xs text-gray-500">
+              {(formData.general?.approved_by || "").length}/30
+            </span>
           </div>
 
           {/* Approved Date */}
@@ -423,6 +726,69 @@ const GeneralInfoTab = ({
           </div>
         </div>
       </div>
+
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#E0E7FF] rounded-lg">
+                  <FileText className="h-5 w-5 text-[#6366F1]" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {previewDocument.fileName}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Close Preview"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-4">
+              {previewDocument.fileType?.startsWith("image/") ? (
+                <img
+                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  alt={previewDocument.fileName}
+                  className="max-w-full h-auto mx-auto"
+                />
+              ) : previewDocument.fileType === "application/pdf" ? (
+                <iframe
+                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  className="w-full h-[600px] border-0"
+                  title={previewDocument.fileName}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    You can still download the file
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={closePreview}
+                className="px-6 py-2.5 border border-[#E5E7EB] text-[#4A5568] rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

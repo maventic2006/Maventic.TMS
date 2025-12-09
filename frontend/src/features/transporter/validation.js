@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ERROR_MESSAGES } from "../../utils/constants";
 import { validateDocumentNumber } from "../../utils/documentValidation";
+import { validateGSTPAN } from "../../utils/gstPanValidation";
 
 // Phone number validation - accepts formats with or without + prefix
 const phoneNumberSchema = z
@@ -45,6 +46,7 @@ export const generalDetailsSchema = z
       .min(1, ERROR_MESSAGES.FROM_DATE_REQUIRED)
       .refine((date) => {
         const selectedDate = new Date(date);
+        selectedDate.setHours(0, 0, 0, 0);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return selectedDate <= today;
@@ -390,4 +392,75 @@ export const fileToBase64 = (file) => {
     };
     reader.onerror = (error) => reject(error);
   });
+};
+
+/**
+ * Validate GST-PAN relationship for transporter
+ * This validation is only applicable for Indian addresses
+ *
+ * @param {object} formData - Complete form data with addresses and documents
+ * @returns {object} - Validation result with errors object
+ */
+export const validateGSTPANRelationship = (formData) => {
+  const errors = {};
+
+  // Get primary address
+  const primaryAddress = formData.addresses?.find(
+    (addr) => addr.isPrimary === true
+  );
+
+  if (!primaryAddress) {
+    return errors; // No primary address, skip validation
+  }
+
+  // Check if it's an Indian address
+  const isIndia =
+    primaryAddress.country === "IN" ||
+    primaryAddress.country === "India" ||
+    primaryAddress.country?.toLowerCase().includes("india");
+
+  if (!isIndia) {
+    return errors; // Not India, skip GST-PAN validation
+  }
+
+  // Only validate if GST number (vatNumber) is provided
+  if (!primaryAddress.vatNumber || primaryAddress.vatNumber.trim() === "") {
+    return errors; // No GST number provided, skip validation
+  }
+
+  // Find PAN card document (DN001 is PAN/TIN in master data)
+  const panDocument = formData.documents?.find((doc) => {
+    const docType = doc.documentType;
+    return docType === "DN001" || docType?.toLowerCase().includes("pan");
+  });
+
+  if (!panDocument) {
+    errors.gstPan = {
+      field: "documents",
+      message:
+        "PAN card document (DN001) is mandatory when GST number is provided for Indian addresses",
+      code: "PAN_REQUIRED",
+      tab: "documents",
+    };
+    return errors;
+  }
+
+  // Validate GST-PAN match
+  const gstValidation = validateGSTPAN(
+    primaryAddress.vatNumber,
+    panDocument.documentNumber,
+    primaryAddress.state
+  );
+
+  if (!gstValidation.isValid) {
+    errors.gstPan = {
+      field: gstValidation.field || "vatNumber",
+      message: gstValidation.error,
+      code: gstValidation.code,
+      tab: gstValidation.field === "documents" ? "documents" : "addresses",
+      hint: "GST format: [2-digit state code][10-char PAN][Entity][Z][Check digit]. Example: 27ABCDE1234F1Z5",
+    };
+  }
+
+  return errors;
 };

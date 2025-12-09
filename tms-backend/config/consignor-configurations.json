@@ -21,24 +21,24 @@
       "consignor_id": {
         "type": "varchar",
         "maxLength": null,
-        "required": true,
+        "required": false,
         "label": "Consignor Id",
-        "inputType": "select",
-        "editable": true,
+        "inputType": "hidden",
+        "editable": false,
         "filterable": true,
-        "validation": "required",
-        "autoGenerate": false
+        "validation": "",
+        "autoGenerate": true
       },
       "warehouse_id": {
         "type": "varchar",
         "maxLength": null,
         "required": false,
         "label": "Warehouse Id",
-        "inputType": "select",
-        "editable": true,
+        "inputType": "hidden",
+        "editable": false,
         "filterable": true,
         "validation": "",
-        "autoGenerate": false
+        "autoGenerate": true
       },
       "parameter_name_key": {
         "type": "varchar",
@@ -78,21 +78,11 @@
         "maxLength": null,
         "required": false,
         "label": "Active",
-        "inputType": "select",
+        "inputType": "checkbox",
         "editable": true,
         "filterable": true,
         "validation": "",
         "autoGenerate": false,
-        "options": [
-          {
-            "value": "Y",
-            "label": "Yes"
-          },
-          {
-            "value": "N",
-            "label": "No"
-          }
-        ],
         "defaultValue": "1"
       },
       "valid_from": {
@@ -100,7 +90,7 @@
         "maxLength": null,
         "required": false,
         "label": "Valid From",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": true,
         "filterable": true,
         "validation": "",
@@ -111,7 +101,7 @@
         "maxLength": null,
         "required": false,
         "label": "Valid To",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": true,
         "filterable": true,
         "validation": "",
@@ -252,7 +242,7 @@
         "editable": true,
         "filterable": true,
         "validation": "required",
-        "autoGenerate": false
+        "autoGenerate": true
       },
       "warehouse_id": {
         "type": "varchar",
@@ -263,7 +253,7 @@
         "editable": true,
         "filterable": true,
         "validation": "",
-        "autoGenerate": false
+        "autoGenerate": true
       },
       "vehicle_type": {
         "type": "varchar",
@@ -927,7 +917,7 @@
         "editable": true,
         "filterable": true,
         "validation": "required",
-        "autoGenerate": false
+        "autoGenerate": true
       },
       "consignor_id": {
         "type": "varchar",
@@ -938,7 +928,7 @@
         "editable": true,
         "filterable": true,
         "validation": "",
-        "autoGenerate": false
+        "autoGenerate": true
       },
       "ebidding_slot_number": {
         "type": "varchar",
@@ -960,7 +950,7 @@
         "editable": true,
         "filterable": true,
         "validation": "",
-        "autoGenerate": false
+        "autoGenerate": true
       },
       "auction_start_date": {
         "type": "date",
@@ -978,7 +968,7 @@
         "maxLength": null,
         "required": false,
         "label": "Auction Start Time",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": true,
         "filterable": true,
         "validation": "",
@@ -1000,7 +990,7 @@
         "maxLength": null,
         "required": false,
         "label": "Auction End Time",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": true,
         "filterable": true,
         "validation": "",
@@ -1054,7 +1044,7 @@
         "maxLength": null,
         "required": false,
         "label": "Created On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1087,7 +1077,7 @@
         "maxLength": null,
         "required": false,
         "label": "Updated On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1231,7 +1221,7 @@
         "maxLength": null,
         "required": false,
         "label": "Created On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1264,7 +1254,7 @@
         "maxLength": null,
         "required": false,
         "label": "Updated On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1406,7 +1396,7 @@
         "maxLength": null,
         "required": false,
         "label": "Created At",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1418,7 +1408,7 @@
         "maxLength": null,
         "required": false,
         "label": "Created On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1440,7 +1430,7 @@
         "maxLength": null,
         "required": false,
         "label": "Updated At",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1451,7 +1441,7 @@
         "maxLength": null,
         "required": false,
         "label": "Updated On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1584,7 +1574,7 @@
         "maxLength": null,
         "required": false,
         "label": "Created At",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1596,7 +1586,7 @@
         "maxLength": null,
         "required": false,
         "label": "Created On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1618,7 +1608,7 @@
         "maxLength": null,
         "required": false,
         "label": "Updated At",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1629,7 +1619,7 @@
         "maxLength": null,
         "required": false,
         "label": "Updated On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1795,7 +1785,7 @@
         "maxLength": null,
         "required": false,
         "label": "Created At",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1807,7 +1797,7 @@
         "maxLength": null,
         "required": false,
         "label": "Created On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1829,7 +1819,7 @@
         "maxLength": null,
         "required": false,
         "label": "Updated At",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",
@@ -1840,7 +1830,7 @@
         "maxLength": null,
         "required": false,
         "label": "Updated On",
-        "inputType": "time",
+        "inputType": "datetime-local",
         "editable": false,
         "filterable": false,
         "validation": "",

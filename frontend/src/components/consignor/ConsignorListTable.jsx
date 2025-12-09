@@ -367,7 +367,7 @@ const ConsignorListTable = ({
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className="text-sm text-[#4A5568]">
-                      {displayValue(consignor.approved_on)}
+                      {displayValue(consignor.approvedOn)}
                     </span>
                   </td>
                 </tr>

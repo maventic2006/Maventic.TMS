@@ -1,5 +1,5 @@
 const db = require("../config/database");
-const axios = require('axios');
+const axios = require("axios");
 
 /**
  * Vehicle Controller
@@ -119,11 +119,11 @@ const generateVehicleId = async () => {
 //     const result = await db('vehicle_ownership_details')
 //       .max('vehicle_ownership_id as max_id')
 //       .first();
-    
+
 //     if (!result.max_id) {
 //       return 'OWN0001';
 //     }
-    
+
 //     const numPart = parseInt(result.max_id.substring(3)) + 1;
 //     return 'OWN' + numPart.toString().padStart(4, '0');
 //   } catch (error) {
@@ -242,13 +242,28 @@ const generateDocumentId = async () => {
 
 /**
  * Generate unique document upload ID
+ * Format: DU0001, DU0002, etc.
+ * Uses collision-resistant logic to prevent duplicate IDs
  */
-const generateDocumentUploadId = async () => {
+const generateDocumentUploadId = async (trx) => {
   try {
-    const result = await db("document_upload").count("* as count").first();
+    const result = await trx("document_upload")
+      .select("document_id")
+      .whereNotNull("document_id")
+      .andWhere("document_id", "like", "DU%")
+      .orderByRaw("CAST(SUBSTRING(document_id, 3) AS UNSIGNED) DESC")
+      .first();
 
-    const count = parseInt(result.count) + 1;
-    return `DU${count.toString().padStart(4, "0")}`;
+    let next = 1;
+
+    if (result?.document_id) {
+      const numeric = parseInt(result.document_id.substring(2)); // Skip "DU"
+      if (!isNaN(numeric)) {
+        next = numeric + 1;
+      }
+    }
+
+    return `DU${next.toString().padStart(4, "0")}`;
   } catch (error) {
     console.error("Error generating document upload ID:", error);
     throw new Error("Failed to generate document upload ID");
@@ -373,11 +388,18 @@ const validateBasicInformation = (data) => {
     });
   }
 
-  if (!data.gps_tracker_imei_number?.trim()) {
-    errors.push({
-      field: "basicInformation.gpsIMEI",
-      message: "GPS Tracker IMEI Number is required",
-    });
+  // GPS IMEI validation - only required if GPS tracking is active
+  if (
+    data.gps_tracker_active_flag === 1 ||
+    data.gps_tracker_active_flag === true
+  ) {
+    if (!data.gps_tracker_imei_number?.trim()) {
+      errors.push({
+        field: "basicInformation.gpsIMEI",
+        message:
+          "GPS Tracker IMEI Number is required when GPS tracking is enabled",
+      });
+    }
   }
 
   if (
@@ -528,61 +550,68 @@ const validateForeignKeys = async (vehicleData) => {
 
   // Validate fuel_type_id
   if (vehicleData.fuel_type_id) {
-    const fuelType = await db('fuel_type_master')
-      .where('fuel_type_id', vehicleData.fuel_type_id)
-      .where('status', 'ACTIVE')
+    const fuelType = await db("fuel_type_master")
+      .where("fuel_type_id", vehicleData.fuel_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!fuelType) {
       // Log available fuel types for debugging when validation fails
-      const availableFuelTypes = await db('fuel_type_master').where('status', 'ACTIVE').select('fuel_type_id', 'fuel_type');
+      const availableFuelTypes = await db("fuel_type_master")
+        .where("status", "ACTIVE")
+        .select("fuel_type_id", "fuel_type");
       console.log("❌ Invalid fuel_type_id:", vehicleData.fuel_type_id);
-      console.log("✅ Valid fuel types:", availableFuelTypes.map(ft => `${ft.fuel_type_id}:${ft.fuel_type}`).join(', '));
-      
+      console.log(
+        "✅ Valid fuel types:",
+        availableFuelTypes
+          .map((ft) => `${ft.fuel_type_id}:${ft.fuel_type}`)
+          .join(", ")
+      );
+
       errors.push({
-        field: 'specifications.fuelType',
-        message: `Invalid fuel type ID: ${vehicleData.fuel_type_id}. Please select a valid fuel type.`
+        field: "specifications.fuelType",
+        message: `Invalid fuel type ID: ${vehicleData.fuel_type_id}. Please select a valid fuel type.`,
       });
     }
   }
 
   // Validate vehicle_type_id
   if (vehicleData.vehicle_type_id) {
-    const vehicleType = await db('vehicle_type_master')
-      .where('vehicle_type_id', vehicleData.vehicle_type_id)
-      .where('status', 'ACTIVE')
+    const vehicleType = await db("vehicle_type_master")
+      .where("vehicle_type_id", vehicleData.vehicle_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!vehicleType) {
       errors.push({
-        field: 'basicInformation.vehicleType',
-        message: `Invalid vehicle type ID: ${vehicleData.vehicle_type_id}. Please select a valid vehicle type.`
+        field: "basicInformation.vehicleType",
+        message: `Invalid vehicle type ID: ${vehicleData.vehicle_type_id}. Please select a valid vehicle type.`,
       });
     }
   }
 
   // Validate usage_type_id
   if (vehicleData.usage_type_id) {
-    const usageType = await db('usage_type_master')
-      .where('usage_type_id', vehicleData.usage_type_id)
-      .where('status', 'ACTIVE')
+    const usageType = await db("usage_type_master")
+      .where("usage_type_id", vehicleData.usage_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!usageType) {
       errors.push({
-        field: 'basicInformation.usageType',
-        message: `Invalid usage type ID: ${vehicleData.usage_type_id}. Please select a valid usage type.`
+        field: "basicInformation.usageType",
+        message: `Invalid usage type ID: ${vehicleData.usage_type_id}. Please select a valid usage type.`,
       });
     }
   }
 
   // Validate engine_type_id
   if (vehicleData.engine_type_id) {
-    const engineType = await db('engine_type_master')
-      .where('engine_type_id', vehicleData.engine_type_id)
-      .where('status', 'ACTIVE')
+    const engineType = await db("engine_type_master")
+      .where("engine_type_id", vehicleData.engine_type_id)
+      .where("status", "ACTIVE")
       .first();
     if (!engineType) {
       errors.push({
-        field: 'specifications.engineType',
-        message: `Invalid engine type ID: ${vehicleData.engine_type_id}. Please select a valid engine type.`
+        field: "specifications.engineType",
+        message: `Invalid engine type ID: ${vehicleData.engine_type_id}. Please select a valid engine type.`,
       });
     }
   }
@@ -623,14 +652,14 @@ const createVehicle = async (req, res) => {
       ...validateBasicInformation(vehicleData),
       ...validateSpecifications(vehicleData),
     ];
-    
+
     // Validate foreign key references
     const foreignKeyErrors = await validateForeignKeys(vehicleData);
     validationErrors.push(...foreignKeyErrors);
-    
+
     if (validationErrors.length > 0) {
       await trx.rollback();
-      console.log('❌ Validation errors found:', validationErrors);
+      console.log("❌ Validation errors found:", validationErrors);
       return res.status(400).json({
         success: false,
         message: "Validation errors",
@@ -650,7 +679,12 @@ const createVehicle = async (req, res) => {
       }
     }
 
-    if (vehicleData.gps_tracker_imei_number) {
+    // Check for duplicate GPS IMEI (only if GPS tracking is enabled and IMEI is provided)
+    if (
+      vehicleData.gps_tracker_imei_number &&
+      (vehicleData.gps_tracker_active_flag === 1 ||
+        vehicleData.gps_tracker_active_flag === true)
+    ) {
       const isDuplicate = await checkDuplicateGPSIMEI(
         vehicleData.gps_tracker_imei_number
       );
@@ -729,7 +763,7 @@ const createVehicle = async (req, res) => {
       max_running_speed: vehicleData.max_running_speed || 0,
       created_by: req.user?.user_id || "SYSTEM",
       updated_by: req.user?.user_id || "SYSTEM",
-      status: "PENDING", // Vehicle remains PENDING until Vehicle Owner user is approved
+      status: "PENDING",
     });
 
     // Insert ownership details if provided
@@ -800,13 +834,69 @@ const createVehicle = async (req, res) => {
     // Insert documents if provided
     if (documents && Array.isArray(documents) && documents.length > 0) {
       for (const doc of documents) {
+        // Validate document_type_id format to prevent database errors
+        const validateDocumentTypeId = (documentType) => {
+          if (!documentType) return null;
+
+          // Check if it's already a valid ID format (DN001, DN002, etc.)
+          if (/^DN\d{3}$/.test(documentType)) {
+            return documentType;
+          }
+
+          // If it's a description, map to ID
+          const documentTypeMap = {
+            "Vehicle Registration Certificate": "DN001",
+            "Vehicle Insurance": "DN009",
+            "PUC certificate": "DN010",
+            "Fitness Certificate": "DN012",
+            "Tax Certificate": "DN005",
+            Permit: "DN006",
+            "Driver License": "DN007",
+            "Road Tax": "DN008",
+            "Commercial Vehicle License": "DN011",
+            "Pollution Certificate": "DN010",
+            "Insurance Policy": "DN009",
+            "Vehicle Permit": "DN006",
+          };
+
+          const mappedId = documentTypeMap[documentType];
+          if (mappedId) {
+            console.warn(
+              `⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`
+            );
+            return mappedId;
+          }
+
+          // If too long for database field, reject it
+          if (documentType.length > 10) {
+            console.error(
+              `❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`
+            );
+            throw new Error(
+              `Invalid document type: "${documentType}". Expected short code like DN001.`
+            );
+          }
+
+          return documentType;
+        };
+
         const documentId = await generateDocumentId();
+        const validatedDocumentTypeId = validateDocumentTypeId(
+          doc.documentType
+        );
+
+        if (!validatedDocumentTypeId) {
+          console.warn(
+            `⚠️ Skipping document with invalid type: ${doc.documentType}`
+          );
+          continue; // Skip this document
+        }
 
         // Insert document metadata
         await trx("vehicle_documents").insert({
           document_id: documentId,
           vehicle_id_code: vehicleId,
-          document_type_id: doc.documentType,
+          document_type_id: validatedDocumentTypeId,
           reference_number: doc.referenceNumber,
           vehicle_maintenance_id: doc.vehicleMaintenanceId,
           permit_category: doc.permitCategory,
@@ -824,10 +914,11 @@ const createVehicle = async (req, res) => {
 
         // Insert document file if provided
         if (doc.fileData && doc.fileName) {
-          const uploadId = await generateDocumentUploadId();
+          const uploadId = await generateDocumentUploadId(trx);
 
           await trx("document_upload").insert({
             document_id: uploadId,
+
             file_name: doc.fileName,
             file_type: doc.fileType || "application/pdf",
             file_xstring_value: doc.fileData, // Base64 encoded file
@@ -990,6 +1081,19 @@ const getAllVehicles = async (req, res) => {
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
+    // Normalize date inputs for accurate filtering
+    // Fix: Use UTC timezone (T00:00:00Z format) to prevent IST offset issues
+    let dateStart = createdOnStart
+      ? createdOnStart.includes("T")
+        ? createdOnStart
+        : `${createdOnStart}T00:00:00Z`
+      : null;
+    let dateEnd = createdOnEnd
+      ? createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd}T23:59:59Z`
+      : null;
+
     // Build query without the non-existent vehicle_capacity_details table
     let query = db("vehicle_basic_information_hdr as vbih")
       .leftJoin(
@@ -1006,6 +1110,25 @@ const getAllVehicles = async (req, res) => {
         "fuel_type_master as ftm",
         "vbih.fuel_type_id",
         "ftm.fuel_type_id"
+      )
+      .leftJoin(
+        db.raw(`(
+          SELECT 
+            aft1.*,
+            um.user_full_name,
+            SUBSTRING_INDEX(um.user_full_name, ' - ', -1) as vehicle_id_extracted
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT004'
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
+        ) as aft`),
+        "aft.vehicle_id_extracted",
+        "vbih.vehicle_id_code_hdr"
       )
       .select(
         "vbih.vehicle_id_code_hdr as vehicleId",
@@ -1039,7 +1162,12 @@ const getAllVehicles = async (req, res) => {
         "vod.ownership_name",
         "vod.registration_date",
         // Get towing capacity from the basic info header table
-        "vbih.towing_capacity as towingCapacity"
+        "vbih.towing_capacity as towingCapacity",
+        db.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
       );
 
     // Apply search filter
@@ -1169,29 +1297,28 @@ const getAllVehicles = async (req, res) => {
       );
     }
 
-    //Created On Date Range Filter
-    if (createdOnStart) {
-      query = query.where("vbhi.created_on", ">=", createdOnStart);
+    // if (registrationDate) {
+    //   // Filter by registration date - exact match on date part
+    //   query = query.whereRaw("DATE(vod.registration_date) = ?", [
+    //     registrationDate,
+    //   ]);
+    // }
+
+    // Created On Date Range Filter (with UTC timezone handling)
+    if (dateStart) {
+      query = query.where("vbih.created_at", ">=", dateStart);
     }
-    if (createdOnEnd) {
-      query = query.where("vbhi.created_on", "<=", createdOnEnd);
+    if (dateEnd) {
+      query = query.where("vbih.created_at", "<=", dateEnd);
     }
 
-    // Get total count for pagination
+    // Get total count for pagination (filters already applied to base query)
     const countQuery = query
       .clone()
       .clearSelect()
       .clearOrder()
       .count("* as total")
       .first();
-
-    // Date Filters for Count Query
-    if (createdOnStart) {
-      countQuery = countQuery.where("vbhi.created_on", ">=", createdOnStart);
-    }
-    if (createdOnEnd) {
-      countQuery = countQuery.where("vbhi.created_on", "<=", createdOnEnd);
-    }
 
     const { total } = await countQuery;
 
@@ -1202,6 +1329,15 @@ const getAllVehicles = async (req, res) => {
       .offset(offset);
 
     const vehicles = await query;
+
+    // Debug: Log the first vehicle to see what data we're getting
+    if (vehicles.length > 0) {
+      console.log("📊 Sample vehicle data from query:");
+      console.log("Vehicle ID:", vehicles[0].vehicleId);
+      console.log("Approver Name:", vehicles[0].approver_name);
+      console.log("Approved On:", vehicles[0].approved_on);
+      console.log("Approval Status:", vehicles[0].approval_status);
+    }
 
     // Transform the data to match frontend expectations
     const transformedVehicles = vehicles.map((vehicle) => ({
@@ -1236,6 +1372,13 @@ const getAllVehicles = async (req, res) => {
       ownershipName: vehicle.ownership_name,
       registrationDate: vehicle.registration_date,
       towingCapacity: parseFloat(vehicle.towingCapacity) || 0,
+      // Show approver name for all statuses (Pending shows pending_with_name, Approved shows actioned_by_name)
+      approver: vehicle.approver_name || null,
+      // Show approved date only when actually approved
+      approvedOn:
+        vehicle.approved_on && vehicle.approval_status === "Approve"
+          ? new Date(vehicle.approved_on).toISOString().split("T")[0]
+          : null,
     }));
 
     res.json({
@@ -1298,9 +1441,23 @@ const getVehicleById = async (req, res) => {
       .orderBy("sequence_number", "asc");
 
     // Get documents with file data and document type names
+    // Fix: Use DISTINCT to avoid duplicate rows from multiple document_upload entries
     const documents = await db("vehicle_documents as vd")
       .leftJoin(
-        "document_upload as du",
+        function () {
+          // Subquery to get the latest/most recent document upload for each system_reference_id
+          this.select([
+            "system_reference_id",
+            "file_name",
+            "file_type",
+            "file_xstring_value",
+          ])
+            .from("document_upload")
+            .whereRaw(
+              "(system_reference_id, created_at) IN (SELECT system_reference_id, MAX(created_at) FROM document_upload GROUP BY system_reference_id)"
+            )
+            .as("du");
+        },
         "vd.document_id",
         "du.system_reference_id"
       )
@@ -1346,28 +1503,34 @@ const getVehicleById = async (req, res) => {
 
     let userApprovalStatus = null;
     let approvalHistory = [];
-    
+
     try {
       // Find Vehicle Owner user associated with this vehicle
       // Vehicle Owner users have names like "Vehicle Owner - VEH0062"
-      const associatedUser = await db('user_master')
-        .where('user_type_id', 'UT005') // Vehicle Owner user type
-        .where('user_full_name', 'like', `%${id}%`) // Match vehicle ID in name
+      const associatedUser = await db("user_master")
+        .where("user_type_id", "UT005") // Vehicle Owner user type
+        .where("user_full_name", "like", `%${id}%`) // Match vehicle ID in name
         .first();
 
       if (associatedUser) {
-        console.log(`✅ Found associated Vehicle Owner user: ${associatedUser.user_id} for vehicle ${id}`);
-        
+        console.log(
+          `✅ Found associated Vehicle Owner user: ${associatedUser.user_id} for vehicle ${id}`
+        );
+
         // Get approval flow for this user
-        const approvalFlows = await db('approval_flow_trans as aft')
-          .leftJoin('approval_type_master as atm', 'aft.approval_type_id', 'atm.approval_type_id')
-          .where('aft.user_id_reference_id', associatedUser.user_id)
-          .select(
-            'aft.*',
-            'atm.approval_type as approval_category',
-            'atm.approval_name'
+        const approvalFlows = await db("approval_flow_trans as aft")
+          .leftJoin(
+            "approval_type_master as atm",
+            "aft.approval_type_id",
+            "atm.approval_type_id"
           )
-          .orderBy('aft.created_at', 'desc');
+          .where("aft.user_id_reference_id", associatedUser.user_id)
+          .select(
+            "aft.*",
+            "atm.approval_type as approval_category",
+            "atm.approval_name"
+          )
+          .orderBy("aft.created_at", "desc");
 
         userApprovalStatus = {
           approvalFlowTransId: approvalFlows[0]?.approval_flow_trans_id || null,
@@ -1376,21 +1539,29 @@ const getVehicleById = async (req, res) => {
           userMobile: associatedUser.mobile_number,
           userStatus: associatedUser.status,
           isActive: associatedUser.is_active,
-          currentApprovalStatus: approvalFlows[0]?.s_status || associatedUser.status,
+          currentApprovalStatus:
+            approvalFlows[0]?.s_status || associatedUser.status,
           pendingWith: approvalFlows[0]?.pending_with_name || null,
           pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
           createdByUserId: approvalFlows[0]?.created_by_user_id || null,
           createdByName: approvalFlows[0]?.created_by_name || null,
+          remarks: approvalFlows[0]?.remarks || null, // ✅ FIX: Include rejection remarks
         };
 
         approvalHistory = approvalFlows;
-        
-        console.log(`✅ Found approval status for vehicle ${id}:`, userApprovalStatus);
+
+        console.log(
+          `✅ Found approval status for vehicle ${id}:`,
+          userApprovalStatus
+        );
       } else {
         console.log(`⚠️  No Vehicle Owner user found for vehicle ${id}`);
       }
     } catch (approvalError) {
-      console.error('❌ Error fetching vehicle approval status:', approvalError.message);
+      console.error(
+        "❌ Error fetching vehicle approval status:",
+        approvalError.message
+      );
     }
 
     // Format response
@@ -1568,6 +1739,9 @@ const updateVehicle = async (req, res) => {
 
   try {
     const { id } = req.params;
+    const userId = req.user?.user_id;
+    const userRole = req.user?.role;
+
     const {
       basicInformation,
       specifications,
@@ -1588,6 +1762,37 @@ const updateVehicle = async (req, res) => {
         success: false,
         message: "Vehicle not found",
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingVehicle.status;
+    const createdBy = existingVehicle.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the creator can edit rejected entities",
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      return res.status(403).json({
+        success: false,
+        message: "Cannot edit entity during approval process",
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "product_owner" || userRole === "admin";
+      if (!isApprover) {
+        return res.status(403).json({
+          success: false,
+          message: "Only approvers can edit active entities",
+        });
+      }
     }
 
     // Combine basic information and specifications for validation
@@ -1614,9 +1819,11 @@ const updateVehicle = async (req, res) => {
       }
     }
 
-    // Check for duplicate GPS IMEI (excluding current vehicle)
+    // Check for duplicate GPS IMEI (only if GPS tracking is enabled and IMEI is provided, excluding current vehicle)
     if (
       vehicleData.gps_tracker_imei_number &&
+      (vehicleData.gps_tracker_active_flag === 1 ||
+        vehicleData.gps_tracker_active_flag === true) &&
       vehicleData.gps_tracker_imei_number !==
         existingVehicle.gps_tracker_imei_number
     ) {
@@ -1631,6 +1838,55 @@ const updateVehicle = async (req, res) => {
           field: "basicInformation.gpsIMEI",
         });
       }
+    }
+
+    // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+    const isResubmission =
+      currentStatus === "INACTIVE" && basicInformation?.status === "PENDING";
+
+    if (isResubmission) {
+      console.log(`🔄 Resubmission detected for vehicle ${id}`);
+
+      // Get vehicle owner user ID (VEH0001 → VO0001)
+      const vehicleNumber = id.substring(3); // Remove 'VEH' prefix
+      const vehicleOwnerUserId = `VO${vehicleNumber}`; // VO0001
+
+      // Find existing approval flow record
+      const approvalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", vehicleOwnerUserId)
+        .where("approval_type_id", "AT004") // Vehicle Owner
+        .orderBy("created_at", "desc")
+        .first();
+
+      if (approvalFlow) {
+        // Update approval flow to restart from Level 1
+        await trx("approval_flow_trans")
+          .where(
+            "approval_flow_unique_id",
+            approvalFlow.approval_flow_unique_id
+          )
+          .update({
+            s_status: "PENDING",
+            approver_level: 1,
+            actioned_by_id: null,
+            actioned_by_name: null,
+            approved_on: null,
+            // Keep remarks from rejection for history
+            updated_at: db.fn.now(),
+          });
+
+        console.log(`✅ Approval flow restarted for ${vehicleOwnerUserId}`);
+      }
+
+      // Update user status to Pending for Approval
+      await trx("user_master").where("user_id", vehicleOwnerUserId).update({
+        status: "Pending for Approval",
+        updated_at: db.fn.now(),
+      });
+
+      console.log(
+        `✅ User status updated to Pending for Approval: ${vehicleOwnerUserId}`
+      );
     }
 
     // Update vehicle basic information
@@ -1797,14 +2053,71 @@ const updateVehicle = async (req, res) => {
 
     // Handle documents (add new, update existing, or delete)
     if (documents && Array.isArray(documents)) {
+      // Document type validation function (same as in create)
+      const validateDocumentTypeId = (documentType) => {
+        if (!documentType) return null;
+
+        // Check if it's already a valid ID format (DN001, DN002, etc.)
+        if (/^DN\d{3}$/.test(documentType)) {
+          return documentType;
+        }
+
+        // If it's a description, map to ID
+        const documentTypeMap = {
+          "Vehicle Registration Certificate": "DN001",
+          "Vehicle Insurance": "DN009",
+          "PUC certificate": "DN010",
+          "Fitness Certificate": "DN012",
+          "Tax Certificate": "DN005",
+          Permit: "DN006",
+          "Driver License": "DN007",
+          "Road Tax": "DN008",
+          "Commercial Vehicle License": "DN011",
+          "Pollution Certificate": "DN010",
+          "Insurance Policy": "DN009",
+          "Vehicle Permit": "DN006",
+        };
+
+        const mappedId = documentTypeMap[documentType];
+        if (mappedId) {
+          console.warn(
+            `⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`
+          );
+          return mappedId;
+        }
+
+        // If too long for database field, reject it
+        if (documentType.length > 10) {
+          console.error(
+            `❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`
+          );
+          throw new Error(
+            `Invalid document type: "${documentType}". Expected short code like DN001.`
+          );
+        }
+
+        return documentType;
+      };
+
       for (const doc of documents) {
+        const validatedDocumentTypeId = validateDocumentTypeId(
+          doc.documentType
+        );
+
+        if (!validatedDocumentTypeId) {
+          console.warn(
+            `⚠️ Skipping document with invalid type: ${doc.documentType}`
+          );
+          continue; // Skip this document
+        }
+
         // If document has an ID, it's an existing document - update it
         if (doc.documentId) {
           // Update document metadata
           await trx("vehicle_documents")
             .where("document_id", doc.documentId)
             .update({
-              document_type_id: doc.documentType,
+              document_type_id: validatedDocumentTypeId,
               reference_number: doc.referenceNumber,
               valid_from: formatDateForMySQL(doc.validFrom),
               valid_to: formatDateForMySQL(doc.validTo),
@@ -1833,7 +2146,7 @@ const updateVehicle = async (req, res) => {
                 });
             } else {
               // Insert new file
-              const uploadId = await generateDocumentUploadId();
+              const uploadId = await generateDocumentUploadId(trx);
               await trx("document_upload").insert({
                 document_id: uploadId,
                 file_name: doc.fileName,
@@ -1858,7 +2171,7 @@ const updateVehicle = async (req, res) => {
           await trx("vehicle_documents").insert({
             document_id: documentId,
             vehicle_id_code: id,
-            document_type_id: doc.documentType,
+            document_type_id: validatedDocumentTypeId,
             reference_number: doc.referenceNumber,
             vehicle_maintenance_id: doc.vehicleMaintenanceId,
             permit_category: doc.permitCategory,
@@ -1876,7 +2189,7 @@ const updateVehicle = async (req, res) => {
 
           // Insert document file if provided
           if (doc.fileData && doc.fileName) {
-            const uploadId = await generateDocumentUploadId();
+            const uploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
               document_id: uploadId,
@@ -1971,7 +2284,6 @@ const deleteVehicle = async (req, res) => {
  * Get master data for vehicle dropdowns
  * @route GET /api/vehicle/master-data
  */
-
 
 const getMasterData = async (req, res) => {
   try {
@@ -2439,14 +2751,61 @@ const saveVehicleAsDraft = async (req, res) => {
 
     // Insert partial documents if provided
     if (documents && Array.isArray(documents) && documents.length > 0) {
+      // Document type validation function
+      const validateDocumentTypeId = (documentType) => {
+        if (!documentType) return null;
+
+        // Check if it's already a valid ID format (DN001, DN002, etc.)
+        if (/^DN\d{3}$/.test(documentType)) {
+          return documentType;
+        }
+
+        // If it's a description, map to ID
+        const documentTypeMap = {
+          "Vehicle Registration Certificate": "DN001",
+          "Vehicle Insurance": "DN009",
+          "PUC certificate": "DN010",
+          "Fitness Certificate": "DN012",
+          "Tax Certificate": "DN005",
+          Permit: "DN006",
+          "Driver License": "DN007",
+          "Road Tax": "DN008",
+          "Commercial Vehicle License": "DN011",
+          "Pollution Certificate": "DN010",
+          "Insurance Policy": "DN009",
+          "Vehicle Permit": "DN006",
+        };
+
+        const mappedId = documentTypeMap[documentType];
+        if (mappedId) {
+          console.warn(
+            `⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`
+          );
+          return mappedId;
+        }
+
+        // If too long for database field, reject it
+        if (documentType.length > 10) {
+          console.error(
+            `❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`
+          );
+          return null; // For drafts, just skip invalid documents
+        }
+
+        return documentType;
+      };
+
       for (const doc of documents) {
         if (doc.documentType || doc.referenceNumber) {
+          const validatedDocumentTypeId = validateDocumentTypeId(
+            doc.documentType
+          );
           const documentId = await generateDocumentId();
 
           await trx("vehicle_documents").insert({
             document_id: documentId,
             vehicle_id_code: vehicleId,
-            document_type_id: doc.documentType || null,
+            document_type_id: validatedDocumentTypeId,
             reference_number: doc.referenceNumber || null,
             vehicle_maintenance_id: doc.vehicleMaintenanceId || null,
             permit_category: doc.permitCategory || null,
@@ -2463,7 +2822,7 @@ const saveVehicleAsDraft = async (req, res) => {
           });
 
           if (doc.fileData && doc.fileName) {
-            const uploadId = await generateDocumentUploadId();
+            const uploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
               document_id: uploadId,
@@ -2763,13 +3122,68 @@ const updateVehicleDraft = async (req, res) => {
       // Insert all documents from the payload
       for (const doc of documents) {
         if (doc.documentType) {
+          // Document type validation function
+          const validateDocumentTypeId = (documentType) => {
+            if (!documentType) return null;
+
+            // Check if it's already a valid ID format (DN001, DN002, etc.)
+            if (/^DN\d{3}$/.test(documentType)) {
+              return documentType;
+            }
+
+            // If it's a description, map to ID
+            const documentTypeMap = {
+              "Vehicle Registration Certificate": "DN001",
+              "Vehicle Insurance": "DN009",
+              "PUC certificate": "DN010",
+              "Fitness Certificate": "DN012",
+              "Tax Certificate": "DN005",
+              Permit: "DN006",
+              "Driver License": "DN007",
+              "Road Tax": "DN008",
+              "Commercial Vehicle License": "DN011",
+              "Pollution Certificate": "DN010",
+              "Insurance Policy": "DN009",
+              "Vehicle Permit": "DN006",
+            };
+
+            const mappedId = documentTypeMap[documentType];
+            if (mappedId) {
+              console.warn(
+                `⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`
+              );
+              return mappedId;
+            }
+
+            // If too long for database field, reject it
+            if (documentType.length > 10) {
+              console.error(
+                `❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`
+              );
+              return null; // For drafts, just skip invalid documents
+            }
+
+            return documentType;
+          };
+
+          const validatedDocumentTypeId = validateDocumentTypeId(
+            doc.documentType
+          );
+
+          if (!validatedDocumentTypeId) {
+            console.warn(
+              `⚠️ Skipping document with invalid type: ${doc.documentType}`
+            );
+            continue;
+          }
+
           // Only insert if documentType is specified
           const documentId = await generateDocumentId();
 
           await trx("vehicle_documents").insert({
             document_id: documentId,
             vehicle_id_code: id,
-            document_type_id: doc.documentType || null,
+            document_type_id: validatedDocumentTypeId,
             reference_number: doc.referenceNumber || null,
             vehicle_maintenance_id: doc.vehicleMaintenanceId || null,
             permit_category: doc.permitCategory || null,
@@ -2786,7 +3200,7 @@ const updateVehicleDraft = async (req, res) => {
           });
 
           if (doc.fileData && doc.fileName) {
-            const uploadId = await generateDocumentUploadId();
+            const uploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
               document_id: uploadId,
@@ -2933,7 +3347,12 @@ const submitVehicleFromDraft = async (req, res) => {
       }
     }
 
-    if (vehicleData.gps_tracker_imei_number) {
+    // Check for duplicate GPS IMEI (only if GPS tracking is enabled and IMEI is provided)
+    if (
+      vehicleData.gps_tracker_imei_number &&
+      (vehicleData.gps_tracker_active_flag === 1 ||
+        vehicleData.gps_tracker_active_flag === true)
+    ) {
       const isDuplicate = await checkDuplicateGPSIMEI(
         vehicleData.gps_tracker_imei_number,
         id
@@ -3094,13 +3513,70 @@ const submitVehicleFromDraft = async (req, res) => {
 
     // Re-insert documents with ACTIVE status
     if (documents && Array.isArray(documents) && documents.length > 0) {
+      // Document type validation function
+      const validateDocumentTypeId = (documentType) => {
+        if (!documentType) return null;
+
+        // Check if it's already a valid ID format (DN001, DN002, etc.)
+        if (/^DN\d{3}$/.test(documentType)) {
+          return documentType;
+        }
+
+        // If it's a description, map to ID
+        const documentTypeMap = {
+          "Vehicle Registration Certificate": "DN001",
+          "Vehicle Insurance": "DN009",
+          "PUC certificate": "DN010",
+          "Fitness Certificate": "DN012",
+          "Tax Certificate": "DN005",
+          Permit: "DN006",
+          "Driver License": "DN007",
+          "Road Tax": "DN008",
+          "Commercial Vehicle License": "DN011",
+          "Pollution Certificate": "DN010",
+          "Insurance Policy": "DN009",
+          "Vehicle Permit": "DN006",
+        };
+
+        const mappedId = documentTypeMap[documentType];
+        if (mappedId) {
+          console.warn(
+            `⚠️ Auto-corrected document type: "${documentType}" → "${mappedId}"`
+          );
+          return mappedId;
+        }
+
+        // If too long for database field, reject it
+        if (documentType.length > 10) {
+          console.error(
+            `❌ Invalid document_type_id: "${documentType}" (too long, max 10 chars)`
+          );
+          throw new Error(
+            `Invalid document type: "${documentType}". Expected short code like DN001.`
+          );
+        }
+
+        return documentType;
+      };
+
       for (const doc of documents) {
+        const validatedDocumentTypeId = validateDocumentTypeId(
+          doc.documentType
+        );
+
+        if (!validatedDocumentTypeId) {
+          console.warn(
+            `⚠️ Skipping document with invalid type: ${doc.documentType}`
+          );
+          continue;
+        }
+
         const documentId = await generateDocumentId();
 
         await trx("vehicle_documents").insert({
           document_id: documentId,
           vehicle_id_code: id,
-          document_type_id: doc.documentType,
+          document_type_id: validatedDocumentTypeId,
           reference_number: doc.referenceNumber,
           vehicle_maintenance_id: doc.vehicleMaintenanceId,
           permit_category: doc.permitCategory,
@@ -3117,7 +3593,7 @@ const submitVehicleFromDraft = async (req, res) => {
         });
 
         if (doc.fileData && doc.fileName) {
-          const uploadId = await generateDocumentUploadId();
+          const uploadId = await generateDocumentUploadId(trx);
 
           await trx("document_upload").insert({
             document_id: uploadId,
@@ -3267,7 +3743,7 @@ const lookupVehicleByRC = async (req, res) => {
     if (!registrationNumber || registrationNumber.length < 8) {
       return res.status(400).json({
         success: false,
-        message: 'Valid registration number is required (minimum 8 characters)'
+        message: "Valid registration number is required (minimum 8 characters)",
       });
     }
 
@@ -3275,89 +3751,94 @@ const lookupVehicleByRC = async (req, res) => {
     const cleanRegNumber = registrationNumber.trim().toUpperCase();
 
     // Call actual RC API
-    const axios = require('axios');
+    const axios = require("axios");
     const apiUrl = `https://api.maventic.in/mapi/getVehicleDetailsByVehicleNumber`;
 
     try {
       const response = await axios.get(apiUrl, {
         timeout: 30000, // 30 second timeout
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          Authorization: `Bearer ${process.env.VEHICLE_API_KEY}`
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${process.env.VEHICLE_API_KEY}`,
         },
         data: {
-          vehiclenumber: cleanRegNumber
+          vehiclenumber: cleanRegNumber,
         },
         // Add SSL configuration to handle certificate issues
-        httpsAgent: new (require('https')).Agent({
-          rejectUnauthorized: false
-        })
+        httpsAgent: new (require("https").Agent)({
+          rejectUnauthorized: false,
+        }),
       });
 
-      console.log('RC API Response:', response.data);
+      console.log("RC API Response:", response.data);
       // Check if response has data
-      if (response.data && response.data.response && response.data.response.length > 0) {
+      if (
+        response.data &&
+        response.data.response &&
+        response.data.response.length > 0
+      ) {
         const rcResponse = response.data.response[0];
-        
-        if (rcResponse.responseStatus === 'SUCCESS' && rcResponse.jsonResponse?.VehicleDetails) {
+
+        if (
+          rcResponse.responseStatus === "SUCCESS" &&
+          rcResponse.jsonResponse?.VehicleDetails
+        ) {
           // Return successful response
           res.json({
             success: true,
-            message: 'Vehicle details fetched successfully',
-            response: response.data.response
+            message: "Vehicle details fetched successfully",
+            response: response.data.response,
           });
         } else {
           // Vehicle not found
           return res.status(404).json({
             success: false,
-            message: 'Registration number not found in RC database'
+            message: "Registration number not found in RC database",
           });
         }
       } else {
         // No data found
         return res.status(404).json({
           success: false,
-          message: 'Registration number not found in RC database'
+          message: "Registration number not found in RC database",
         });
       }
     } catch (apiError) {
-      console.error('RC API Error:', apiError.message);
-      
+      console.error("RC API Error:", apiError.message);
+
       // Handle different types of API errors
-      if (apiError.code === 'ECONNABORTED') {
+      if (apiError.code === "ECONNABORTED") {
         return res.status(408).json({
           success: false,
-          message: 'Request timeout - RC API is taking too long to respond'
+          message: "Request timeout - RC API is taking too long to respond",
         });
       } else if (apiError.response?.status === 404) {
         return res.status(404).json({
           success: false,
-          message: 'Registration number not found in RC database'
+          message: "Registration number not found in RC database",
         });
       } else if (apiError.response?.status >= 500) {
         return res.status(502).json({
           success: false,
-          message: 'Server error occurred while fetching vehicle details'
+          message: "Server error occurred while fetching vehicle details",
         });
       } else {
         return res.status(502).json({
           success: false,
-          message: 'Error occurred in server while fetching vehicle details'
+          message: "Error occurred in server while fetching vehicle details",
         });
       }
     }
-
   } catch (error) {
-    console.error('Error in RC lookup:', error);
+    console.error("Error in RC lookup:", error);
     res.status(500).json({
       success: false,
-      message: 'Error occurred in server while processing request',
-      error: error.message
+      message: "Error occurred in server while processing request",
+      error: error.message,
     });
   }
 };
-
 
 module.exports = {
   createVehicle,
@@ -3369,7 +3850,6 @@ module.exports = {
   lookupVehicleByRC,
   saveVehicleAsDraft,
   deleteVehicleDraft,
-  submitVehicleFromDraft, 
+  submitVehicleFromDraft,
   updateVehicleDraft,
-  
 };

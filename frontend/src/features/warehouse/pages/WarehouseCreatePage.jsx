@@ -73,8 +73,6 @@ const getInitialFormData = () => ({
     street2: "",
     postalCode: "",
     vatNumber: "",
-    tinPan: "",
-    tan: "",
     addressType: "",
     isPrimary: true,
   },

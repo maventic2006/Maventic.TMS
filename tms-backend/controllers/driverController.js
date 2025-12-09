@@ -282,10 +282,27 @@ const validateDateRange = (fromDate, toDate, fieldName = "Date") => {
 };
 
 // Date formatting helper
-const formatDateForInput = (date) => {
-  if (!date) return null;
-  const d = new Date(date);
-  return d.toISOString().split("T")[0];
+// Helper function to format date to YYYY-MM-DD
+// Fixed to handle timezone issues - prevents date shifting
+const formatDateForInput = (dateValue) => {
+  if (!dateValue) return null;
+
+  // If already a string in YYYY-MM-DD format, return as-is
+  if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return dateValue;
+  }
+
+  // Handle Date objects or datetime strings
+  const date = new Date(dateValue);
+  // Check if date is valid
+  if (isNaN(date.getTime())) return null;
+
+  // Use UTC methods to avoid timezone shifts
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 };
 
 // Create Driver Controller
@@ -734,6 +751,24 @@ const createDriver = async (req, res) => {
               rejectUnauthorized: false, // Disable SSL verification for this API only
             });
 
+            // Format date to YYYY-MM-DD as required by the API
+            const formattedDob = formatDateForInput(basicInfo.dateOfBirth);
+
+            if (!formattedDob) {
+              await trx.rollback();
+              return res.status(400).json({
+                success: false,
+                error: {
+                  code: "VALIDATION_ERROR",
+                  message: "Invalid date of birth format",
+                  field: "basicInfo.dateOfBirth",
+                },
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            console.log("🔍 Formatted DOB for API:", formattedDob);
+
             const apiResponse = await axios({
               method: "GET",
               url: "https://api.maventic.in/mapi/getDLDetails",
@@ -743,7 +778,7 @@ const createDriver = async (req, res) => {
               },
               data: {
                 dlnumber: doc.documentNumber,
-                dob: basicInfo.dateOfBirth,
+                dob: formattedDob,
               },
               httpsAgent: httpsAgent, // Apply custom agent to bypass SSL verification
             });
@@ -1031,7 +1066,8 @@ const createDriver = async (req, res) => {
     if (documents && documents.length > 0) {
       for (const doc of documents) {
         const documentId = await generateDocumentId(trx);
-        const documentUniqueId = `${driverId}-${documentId}`;
+        // ✅ FIX: Use underscore for consistency with saveDriverAsDraft and submitDriverFromDraft
+        const documentUniqueId = `${driverId}_${documentId}`;
 
         await trx("driver_documents").insert({
           document_unique_id: documentUniqueId,
@@ -1233,7 +1269,7 @@ const createDriver = async (req, res) => {
       approval_flow_trans_id: approvalFlowId,
       approval_config_id: approvalConfig.approval_config_id,
       approval_type_id: "AT003", // Driver User
-      user_id_reference_id: driverAdminUserId, // Use Driver Admin user ID
+      user_id_reference_id: driverId, // 🔥 FIX: Store actual driver entity ID instead of admin user ID
       s_status: "PENDING",
       approver_level: 1,
       pending_with_role_id: "RL001", // Product Owner role
@@ -1590,6 +1626,8 @@ const updateDriver = async (req, res) => {
   try {
     const { id } = req.params;
     const { basicInfo, addresses, documents, history, accidents } = req.body;
+    const userId = req.user?.user_id;
+    const userRole = req.user?.role;
 
     // Validate driver exists
     const existingDriver = await trx("driver_basic_information")
@@ -1606,6 +1644,52 @@ const updateDriver = async (req, res) => {
         },
         timestamp: new Date().toISOString(),
       });
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existingDriver.status;
+    const createdBy = existingDriver.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Only the creator can edit rejected entities",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      await trx.rollback();
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: "Cannot edit entity during approval process",
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "product_owner" || userRole === "admin";
+      if (!isApprover) {
+        await trx.rollback();
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only approvers can edit active entities",
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     const currentTimestamp = new Date();
@@ -1704,6 +1788,55 @@ const updateDriver = async (req, res) => {
         }
       }
 
+      // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+      const isResubmission =
+        currentStatus === "INACTIVE" && basicInfo.status === "PENDING";
+
+      if (isResubmission) {
+        console.log(`🔄 Resubmission detected for driver ${id}`);
+
+        // Get driver admin user ID (DRV0001 → DA0001)
+        const driverNumber = id.substring(3); // Remove 'DRV' prefix
+        const driverAdminUserId = `DA${driverNumber}`; // DA0001
+
+        // Find existing approval flow record
+        const approvalFlow = await trx("approval_flow_trans")
+          .where("user_id_reference_id", id) // 🔥 FIX: Use driver entity ID instead of admin user ID
+          .where("approval_type_id", "AT003") // Driver Admin
+          .orderBy("created_at", "desc")
+          .first();
+
+        if (approvalFlow) {
+          // Update approval flow to restart from Level 1
+          await trx("approval_flow_trans")
+            .where(
+              "approval_flow_unique_id",
+              approvalFlow.approval_flow_unique_id
+            )
+            .update({
+              s_status: "PENDING",
+              approver_level: 1,
+              actioned_by_id: null,
+              actioned_by_name: null,
+              approved_on: null,
+              // Keep remarks from rejection for history
+              updated_at: currentTimestamp,
+            });
+
+          console.log(`✅ Approval flow restarted for ${driverAdminUserId}`);
+        }
+
+        // Update user status to Pending for Approval
+        await trx("user_master").where("user_id", driverAdminUserId).update({
+          status: "Pending for Approval",
+          updated_at: currentTimestamp,
+        });
+
+        console.log(
+          `✅ User status updated to Pending for Approval: ${driverAdminUserId}`
+        );
+      }
+
       await trx("driver_basic_information")
         .where("driver_id", id)
         .update({
@@ -1715,6 +1848,7 @@ const updateDriver = async (req, res) => {
           email_id: basicInfo.emailId || null,
           emergency_contact: basicInfo.emergencyContact || null,
           alternate_phone_number: basicInfo.alternatePhoneNumber || null,
+          status: basicInfo.status || currentStatus, // Update status if provided
           updated_at: currentTimestamp,
           updated_on: currentTimestamp,
           updated_by: currentUser,
@@ -1936,6 +2070,24 @@ const updateDriver = async (req, res) => {
                 rejectUnauthorized: false, // Disable SSL verification for this API only
               });
 
+              // Format date to YYYY-MM-DD as required by the API
+              const formattedDob = formatDateForInput(driverInfo.date_of_birth);
+
+              if (!formattedDob) {
+                await trx.rollback();
+                return res.status(400).json({
+                  success: false,
+                  error: {
+                    code: "VALIDATION_ERROR",
+                    message: "Invalid date of birth format",
+                    field: `documents[${i}].documentNumber`,
+                  },
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              console.log("🔍 Formatted DOB for API:", formattedDob);
+
               const apiResponse = await axios({
                 method: "GET",
                 url: "https://api.maventic.in/mapi/getDLDetails",
@@ -1945,7 +2097,7 @@ const updateDriver = async (req, res) => {
                 },
                 data: {
                   dlnumber: doc.documentNumber,
-                  dob: driverInfo.date_of_birth,
+                  dob: formattedDob,
                 },
                 httpsAgent: httpsAgent, // Apply custom agent to bypass SSL verification
               });
@@ -2047,6 +2199,23 @@ const updateDriver = async (req, res) => {
         }
       }
 
+      // 🔍 DEBUG: Log all received documents to diagnose duplication issue
+      console.log("📋 ========================================");
+      console.log("📋 RECEIVED DOCUMENTS PAYLOAD (UPDATE DRIVER):");
+      console.log("📋 Total documents received:", documents.length);
+      documents.forEach((doc, idx) => {
+        console.log(`📋 Document ${idx}:`, {
+          documentId: doc.documentId,
+          documentType: doc.documentType,
+          documentTypeId: doc.documentTypeId,
+          documentNumber: doc.documentNumber,
+          hasDocumentId: !!doc.documentId,
+          documentIdType: typeof doc.documentId,
+          documentIdValue: doc.documentId,
+        });
+      });
+      console.log("📋 ========================================");
+
       // Update or insert documents
       for (const doc of documents) {
         // Skip documents without document number (empty documents)
@@ -2054,7 +2223,15 @@ const updateDriver = async (req, res) => {
           continue;
         }
 
+        console.log("🔍 Processing document:", {
+          documentId: doc.documentId,
+          documentNumber: doc.documentNumber,
+          willUpdate: !!doc.documentId,
+          willInsert: !doc.documentId,
+        });
+
         if (doc.documentId) {
+          console.log("✅ UPDATE path - documentId:", doc.documentId);
           // Update existing document
           await trx("driver_documents")
             .where("document_id", doc.documentId)
@@ -2076,15 +2253,19 @@ const updateDriver = async (req, res) => {
 
           // Handle file upload for existing document
           if (doc.fileData) {
-            // Check if document_upload record exists
+            // ✅ FIX: Search by system_reference_id, not document_id
+            // document_id in document_upload is a different auto-generated ID
+            // system_reference_id links to driver_documents.document_unique_id
+            const documentUniqueId = `${id}_${doc.documentId}`;
+
             const existingUpload = await trx("document_upload")
-              .where("document_id", doc.documentId)
+              .where("system_reference_id", documentUniqueId)
               .first();
 
             if (existingUpload) {
               // Update existing upload
               await trx("document_upload")
-                .where("document_id", doc.documentId)
+                .where("system_reference_id", documentUniqueId)
                 .update({
                   file_name: doc.fileName || null,
                   file_type: doc.fileType || null,
@@ -2098,16 +2279,14 @@ const updateDriver = async (req, res) => {
                 });
 
               console.log(
-                `✅ Document upload updated for document ${doc.documentId}`
+                `✅ Document upload updated for document ${doc.documentId} (system_reference_id: ${documentUniqueId})`
               );
             } else {
               // Insert new upload for existing document
-              const docUploadId = await generateDocumentUploadId();
-              const documentUniqueId = `${id}-${doc.documentId}`;
+              const docUploadId = await generateDocumentUploadId(trx);
 
               await trx("document_upload").insert({
-                document_upload_unique_id: docUploadId,
-                document_id: doc.documentId,
+                document_id: docUploadId,
                 file_name: doc.fileName || null,
                 file_type: doc.fileType || null,
                 file_xstring_value: doc.fileData,
@@ -2125,14 +2304,16 @@ const updateDriver = async (req, res) => {
               });
 
               console.log(
-                `✅ Document upload ${docUploadId} inserted for document ${doc.documentId}`
+                `✅ Document upload ${docUploadId} inserted for document ${doc.documentId} (system_reference_id: ${documentUniqueId})`
               );
             }
           }
         } else {
+          console.log("⚠️ INSERT path - NO documentId, creating new document");
           // Insert new document
           const documentId = await generateDocumentId(trx);
-          const documentUniqueId = `${id}-${documentId}`;
+          // ✅ FIX: Use underscore for consistency
+          const documentUniqueId = `${id}_${documentId}`;
 
           await trx("driver_documents").insert({
             document_unique_id: documentUniqueId,
@@ -2157,11 +2338,10 @@ const updateDriver = async (req, res) => {
 
           // If file data is provided for new document, insert into document_upload table
           if (doc.fileData) {
-            const docUploadId = await generateDocumentUploadId();
+            const docUploadId = await generateDocumentUploadId(trx);
 
             await trx("document_upload").insert({
-              document_upload_unique_id: docUploadId,
-              document_id: documentId,
+              document_id: docUploadId,
               file_name: doc.fileName || null,
               file_type: doc.fileType || null,
               file_xstring_value: doc.fileData,
@@ -2735,17 +2915,25 @@ const getDrivers = async (req, res) => {
       createdOnEnd = "",
     } = req.query;
 
+    // Get current user ID for draft filtering
+    const currentUserId = req.user?.user_id;
+
+    console.log("🔍 DRAFT FILTER DEBUG:");
+    console.log("  Current User ID:", currentUserId);
+    console.log("  User Type:", req.user?.user_type_id);
+    console.log("  Filters:", { status, driverId, fullName });
+
     // Convert page and limit
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Base Query
+    // Base Query - Modified to join addresses and documents with status IN ('ACTIVE', 'DRAFT')
     let query = knex("driver_basic_information as dbi")
       .leftJoin("tms_address as addr", function () {
         this.on("dbi.driver_id", "=", "addr.user_reference_id")
           .andOn("addr.user_type", "=", knex.raw("'DRIVER'"))
-          .andOn("addr.status", "=", knex.raw("'ACTIVE'"))
+          .andOn(knex.raw("addr.status IN ('ACTIVE', 'DRAFT')")) // ✅ Include DRAFT addresses
           .andOn("addr.is_primary", "=", knex.raw("true"));
       })
       .leftJoin(
@@ -2756,11 +2944,29 @@ const getDrivers = async (req, res) => {
               "GROUP_CONCAT(document_number SEPARATOR ', ') as license_numbers"
             )
           )
-          .where("status", "ACTIVE")
+          .whereIn("status", ["ACTIVE", "DRAFT"]) // ✅ Include DRAFT documents
           .groupBy("driver_id")
           .as("dd"),
         "dbi.driver_id",
         "dd.driver_id"
+      )
+      .leftJoin(
+        knex.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT003'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        knex.raw(
+          "CONCAT('DRV', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED), 4, '0'))"
+        ),
+        "dbi.driver_id"
       )
       .select(
         "dbi.driver_id",
@@ -2782,7 +2988,12 @@ const getDrivers = async (req, res) => {
         "addr.city",
         "addr.district",
         "addr.postal_code",
-        "dd.license_numbers"
+        "dd.license_numbers",
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
       );
 
     // Count query
@@ -2849,7 +3060,7 @@ const getDrivers = async (req, res) => {
           SELECT driver_id 
           FROM driver_documents 
           WHERE document_number LIKE ? 
-            AND status = 'ACTIVE'
+            AND status IN ('ACTIVE', 'DRAFT')
         )
       `;
 
@@ -2864,8 +3075,12 @@ const getDrivers = async (req, res) => {
     }
 
     if (createdOnEnd) {
-      query.where("dbi.created_on", "<=", createdOnEnd);
-      countQuery.where("dbi.created_on", "<=", createdOnEnd);
+      // Add end of day time (23:59:59) to include entire day
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      query.where("dbi.created_on", "<=", endDateWithTime);
+      countQuery.where("dbi.created_on", "<=", endDateWithTime);
     }
 
     // ------- ADDRESS FILTERS -------
@@ -2883,7 +3098,7 @@ const getDrivers = async (req, res) => {
           FROM tms_address 
           WHERE user_type = 'DRIVER' 
             AND country LIKE ? 
-            AND status = 'ACTIVE' 
+            AND status IN ('ACTIVE', 'DRAFT')
             AND is_primary = true
         )
       `;
@@ -2915,7 +3130,7 @@ const getDrivers = async (req, res) => {
           FROM tms_address 
           WHERE user_type = 'DRIVER' 
             AND state LIKE ? 
-            AND status = 'ACTIVE' 
+            AND status IN ('ACTIVE', 'DRAFT')
             AND is_primary = true
         )
       `;
@@ -2931,7 +3146,7 @@ const getDrivers = async (req, res) => {
           FROM tms_address 
           WHERE user_type = 'DRIVER' 
             AND city LIKE ? 
-            AND status = 'ACTIVE' 
+            AND status IN ('ACTIVE', 'DRAFT')
             AND is_primary = true
         )
       `;
@@ -2947,7 +3162,7 @@ const getDrivers = async (req, res) => {
           FROM tms_address 
           WHERE user_type = 'DRIVER' 
             AND postal_code LIKE ? 
-            AND status = 'ACTIVE' 
+            AND status IN ('ACTIVE', 'DRAFT')
             AND is_primary = true
         )
       `;
@@ -2964,6 +3179,35 @@ const getDrivers = async (req, res) => {
         countQuery.where("dbi.avg_rating", ">=", rating);
       }
     }
+
+    // ✅ DRAFT VISIBILITY FILTER - Only show DRAFT drivers to their creator
+    // This ensures that draft drivers are private and only visible to the user who created them
+    // Handle both "DRAFT" and "SAVE_AS_DRAFT" statuses for backward compatibility
+    query.where(function () {
+      this.where(function () {
+        // Show all non-draft drivers to everyone
+        this.whereNotIn("dbi.status", ["DRAFT", "SAVE_AS_DRAFT"]);
+      }).orWhere(function () {
+        // For DRAFT drivers, only show if user is the creator
+        this.whereIn("dbi.status", ["DRAFT", "SAVE_AS_DRAFT"]).where(
+          "dbi.created_by",
+          "=",
+          currentUserId
+        );
+      });
+    });
+
+    countQuery.where(function () {
+      this.where(function () {
+        this.whereNotIn("dbi.status", ["DRAFT", "SAVE_AS_DRAFT"]);
+      }).orWhere(function () {
+        this.whereIn("dbi.status", ["DRAFT", "SAVE_AS_DRAFT"]).where(
+          "dbi.created_by",
+          "=",
+          currentUserId
+        );
+      });
+    });
 
     // ------- TOTAL COUNT -------
     const [{ count: total }] = await countQuery.count("* as count");
@@ -2995,6 +3239,11 @@ const getDrivers = async (req, res) => {
       createdBy: driver.created_by,
       createdOn: formatDateForInput(driver.created_on),
       updatedOn: formatDateForInput(driver.updated_on),
+      approver: driver.approver_name || null,
+      approvedOn:
+        driver.approved_on && driver.approval_status === "Approve"
+          ? new Date(driver.approved_on).toISOString().split("T")[0]
+          : null,
     }));
 
     res.json({
@@ -3241,6 +3490,7 @@ const getDriverById = async (req, res) => {
               pendingWithUserId: approvalFlows[0]?.pending_with_user_id || null,
               createdByUserId: approvalFlows[0]?.created_by_user_id || null,
               createdByName: approvalFlows[0]?.created_by_name || null,
+              remarks: approvalFlows[0]?.remarks || null, // ✅ FIX: Include rejection remarks
             };
 
             approvalHistory = approvalFlows;
@@ -3483,6 +3733,26 @@ const getMasterData = async (req, res) => {
       ];
     }
 
+    // Get mandatory documents for DRIVER user type
+    const mandatoryDocuments = await knex("doc_type_configuration as dtc")
+      .join(
+        "document_name_master as dnm",
+        "dtc.doc_name_master_id",
+        "dnm.doc_name_master_id"
+      )
+      .select(
+        "dtc.doc_name_master_id as value",
+        "dnm.document_name as label",
+        "dtc.is_mandatory",
+        "dtc.is_expiry_required",
+        "dtc.is_verification_required"
+      )
+      .where("dtc.user_type", "DRIVER")
+      .where("dtc.status", "ACTIVE")
+      .where("dnm.status", "ACTIVE")
+      .where("dtc.is_mandatory", 1)
+      .orderBy("dnm.document_name");
+
     res.json({
       success: true,
       data: {
@@ -3492,6 +3762,7 @@ const getMasterData = async (req, res) => {
         genderOptions,
         bloodGroupOptions,
         violationTypes,
+        mandatoryDocuments,
       },
       timestamp: new Date().toISOString(),
     });
@@ -3548,14 +3819,14 @@ const getMandatoryDocuments = async (req, res) => {
   try {
     console.log("📋 Fetching mandatory documents for Driver...");
 
-    // Query doc_type_configuration for Driver user type
+    // Query doc_type_configuration for DRIVER user type
     const mandatoryDocs = await knex("doc_type_configuration as dtc")
       .join(
         "document_name_master as dnm",
         "dtc.doc_name_master_id",
         "dnm.doc_name_master_id"
       )
-      .where("dtc.user_type", "Driver")
+      .where("dtc.user_type", "DRIVER")
       .where("dtc.is_mandatory", 1)
       .where("dtc.status", "ACTIVE")
       .where("dnm.status", "ACTIVE")
@@ -3988,7 +4259,39 @@ const saveDriverAsDraft = async (req, res) => {
   const trx = await knex.transaction();
 
   try {
-    const { basicInfo, addresses, documents } = req.body;
+    // ✅ FIX: Accept both "history"/"employmentHistory" and "accidents"/"accidentsViolations"
+    // Frontend sends "history" and "accidents" from DriverCreatePage
+    // DriverDetailsPage sends "employmentHistory" and "accidentsViolations"
+    const {
+      basicInfo,
+      addresses,
+      documents,
+      employmentHistory,
+      accidentsViolations,
+      history,
+      accidents,
+    } = req.body;
+
+    // Use whichever field name was provided
+    const historyData = employmentHistory || history || [];
+    const accidentsData = accidentsViolations || accidents || [];
+
+    console.log("📝 SAVE AS DRAFT - Payload Analysis:");
+    console.log(
+      "  - employmentHistory:",
+      employmentHistory ? employmentHistory.length : "not provided"
+    );
+    console.log("  - history:", history ? history.length : "not provided");
+    console.log(
+      "  - accidentsViolations:",
+      accidentsViolations ? accidentsViolations.length : "not provided"
+    );
+    console.log(
+      "  - accidents:",
+      accidents ? accidents.length : "not provided"
+    );
+    console.log("  - Using historyData:", historyData.length, "records");
+    console.log("  - Using accidentsData:", accidentsData.length, "records");
 
     const timestamp = new Date();
     const user = req.user?.user_id || "SYSTEM";
@@ -4048,7 +4351,7 @@ const saveDriverAsDraft = async (req, res) => {
           address_type_id: addr.addressTypeId || null,
           is_primary: addr.isPrimary || false,
 
-          status: "ACTIVE",
+          status: "DRAFT", // ✅ Set to DRAFT for draft drivers
 
           created_at: timestamp,
           created_on: timestamp,
@@ -4061,7 +4364,7 @@ const saveDriverAsDraft = async (req, res) => {
     }
 
     // ===========================================================
-    // 5️⃣ INSERT DOCUMENTS  (driver_documents)
+    // 5️⃣ INSERT DOCUMENTS  (driver_documents + document_upload)
     // ===========================================================
     if (documents && documents.length > 0) {
       for (const doc of documents) {
@@ -4085,7 +4388,7 @@ const saveDriverAsDraft = async (req, res) => {
           active_flag: doc.status !== false,
           remarks: doc.remarks || null,
 
-          status: "ACTIVE",
+          status: "DRAFT", // ✅ Set to DRAFT for draft drivers
 
           created_at: timestamp,
           created_on: timestamp,
@@ -4094,7 +4397,115 @@ const saveDriverAsDraft = async (req, res) => {
           updated_on: timestamp,
           updated_by: user,
         });
+
+        // ✅ FIX Issue 3: Save document upload if fileData provided
+        if (doc.fileData) {
+          const docUploadId = await generateDocumentUploadId(trx);
+
+          await trx("document_upload").insert({
+            document_id: docUploadId,
+            file_name: doc.fileName || null,
+            file_type: doc.fileType || "application/pdf",
+            file_xstring_value: doc.fileData,
+            system_reference_id: documentUniqueId,
+            is_verified: false,
+            valid_from: doc.validFrom || null,
+            valid_to: doc.validTo || null,
+            created_at: timestamp,
+            created_on: timestamp,
+            created_by: user,
+            updated_at: timestamp,
+            updated_on: timestamp,
+            updated_by: user,
+            status: "DRAFT",
+          });
+        }
       }
+    }
+
+    // ===========================================================
+    // 6️⃣ INSERT HISTORY  (driver_history_information)
+    // ===========================================================
+    if (historyData && historyData.length > 0) {
+      console.log(`✅ Saving ${historyData.length} history record(s)...`);
+      for (const history of historyData) {
+        // Only insert if meaningful data present
+        // ✅ FIX: Accept both 'employer' and 'employerName' field names
+        if (history.employer || history.employerName || history.fromDate) {
+          const historyId = await generateHistoryId(trx);
+
+          await trx("driver_history_information").insert({
+            driver_history_id: historyId,
+            driver_id: driverId,
+            employer: history.employer || history.employerName || null,
+            employment_status: history.employmentStatus || null,
+            from_date: history.fromDate || null,
+            to_date: history.toDate || null,
+            job_title: history.jobTitle || null,
+            created_at: timestamp,
+            created_on: timestamp,
+            created_by: user,
+            updated_at: timestamp,
+            updated_on: timestamp,
+            updated_by: user,
+            status: "DRAFT",
+          });
+          console.log(
+            `  ✓ History saved: ${historyId} - ${
+              history.employer || history.employerName
+            }`
+          );
+        }
+      }
+    } else {
+      console.log("⚠️ No history data to save");
+    }
+
+    // ===========================================================
+    // 7️⃣ INSERT ACCIDENTS/VIOLATIONS  (driver_accident_violation)
+    // ===========================================================
+    if (accidentsData && accidentsData.length > 0) {
+      console.log(
+        `✅ Saving ${accidentsData.length} accident/violation record(s)...`
+      );
+      for (const incident of accidentsData) {
+        // Only insert if meaningful data present
+        // ✅ FIX: Accept both 'date'/'incidentDate' and 'type'/'violationType' field names
+        if (
+          incident.date ||
+          incident.incidentDate ||
+          incident.type ||
+          incident.violationType
+        ) {
+          const accidentId = await generateAccidentId(trx);
+
+          await trx("driver_accident_violation").insert({
+            driver_violation_id: accidentId,
+            driver_id: driverId,
+            type: incident.type || incident.violationType || null,
+            date: incident.date || incident.incidentDate || null,
+            vehicle_regn_number:
+              incident.vehicleRegnNumber ||
+              incident.vehicleRegistrationNumber ||
+              null,
+            description: incident.description || null,
+            created_at: timestamp,
+            created_on: timestamp,
+            created_by: user,
+            updated_at: timestamp,
+            updated_on: timestamp,
+            updated_by: user,
+            status: "DRAFT",
+          });
+          console.log(
+            `  ✓ Accident saved: ${accidentId} - ${
+              incident.type || incident.violationType
+            } on ${incident.date || incident.incidentDate}`
+          );
+        }
+      }
+    } else {
+      console.log("⚠️ No accident/violation data to save");
     }
 
     await trx.commit();
@@ -4128,18 +4539,41 @@ const saveDriverAsDraft = async (req, res) => {
 const updateDriverDraft = async (req, res) => {
   try {
     const { id } = req.params;
+    // ✅ FIX: Accept both "history"/"employmentHistory" and "accidents"/"accidentsViolations"
     const {
       basicInfo,
       addresses,
       documents,
       employmentHistory,
       accidentsViolations,
+      history,
+      accidents,
     } = req.body;
+
+    // Use whichever field name was provided
+    const historyData = employmentHistory || history || [];
+    const accidentsData = accidentsViolations || accidents || [];
+
     const userId = req.user?.user_id;
 
     const currentTimestamp = new Date();
 
     console.log("📝 Updating driver draft:", id, "User:", userId);
+    console.log(
+      "  - employmentHistory:",
+      employmentHistory ? employmentHistory.length : "not provided"
+    );
+    console.log("  - history:", history ? history.length : "not provided");
+    console.log(
+      "  - accidentsViolations:",
+      accidentsViolations ? accidentsViolations.length : "not provided"
+    );
+    console.log(
+      "  - accidents:",
+      accidents ? accidents.length : "not provided"
+    );
+    console.log("  - Using historyData:", historyData.length, "records");
+    console.log("  - Using accidentsData:", accidentsData.length, "records");
 
     // Verify driver exists
     const existing = await knex("driver_basic_information")
@@ -4344,16 +4778,18 @@ const updateDriverDraft = async (req, res) => {
       // ---------------------------
       // Re-insert history (driver_history_information)
       // ---------------------------
-      if (employmentHistory && employmentHistory.length > 0) {
-        for (const history of employmentHistory) {
+      if (historyData && historyData.length > 0) {
+        console.log(`✅ Updating ${historyData.length} history record(s)...`);
+        for (const history of historyData) {
           // Only insert if meaningful data present
-          if (history.employerName || history.fromDate) {
+          // ✅ FIX: Accept both 'employer' and 'employerName' field names
+          if (history.employer || history.employerName || history.fromDate) {
             const historyId = await generateHistoryId(trx);
 
             await trx("driver_history_information").insert({
               driver_history_id: historyId,
               driver_id: id,
-              employer: history.employerName || null,
+              employer: history.employer || history.employerName || null,
               employment_status: history.employmentStatus || null,
               from_date: history.fromDate || null,
               to_date: history.toDate || null,
@@ -4366,24 +4802,40 @@ const updateDriverDraft = async (req, res) => {
               updated_by: userId,
               status: "DRAFT",
             });
+            console.log(
+              `  ✓ History updated: ${historyId} - ${
+                history.employer || history.employerName
+              }`
+            );
           }
         }
+      } else {
+        console.log("⚠️ No history data to update");
       }
 
       // ---------------------------
       // Re-insert accidents/violations (driver_accident_violation)
       // ---------------------------
-      if (accidentsViolations && accidentsViolations.length > 0) {
-        for (const incident of accidentsViolations) {
+      if (accidentsData && accidentsData.length > 0) {
+        console.log(
+          `✅ Updating ${accidentsData.length} accident/violation record(s)...`
+        );
+        for (const incident of accidentsData) {
           // Only insert if meaningful data present
-          if (incident.incidentDate || incident.violationType) {
+          // ✅ FIX: Accept both 'date'/'incidentDate' and 'type'/'violationType' field names
+          if (
+            incident.date ||
+            incident.incidentDate ||
+            incident.type ||
+            incident.violationType
+          ) {
             const accidentId = await generateAccidentId(trx);
 
             await trx("driver_accident_violation").insert({
               driver_violation_id: accidentId,
               driver_id: id,
-              type: incident.violationType || null,
-              date: incident.incidentDate || null,
+              type: incident.type || incident.violationType || null,
+              date: incident.date || incident.incidentDate || null,
               vehicle_regn_number:
                 incident.vehicleRegnNumber ||
                 incident.vehicleRegistrationNumber ||
@@ -4397,8 +4849,15 @@ const updateDriverDraft = async (req, res) => {
               updated_by: userId,
               status: "DRAFT",
             });
+            console.log(
+              `  ✓ Accident updated: ${accidentId} - ${
+                incident.type || incident.violationType
+              } on ${incident.date || incident.incidentDate}`
+            );
           }
         }
+      } else {
+        console.log("⚠️ No accident/violation data to update");
       }
 
       await trx.commit();
@@ -4436,13 +4895,21 @@ const updateDriverDraft = async (req, res) => {
 const submitDriverFromDraft = async (req, res) => {
   try {
     const { id } = req.params;
+    // ✅ FIX: Accept both "history"/"employmentHistory" and "accidents"/"accidentsViolations"
     const {
       basicInfo,
       addresses,
       documents,
       employmentHistory,
       accidentsViolations,
+      history,
+      accidents,
     } = req.body;
+
+    // Use whichever field name was provided
+    const historyData = employmentHistory || history || [];
+    const accidentsData = accidentsViolations || accidents || [];
+
     const userId = req.user?.user_id;
 
     const currentTimestamp = new Date();
@@ -4453,6 +4920,21 @@ const submitDriverFromDraft = async (req, res) => {
       "User:",
       userId
     );
+    console.log(
+      "  - employmentHistory:",
+      employmentHistory ? employmentHistory.length : "not provided"
+    );
+    console.log("  - history:", history ? history.length : "not provided");
+    console.log(
+      "  - accidentsViolations:",
+      accidentsViolations ? accidentsViolations.length : "not provided"
+    );
+    console.log(
+      "  - accidents:",
+      accidents ? accidents.length : "not provided"
+    );
+    console.log("  - Using historyData:", historyData.length, "records");
+    console.log("  - Using accidentsData:", accidentsData.length, "records");
 
     // Verify it's a draft and belongs to the user
     const existing = await knex("driver_basic_information")
@@ -4785,6 +5267,124 @@ const submitDriverFromDraft = async (req, res) => {
             },
           });
         }
+
+        // ============================================
+        // 🔍 FIX Issue 1: DRIVER LICENSE VALIDATION VIA API FOR SUBMIT FROM DRAFT
+        // ============================================
+        if (doc.documentTypeName.toLowerCase() === "driver license") {
+          console.log(
+            "🔍 Validating Driver License using external API (SUBMIT FROM DRAFT)..."
+          );
+
+          try {
+            // Create HTTPS agent that bypasses SSL certificate verification for this specific API
+            const httpsAgent = new https.Agent({
+              rejectUnauthorized: false, // Disable SSL verification for this API only
+            });
+
+            // Format date to YYYY-MM-DD as required by the API
+            const formattedDob = formatDateForInput(basicInfo.dateOfBirth);
+
+            if (!formattedDob) {
+              return res.status(400).json({
+                success: false,
+                error: {
+                  code: "VALIDATION_ERROR",
+                  message:
+                    "Driver date of birth is required for license validation",
+                  field: "basicInfo.dateOfBirth",
+                },
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            console.log("🔍 Formatted DOB for API:", formattedDob);
+
+            const apiResponse = await axios({
+              method: "GET",
+              url: "https://api.maventic.in/mapi/getDLDetails",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.DL_API_KEY || ""}`,
+              },
+              data: {
+                dlnumber: doc.documentNumber,
+                dob: formattedDob,
+              },
+              httpsAgent: httpsAgent, // Apply custom agent to bypass SSL verification
+            });
+
+            const result = apiResponse.data;
+            console.log("📡 DL API Response (Submit From Draft):", result);
+
+            // Check for API-level errors
+            // API returns: { error: "false", code: "200", message: "Success", data: {...} }
+            if (result.error === "true" || result.code !== "200") {
+              // Determine user-friendly message based on response
+              let userMessage =
+                "Driver license number is invalid or could not be found";
+              if (
+                result.message &&
+                result.message.toLowerCase().includes("expired")
+              ) {
+                userMessage =
+                  "Driver license has expired. Please renew your license";
+              } else if (
+                result.message &&
+                result.message.toLowerCase().includes("not found")
+              ) {
+                userMessage =
+                  "Driver license number could not be found in the system";
+              } else if (
+                result.message &&
+                result.message.toLowerCase().includes("format")
+              ) {
+                userMessage = "Driver license number format is invalid";
+              }
+
+              return res.status(400).json({
+                success: false,
+                error: {
+                  code: "INVALID_DRIVER_LICENSE",
+                  message: userMessage,
+                  field: `documents[${i}].documentNumber`,
+                },
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            // Success check - verify both error flag and message
+            if (result.error !== "false" || result.message !== "Success") {
+              return res.status(400).json({
+                success: false,
+                error: {
+                  code: "INVALID_DRIVER_LICENSE",
+                  message:
+                    result.message ||
+                    "Driver license number is invalid or could not be verified",
+                  field: `documents[${i}].documentNumber`,
+                },
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            console.log(
+              "✅ Driver License validated successfully (Submit From Draft)"
+            );
+          } catch (err) {
+            console.error("❌ DL API ERROR (Submit From Draft):", err);
+            return res.status(500).json({
+              success: false,
+              error: {
+                code: "DL_API_ERROR",
+                message:
+                  "Unable to validate driver license. Please try again later",
+                field: `documents[${i}].documentNumber`,
+              },
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
       }
     }
 
@@ -4897,8 +5497,11 @@ const submitDriverFromDraft = async (req, res) => {
       }
 
       // Re-insert employment history if provided
-      if (employmentHistory && employmentHistory.length > 0) {
-        for (const history of employmentHistory) {
+      if (historyData && historyData.length > 0) {
+        console.log(
+          `✅ Submitting ${historyData.length} history record(s) for approval...`
+        );
+        for (const history of historyData) {
           const historyId = await generateHistoryId(trx);
 
           await trx("driver_history_information").insert({
@@ -4917,12 +5520,22 @@ const submitDriverFromDraft = async (req, res) => {
             created_on: currentTimestamp,
             updated_on: currentTimestamp,
           });
+          console.log(
+            `  ✓ History submitted: ${historyId} - ${
+              history.employer || history.employerName
+            }`
+          );
         }
+      } else {
+        console.log("⚠️ No history data to submit");
       }
 
       // Re-insert accidents/violations if provided
-      if (accidentsViolations && accidentsViolations.length > 0) {
-        for (const incident of accidentsViolations) {
+      if (accidentsData && accidentsData.length > 0) {
+        console.log(
+          `✅ Submitting ${accidentsData.length} accident/violation record(s) for approval...`
+        );
+        for (const incident of accidentsData) {
           const accidentId = await generateAccidentId(trx);
 
           await trx("driver_accident_violation").insert({
@@ -4930,7 +5543,10 @@ const submitDriverFromDraft = async (req, res) => {
             driver_id: id,
             type: incident.type || incident.violationType || null,
             date: incident.date || incident.incidentDate || null,
-            vehicle_regn_number: incident.vehicleRegistrationNumber || null,
+            vehicle_regn_number:
+              incident.vehicleRegistrationNumber ||
+              incident.vehicleRegnNumber ||
+              null,
             description: incident.description || null,
             status: "ACTIVE",
             created_by: userId,
@@ -4940,7 +5556,14 @@ const submitDriverFromDraft = async (req, res) => {
             created_on: currentTimestamp,
             updated_on: currentTimestamp,
           });
+          console.log(
+            `  ✓ Accident submitted: ${accidentId} - ${
+              incident.type || incident.violationType
+            } on ${incident.date || incident.incidentDate}`
+          );
         }
+      } else {
+        console.log("⚠️ No accident/violation data to submit");
       }
 
       // ========================================
@@ -4955,7 +5578,7 @@ const submitDriverFromDraft = async (req, res) => {
         `  Generated user ID: ${driverAdminUserId} (derived from ${id})`
       );
 
-      // Check if user already exists (in case this is a re-submission)
+      // Check if user already exists (in case this is a re-submission or update)
       const existingUser = await trx("user_master")
         .where("user_id", driverAdminUserId)
         .first();
@@ -5049,7 +5672,7 @@ const submitDriverFromDraft = async (req, res) => {
           approval_flow_trans_id: approvalFlowId,
           approval_config_id: approvalConfig.approval_config_id,
           approval_type_id: "AT003", // Driver User
-          user_id_reference_id: driverAdminUserId, // Use Driver Admin user ID
+          user_id_reference_id: id, // 🔥 FIX: Store actual driver entity ID instead of admin user ID
           s_status: "PENDING",
           approver_level: 1,
           pending_with_role_id: "RL001", // Product Owner role
@@ -5074,100 +5697,118 @@ const submitDriverFromDraft = async (req, res) => {
           `  🔑 Initial Password: ${initialPassword} (MUST BE SHARED SECURELY)`
         );
       } else {
+        // User already exists - update status and ensure approval flow exists
         console.log(`  ✅ User account already exists: ${driverAdminUserId}`);
 
-        // Update existing user status to PENDING if it's currently DRAFT
-        if (existingUser.status === "DRAFT") {
-          await trx("user_master").where("user_id", driverAdminUserId).update({
+        // Always update user status to PENDING when submitting draft
+        await trx("user_master")
+          .where("user_id", driverAdminUserId)
+          .update({
             status: "PENDING",
+            full_name: basicInfo.fullName, // Update with latest data
+            email_id: basicInfo.emailId || existingUser.email_id,
+            mobile_number: basicInfo.phoneNumber || existingUser.mobile_number,
             updated_by: userId,
             updated_at: currentTimestamp,
             updated_on: currentTimestamp,
           });
-          console.log(
-            `  ✅ Updated user status to PENDING: ${driverAdminUserId}`
-          );
-        }
+        console.log(
+          `  ✅ Updated user status to PENDING: ${driverAdminUserId}`
+        );
+      }
 
-        // Check if approval flow already exists
-        const existingApprovalFlow = await trx("approval_flow_trans")
-          .where("user_id_reference_id", driverAdminUserId)
-          .where("s_status", "PENDING")
+      // ========================================
+      // ENSURE APPROVAL FLOW EXISTS (ALWAYS)
+      // ========================================
+      // Check if approval flow already exists for this user
+      const existingApprovalFlow = await trx("approval_flow_trans")
+        .where("user_id_reference_id", driverAdminUserId)
+        .where("s_status", "PENDING")
+        .where("status", "ACTIVE")
+        .first();
+
+      if (!existingApprovalFlow) {
+        console.log(
+          `  🔄 Creating approval flow for driver user: ${driverAdminUserId}`
+        );
+
+        // Get current user details
+        const creatorUserId = userId;
+        const creatorName = req.user?.user_full_name || "Product Owner";
+
+        // Get approval configuration
+        const approvalConfig = await trx("approval_configuration")
+          .where({
+            approval_type_id: "AT003", // Driver User
+            approver_level: 1,
+            status: "ACTIVE",
+          })
           .first();
 
-        if (!existingApprovalFlow) {
-          console.log(`  🔄 Creating missing approval flow for existing user`);
-
-          // Get approval configuration
-          const approvalConfig = await trx("approval_configuration")
-            .where({
-              approval_type_id: "AT003", // Driver User
-              approver_level: 1,
-              status: "ACTIVE",
-            })
-            .first();
-
-          if (approvalConfig) {
-            // Determine pending approver
-            const creatorUserId = userId;
-            const creatorName = req.user?.user_full_name || "Product Owner";
-
-            let pendingWithUserId = null;
-            let pendingWithName = null;
-
-            if (creatorUserId === "PO001") {
-              const po2 = await trx("user_master")
-                .where("user_id", "PO002")
-                .first();
-              pendingWithUserId = "PO002";
-              pendingWithName = po2?.user_full_name || "Product Owner 2";
-            } else if (creatorUserId === "PO002") {
-              const po1 = await trx("user_master")
-                .where("user_id", "PO001")
-                .first();
-              pendingWithUserId = "PO001";
-              pendingWithName = po1?.user_full_name || "Product Owner 1";
-            } else {
-              const po1 = await trx("user_master")
-                .where("user_id", "PO001")
-                .first();
-              pendingWithUserId = "PO001";
-              pendingWithName = po1?.user_full_name || "Product Owner 1";
-            }
-
-            // Generate approval flow trans ID
-            const approvalFlowId = await generateApprovalFlowId(trx);
-
-            // Create approval flow transaction entry
-            await trx("approval_flow_trans").insert({
-              approval_flow_trans_id: approvalFlowId,
-              approval_config_id: approvalConfig.approval_config_id,
-              approval_type_id: "AT003", // Driver User
-              user_id_reference_id: driverAdminUserId,
-              s_status: "PENDING",
-              approver_level: 1,
-              pending_with_role_id: "RL001", // Product Owner role
-              pending_with_user_id: pendingWithUserId,
-              pending_with_name: pendingWithName,
-              created_by_user_id: creatorUserId,
-              created_by_name: creatorName,
-              created_by: creatorUserId,
-              updated_by: creatorUserId,
-              created_at: currentTimestamp,
-              updated_at: currentTimestamp,
-              created_on: currentTimestamp,
-              updated_on: currentTimestamp,
-              status: "ACTIVE",
-            });
-
-            console.log(`  ✅ Created approval workflow: ${approvalFlowId}`);
-            console.log(
-              `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
-            );
-          }
-        } else {
-          console.log(`  ✅ Approval flow already exists for user`);
+        if (!approvalConfig) {
+          throw new Error("Approval configuration not found for Driver User");
         }
+
+        // Determine pending approver (Product Owner who did NOT create this)
+        let pendingWithUserId = null;
+        let pendingWithName = null;
+
+        if (creatorUserId === "PO001") {
+          const po2 = await trx("user_master")
+            .where("user_id", "PO002")
+            .first();
+          pendingWithUserId = "PO002";
+          pendingWithName = po2?.user_full_name || "Product Owner 2";
+        } else if (creatorUserId === "PO002") {
+          const po1 = await trx("user_master")
+            .where("user_id", "PO001")
+            .first();
+          pendingWithUserId = "PO001";
+          pendingWithName = po1?.user_full_name || "Product Owner 1";
+        } else {
+          // If creator is neither PO1 nor PO2, default to PO001
+          const po1 = await trx("user_master")
+            .where("user_id", "PO001")
+            .first();
+          pendingWithUserId = "PO001";
+          pendingWithName = po1?.user_full_name || "Product Owner 1";
+        }
+
+        // Generate approval flow trans ID
+        const approvalFlowId = await generateApprovalFlowId(trx);
+
+        // Create approval flow transaction entry
+        await trx("approval_flow_trans").insert({
+          approval_flow_trans_id: approvalFlowId,
+          approval_config_id: approvalConfig.approval_config_id,
+          approval_type_id: "AT003", // Driver User
+          user_id_reference_id: driverAdminUserId,
+          s_status: "PENDING",
+          approver_level: 1,
+          pending_with_role_id: "RL001", // Product Owner role
+          pending_with_user_id: pendingWithUserId,
+          pending_with_name: pendingWithName,
+          created_by_user_id: creatorUserId,
+          created_by_name: creatorName,
+          created_by: creatorUserId,
+          updated_by: creatorUserId,
+          created_at: currentTimestamp,
+          updated_at: currentTimestamp,
+          created_on: currentTimestamp,
+          updated_on: currentTimestamp,
+          status: "ACTIVE",
+        });
+
+        console.log(
+          `  ✅ Created approval workflow: ${approvalFlowId} for ${driverAdminUserId}`
+        );
+        console.log(
+          `  📧 Pending with: ${pendingWithName} (${pendingWithUserId})`
+        );
+      } else {
+        console.log(
+          `  ✅ Approval flow already exists: ${existingApprovalFlow.approval_flow_trans_id}`
+        );
       }
 
       await trx.commit();

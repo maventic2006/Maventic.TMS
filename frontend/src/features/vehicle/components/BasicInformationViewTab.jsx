@@ -1,13 +1,11 @@
-﻿import React from "react";
+import React from "react";
 import {
   Truck,
-  Calendar,
-  Hash,
-  User,
+  Settings,
   MapPin,
   FileText,
-  Settings,
   Flag,
+  Calendar,
 } from "lucide-react";
 import VehicleStatusPill from "../../../components/vehicle/VehicleStatusPill";
 import { formatDate } from "../../../utils/helpers";
@@ -32,13 +30,21 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
     );
   }
 
+  // Get the basic information from the vehicle data
+  // The transformed vehicle data is flattened, so we access properties directly from vehicle
+  const basicInfo = vehicle || {};
+
+  const formatDateLocal = (dateStr) => {
+    if (!dateStr) return "N/A";
+    try {
+      return new Date(dateStr).toLocaleDateString();
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Status Badge */}
-      {/* <div className="flex items-center justify-between pb-4 border-b border-[#E5E7EB]">
-        <h3 className="text-lg font-bold text-[#0D1A33]">Basic Vehicle Information</h3>
-      </div> */}
-
       {/* Vehicle Identification - 3 Column Grid */}
       <div className="bg-white rounded-lg border border-[#E5E7EB] p-6">
         <div className="flex items-center gap-2 mb-5 pb-3 border-b border-[#E5E7EB]">
@@ -49,68 +55,18 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
           <VehicleStatusPill status={vehicle.status} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-          <InfoField label="Vehicle ID" value={vehicle.vehicleId} />
           <InfoField
             label="Registration Number"
-            value={vehicle.registrationNumber}
+            value={basicInfo.registrationNumber}
           />
-          <InfoField label="Vehicle Type" value={vehicle.vehicleType} />
-          <InfoField label="Make/Brand" value={vehicle.make} />
-          <InfoField label="Model" value={vehicle.model} />
-          <InfoField label="Manufacturing Year" value={vehicle.year} />
-          <InfoField label="VIN (Chassis No.)" value={vehicle.chassisNumber} />
-          <InfoField label="Engine Number" value={vehicle.engineNumber} />
-          <InfoField label="Color" value={vehicle.color} />
-        </div>
-      </div>
-
-      {/* Registration Details - 3 Column Grid */}
-      <div className="bg-white rounded-lg border border-[#E5E7EB] p-6">
-        <div className="flex items-center gap-2 mb-5 pb-3 border-b border-[#E5E7EB]">
-          <FileText className="h-5 w-5 text-[#6366F1]" />
-          <h4 className="text-sm font-bold text-[#0D1A33] uppercase tracking-wide">
-            Registration Details
-          </h4>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-          <InfoField
-            label="Registration State"
-            value={vehicle.registrationState}
-          />
-          <InfoField
-            label="Registration Date"
-            value={formatDate(vehicle.registrationDate)}
-          />
-          <InfoField label="RC Book Number" value={vehicle.rcBookNumber} />
-          <InfoField
-            label="RC Expiry Date"
-            value={formatDate(vehicle.rcExpiryDate)}
-          />
-          <InfoField
-            label="Insurance Policy No."
-            value={vehicle.insurancePolicyNumber}
-          />
-          <InfoField
-            label="Insurance Expiry"
-            value={formatDate(vehicle.insuranceExpiryDate)}
-          />
-        </div>
-      </div>
-
-      {/* Technical Specifications - 3 Column Grid */}
-      <div className="bg-white rounded-lg border border-[#E5E7EB] p-6">
-        <div className="flex items-center gap-2 mb-5 pb-3 border-b border-[#E5E7EB]">
-          <Settings className="h-5 w-5 text-[#6366F1]" />
-          <h4 className="text-sm font-bold text-[#0D1A33] uppercase tracking-wide">
-            Technical Specifications
-          </h4>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-          <InfoField label="Fuel Type" value={vehicle.fuelType} />
-          <InfoField label="Transmission" value={vehicle.transmission} />
-          <InfoField label="Fuel Capacity (L)" value={vehicle.fuelCapacity} />
-          <InfoField label="Mileage (km/l)" value={vehicle.mileage} />
-          <InfoField label="Seating Capacity" value={vehicle.seatingCapacity} />
+          <InfoField label="VIN (Chassis No.)" value={basicInfo.vin} />
+          <InfoField label="Vehicle Type" value={basicInfo.vehicleTypeDescription || basicInfo.vehicleType} />
+          <InfoField label="Make/Brand" value={basicInfo.make} />
+          <InfoField label="Model" value={basicInfo.model} />
+          <InfoField label="Manufacturing Year" value={basicInfo.year} />
+          <InfoField label="Vehicle Category" value={basicInfo.vehicleCategory} />
+          <InfoField label="Manufacturing Month & Year" value={basicInfo.manufacturingMonthYear} />
+          <InfoField label="Color" value={basicInfo.color} />
         </div>
       </div>
 
@@ -123,21 +79,24 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
           </h4>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-          <InfoField
-            label="Current Odometer (km)"
-            value={vehicle.currentOdometer}
+          <InfoField label="Usage Type" value={basicInfo.usageType} />
+          <InfoField label="Mileage" value={`${basicInfo.mileage || 0} km/l`} />
+          <InfoField label="Current Driver" value={basicInfo.currentDriver} />
+          <InfoField label="Transporter ID" value={basicInfo.transporterId} />
+          <InfoField label="Transporter Name" value={basicInfo.transporterName} />
+          <InfoField 
+            label="Leasing Flag" 
+            value={basicInfo.leasingFlag ? "Yes" : "No"} 
           />
-          <InfoField label="Average KM/Day" value={vehicle.averageKmPerDay} />
-          <InfoField
-            label="Last Service Date"
-            value={formatDate(vehicle.lastServiceDate)}
+          <InfoField label="Leased From" value={basicInfo.leasedFrom} />
+          <InfoField 
+            label="Lease Start Date" 
+            value={formatDateLocal(basicInfo.leaseStartDate)} 
           />
-          <InfoField
-            label="Next Service Due (km)"
-            value={formatDate(vehicle.nextServiceDue)}
+          <InfoField 
+            label="Lease End Date" 
+            value={formatDateLocal(basicInfo.leaseEndDate)} 
           />
-          <InfoField label="Current Driver" value={vehicle.currentDriver} />
-          <InfoField label="Current Location" value={vehicle.currentLocation} />
         </div>
       </div>
 
@@ -150,19 +109,52 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
           </h4>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+          <InfoField label="GPS IMEI Number" value={basicInfo.gpsIMEI} />
           <InfoField
             label="GPS Enabled"
-            value={vehicle.gpsEnabled ? "Yes" : "No"}
+            value={basicInfo.gpsEnabled || basicInfo.gpsActive ? "Yes" : "No"}
           />
-          <InfoField label="GPS Device ID" value={vehicle.gpsDeviceId} />
-          <InfoField label="GPS Provider" value={vehicle.gpsProvider} />
-          <InfoField label="IMEI Number" value={vehicle.imeiNumber} />
-          <InfoField label="SIM Number" value={vehicle.simNumber} />
-          <InfoField label="Last GPS Update" value={vehicle.lastGpsUpdate} />
+          <InfoField label="GPS Provider" value={basicInfo.gpsProvider} />
         </div>
       </div>
 
-      {/* Audit Information - 3 Column Grid */}
+      {/* Registration & Location - 3 Column Grid */}
+      <div className="bg-white rounded-lg border border-[#E5E7EB] p-6">
+        <div className="flex items-center gap-2 mb-5 pb-3 border-b border-[#E5E7EB]">
+          <FileText className="h-5 w-5 text-[#6366F1]" />
+          <h4 className="text-sm font-bold text-[#0D1A33] uppercase tracking-wide">
+            Registration & Location
+          </h4>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+          <InfoField
+            label="Vehicle Registered at Country"
+            value={basicInfo.vehicleRegisteredAtCountry}
+          />
+          <InfoField
+            label="Vehicle Registered at State"
+            value={basicInfo.vehicleRegisteredAtState}
+          />
+          <InfoField 
+            label="Safety Inspection Date" 
+            value={formatDateLocal(basicInfo.safetyInspectionDate)} 
+          />
+          <InfoField 
+            label="Avg Running Speed (km/h)" 
+            value={basicInfo.avgRunningSpeed} 
+          />
+          <InfoField 
+            label="Max Running Speed (km/h)" 
+            value={basicInfo.maxRunningSpeed} 
+          />
+          <InfoField 
+            label="Taxes and Fees" 
+            value={basicInfo.taxesAndFees ? `₹${basicInfo.taxesAndFees}` : "N/A"} 
+          />
+        </div>
+      </div>
+
+      {/* System Information - 3 Column Grid */}
       <div className="bg-white rounded-lg border border-[#E5E7EB] p-6">
         <div className="flex items-center gap-2 mb-5 pb-3 border-b border-[#E5E7EB]">
           <Calendar className="h-5 w-5 text-[#6366F1]" />
@@ -173,14 +165,13 @@ const BasicInformationViewTab = ({ vehicle, isEditMode }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
           <InfoField
             label="Created Date"
-            value={formatDate(vehicle.createdAt)}
+            value={formatDateLocal(vehicle.createdAt)}
           />
           <InfoField label="Created By" value={vehicle.createdBy} />
           <InfoField
             label="Last Updated"
-            value={formatDate(vehicle.updatedAt)}
+            value={formatDateLocal(vehicle.updatedAt)}
           />
-          <InfoField label="Updated By" value={vehicle.updatedBy} />
           <InfoField label="Status" value={vehicle.status} />
           <InfoField
             label="Blacklist Status"

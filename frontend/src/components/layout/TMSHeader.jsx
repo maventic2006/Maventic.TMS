@@ -335,9 +335,12 @@ const TMSHeader = ({ theme }) => {
     }
 
     // Transporter Config navigation
+    // Transporter Config navigation (Dropdown)
     else if (item.title === "Transporter Vehicle Configured Data") {
-      const targetPath = "/configuration/transporter-vehicle-config";
-      console.log("🚛 Transporter Config - Vehicle Configured Data");
+      const targetPath = "/transporter-configuration/tv-config-data";
+      console.log(
+        "🚛 Transporter Config - Transporter Vehicle Configured Data"
+      );
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);
@@ -531,9 +534,12 @@ const TMSHeader = ({ theme }) => {
     }
 
     // Transporter Config navigation
+    // Transporter Config navigation (Sidebar)
     else if (item.title === "Transporter Vehicle Configured Data") {
-      const targetPath = "/transporter-configuration/vehicle-config";
-      console.log("🚚 Transporter Config - Vehicle Configured Data");
+      const targetPath = "/transporter-configuration/tv-config-data";
+      console.log(
+        "🚚 Transporter Config - Transporter Vehicle Configured Data"
+      );
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);
       console.log("✅ Navigation command executed for:", targetPath);

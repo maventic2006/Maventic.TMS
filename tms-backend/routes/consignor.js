@@ -31,6 +31,10 @@ const upload = multer({
   storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max file size
+    fieldSize: 50 * 1024 * 1024, // 50MB max field value size (for large JSON payloads)
+    fieldNameSize: 200, // Max field name size
+    fields: 50, // Max number of non-file fields
+    files: 20, // Max number of file fields
   },
   fileFilter: (req, file, cb) => {
     // Allowed file types
@@ -58,30 +62,32 @@ const upload = multer({
   },
 });
 
-// Middleware to check if user is product owner (admin/owner role)
-const checkProductOwnerAccess = (req, res, next) => {
+// Middleware to check if user has consignor access (product owner or consignor admin)
+const checkConsignorAccess = (req, res, next) => {
   const userType = req.user?.user_type_id;
   const userId = req.user?.user_id;
 
-  console.log("\n🔒 ===== PRODUCT OWNER ACCESS CHECK =====");
+  console.log("\n🔒 ===== CONSIGNOR ACCESS CHECK =====");
   console.log("👤 User ID:", userId);
   console.log("🏷️  User Type:", userType);
-  console.log("✅ Required Type: UT001 (Product Owner)");
+  console.log("✅ Allowed Types: UT001 (Product Owner), UT006 (Consignor Admin)");
 
-  // UT001 is Owner (product owner)
-  if (userType !== "UT001") {
-    console.log("❌ ACCESS DENIED - User is not a Product Owner");
+  // UT001 is Product Owner, UT006 is Consignor Admin - both can access consignor resources
+  const allowedTypes = ["UT001", "UT006"];
+  
+  if (!allowedTypes.includes(userType)) {
+    console.log("❌ ACCESS DENIED - User is not authorized for consignor resources");
     console.log("🔒 ===== ACCESS CHECK FAILED =====\n");
     return res.status(403).json({
       success: false,
       error: {
         code: "ACCESS_DENIED",
-        message: "Only product owners can access this resource",
+        message: "Only product owners and consignor admins can access this resource",
       },
     });
   }
 
-  console.log("✅ ACCESS GRANTED - User is Product Owner");
+  console.log(`✅ ACCESS GRANTED - User has ${userType === "UT001" ? "Product Owner" : "Consignor Admin"} access`);
   console.log("🔒 ===== ACCESS CHECK PASSED =====\n");
   next();
 };
@@ -107,7 +113,7 @@ const checkProductOwnerAccess = (req, res, next) => {
 router.get(
   "/master-data",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   getMasterData
 );
 
@@ -127,7 +133,7 @@ router.get(
 router.post(
   "/save-draft",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   upload.any(),
   saveConsignorAsDraft
 );
@@ -142,7 +148,7 @@ router.post(
 router.put(
   "/:id/update-draft",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   upload.any(),
   updateConsignorDraft
 );
@@ -157,7 +163,7 @@ router.put(
 router.put(
   "/:id/submit-draft",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   upload.any(),
   submitConsignorFromDraft
 );
@@ -172,20 +178,20 @@ router.put(
 router.delete(
   "/:id/delete-draft",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   deleteConsignorDraft
 );
 
 // 2️⃣ List all consignors route (with pagination, filters, search)
 // GET /api/consignors
-router.get("/", authenticateToken, checkProductOwnerAccess, getConsignors);
+router.get("/", authenticateToken, checkConsignorAccess, getConsignors);
 
 // 3️⃣ CREATE NEW CONSIGNOR (with file upload support)
 // POST /api/consignors
 router.post(
   "/",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   upload.any(), // Accept multiple files with any field names
   createConsignor
 );
@@ -195,7 +201,7 @@ router.post(
 router.get(
   "/:id",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   getConsignorById
 );
 
@@ -204,7 +210,7 @@ router.get(
 router.put(
   "/:id",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   upload.any(), // Accept multiple files with any field names
   updateConsignor
 );
@@ -214,7 +220,7 @@ router.put(
 router.delete(
   "/:id",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   deleteConsignor
 );
 
@@ -227,7 +233,7 @@ router.delete(
 router.get(
   "/:customerId/documents/:documentId/download",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   downloadDocument
 );
 
@@ -236,7 +242,7 @@ router.get(
 router.get(
   "/:customerId/contacts/:contactId/photo",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   downloadContactPhoto
 );
 
@@ -246,7 +252,7 @@ router.get(
 router.get(
   "/:customerId/general/:fileType/download",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   downloadGeneralDocument
 );
 
@@ -255,7 +261,7 @@ router.get(
 router.get(
   "/:customerId/warehouses",
   authenticateToken,
-  checkProductOwnerAccess,
+  checkConsignorAccess,
   getConsignorWarehouses
 );
 

@@ -892,7 +892,9 @@ const DriverCreatePage = () => {
   } = useSelector((state) => state.driver);
 
   const [activeTab, setActiveTab] = useState(0);
-  const [formData, setFormData] = useState({
+
+  // Create initial form data ONCE and reuse for both state and dirty tracking
+  const [initialFormState] = useState({
     basicInfo: {
       fullName: "",
       dateOfBirth: "",
@@ -916,36 +918,12 @@ const DriverCreatePage = () => {
         addressTypeId: "",
       },
     ],
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        issuingCountry: "",
-        issuingState: "",
-        validFrom: "",
-        validTo: "",
-        status: true,
-        // Note: File uploads will be handled separately via document_upload table
-      },
-    ],
-    history: [
-      {
-        employer: "",
-        employmentStatus: "",
-        fromDate: "",
-        toDate: "",
-        jobTitle: "",
-      },
-    ],
-    accidents: [
-      {
-        type: "",
-        date: "",
-        description: "",
-        vehicleRegistrationNumber: "",
-      },
-    ],
+    documents: [], // Start with empty - mandatory docs will be added by DocumentsTab
+    history: [], // Optional - start with empty array
+    accidents: [], // Optional - start with empty array
   });
+
+  const [formData, setFormData] = useState(initialFormState);
 
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
@@ -960,60 +938,8 @@ const DriverCreatePage = () => {
   // DRAFT MANAGEMENT HOOKS
   // ============================================
 
-  // Initial form data for dirty tracking
-  const initialFormData = {
-    basicInfo: {
-      fullName: "",
-      dateOfBirth: "",
-      gender: "",
-      bloodGroup: "",
-      phoneNumber: "",
-      emailId: "",
-      emergencyContact: "",
-      alternatePhoneNumber: "",
-    },
-    addresses: [
-      {
-        country: "",
-        state: "",
-        city: "",
-        district: "",
-        street1: "",
-        street2: "",
-        postalCode: "",
-        isPrimary: true,
-        addressTypeId: "",
-      },
-    ],
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        issuingCountry: "",
-        issuingState: "",
-        validFrom: "",
-        validTo: "",
-        status: true,
-      },
-    ],
-    history: [
-      {
-        employer: "",
-        employmentStatus: "",
-        fromDate: "",
-        toDate: "",
-        jobTitle: "",
-      },
-    ],
-    accidents: [
-      {
-        type: "",
-        date: "",
-        description: "",
-        vehicleRegistrationNumber: "",
-      },
-    ],
-  };
+  // Use the same object reference for dirty tracking to prevent false positives
+  const initialFormData = initialFormState;
 
   // Form dirty tracking - Pass INITIAL form data (empty baseline) to the hook
   const { isDirty, setCurrentData, resetDirty } =
@@ -1023,6 +949,23 @@ const DriverCreatePage = () => {
   useEffect(() => {
     setCurrentData(formData);
   }, [formData, setCurrentData]);
+
+  // Reset dirty state after mandatory documents are auto-populated
+  // This ensures that pre-filled mandatory documents don't trigger dirty state
+  useEffect(() => {
+    // Check if documents have been populated (non-empty documents array)
+    if (formData.documents && formData.documents.length > 0) {
+      // Check if these are mandatory documents (have isMandatory flag)
+      const hasMandatoryDocs = formData.documents.some(
+        (doc) => doc.isMandatory
+      );
+
+      // If we have mandatory docs and form was just initialized, reset dirty state
+      if (hasMandatoryDocs && formData.basicInfo.fullName === "") {
+        resetDirty(formData);
+      }
+    }
+  }, [formData.documents.length]); // Only run when documents array length changes
 
   // Save as draft hook
   const {
@@ -1410,6 +1353,18 @@ const DriverCreatePage = () => {
   };
 
   const handleSaveAsDraft = async () => {
+    // ✅ Check if form has any changes before saving
+    if (!isDirty) {
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "No changes to save",
+          duration: 3000,
+        })
+      );
+      return;
+    }
+
     // Clear previous errors
     setValidationErrors({});
     setTabErrors({
@@ -1530,7 +1485,7 @@ const DriverCreatePage = () => {
 
             <button
               onClick={handleSaveAsDraft}
-              disabled={isCreating || isSavingDraft}
+              disabled={isCreating || isSavingDraft || !isDirty}
               className="group inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-xl font-medium text-sm hover:bg-white/20 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isSavingDraft ? (

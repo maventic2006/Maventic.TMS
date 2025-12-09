@@ -32,6 +32,7 @@ import {
 
 import { getComponentTheme } from "../utils/theme";
 import { TOAST_TYPES } from "../utils/constants";
+import { formatDateForInput } from "../utils/helpers";
 import EmptyState from "../components/ui/EmptyState";
 
 // Import warehouse approval component
@@ -49,14 +50,24 @@ import AddressEditTab from "../features/warehouse/components/AddressTab";
 import DocumentsEditTab from "../features/warehouse/components/DocumentsTab";
 import GeofencingEditTab from "../features/warehouse/components/GeofencingTab";
 
+// Import submit draft modal
+import SubmitDraftModal from "../components/ui/SubmitDraftModal";
+
 const WarehouseDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const { user, role } = useSelector((state) => state.auth);
-  const { warehouses, currentWarehouse, masterData, loading, error } =
-    useSelector((state) => state.warehouse);
+  const {
+    warehouses,
+    currentWarehouse,
+    masterData,
+    loading,
+    error,
+    isUpdatingDraft,
+    isSubmittingDraft,
+  } = useSelector((state) => state.warehouse);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -69,6 +80,7 @@ const WarehouseDetails = () => {
     3: false, // Geofencing
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false); // ✅ Add modal state
 
   const actionButtonTheme = getComponentTheme("actionButton");
   const tabButtonTheme = getComponentTheme("tabButton");
@@ -84,13 +96,13 @@ const WarehouseDetails = () => {
         ? warehouseData.address[0]
         : warehouseData.address || {};
 
-    // Transform documents to edit format
+    // Transform documents to edit format with date formatting
     const transformedDocuments = (warehouseData.documents || []).map((doc) => ({
       documentUniqueId: doc.documentUniqueId || "", // ✅ PRESERVE document ID for updates
       documentType: doc.documentTypeId || doc.documentType || "",
       documentNumber: doc.documentNumber || "",
-      validFrom: doc.validFrom || "",
-      validTo: doc.validTo || "",
+      validFrom: formatDateForInput(doc.validFrom) || "", // ✅ Format date for input
+      validTo: formatDateForInput(doc.validTo) || "", // ✅ Format date for input
       fileName: doc.fileName || "",
       fileType: doc.fileType || "",
       fileData: doc.fileData || "",
@@ -99,6 +111,7 @@ const WarehouseDetails = () => {
 
     return {
       generalDetails: {
+        consignorId: warehouseData.consignor_id || "", // ✅ ADDED: Include consignor ID
         warehouseName: warehouseData.warehouse_name1 || "",
         warehouseName2: warehouseData.warehouse_name2 || "",
         warehouseType: warehouseData.warehouse_type || "",
@@ -126,8 +139,6 @@ const WarehouseDetails = () => {
         street2: address.street_2 || address.street2 || "",
         postalCode: address.postal_code || address.postalCode || "",
         vatNumber: address.vat_number || address.vatNumber || "",
-        tinPan: address.tin_pan || address.tinPan || "",
-        tan: address.tan || "",
       },
       documents: transformedDocuments,
       geofencing: warehouseData.geofencing || warehouseData.subLocations || [],
@@ -160,7 +171,12 @@ const WarehouseDetails = () => {
         editData.generalDetails?.gateOutChecklistAuth || false,
       gatepass_system_available:
         editData.generalDetails?.gatepassSystem || false,
-      consignor_id: currentWarehouse?.consignor_id || user?.consignor_id || "",
+      // ✅ FIXED: Use consignorId from editData if available (preserved from transform)
+      consignor_id:
+        editData.generalDetails?.consignorId ||
+        currentWarehouse?.consignor_id ||
+        user?.consignor_id ||
+        "",
       address: editData.address
         ? {
             address_type_id: editData.address.addressType || "",
@@ -172,8 +188,6 @@ const WarehouseDetails = () => {
             street_2: editData.address.street2 || "",
             postal_code: editData.address.postalCode || "",
             vat_number: editData.address.vatNumber || "",
-            tin_pan: editData.address.tinPan || "",
-            tan: editData.address.tan || "",
           }
         : {},
       documents: editData.documents || [],
@@ -224,13 +238,21 @@ const WarehouseDetails = () => {
     dispatch(fetchMasterData());
   }, [dispatch]);
 
-  // Set edit form data when warehouse data is loaded
+  // ✅ Clear editFormData when warehouse ID changes (prevents stale data)
   useEffect(() => {
-    if (currentWarehouse && !editFormData) {
-      // Transform flat backend structure to nested frontend structure
+    setEditFormData(null);
+    setIsEditMode(false);
+    setHasUnsavedChanges(false);
+    setValidationErrors({});
+  }, [id]);
+
+  // ✅ Set edit form data when warehouse data is loaded or warehouse ID changes
+  useEffect(() => {
+    if (currentWarehouse) {
+      // Always re-transform when currentWarehouse changes (different warehouse_id or fresh data)
       setEditFormData(transformToEditFormat(currentWarehouse));
     }
-  }, [currentWarehouse, editFormData]);
+  }, [currentWarehouse?.warehouse_id, currentWarehouse]);
 
   // Refresh data function for error recovery
   const handleRefreshData = () => {
@@ -239,6 +261,110 @@ const WarehouseDetails = () => {
       dispatch(fetchMasterData());
     }
   };
+
+  // Check if warehouse is a draft
+  const isDraftWarehouse = currentWarehouse?.status === "SAVE_AS_DRAFT";
+
+  // Check if current user is the creator of this warehouse
+  // Use String() to ensure type consistency in comparison
+  // Backend returns created_by (snake_case), not createdBy (camelCase)
+  const isCreator =
+    currentWarehouse?.created_by &&
+    user?.user_id &&
+    String(currentWarehouse.created_by) === String(user.user_id);
+
+  // Check if current user is an approver
+  // Check both role and user_type_id for Product Owner detection
+  const isApprover =
+    user?.role === "Product Owner" ||
+    user?.role === "admin" ||
+    user?.user_type_id === "UT001"; // UT001 is Owner/Product Owner
+
+  // 🔍 DEBUG: Log creator and approver checks
+  console.log("🔍 EDIT BUTTON DEBUG - WAREHOUSE:");
+  console.log("  Current User ID:", user?.user_id, typeof user?.user_id);
+  console.log("  Current User Role:", user?.role);
+  console.log("  Current User Type ID:", user?.user_type_id);
+  console.log(
+    "  Warehouse Created By:",
+    currentWarehouse?.created_by,
+    typeof currentWarehouse?.created_by
+  );
+  console.log(
+    "  String Comparison:",
+    String(currentWarehouse?.created_by),
+    "===",
+    String(user?.user_id)
+  );
+  console.log("  Is Creator:", isCreator);
+  console.log("  Is Approver:", isApprover, "(role-based or UT001)");
+  console.log("  Is Draft:", isDraftWarehouse);
+  console.log("  Status:", currentWarehouse?.status);
+
+  // ✅ PERMISSION LOGIC - Rejection/Resubmission Workflow
+  // Determine if user can edit based on entity status and user role
+  const canEdit = React.useMemo(() => {
+    const status = currentWarehouse?.status;
+
+    console.log("🔍 CANEDIT CALCULATION - WAREHOUSE:");
+    console.log("  Status:", status);
+    console.log("  isDraftWarehouse:", isDraftWarehouse);
+    console.log("  isCreator:", isCreator);
+    console.log("  isApprover:", isApprover);
+
+    // DRAFT: Only creator can edit
+    if (isDraftWarehouse) {
+      console.log("  Result: DRAFT - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // INACTIVE (rejected): Only creator can edit
+    if (status === "INACTIVE") {
+      console.log("  Result: INACTIVE - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // PENDING: No one can edit (locked during approval)
+    if (status === "PENDING") {
+      console.log("  Result: PENDING - returning false");
+      return false;
+    }
+
+    // ACTIVE: Only approvers can edit
+    if (status === "ACTIVE") {
+      console.log("  Result: ACTIVE - returning isApprover:", isApprover);
+      return isApprover;
+    }
+
+    // Default: Allow edit
+    console.log("  Result: DEFAULT - returning true");
+    return true;
+  }, [currentWarehouse?.status, isCreator, isApprover, isDraftWarehouse]);
+
+  console.log("🔍 FINAL CANEDIT VALUE - WAREHOUSE:", canEdit);
+
+  // Debug logging for approval data
+  useEffect(() => {
+    if (currentWarehouse) {
+      console.log("🔍 WarehouseDetails - Warehouse Data Loaded:");
+      console.log("  Warehouse ID:", currentWarehouse.warehouseId);
+      console.log("  Status:", currentWarehouse.status);
+      console.log(
+        "  User Approval Status:",
+        currentWarehouse.userApprovalStatus
+      );
+      console.log(
+        "  ✅ Remarks Available:",
+        currentWarehouse.userApprovalStatus?.remarks ? "YES" : "NO"
+      );
+      console.log(
+        "  Remarks Content:",
+        currentWarehouse.userApprovalStatus?.remarks
+      );
+      console.log("  Current User:", user);
+      console.log("  Full currentWarehouse object:", currentWarehouse);
+    }
+  }, [currentWarehouse, user]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -317,6 +443,167 @@ const WarehouseDetails = () => {
   };
 
   const handleSaveChanges = async () => {
+    // ✅ If this is a draft warehouse, show the submit modal
+    const isDraft = currentWarehouse?.status === "SAVE_AS_DRAFT";
+
+    if (isDraft) {
+      setShowSubmitModal(true);
+      return;
+    }
+
+    // For non-draft warehouses, proceed with normal update
+    await handleNormalUpdate();
+  };
+
+  // ✅ Handle update draft (minimal validation)
+  const handleUpdateDraft = async () => {
+    setShowSubmitModal(false);
+
+    try {
+      // Minimal validation - only warehouse name required
+      if (
+        !editFormData?.generalDetails?.warehouseName ||
+        editFormData.generalDetails.warehouseName.trim().length < 2
+      ) {
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "Warehouse name is required (minimum 2 characters)",
+          })
+        );
+        return;
+      }
+
+      // Clear previous errors
+      dispatch(clearError());
+
+      // Transform nested frontend structure to flat backend structure
+      const backendData = transformToBackendFormat(editFormData);
+
+      // Update draft without validation
+      const result = await dispatch(
+        updateWarehouseDraft({
+          warehouseId: id,
+          warehouseData: backendData,
+        })
+      ).unwrap();
+
+      // Success
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Warehouse draft updated successfully!",
+        })
+      );
+
+      // Refresh the warehouse data
+      await dispatch(fetchWarehouseById(id));
+
+      // Switch to view mode
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
+    } catch (err) {
+      console.error("Error updating draft:", err);
+
+      // Clear Redux error state
+      dispatch(clearError());
+
+      // Show error toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: err.message || "Failed to update draft. Please try again.",
+        })
+      );
+    }
+  };
+
+  // ✅ Handle submit for approval (full validation)
+  const handleSubmitForApprovalFromModal = async () => {
+    setShowSubmitModal(false);
+
+    try {
+      // Clear previous errors
+      dispatch(clearError());
+
+      // Transform nested frontend structure to flat backend structure
+      const backendData = transformToBackendFormat(editFormData);
+
+      // Submit for approval (will perform full validation)
+      const result = await dispatch(
+        submitWarehouseFromDraft({
+          warehouseId: id,
+          warehouseData: backendData,
+        })
+      ).unwrap();
+
+      // Success
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: "Warehouse submitted for approval successfully!",
+        })
+      );
+
+      // Refresh the warehouse data
+      await dispatch(fetchWarehouseById(id));
+
+      // Switch to view mode
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setValidationErrors({});
+    } catch (err) {
+      console.error("Error submitting warehouse for approval:", err);
+
+      // Clear Redux error state
+      dispatch(clearError());
+
+      // Check if it's a validation error
+      if (
+        err.code === "VALIDATION_ERROR" ||
+        err.message?.includes("required") ||
+        err.message?.includes("validation")
+      ) {
+        // Build user-friendly error message
+        let errorMessage = err.message || "Validation failed";
+
+        // If there's a field specified, make it more specific
+        if (err.field) {
+          errorMessage = `${err.message}`;
+
+          // If there's expected format info, add it
+          if (err.expectedFormat) {
+            errorMessage += ` (Expected format: ${err.expectedFormat})`;
+          }
+        }
+
+        // Show validation error
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: errorMessage,
+          })
+        );
+
+        // Stay in edit mode to allow user to fix errors
+        return;
+      }
+
+      // Other errors
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message:
+            err.message ||
+            "Failed to submit warehouse for approval. Please try again.",
+        })
+      );
+    }
+  };
+
+  // ✅ Handle normal update for non-draft warehouses
+  const handleNormalUpdate = async () => {
     try {
       // Clear previous errors
       setValidationErrors({});
@@ -414,8 +701,24 @@ const WarehouseDetails = () => {
       });
       dispatch(clearError());
 
+      // ✅ RESUBMISSION LOGIC - If entity is INACTIVE (rejected), change status to PENDING
+      const isResubmission = currentWarehouse?.status === "INACTIVE";
+
       // Transform nested frontend structure to flat backend structure
-      const backendData = transformToBackendFormat(editFormData);
+      let backendData = transformToBackendFormat(editFormData);
+
+      // If resubmitting, update the status to PENDING to restart approval workflow
+      if (isResubmission) {
+        backendData = {
+          ...backendData,
+          status: "PENDING", // Restart approval workflow
+        };
+      }
+
+      console.log("🔍 RESUBMISSION CHECK - WAREHOUSE:");
+      console.log("  Current Status:", currentWarehouse?.status);
+      console.log("  Is Resubmission:", isResubmission);
+      console.log("  Final Status:", backendData?.status);
 
       // Call appropriate update API based on status
       let result;
@@ -441,7 +744,9 @@ const WarehouseDetails = () => {
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: isDraft
+          message: isResubmission
+            ? "Warehouse resubmitted for approval successfully! Status changed to PENDING."
+            : isDraft
             ? "Warehouse draft updated successfully!"
             : "Warehouse updated successfully!",
         })
@@ -461,9 +766,10 @@ const WarehouseDetails = () => {
       dispatch(clearError());
 
       // Check if it's a validation error from backend (400 Bad Request)
+      // Backend returns: { success: false, error: { code, message, field } }
       if (
-        err.code === "VALIDATION_ERROR" ||
-        err.message?.includes("required")
+        err.error?.code === "VALIDATION_ERROR" ||
+        err.error?.message?.includes("required")
       ) {
         // Backend validation error - show inline errors and stay in edit mode
 
@@ -471,36 +777,64 @@ const WarehouseDetails = () => {
         let tabWithError = null;
         const backendErrors = {};
 
-        if (err.field) {
-          // Parse field path like "warehouse_name1"
-          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+        if (err.error?.field) {
+          // Map field name to tab index
+          const fieldName = err.error.field;
 
-          if (fieldMatch) {
-            const [, section, index, field] = fieldMatch;
+          // Field to tab mapping (based on which tab contains the field)
+          const fieldToTabMapping = {
+            // General Details Tab (0)
+            warehouseName: 0,
+            warehouse_name1: 0,
+            warehouse_name2: 0,
+            warehouseType: 0,
+            warehouse_type: 0,
+            materialType: 0,
+            material_type_id: 0,
+            // Address Tab (1)
+            vatNumber: 1,
+            vat_number: 1,
+            gstNumber: 1,
+            addressLine1: 1,
+            address_line1: 1,
+            addressLine2: 1,
+            address_line2: 1,
+            city: 1,
+            state: 1,
+            country: 1,
+            pincode: 1,
+            region: 1,
+            zone: 1,
+            // Documents Tab (2)
+            documentType: 2,
+            documentNumber: 2,
+            // Geofencing Tab (3)
+            latitude: 3,
+            longitude: 3,
+            radius: 3,
+          };
 
-            // Map section to tab index
-            const tabMapping = {
-              general: 0,
-              facilities: 1,
-              address: 2,
-              documents: 3,
-            };
+          // Determine which tab the error belongs to
+          tabWithError = fieldToTabMapping[fieldName] ?? 0;
 
-            tabWithError = tabMapping[section] || 0;
+          // Store error in validation errors object
+          if (!backendErrors.address) backendErrors.address = {};
 
-            if (index !== undefined) {
-              // Array field error
-              if (!backendErrors[section]) backendErrors[section] = {};
-              if (!backendErrors[section][index])
-                backendErrors[section][index] = {};
-              if (field) {
-                backendErrors[section][index][field] = err.message;
-              }
-            } else if (field) {
-              // Object field error
-              if (!backendErrors[section]) backendErrors[section] = {};
-              backendErrors[section][field] = err.message;
-            }
+          // Map vatNumber errors to address section
+          if (fieldName === "vatNumber" || fieldName === "vat_number") {
+            backendErrors.address.vatNumber = err.error.message;
+          } else {
+            // For other fields, store in appropriate section
+            const section =
+              tabWithError === 0
+                ? "general"
+                : tabWithError === 1
+                ? "address"
+                : tabWithError === 2
+                ? "documents"
+                : "geofencing";
+            if (!backendErrors[section]) backendErrors[section] = {};
+            backendErrors[section][fieldName] = err.error.message;
           }
         }
 
@@ -521,12 +855,14 @@ const WarehouseDetails = () => {
           setActiveTab(tabWithError);
         }
 
-        // Show error toast
+        // Show error toast with validation details
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
             message:
-              err.message || "Please fix validation errors before saving.",
+              err.error.message ||
+              "Please fix validation errors before saving.",
+            details: err.error.expectedFormats || undefined,
           })
         );
 
@@ -539,97 +875,9 @@ const WarehouseDetails = () => {
         addToast({
           type: TOAST_TYPES.ERROR,
           message:
-            err.message || "Failed to update warehouse. Please try again.",
-        })
-      );
-    }
-  };
-
-  // Submit warehouse draft for approval
-  const handleSubmitForApproval = async () => {
-    try {
-      // Confirm submission
-      // const confirmed = window.confirm(
-      //   "Are you sure you want to submit this warehouse for approval? Full validation will be applied."
-      // );
-
-      // if (!confirmed) {
-      //   return;
-      // }
-
-      // Clear previous errors
-      dispatch(clearError());
-
-      // Transform nested frontend structure to flat backend structure
-      const backendData = transformToBackendFormat(editFormData);
-
-      // Submit for approval (will perform full validation)
-      const result = await dispatch(
-        submitWarehouseFromDraft({
-          warehouseId: id,
-          warehouseData: backendData,
-        })
-      ).unwrap();
-
-      // Success
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.SUCCESS,
-          message: "Warehouse submitted for approval successfully!",
-        })
-      );
-
-      // Refresh the warehouse data
-      await dispatch(fetchWarehouseById(id));
-
-      // Switch to view mode
-      setIsEditMode(false);
-      setHasUnsavedChanges(false);
-      setValidationErrors({});
-    } catch (err) {
-      console.error("Error submitting warehouse for approval:", err);
-
-      // Clear Redux error state
-      dispatch(clearError());
-
-      // Check if it's a validation error
-      if (
-        err.code === "VALIDATION_ERROR" ||
-        err.message?.includes("required") ||
-        err.message?.includes("validation")
-      ) {
-        // Build user-friendly error message
-        let errorMessage = err.message || "Validation failed";
-
-        // If there's a field specified, make it more specific
-        if (err.field) {
-          errorMessage = `${err.message}`;
-
-          // If there's expected format info, add it
-          if (err.expectedFormat) {
-            errorMessage += ` (Expected format: ${err.expectedFormat})`;
-          }
-        }
-
-        // Show validation error
-        dispatch(
-          addToast({
-            type: TOAST_TYPES.ERROR,
-            message: errorMessage,
-          })
-        );
-
-        // Stay in edit mode to allow user to fix errors
-        return;
-      }
-
-      // Other errors
-      dispatch(
-        addToast({
-          type: TOAST_TYPES.ERROR,
-          message:
+            err.error?.message ||
             err.message ||
-            "Failed to submit warehouse for approval. Please try again.",
+            "Failed to update warehouse. Please try again.",
         })
       );
     }
@@ -644,7 +892,7 @@ const WarehouseDetails = () => {
         return;
       }
     }
-    navigate("/warehouse");
+    navigate(-1);
   };
 
   const handleTabChange = (tabId) => {
@@ -828,6 +1076,12 @@ const WarehouseDetails = () => {
               </div>
             )}
 
+            {console.log("🔍 BUTTON RENDER CHECK - WAREHOUSE:", {
+              isEditMode,
+              canEdit,
+              showButton: !isEditMode && canEdit,
+            })}
+
             {isEditMode ? (
               <>
                 <button
@@ -838,27 +1092,7 @@ const WarehouseDetails = () => {
                   Cancel
                 </button>
 
-                {/* Show "Submit for Approval" button for drafts in edit mode */}
-                {currentWarehouse?.status === "SAVE_AS_DRAFT" && (
-                  <button
-                    onClick={handleSubmitForApproval}
-                    disabled={loading}
-                    className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white rounded-xl font-medium text-sm hover:from-[#2563EB] hover:to-[#3B82F6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                        Submit for Approval
-                      </>
-                    )}
-                  </button>
-                )}
-
+                {/* ✅ SINGLE "Save Changes" button - opens modal for drafts */}
                 <button
                   onClick={handleSaveChanges}
                   disabled={loading}
@@ -872,27 +1106,56 @@ const WarehouseDetails = () => {
                   ) : (
                     <>
                       <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                      {currentWarehouse?.status === "SAVE_AS_DRAFT"
-                        ? "Save Draft"
-                        : "Save Changes"}
+                      Save Changes
                     </>
                   )}
                 </button>
               </>
             ) : (
-              <button
-                onClick={handleEditToggle}
-                className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
-              >
-                <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                {currentWarehouse?.status === "SAVE_AS_DRAFT"
-                  ? "Edit Draft"
-                  : "Edit Details"}
-              </button>
+              !isEditMode &&
+              canEdit && (
+                <button
+                  onClick={handleEditToggle}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
+                >
+                  <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  {currentWarehouse?.status === "SAVE_AS_DRAFT"
+                    ? "Edit Draft"
+                    : "Edit Details"}
+                </button>
+              )
             )}
           </div>
         </div>
       </div>
+
+      {/* ✅ REJECTION REMARKS BANNER - Show when entity is rejected (INACTIVE) */}
+      {currentWarehouse?.status === "INACTIVE" &&
+        currentWarehouse?.userApprovalStatus?.remarks && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-6 mx-6 mt-4 rounded-lg shadow-sm">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-red-900 font-semibold text-lg mb-2 flex items-center gap-2">
+                  Rejection Remarks
+                  <span className="text-xs bg-red-100 px-2 py-1 rounded-full ml-2">
+                    Entity Rejected
+                  </span>
+                </h4>
+                <p className="text-red-800 whitespace-pre-wrap leading-relaxed">
+                  {currentWarehouse.userApprovalStatus.remarks}
+                </p>
+                {isCreator && !isEditMode && (
+                  <div className="mt-4 text-sm text-red-700 bg-red-100 p-3 rounded-md">
+                    <strong>Note:</strong> Please address the rejection remarks
+                    above and click "Edit Details" to make the necessary
+                    changes, then save to resubmit for approval.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Modern Tab Navigation with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">
@@ -1009,6 +1272,17 @@ const WarehouseDetails = () => {
           })}
         </div>
       </div>
+
+      {/* ✅ Submit Draft Modal */}
+      <SubmitDraftModal
+        isOpen={showSubmitModal}
+        onUpdateDraft={handleUpdateDraft}
+        onSubmitForApproval={handleSubmitForApprovalFromModal}
+        onCancel={() => setShowSubmitModal(false)}
+        isLoading={isUpdatingDraft || isSubmittingDraft}
+        title="Submit Changes"
+        message="Would you like to update the draft or submit it for approval?"
+      />
     </div>
   );
 };

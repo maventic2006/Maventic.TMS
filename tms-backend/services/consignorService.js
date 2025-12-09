@@ -10,6 +10,66 @@ const {
   consignorUpdateSchema,
   listQuerySchema,
 } = require("../validation/consignorValidation");
+const { uploadFile } = require("../utils/storageService");
+
+// ============================================================================
+// UTILITY FUNCTIONS FOR DATE FORMATTING
+// ============================================================================
+
+/**
+ * Convert ISO date string to MySQL date format (YYYY-MM-DD)
+ * Handles both date-only and datetime strings with timezone
+ * 
+ * @param {string} isoDateString - ISO date/datetime string (e.g., '2025-09-21T18:30:00.000Z')
+ * @returns {string|null} MySQL date format (YYYY-MM-DD) or null if invalid
+ */
+const formatDateForMySQL = (isoDateString) => {
+  if (!isoDateString || isoDateString === "") return null;
+  
+  try {
+    const date = new Date(isoDateString);
+    if (isNaN(date.getTime())) {
+      console.warn(`[Consignor Service] Invalid date string: ${isoDateString}`);
+      return null;
+    }
+
+    // Convert to MySQL date format (YYYY-MM-DD)
+    // Use UTC to maintain consistency
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+
+    const result = `${year}-${month}-${day}`;
+    console.log(`[Consignor Service] Date converted: ${isoDateString} → ${result}`);
+    return result;
+  } catch (error) {
+    console.warn(`[Consignor Service] Error formatting date ${isoDateString}:`, error.message);
+    return null;
+  }
+};
+
+/**
+ * Transform frontend field names to backend field names
+ * Handles both camelCase (frontend) and snake_case (backend) field names
+ */
+const transformDocumentFields = (documents) => {
+  if (!documents || !Array.isArray(documents)) {
+    return documents;
+  }
+
+  return documents.map((doc) => ({
+    document_unique_id: doc.document_unique_id,
+    // Accept both frontend (documentType) and backend (document_type_id) field names
+    document_type_id: doc.documentType || doc.document_type_id,
+    document_number: doc.documentNumber || doc.document_number || null,
+    // Accept both validFrom and valid_from
+    valid_from: doc.validFrom || doc.valid_from,
+    valid_to: doc.validTo || doc.valid_to || null,
+    country: doc.country || null,
+    status: doc.status !== undefined ? doc.status : true,
+    fileKey: doc.fileKey || null,
+  }));
+};
 
 /**
  * Generate unique contact ID
@@ -114,6 +174,44 @@ const isCompanyCodeUnique = async (companyCode, excludeCustomerId = null) => {
 
   const existing = await query.first();
   return !existing;
+};
+
+/**
+ * Generate suggested alternative company codes
+ */
+const generateCompanyCodeSuggestions = async (baseCode, maxSuggestions = 3) => {
+  const suggestions = [];
+  const cleanCode = baseCode.toUpperCase().trim();
+  
+  // Try adding numbers 1-9
+  for (let i = 1; i <= 9 && suggestions.length < maxSuggestions; i++) {
+    const suggestion = `${cleanCode}${i}`;
+    if (await isCompanyCodeUnique(suggestion)) {
+      suggestions.push(suggestion);
+    }
+  }
+  
+  // Try adding two-digit numbers 10-20
+  for (let i = 10; i <= 20 && suggestions.length < maxSuggestions; i++) {
+    const suggestion = `${cleanCode}${i}`;
+    if (await isCompanyCodeUnique(suggestion)) {
+      suggestions.push(suggestion);
+    }
+  }
+  
+  // Try alternative patterns if still no suggestions
+  if (suggestions.length < maxSuggestions) {
+    const patterns = ['_01', '_02', '_03', 'INC', 'LTD', 'CO'];
+    for (const pattern of patterns) {
+      if (suggestions.length >= maxSuggestions) break;
+      const suggestion = `${cleanCode}${pattern}`;
+      if (await isCompanyCodeUnique(suggestion)) {
+        suggestions.push(suggestion);
+      }
+    }
+  }
+  
+  return suggestions;
 };
 
 /**
@@ -284,7 +382,7 @@ const generateApprovalFlowId = async (trx = knex) => {
 //   }
 // };
 
-const getConsignorList = async (queryParams) => {
+const getConsignorList = async (queryParams, user = null) => {
   try {
     // Validate query parameters
     const { error, value } = listQuerySchema.validate(queryParams);
@@ -311,51 +409,116 @@ const getConsignorList = async (queryParams) => {
       createdOnEnd,
     } = value;
 
+    // Get user ID for draft filtering
+    const currentUserId = user?.user_id;
+
     // Ensure numeric paging values (safe defaults)
     const pageNum = parseInt(page, 10) || 1;
     const limitNum = parseInt(limit, 10) || 25;
     const offset = (pageNum - 1) * limitNum;
 
     // Normalize date inputs for accurate filtering
-    let dateStart = createdOnStart ? `${createdOnStart} 00:00:00` : null;
-    let dateEnd = createdOnEnd ? `${createdOnEnd} 23:59:59` : null;
+    // Fix: Use UTC timezone (T00:00:00Z format) to prevent IST offset issues
+    let dateStart = createdOnStart
+      ? createdOnStart.includes("T")
+        ? createdOnStart
+        : `${createdOnStart}T00:00:00Z`
+      : null;
+    let dateEnd = createdOnEnd
+      ? createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd}T23:59:59Z`
+      : null;
 
     // Build base query with filters
     const baseQuery = knex("consignor_basic_information");
 
-    // Apply filters
+    // Apply filters (table-qualified to avoid ambiguity with joined tables)
     if (customer_id) {
-      baseQuery.where("customer_id", "like", `%${customer_id}%`);
+      baseQuery.where(
+        "consignor_basic_information.customer_id",
+        "like",
+        `%${customer_id}%`
+      );
     }
 
     if (status) {
-      baseQuery.where("status", status);
+      if (status === "SAVE_AS_DRAFT") {
+        // 🔒 DRAFT PRIVACY: Only show drafts created by current user
+        if (currentUserId) {
+          baseQuery.where("consignor_basic_information.status", status)
+                   .where("consignor_basic_information.created_by", currentUserId);
+        } else {
+          // If no user context, exclude all drafts
+          baseQuery.where("consignor_basic_information.status", "!=", "SAVE_AS_DRAFT");
+        }
+      } else {
+        // For non-draft statuses, show all records regardless of creator
+        baseQuery.where("consignor_basic_information.status", status);
+      }
+    } else {
+      // 🔒 DEFAULT BEHAVIOR: Hide all drafts if no specific status filter is applied
+      // This ensures drafts don't appear in general lists unless explicitly requested
+      baseQuery.where(function() {
+        this.where("consignor_basic_information.status", "!=", "SAVE_AS_DRAFT")
+            .orWhere(function() {
+              this.where("consignor_basic_information.status", "SAVE_AS_DRAFT")
+                  .where("consignor_basic_information.created_by", currentUserId || "");
+            });
+      });
     }
 
     if (industry_type) {
-      baseQuery.where("industry_type", "like", `%${industry_type}%`);
+      baseQuery.where(
+        "consignor_basic_information.industry_type",
+        "like",
+        `%${industry_type}%`
+      );
     }
 
     if (currency_type) {
-      baseQuery.where("currency_type", "like", `%${currency_type}%`);
+      baseQuery.where(
+        "consignor_basic_information.currency_type",
+        "like",
+        `%${currency_type}%`
+      );
     }
 
     // Apply search (searches across customer_id, customer_name, search_term)
     if (search) {
       baseQuery.where(function () {
-        this.where("customer_id", "like", `%${search}%`)
-          .orWhere("customer_name", "like", `%${search}%`)
-          .orWhere("search_term", "like", `%${search}%`);
+        this.where(
+          "consignor_basic_information.customer_id",
+          "like",
+          `%${search}%`
+        )
+          .orWhere(
+            "consignor_basic_information.customer_name",
+            "like",
+            `%${search}%`
+          )
+          .orWhere(
+            "consignor_basic_information.search_term",
+            "like",
+            `%${search}%`
+          );
       });
     }
 
     // --- Created On Date Range Filter ---
     if (dateStart && dateEnd) {
-      baseQuery.whereBetween("created_at", [dateStart, dateEnd]);
+      baseQuery.whereBetween("consignor_basic_information.created_at", [
+        dateStart,
+        dateEnd,
+      ]);
     } else if (dateStart) {
-      baseQuery.where("created_at", ">=", dateStart);
+      baseQuery.where(
+        "consignor_basic_information.created_at",
+        ">=",
+        dateStart
+      );
     } else if (dateEnd) {
-      baseQuery.where("created_at", "<=", dateEnd);
+      baseQuery.where("consignor_basic_information.created_at", "<=", dateEnd);
     }
     // --- End date range filter ---
 
@@ -367,25 +530,63 @@ const getConsignorList = async (queryParams) => {
     // Build data query with select columns (clone again)
     const dataQuery = baseQuery
       .clone()
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            aft1.*,
+            um.consignor_id
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT 
+              user_id_reference_id,
+              MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT002'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+                AND aft1.approval_flow_unique_id = aft2.max_id
+          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
+        ) as aft`),
+        knex.raw("aft.consignor_id = consignor_basic_information.customer_id")
+      )
       .select(
-        "consignor_unique_id",
-        "customer_id",
-        "customer_name",
-        "search_term",
-        "industry_type",
-        "currency_type",
-        "payment_term",
-        "status",
-        "approved_by",
-        "approved_date",
-        "created_at",
-        "updated_at"
+        "consignor_basic_information.consignor_unique_id",
+        "consignor_basic_information.customer_id",
+        "consignor_basic_information.customer_name",
+        "consignor_basic_information.search_term",
+        "consignor_basic_information.industry_type",
+        "consignor_basic_information.currency_type",
+        "consignor_basic_information.payment_term",
+        "consignor_basic_information.status",
+        "consignor_basic_information.approved_by",
+        "consignor_basic_information.approved_date",
+        "consignor_basic_information.created_at",
+        "consignor_basic_information.updated_at",
+        "consignor_basic_information.created_by", // Add created_by for draft filtering verification
+        // Use approval flow data if available, fallback to table columns
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name, consignor_basic_information.approved_by) as approver_name"
+        ),
+        knex.raw(
+          "COALESCE(aft.approved_on, consignor_basic_information.approved_date) as approved_on"
+        ),
+        "aft.s_status as approval_status"
       );
 
-    // Apply sorting
+    // Apply sorting (table-qualified to avoid ambiguity)
     const sortColumn = sortBy || "created_at";
     const sortDirection = (sortOrder || "desc").toUpperCase();
-    dataQuery.orderBy(sortColumn, sortDirection);
+    // Qualify sortColumn if it's a basic column (not an alias like approver_name)
+    const qualifiedSortColumn = [
+      "created_at",
+      "status",
+      "customer_id",
+      "customer_name",
+    ].includes(sortColumn)
+      ? `consignor_basic_information.${sortColumn}`
+      : sortColumn;
+    dataQuery.orderBy(qualifiedSortColumn, sortDirection);
 
     // Apply pagination
     dataQuery.limit(limitNum).offset(offset);
@@ -393,9 +594,19 @@ const getConsignorList = async (queryParams) => {
     // Execute query
     const consignors = await dataQuery;
 
+    // Transform consignors to include approver fields
+    const transformedConsignors = consignors.map((consignor) => ({
+      ...consignor,
+      approver: consignor.approver_name || null,
+      approvedOn:
+        consignor.approved_on && consignor.approval_status === "Approve"
+          ? new Date(consignor.approved_on).toISOString().split("T")[0]
+          : null,
+    }));
+
     // Return with metadata
     return {
-      data: consignors,
+      data: transformedConsignors,
       meta: {
         page: pageNum,
         limit: limitNum,
@@ -633,6 +844,7 @@ const getConsignorById = async (customerId) => {
             pendingWithUserId: approvalFlow.pending_with_user_id,
             createdByUserId: approvalFlow.created_by_user_id,
             createdByName: approvalFlow.created_by_name,
+            remarks: approvalFlow.remarks || null, // ✅ FIX: Include rejection remarks
           };
 
           console.log(
@@ -671,8 +883,11 @@ const getConsignorById = async (customerId) => {
         approved_by: consignor.approved_by,
         approved_date: consignor.approved_date,
         upload_nda: consignor.upload_nda, // NDA document ID
+        nda_validity: consignor.nda_validity, // NDA validity date
         upload_msa: consignor.upload_msa, // MSA document ID
+        msa_validity: consignor.msa_validity, // MSA validity date
         status: consignor.status,
+        created_by: consignor.created_by, // Add creator field for permission checks
       },
       // Map database column names to frontend field names
       contacts: contacts.map((c) => ({
@@ -696,19 +911,39 @@ const getConsignorById = async (customerId) => {
           }
         : null,
       documents: documents.map((d) => ({
-        documentUniqueId: d.document_unique_id, // Keep unique ID for reference
-        documentType: d.document_type_id, // Frontend expects "documentType" with ID
-        documentTypeName: d.document_type, // Document name from master table
-        documentNumber: d.document_number,
+        // ✅ PRIMARY IDENTIFIERS
+        document_unique_id: d.document_unique_id, // Backend snake_case format for DocumentsViewTab
+        documentUniqueId: d.document_unique_id, // Legacy camelCase format for backward compatibility
+        
+        // ✅ DOCUMENT TYPE INFORMATION  
+        document_type_id: d.document_type_id, // Backend field for edit mode
+        document_type: d.document_type, // Backend field for view mode (DocumentsViewTab expects this)
+        documentType: d.document_type_id, // Legacy frontend field
+        documentTypeName: d.document_type, // Human readable name
+        
+        // ✅ DOCUMENT IDENTIFICATION
+        document_number: d.document_number, // Backend field for DocumentsViewTab
+        documentNumber: d.document_number, // Legacy frontend field
         referenceNumber: "", // Not stored in database, return empty
         country: "", // Not stored in database, return empty
-        validFrom: d.valid_from,
-        validTo: d.valid_to,
-        documentId: d.document_id, // Document upload ID for download
-        fileName: d.file_name || "", // Original file name
-        fileType: d.file_type || "", // MIME type
+        
+        // ✅ VALIDITY DATES - DUAL FORMAT FOR COMPLETE COMPATIBILITY
+        valid_from: d.valid_from, // Backend snake_case format for DocumentsViewTab
+        valid_to: d.valid_to, // Backend snake_case format for DocumentsViewTab  
+        validFrom: d.valid_from, // Legacy camelCase format for edit mode
+        validTo: d.valid_to, // Legacy camelCase format for edit mode
+        
+        // ✅ FILE INFORMATION - DUAL FORMAT
+        file_name: d.file_name || "", // Backend snake_case format for DocumentsViewTab
+        file_type: d.file_type || "", // Backend snake_case format for DocumentsViewTab
+        fileName: d.file_name || "", // Legacy camelCase format for edit mode
+        fileType: d.file_type || "", // Legacy camelCase format for edit mode
+        
+        // ✅ METADATA
+        document_id: d.document_id, // Backend document upload ID for download
+        documentId: d.document_id, // Legacy field name
         fileData: "", // Not returned for security (use download endpoint)
-        status: d.status === "ACTIVE", // Convert to boolean for frontend
+        status: d.status === "ACTIVE" ? "ACTIVE" : d.status || "DRAFT", // Return actual status string for DocumentsViewTab
       })),
       userApprovalStatus: userApprovalStatus, // Add at top level for Redux to destructure
     };
@@ -731,6 +966,11 @@ const createConsignor = async (payload, files, userId) => {
   const trx = await knex.transaction();
 
   try {
+    // Transform document fields from frontend format to backend format
+    if (payload.documents && Array.isArray(payload.documents)) {
+      payload.documents = transformDocumentFields(payload.documents);
+    }
+
     // Validate payload
     const { error, value } = consignorCreateSchema.validate(payload, {
       abortEarly: false,
@@ -787,13 +1027,24 @@ const createConsignor = async (payload, files, userId) => {
         organization.company_code
       );
       if (!isCompanyUnique) {
+        // Generate suggested alternative company codes
+        const suggestions = await generateCompanyCodeSuggestions(
+          organization.company_code,
+          3
+        );
+        
+        let message = "Company code already exists. Please use a different code.";
+        if (suggestions && Array.isArray(suggestions) && suggestions.length > 0) {
+          message += ` Suggested alternatives: ${suggestions.join(", ")}`;
+        }
+        
         throw {
           type: "VALIDATION_ERROR",
           details: [
             {
               field: "organization.company_code",
-              message:
-                "Company code already exists. Please use a different code.",
+              message: message,
+              suggestions: suggestions,
             },
           ],
           message: "Duplicate company code",
@@ -814,7 +1065,7 @@ const createConsignor = async (payload, files, userId) => {
         website_url: general.website_url || null,
         name_on_po: general.name_on_po || null,
         approved_by: general.approved_by || null,
-        approved_date: general.approved_date || null,
+        approved_date: formatDateForMySQL(general.approved_date), // ✅ Format date for MySQL
         status: "PENDING", // Set to PENDING when consignor is created (awaiting approval)
         created_by: userId,
         updated_by: userId,
@@ -901,6 +1152,26 @@ const createConsignor = async (payload, files, userId) => {
             `  Uploading file: ${file.originalname}, size: ${file.size}, type: ${file.mimetype}`
           );
 
+          // ✅ VALIDATION: Ensure document_type_id is present
+          const documentTypeId = doc.document_type_id || doc.documentTypeId || doc.documentType;
+          
+          console.log(`  - document_type_id: ${doc.document_type_id}`);
+          console.log(`  - documentTypeId: ${doc.documentTypeId}`);
+          console.log(`  - documentType: ${doc.documentType}`);
+          console.log(`  - Final documentTypeId: ${documentTypeId}`);
+          
+          if (!documentTypeId) {
+            console.error(`❌ MISSING DOCUMENT TYPE ID for document ${i + 1}`);
+            throw {
+              type: "VALIDATION_ERROR",
+              details: [{
+                field: `documents[${i}].document_type_id`,
+                message: "Document type ID is required for file uploads",
+              }],
+              message: "Document validation failed - missing document type",
+            };
+          }
+
           // Convert file buffer to base64
           const base64Data = file.buffer.toString("base64");
 
@@ -917,16 +1188,16 @@ const createConsignor = async (payload, files, userId) => {
             updated_at: knex.fn.now(),
           });
 
-          // Insert into consignor_documents table
+          // Insert into consignor_documents table with proper date formatting
           const documentUniqueId = await generateDocumentId(trx);
           await trx("consignor_documents").insert({
             document_unique_id: documentUniqueId,
             document_id: documentUploadId,
             customer_id: general.customer_id,
-            document_type_id: doc.document_type_id,
+            document_type_id: documentTypeId, // ✅ FIXED: Use validated documentTypeId
             document_number: doc.document_number || null,
-            valid_from: doc.valid_from,
-            valid_to: doc.valid_to || null,
+            valid_from: formatDateForMySQL(doc.valid_from), // ✅ Format date for MySQL
+            valid_to: formatDateForMySQL(doc.valid_to), // ✅ Format date for MySQL
             status: "ACTIVE",
             created_by: userId,
             updated_by: userId,
@@ -1151,7 +1422,7 @@ const createConsignor = async (payload, files, userId) => {
       approval_config_id: approvalConfig.approval_config_id,
       approval_type_id: "AT002", // Consignor Admin
       user_id_reference_id: consignorAdminUserId,
-      s_status: "Pending for Approval",
+      s_status: "PENDING",
       approver_level: 1,
       pending_with_role_id: "RL001", // Product Owner role
       pending_with_user_id: pendingWithUserId,
@@ -1200,7 +1471,13 @@ const createConsignor = async (payload, files, userId) => {
 /**
  * Update existing consignor
  */
-const updateConsignor = async (customerId, payload, files, userId) => {
+const updateConsignor = async (
+  customerId,
+  payload,
+  files,
+  userId,
+  userRole = null
+) => {
   const trx = await knex.transaction();
 
   try {
@@ -1214,6 +1491,37 @@ const updateConsignor = async (customerId, payload, files, userId) => {
         type: "NOT_FOUND",
         message: `Consignor with ID '${customerId}' not found`,
       };
+    }
+
+    // ✅ PERMISSION CHECKS - Rejection/Resubmission Workflow
+    const currentStatus = existing.status;
+    const createdBy = existing.created_by;
+
+    // INACTIVE entities: Only creator can edit
+    if (currentStatus === "INACTIVE" && createdBy !== userId) {
+      throw {
+        type: "FORBIDDEN",
+        message: "Only the creator can edit rejected entities",
+      };
+    }
+
+    // PENDING entities: No one can edit (locked during approval)
+    if (currentStatus === "PENDING") {
+      throw {
+        type: "FORBIDDEN",
+        message: "Cannot edit entity during approval process",
+      };
+    }
+
+    // ACTIVE entities: Only approvers can edit
+    if (currentStatus === "ACTIVE") {
+      const isApprover = userRole === "product_owner" || userRole === "admin";
+      if (!isApprover) {
+        throw {
+          type: "FORBIDDEN",
+          message: "Only approvers can edit active entities",
+        };
+      }
     }
 
     // Validate payload
@@ -1253,10 +1561,72 @@ const updateConsignor = async (customerId, payload, files, userId) => {
         }
       }
 
+      // ✅ RESUBMISSION DETECTION - Check if status is changing from INACTIVE to PENDING
+      const isResubmission =
+        currentStatus === "INACTIVE" && general.status === "PENDING";
+
+      if (isResubmission) {
+        console.log(`🔄 Resubmission detected for consignor ${customerId}`);
+
+        // Get consignor admin user ID via user_master lookup
+        const consignorUser = await trx("user_master")
+          .where("consignor_id", customerId)
+          .where("user_type_id", "UT006") // Consignor Admin
+          .first();
+
+        if (consignorUser) {
+          const consignorAdminUserId = consignorUser.user_id;
+
+          // Find existing approval flow record
+          const approvalFlow = await trx("approval_flow_trans")
+            .where("user_id_reference_id", consignorAdminUserId)
+            .where("approval_type_id", "AT002") // Consignor Admin
+            .orderBy("created_at", "desc")
+            .first();
+
+          if (approvalFlow) {
+            // Update approval flow to restart from Level 1
+            await trx("approval_flow_trans")
+              .where(
+                "approval_flow_unique_id",
+                approvalFlow.approval_flow_unique_id
+              )
+              .update({
+                s_status: "PENDING",
+                approver_level: 1,
+                actioned_by_id: null,
+                actioned_by_name: null,
+                approved_on: null,
+                // Keep remarks from rejection for history
+                updated_at: knex.fn.now(),
+              });
+
+            console.log(
+              `✅ Approval flow restarted for ${consignorAdminUserId}`
+            );
+          }
+
+          // Update user status to Pending for Approval
+          await trx("user_master")
+            .where("user_id", consignorAdminUserId)
+            .update({
+              status: "Pending for Approval",
+              updated_at: knex.fn.now(),
+            });
+
+          console.log(
+            `✅ User status updated to Pending for Approval: ${consignorAdminUserId}`
+          );
+        }
+      }
+
+      // Filter out frontend-only fields that don't exist in database
+      const { userApprovalStatus, ...generalDbFields } = general;
+
       await trx("consignor_basic_information")
         .where("customer_id", customerId)
         .update({
-          ...general,
+          ...generalDbFields,
           updated_by: userId,
           updated_at: knex.fn.now(),
         });
@@ -1264,19 +1634,17 @@ const updateConsignor = async (customerId, payload, files, userId) => {
 
     // 2. Update contacts if provided with photo upload handling
     if (contacts) {
-      // Soft delete existing contacts
-      await trx("contact").where("customer_id", customerId).update({
-        status: "INACTIVE",
-        updated_by: userId,
-        updated_at: knex.fn.now(),
-      });
+      // Hard delete existing contacts to avoid duplicate key errors
+      // This is safe because we're in a transaction - if anything fails, everything rolls back
+      await trx("contact").where("customer_id", customerId).del();
 
       // Insert new contacts with frontend field mapping and photo uploads
       if (contacts.length > 0) {
         const contactInserts = await Promise.all(
           contacts.map(async (contact, index) => {
-            const contactId =
-              contact.contact_id || (await generateContactId(trx));
+            // Always generate a new contact ID to avoid conflicts
+            // Even if contact has an ID, we deleted all old contacts, so we need fresh IDs
+            const contactId = await generateContactId(trx);
 
             // Handle photo upload if file exists
             let photoUrl = contact.photo || null;
@@ -1360,11 +1728,40 @@ const updateConsignor = async (customerId, payload, files, userId) => {
 
     // 4. Handle document updates if provided
     if (documents && files) {
-      for (const doc of documents) {
+      console.log(`\n📄 ===== PROCESSING ${documents.length} DOCUMENTS =====`);
+      
+      for (let i = 0; i < documents.length; i++) {
+        const doc = documents[i];
         const file = files[doc.fileKey];
 
+        console.log(`\n📄 Document ${i + 1}:`);
+        console.log(`  - FileKey: ${doc.fileKey}`);
+        console.log(`  - File exists: ${!!file}`);
+        console.log(`  - document_type_id: ${doc.document_type_id}`);
+        console.log(`  - documentTypeId: ${doc.documentTypeId}`);
+        console.log(`  - documentType: ${doc.documentType}`);
+        console.log(`  - Raw doc object:`, JSON.stringify(doc, null, 2));
+
         if (file) {
+          // ✅ VALIDATION: Ensure document_type_id is present
+          const documentTypeId = doc.document_type_id || doc.documentTypeId || doc.documentType;
+          
+          if (!documentTypeId) {
+            console.error(`❌ MISSING DOCUMENT TYPE ID for document ${i + 1}`);
+            throw {
+              type: "VALIDATION_ERROR",
+              details: [{
+                field: `documents[${i}].document_type_id`,
+                message: "Document type ID is required for file uploads",
+              }],
+              message: "Document validation failed - missing document type",
+            };
+          }
+
+          console.log(`  ✅ Using document_type_id: ${documentTypeId}`);
+
           const uploadResult = await uploadFile(file, "consignor/documents");
+          console.log(`  ✅ File uploaded: ${uploadResult.filePath}`);
 
           const documentUploadId = await generateDocumentUploadId(trx);
           await trx("document_upload").insert({
@@ -1383,10 +1780,10 @@ const updateConsignor = async (customerId, payload, files, userId) => {
             document_unique_id: documentUniqueId,
             document_id: documentUploadId,
             customer_id: customerId,
-            document_type_id: doc.document_type_id || doc.documentTypeId,
+            document_type_id: documentTypeId, // ✅ FIXED: Use validated documentTypeId
             document_number: doc.document_number || doc.documentNumber || null,
-            valid_from: doc.valid_from || doc.validFrom,
-            valid_to: doc.valid_to || doc.validTo || null,
+            valid_from: formatDateForMySQL(doc.valid_from || doc.validFrom), // ✅ Format date for MySQL
+            valid_to: formatDateForMySQL(doc.valid_to || doc.validTo), // ✅ Format date for MySQL
             status: "ACTIVE",
             created_by: userId,
             updated_by: userId,
@@ -1507,7 +1904,7 @@ const getDocumentFile = async (customerId, documentId) => {
       .join("document_upload as du", "cd.document_id", "du.document_id")
       .where("cd.customer_id", customerId)
       .where("cd.document_unique_id", documentId)
-      .where("cd.status", "ACTIVE")
+      .whereIn("cd.status", ["ACTIVE", "DRAFT"]) // Include DRAFT status for draft editing
       .select("du.file_name", "du.file_type", "du.file_xstring_value")
       .first();
 
@@ -1545,7 +1942,7 @@ const getContactPhoto = async (customerId, contactId) => {
     const contact = await knex("contact")
       .where("customer_id", customerId)
       .where("contact_id", contactId)
-      .where("status", "ACTIVE")
+      .whereIn("status", ["ACTIVE", "DRAFT"]) // Include DRAFT status for draft editing
       .first();
 
     if (!contact || !contact.contact_photo) {
@@ -1646,4 +2043,11 @@ module.exports = {
   getContactPhoto,
   getGeneralDocument,
   getConsignorWarehouses,
+  // Utility functions for testing
+  isCompanyCodeUnique,
+  generateCompanyCodeSuggestions,
+  // Helper functions for save-as-draft
+  generateDocumentId,
+  generateDocumentUploadId,
+  generateContactId,
 };

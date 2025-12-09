@@ -1,27 +1,35 @@
-Ôªøconst db = require('./config/database');
+const mysql = require('mysql2/promise');
 
-async function checkTableStructure() {
+const checkTable = async () => {
   try {
-    const columns = await db('document_name_master').columnInfo();
-    console.log('\n=== document_name_master Table Structure ===\n');
-    Object.entries(columns).forEach(([name, info]) => {
-      console.log(`${name}:`);
-      console.log(`  Type: ${info.type}`);
-      console.log(`  MaxLength: ${info.maxLength}`);
-      console.log(`  Nullable: ${info.nullable}`);
-      console.log('');
+    const connection = await mysql.createConnection({
+      host: '192.168.2.27',
+      port: 3306,
+      user: 'root',
+      password: 'Ventic*2025#',
+      database: 'tms_dev'
     });
     
-    // Get a sample record
-    const sample = await db('document_name_master').first();
-    console.log('\nSample Record:');
-    console.log(JSON.stringify(sample, null, 2));
+    console.log('Ì¥ç Checking user_master table structure...');
+    
+    const [columns] = await connection.execute('DESCRIBE user_master');
+    
+    console.log('\nÌ≥ã Table Structure:');
+    columns.forEach(col => {
+      console.log(`  ${col.Field} - ${col.Type} (${col.Null === 'YES' ? 'Nullable' : 'Not Null'})`);
+    });
+    
+    console.log('\nÌ¥ç Sample users:');
+    const [users] = await connection.execute('SELECT * FROM user_master LIMIT 5');
+    users.forEach(user => {
+      console.log('User:', user);
+    });
+    
+    await connection.end();
     
   } catch (error) {
-    console.error('Error:', error.message);
-  } finally {
-    await db.destroy();
+    console.error('‚ùå Error:', error.message);
   }
-}
+};
 
-checkTableStructure();
+checkTable();

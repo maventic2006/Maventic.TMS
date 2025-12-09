@@ -32,12 +32,24 @@ if (import.meta.env.NODE_ENV === "development") {
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 seconds (increased from 10s for file uploads and bulk operations)
+  timeout: 30000, // 30 seconds default
   withCredentials: true, // Include cookies in requests
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+// Create a separate instance for file uploads with longer timeout
+export const createFileUploadAPI = (timeoutMs = 120000) => {
+  return axios.create({
+    baseURL: API_BASE_URL,
+    timeout: timeoutMs, // 2 minutes for file uploads by default
+    withCredentials: true,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};
 
 // Request interceptor for debugging
 api.interceptors.request.use(
@@ -273,6 +285,13 @@ export const vehicleAPI = {
       queryParams.append("towingCapacityMin", params.towingCapacityMin);
     if (params.towingCapacityMax)
       queryParams.append("towingCapacityMax", params.towingCapacityMax);
+
+    // Date filters
+    if (params.createdOnStart)
+      queryParams.append("createdOnStart", params.createdOnStart);
+    if (params.createdOnEnd)
+      queryParams.append("createdOnEnd", params.createdOnEnd);
+
     if (params.sortBy) queryParams.append("sortBy", params.sortBy);
     if (params.sortOrder) queryParams.append("sortOrder", params.sortOrder);
 
@@ -309,7 +328,9 @@ export const vehicleAPI = {
 
   // RC Lookup API - Get vehicle details by registration number
   lookupVehicleByRC: (registrationNumber) => {
-    return api.get(`/vehicles/rc-lookup/${encodeURIComponent(registrationNumber)}`);
+    return api.get(
+      `/vehicles/rc-lookup/${encodeURIComponent(registrationNumber)}`
+    );
   },
 
   // ==================== DRAFT WORKFLOW ENDPOINTS ====================

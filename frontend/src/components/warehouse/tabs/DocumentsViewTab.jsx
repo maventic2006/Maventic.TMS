@@ -1,311 +1,519 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
+  Download,
+  Eye,
   Calendar,
   CheckCircle,
   XCircle,
-  ChevronDown,
-  ChevronUp,
-  File,
-  Download,
-  Eye,
+  Hash,
+  AlertTriangle,
+  X,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import CollapsibleSection from "../../ui/CollapsibleSection";
+import api from "../../../utils/api";
 
 const DocumentsViewTab = ({ warehouseData }) => {
-  const [expandedSections, setExpandedSections] = useState({
-    documents: true,
-  });
-  const [expandedDocuments, setExpandedDocuments] = useState({});
+  const data = warehouseData;
+  const documents = data?.documents || [];
+  const [previewDocument, setPreviewDocument] = useState(null);
+  const [loadingDocument, setLoadingDocument] = useState(null);
 
-  // Helper function to display value or N/A
-  const displayValue = (value) => {
-    if (value === null || value === undefined || value === "") {
-      return <span className="text-gray-500 italic">N/A</span>;
+  // 🔍 DEBUG: Log warehouse data and documents
+  useEffect(() => {
+    console.log("📄 DocumentsViewTab - warehouseData:", warehouseData);
+    console.log("📄 DocumentsViewTab - documents array:", documents);
+    console.log("📄 DocumentsViewTab - documents length:", documents.length);
+    if (documents.length > 0) {
+      console.log("📄 DocumentsViewTab - first document:", documents[0]);
     }
-    return <span className="text-[#0D1A33] font-medium">{value}</span>;
+  }, [warehouseData, documents]);
+
+  // Handle keyboard events for modal
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && previewDocument) {
+        closePreview();
+      }
+    };
+
+    if (previewDocument) {
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [previewDocument]);
+
+  const getDocumentIcon = (documentType) => {
+    // You can extend this with more specific icons based on document type
+    return FileText;
   };
 
-  // Helper function to format date
+  const getStatusColor = (status) => {
+    return status
+      ? "bg-green-100 text-green-800 border-green-200"
+      : "bg-red-100 text-red-800 border-red-200";
+  };
+
+  const getStatusIcon = (status) => {
+    return status ? CheckCircle : XCircle;
+  };
+
+  const isDocumentExpired = (validTo) => {
+    if (!validTo) return false;
+    const today = new Date();
+    const expiryDate = new Date(validTo);
+    return expiryDate < today;
+  };
+
+  const isDocumentExpiringSoon = (validTo) => {
+    if (!validTo) return false;
+    const today = new Date();
+    const expiryDate = new Date(validTo);
+    const daysUntilExpiry = Math.ceil(
+      (expiryDate - today) / (1000 * 60 * 60 * 24)
+    );
+    return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  // Main preview handler that matches transporter implementation
+  const handlePreviewDocument = (doc) => {
+    // Check if document has file data (for uploaded files)
+    if (doc.fileData && doc.fileType && doc.fileName) {
+      setPreviewDocument({
+        fileName: doc.fileName,
+        fileType: doc.fileType,
+        fileData: doc.fileData,
       });
+      return;
+    }
+
+    // For files uploaded via File objects (in create mode)
+    if (doc.fileUpload instanceof File) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+        setPreviewDocument({
+          fileName: doc.fileUpload.name,
+          fileType: doc.fileUpload.type,
+          fileData: base64Data,
+        });
+      };
+      reader.readAsDataURL(doc.fileUpload);
+      return;
+    }
+
+    // For API-fetched documents, try to fetch file data
+    if (doc.documentUniqueId) {
+      handleViewDocument(doc);
+      return;
+    }
+
+    console.log("No valid file data for preview:", doc);
+    alert("No file data available for this document");
+  };
+
+  const handleViewDocument = async (document) => {
+    if (!document.documentUniqueId) {
+      alert("No document ID available for this document");
+      return;
+    }
+
+    try {
+      setLoadingDocument(document.documentUniqueId);
+      const response = await api.get(
+        `/warehouse/document/${document.documentUniqueId}`
+      );
+
+      if (response.data.success && response.data.data.fileData) {
+        setPreviewDocument({
+          fileName: document.fileName || "Document",
+          fileType: document.fileType || "application/octet-stream",
+          fileData: response.data.data.fileData,
+        });
+      } else {
+        alert("No file data available for this document");
+      }
     } catch (error) {
-      return "N/A";
+      console.error("Error fetching document:", error);
+      alert("Failed to load document. Please try again.");
+    } finally {
+      setLoadingDocument(null);
     }
   };
 
-  const toggleSection = (section) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
+  const handleDownloadDocument = async (doc) => {
+    // If document has local fileData, download directly
+    if (doc.fileData && doc.fileType) {
+      const byteCharacters = atob(doc.fileData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: doc.fileType });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download =
+        doc.fileName ||
+        `${doc.documentType}_${doc.documentNumber}.${
+          doc.fileType.split("/")[1]
+        }`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Otherwise fetch from API
+    if (!doc.documentUniqueId) {
+      alert("No document ID available for download");
+      return;
+    }
+
+    try {
+      setLoadingDocument(doc.documentUniqueId);
+      const response = await api.get(
+        `/warehouse/document/${doc.documentUniqueId}`
+      );
+
+      if (response.data.success && response.data.data.fileData) {
+        const base64Data = response.data.data.fileData;
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: doc.fileType });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download =
+          doc.fileName || `${doc.documentType}_${doc.documentNumber}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert("No file data available for download");
+      }
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      alert("Failed to download document. Please try again.");
+    } finally {
+      setLoadingDocument(null);
+    }
   };
 
-  const toggleDocument = (index) => {
-    setExpandedDocuments((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
+  const closePreview = () => {
+    setPreviewDocument(null);
   };
-
-  const CollapsibleSection = ({ title, icon: Icon, sectionKey, children }) => {
-    const isExpanded = expandedSections[sectionKey];
-
-    return (
-      <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
-        <button
-          onClick={() => toggleSection(sectionKey)}
-          className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Icon className="h-5 w-5 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          </div>
-          {isExpanded ? (
-            <ChevronUp className="h-5 w-5 text-gray-500" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-gray-500" />
-          )}
-        </button>
-
-        <AnimatePresence initial={false}>
-          {isExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="overflow-hidden"
-            >
-              <div className="px-6 py-4 border-t border-gray-200">
-                {children}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  };
-
-  const documents = warehouseData?.documents || [];
 
   return (
-    <div className="space-y-6 p-2">
-      {/* Documents Section */}
-      <CollapsibleSection
-        title="Documents"
-        icon={FileText}
-        sectionKey="documents"
-      >
-        {documents && documents.length > 0 ? (
-          <div className="space-y-4">
-            {documents.map((doc, index) => {
-              const isExpanded = expandedDocuments[index];
+    <div className="space-y-6">
+      {documents.length === 0 ? (
+        <div className="text-center py-12">
+          <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-500 mb-2">
+            No Documents Found
+          </h3>
+          <p className="text-gray-400">
+            No document information has been added yet.
+          </p>
+        </div>
+      ) : (
+        documents.map((document, documentIndex) => {
+          const IconComponent = getDocumentIcon(document.documentType);
+          const StatusIcon = getStatusIcon(document.status);
+          const isExpired = isDocumentExpired(document.validTo);
+          const isExpiringSoon = isDocumentExpiringSoon(document.validTo);
 
-              return (
-                <div
-                  key={doc.documentUniqueId || index}
-                  className="border border-gray-200 rounded-lg overflow-hidden"
-                >
-                  <button
-                    onClick={() => toggleDocument(index)}
-                    className="w-full px-4 py-3 flex items-start justify-between hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="text-left">
-                        <p className="font-medium text-gray-900">
-                          {doc.documentType || "Document"}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {doc.documentNumber || "N/A"}
-                        </p>
-                      </div>
+          return (
+            <CollapsibleSection
+              key={documentIndex}
+              defaultOpen={documentIndex === 0}
+              gradientFrom="purple-50/50"
+              gradientTo="pink-50/50"
+              borderColor="purple-100/50"
+              header={
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                      <IconComponent className="w-5 h-5 text-white" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      {doc.status ? (
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <XCircle className="w-5 h-5 text-gray-400" />
-                      )}
-                      {isExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-gray-500" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-gray-500" />
-                      )}
+                    <div className="text-left">
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        {document.documentType ||
+                          `Document ${documentIndex + 1}`}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {document.documentNumber || "No document number"}
+                      </p>
                     </div>
-                  </button>
+                  </div>
 
-                  <AnimatePresence initial={false}>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-4 py-4 border-t border-gray-200 bg-gray-50">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">
-                                Document Type
-                              </label>
-                              {displayValue(doc.documentType)}
-                            </div>
-
-                            <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">
-                                Document Number
-                              </label>
-                              {displayValue(doc.documentNumber)}
-                            </div>
-
-                            <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">
-                                Valid From
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                {displayValue(formatDate(doc.validFrom))}
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">
-                                Valid To
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                {displayValue(formatDate(doc.validTo))}
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">
-                                File Name
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <File className="h-4 w-4 text-gray-400" />
-                                {displayValue(doc.fileName)}
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">
-                                Status
-                              </label>
-                              <span
-                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                  doc.status
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-gray-100 text-gray-800"
-                                }`}
-                              >
-                                {doc.status ? "Active" : "Inactive"}
-                              </span>
-                            </div>
-
-                            {doc.fileData && (
-                              <div className="col-span-2">
-                                <label className="block text-sm font-medium text-gray-600 mb-2">
-                                  File Preview
-                                </label>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => {
-                                      // Open file in new tab
-                                      const byteCharacters = atob(doc.fileData);
-                                      const byteNumbers = new Array(
-                                        byteCharacters.length
-                                      );
-                                      for (
-                                        let i = 0;
-                                        i < byteCharacters.length;
-                                        i++
-                                      ) {
-                                        byteNumbers[i] =
-                                          byteCharacters.charCodeAt(i);
-                                      }
-                                      const byteArray = new Uint8Array(
-                                        byteNumbers
-                                      );
-                                      const blob = new Blob([byteArray], {
-                                        type: doc.fileType,
-                                      });
-                                      const url = URL.createObjectURL(blob);
-                                      window.open(url, "_blank");
-                                    }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                    View File
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      // Download file
-                                      const byteCharacters = atob(doc.fileData);
-                                      const byteNumbers = new Array(
-                                        byteCharacters.length
-                                      );
-                                      for (
-                                        let i = 0;
-                                        i < byteCharacters.length;
-                                        i++
-                                      ) {
-                                        byteNumbers[i] =
-                                          byteCharacters.charCodeAt(i);
-                                      }
-                                      const byteArray = new Uint8Array(
-                                        byteNumbers
-                                      );
-                                      const blob = new Blob([byteArray], {
-                                        type: doc.fileType,
-                                      });
-                                      const url = URL.createObjectURL(blob);
-                                      const a = document.createElement("a");
-                                      a.href = url;
-                                      a.download = doc.fileName || "document";
-                                      a.click();
-                                    }}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                                  >
-                                    <Download className="h-4 w-4" />
-                                    Download
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
+                  {/* Status and Warning Badges */}
+                  <div className="flex items-center gap-2 mr-8">
+                    {isExpired && (
+                      <div className="flex items-center gap-1 bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-medium border border-red-200">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>Expired</span>
+                      </div>
                     )}
-                  </AnimatePresence>
+
+                    {!isExpired && isExpiringSoon && (
+                      <div className="flex items-center gap-1 bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-medium border border-yellow-200">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>Expiring Soon</span>
+                      </div>
+                    )}
+
+                    <div
+                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                        document.status
+                      )}`}
+                    >
+                      <StatusIcon className="w-3 h-3" />
+                      <span>{document.status ? "Active" : "Inactive"}</span>
+                    </div>
+                  </div>
                 </div>
-              );
-            })}
+              }
+            >
+              {/* Document Information Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-600">
+                    Document Number
+                  </label>
+                  <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                    <Hash className="w-4 h-4 text-gray-500" />
+                    <p className="text-gray-800">
+                      {document.documentNumber || "N/A"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-600">
+                    Valid From
+                  </label>
+                  <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-500" />
+                    <p className="text-gray-800">
+                      {formatDate(document.validFrom)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-600">
+                    Valid To
+                  </label>
+                  <div
+                    className={`bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border flex items-center gap-2 ${
+                      isExpired
+                        ? "border-red-300 bg-red-50/50"
+                        : isExpiringSoon
+                        ? "border-yellow-300 bg-yellow-50/50"
+                        : "border-gray-200/50"
+                    }`}
+                  >
+                    <Calendar
+                      className={`w-4 h-4 ${
+                        isExpired
+                          ? "text-red-500"
+                          : isExpiringSoon
+                          ? "text-yellow-500"
+                          : "text-gray-500"
+                      }`}
+                    />
+                    <p
+                      className={`${
+                        isExpired
+                          ? "text-red-800"
+                          : isExpiringSoon
+                          ? "text-yellow-800"
+                          : "text-gray-800"
+                      }`}
+                    >
+                      {formatDate(document.validTo)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-600">
+                    File Type
+                  </label>
+                  <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50">
+                    <p className="text-gray-800">
+                      {document.fileType || "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* File Information */}
+              {document.fileName && (
+                <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800">
+                          {document.fileName}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {document.fileType} Document
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Show view button if document has any file data */}
+                      {(document.fileData ||
+                        document.fileUpload ||
+                        document.fileName) && (
+                        <button
+                          onClick={() => handlePreviewDocument(document)}
+                          disabled={
+                            loadingDocument === document.documentUniqueId
+                          }
+                          className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loadingDocument === document.documentUniqueId ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-4 h-4" />
+                              View
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {/* Show download button for documents that can be downloaded */}
+                      {(document.fileData || document.documentUniqueId) && (
+                        <button
+                          onClick={() => handleDownloadDocument(document)}
+                          disabled={
+                            loadingDocument === document.documentUniqueId
+                          }
+                          className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loadingDocument === document.documentUniqueId ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-4 h-4" />
+                              Download
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CollapsibleSection>
+          );
+        })
+      )}
+
+      {/* Document Preview Modal - Matching Transporter Implementation */}
+      {previewDocument && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={closePreview}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#E0E7FF] rounded-lg">
+                  <FileText className="h-5 w-5 text-[#6366F1]" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {previewDocument.fileName}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-4">
+              {previewDocument.fileType?.startsWith("image/") ? (
+                <img
+                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  alt={previewDocument.fileName}
+                  className="max-w-full h-auto mx-auto"
+                />
+              ) : previewDocument.fileType === "application/pdf" ? (
+                <iframe
+                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  className="w-full h-[600px] border-0"
+                  title={previewDocument.fileName}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    You can still download the file
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={closePreview}
+                className="px-6 py-2.5 border border-[#E5E7EB] text-[#4A5568] rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-8">
-            <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No documents available</p>
-            <p className="text-sm text-gray-400 mt-1">
-              Document information will appear here once uploaded
-            </p>
-          </div>
-        )}
-      </CollapsibleSection>
+        </div>
+      )}
     </div>
   );
 };

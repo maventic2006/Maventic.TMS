@@ -1,7 +1,6 @@
-﻿import React from "react";
+﻿import React, { useEffect } from "react";
 import { FileText } from "lucide-react";
 import { useSelector } from "react-redux";
-import { Country } from "country-state-city";
 import ThemeTable from "../../../components/ui/ThemeTable";
 
 const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
@@ -12,16 +11,43 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   // Document type options from master data (backend already returns value/label format)
   const documentTypes = masterData?.documentNames || [];
 
-  // Get all countries from country-state-city package
-  const allCountries = Country.getAllCountries();
+  // Debug logging
+  console.log("📄 DocumentsTab - masterData:", masterData);
+  console.log("📄 DocumentsTab - documentTypes:", documentTypes);
+  console.log(
+    "📄 DocumentsTab - mandatory count:",
+    documentTypes.filter((dt) => dt.isMandatory).length
+  );
 
-  // Country options from country-state-city package (convert to value/label format)
-  const countryOptions = React.useMemo(() => {
-    return allCountries.map((country) => ({
-      value: country.name,
-      label: country.name,
-    }));
-  }, []);
+  // Auto-populate mandatory documents when component mounts or when documentTypes change
+  useEffect(() => {
+    if (documentTypes.length > 0 && documents.length === 0) {
+      const mandatoryDocuments = documentTypes
+        .filter((docType) => docType.isMandatory)
+        .map((docType) => ({
+          documentType: docType.value,
+          documentNumber: "",
+          validFrom: "",
+          validTo: "",
+          status: true,
+          fileName: "",
+          fileType: "",
+          fileData: "",
+          fileUpload: null, // For file upload
+          documentProvider: "",
+          premiumAmount: 0,
+          remarks: "",
+        }));
+
+      // Only set if no documents exist yet
+      if (mandatoryDocuments.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          documents: mandatoryDocuments,
+        }));
+      }
+    }
+  }, [documentTypes, documents.length, setFormData]);
 
   // Table column configuration
   const columns = [
@@ -42,15 +68,6 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       width: "min-w-[200px]",
     },
     {
-      key: "country",
-      label: "Country",
-      type: "select",
-      options: countryOptions,
-      placeholder: "Select Country",
-      searchable: true,
-      width: "min-w-[200px]",
-    },
-    {
       key: "validFrom",
       label: "Valid From",
       type: "date",
@@ -67,6 +84,7 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       label: "Document Upload",
       type: "file",
       width: "min-w-[200px]",
+      accept: ".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx",
     },
   ];
 
@@ -81,14 +99,16 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
     const newDocument = {
       documentType: "",
       documentNumber: "",
-      referenceNumber: "",
-      country: "",
       validFrom: "",
       validTo: "",
       status: true,
       fileName: "",
       fileType: "",
       fileData: "",
+      fileUpload: null, // For file upload
+      documentProvider: "",
+      premiumAmount: 0,
+      remarks: "",
     };
 
     const updatedDocuments = [...documents, newDocument];
@@ -99,8 +119,36 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
   };
 
   const handleRemoveDocument = (index) => {
-    if (documents.length <= 1) return; // Keep at least one document
+    // Check if this is a mandatory document type
+    const documentToRemove = documents[index];
+    const mandatoryDocTypes = documentTypes
+      .filter((dt) => dt.isMandatory)
+      .map((dt) => dt.value);
 
+    if (mandatoryDocTypes.includes(documentToRemove.documentType)) {
+      // Don't allow removal of mandatory document types, just clear the fields
+      const updatedDocuments = [...documents];
+      updatedDocuments[index] = {
+        ...updatedDocuments[index],
+        documentNumber: "",
+        validFrom: "",
+        validTo: "",
+        fileName: "",
+        fileType: "",
+        fileData: "",
+        fileUpload: null,
+        documentProvider: "",
+        premiumAmount: 0,
+        remarks: "",
+      };
+      setFormData((prev) => ({
+        ...prev,
+        documents: updatedDocuments,
+      }));
+      return;
+    }
+
+    // Allow removal of non-mandatory documents
     const updatedDocuments = documents.filter((_, i) => i !== index);
     setFormData((prev) => ({
       ...prev,
@@ -143,19 +191,25 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
       )}
 
       {/* Guidelines */}
-      {/* <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h4 className="text-sm font-medium text-blue-900 mb-2">
           Document Guidelines:
         </h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li> Document numbers must be unique within the same document type</li>
-          <li> Valid from date cannot be in the future</li>
-          <li> Valid to date must be after valid from date</li>
-          <li> File uploads are optional but recommended for verification</li>
-          <li> Supported formats: JPEG, PNG, GIF, PDF, DOC, DOCX (max 5MB)</li>
-          <li> Document number format: Only uppercase letters, numbers, hyphens, and forward slashes</li>
+          <li>• Mandatory documents are pre-populated and cannot be removed</li>
+          <li>
+            • Document numbers must be unique within the same document type
+          </li>
+          <li>• Valid from date cannot be in the future</li>
+          <li>• Valid to date must be after valid from date</li>
+          <li>• File uploads are required for all document types</li>
+          <li>• Supported formats: JPEG, PNG, GIF, PDF, DOC, DOCX (max 5MB)</li>
+          <li>
+            • Document number format: Only uppercase letters, numbers, hyphens,
+            and forward slashes
+          </li>
         </ul>
-      </div> */}
+      </div>
     </div>
   );
 };

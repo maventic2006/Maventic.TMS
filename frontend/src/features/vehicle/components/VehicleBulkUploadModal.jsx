@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Upload, Download, FileSpreadsheet, X, CheckCircle, AlertCircle, Info, Loader2, Truck } from "lucide-react";
+import { Upload, Download, FileSpreadsheet, X, CheckCircle, AlertCircle, Info, Loader2, Truck, Eye } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { Button } from "../../../components/ui/Button";
 import {
@@ -14,8 +14,11 @@ import {
   updateVehicleBatchStatus,
   handleVehicleBatchComplete,
   handleVehicleBatchError,
+  fetchVehicleBatchStatus,
+  openVehicleErrorDetailsModal,
 } from "../../../redux/slices/vehicleBulkUploadSlice";
 import socketService from "../../../services/socketService";
+import VehicleErrorDetailsModal from "./VehicleErrorDetailsModal";
 
 /**
  * Vehicle Bulk Upload Modal Component
@@ -32,6 +35,7 @@ const VehicleBulkUploadModal = () => {
     isDownloadingTemplate,
     isDownloadingErrorReport,
     error,
+    progressLogs,
   } = useSelector((state) => state.vehicleBulkUpload);
 
   const [selectedFile, setSelectedFile] = useState(null);
@@ -82,15 +86,27 @@ const VehicleBulkUploadModal = () => {
       socketService.on('vehicleBulkUploadComplete', handleComplete);
       socketService.on('vehicleBulkUploadError', handleError);
       
+      // Fallback polling mechanism (in case Socket.IO doesn't work)
+      let pollingInterval = null;
+      if (isUploading || currentBatch?.status === 'processing') {
+        pollingInterval = setInterval(() => {
+          dispatch(fetchVehicleBatchStatus(batchId));
+        }, 3000); // Poll every 3 seconds
+      }
+      
       // Cleanup on unmount or batch change
       return () => {
         socketService.off('vehicleBulkUploadProgress', handleProgress);
         socketService.off('vehicleBulkUploadComplete', handleComplete);
         socketService.off('vehicleBulkUploadError', handleError);
         socketService.leaveBatchRoom(batchId);
+        
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+        }
       };
     }
-  }, [currentBatch?.batch_id, dispatch]);
+  }, [currentBatch?.batch_id, isUploading, dispatch]);
 
   // Close modal handler
   const handleClose = useCallback(() => {
@@ -185,12 +201,42 @@ const VehicleBulkUploadModal = () => {
     }
   }, [currentBatch, dispatch]);
 
+  // View error details handler
+  const handleViewErrorDetails = useCallback(() => {
+    if (currentBatch?.batch_id) {
+      dispatch(openVehicleErrorDetailsModal());
+    }
+  }, [currentBatch, dispatch]);
+
   // Modal footer
   const footer = (
     <>
       <Button variant="outline" onClick={handleViewHistory}>
         View History
       </Button>
+      {/* View Error Details Button - Show when there are validation errors */}
+      {validationResults && validationResults.invalid > 0 && currentBatch?.batch_id && (
+        <Button 
+          variant="outline" 
+          onClick={handleViewErrorDetails}
+          className="flex items-center gap-2"
+        >
+          <Eye className="h-4 w-4" />
+          View Error Details
+        </Button>
+      )}
+      {/* Download Error Report Button - Show when there are validation errors */}
+      {validationResults && validationResults.invalid > 0 && currentBatch?.batch_id && (
+        <Button 
+          variant="outline" 
+          onClick={handleDownloadErrorReport}
+          disabled={isDownloadingErrorReport}
+          className="flex items-center gap-2"
+        >
+          <Download className="h-4 w-4" />
+          {isDownloadingErrorReport ? "Downloading..." : "Download Report"}
+        </Button>
+      )}
       <Button variant="outline" onClick={handleClose}>
         Close
       </Button>
@@ -198,18 +244,19 @@ const VehicleBulkUploadModal = () => {
   );
 
   return (
-    <Modal
-      isOpen={isModalOpen}
-      onClose={handleClose}
-      title={
-        <div className="flex items-center gap-2">
-          <Truck className="h-6 w-6 text-orange-600" />
-          <span>Bulk Upload Vehicles</span>
-        </div>
-      }
-      size="lg"
-      footer={footer}
-    >
+    <>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={handleClose}
+        title={
+          <div className="flex items-center gap-2">
+            <Truck className="h-6 w-6 text-orange-600" />
+            <span>Bulk Upload Vehicles</span>
+          </div>
+        }
+        size="lg"
+        footer={footer}
+      >
       <div className="space-y-6">
         {/* Instructions */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -312,20 +359,124 @@ const VehicleBulkUploadModal = () => {
 
         {/* Progress Bar - Only show during upload */}
         {isUploading && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="font-medium text-gray-700">Processing Vehicle Batch...</span>
-              <span className="text-gray-600">{uploadProgress}%</span>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium text-gray-700">Processing Vehicle Batch...</span>
+                <span className="text-gray-600">{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-orange-500 to-orange-600 h-3 rounded-full transition-all duration-300 flex items-center justify-end"
+                  style={{ width: `${uploadProgress}%` }}
+                >
+                  {uploadProgress > 10 && (
+                    <Loader2 className="h-3 w-3 mr-1 text-white animate-spin" />
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-orange-500 to-orange-600 h-3 rounded-full transition-all duration-300 flex items-center justify-end"
-                style={{ width: `${uploadProgress}%` }}
-              >
-                {uploadProgress > 10 && (
-                  <Loader2 className="h-3 w-3 mr-1 text-white animate-spin" />
+
+            {/* Real-time Processing Log */}
+            {progressLogs && progressLogs.length > 0 && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  Live Processing Log
+                </h4>
+                <div className="max-h-32 overflow-y-auto space-y-1 scrollbar-thin">
+                  {progressLogs.slice(-10).map((log, index) => (
+                    <div key={index} className="flex items-start gap-2 text-sm">
+                      <div className="flex-shrink-0 mt-1">
+                        {log.type === 'success' && (
+                          <CheckCircle className="h-3 w-3 text-green-600" />
+                        )}
+                        {log.type === 'error' && (
+                          <AlertCircle className="h-3 w-3 text-red-600" />
+                        )}
+                        {log.type === 'warning' && (
+                          <AlertCircle className="h-3 w-3 text-yellow-600" />
+                        )}
+                        {log.type === 'info' && (
+                          <Info className="h-3 w-3 text-blue-600" />
+                        )}
+                      </div>
+                      <span 
+                        className={`flex-1 ${
+                          log.type === 'success' ? 'text-green-800' :
+                          log.type === 'error' ? 'text-red-800' :
+                          log.type === 'warning' ? 'text-yellow-800' :
+                          'text-gray-700'
+                        }`}
+                      >
+                        {log.message}
+                      </span>
+                      <span className="text-xs text-gray-500 flex-shrink-0">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {progressLogs.length > 10 && (
+                  <div className="text-xs text-gray-500 text-center mt-2 pt-2 border-t border-gray-200">
+                    Showing last 10 of {progressLogs.length} log entries
+                  </div>
                 )}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Processing Status - Show during upload with partial results */}
+        {currentBatch && currentBatch.status === 'processing' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 shadow-sm">
+              <h4 className="font-semibold text-blue-900 mb-4 flex items-center gap-2 text-lg">
+                <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />
+                Batch Processing In Progress
+              </h4>
+              
+              <div className="mb-4">
+                <p className="text-sm text-blue-700 mb-3">
+                  <strong>Batch ID:</strong> {currentBatch.batch_id}
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-white rounded-lg border border-blue-300">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {currentBatch.processed_rows || 0}/{currentBatch.total_rows || 0}
+                    </p>
+                    <p className="text-sm font-medium text-blue-700 mt-1">Rows Processed</p>
+                  </div>
+                  <div className="text-center p-4 bg-white rounded-lg border border-blue-300">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {validationResults ? (validationResults.valid + validationResults.invalid) : 0}
+                    </p>
+                    <p className="text-sm font-medium text-blue-700 mt-1">Vehicles Validated</p>
+                  </div>
+                </div>
+              </div>
+
+              {validationResults && (validationResults.valid > 0 || validationResults.invalid > 0) && (
+                <div className="border-t border-blue-200 pt-4">
+                  <h5 className="font-semibold text-blue-800 mb-3 text-sm uppercase tracking-wide">
+                    Current Validation Status
+                  </h5>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-xl font-bold text-green-600">
+                        {validationResults.valid || 0}
+                      </p>
+                      <p className="text-sm font-medium text-green-700">Valid</p>
+                    </div>
+                    <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+                      <p className="text-xl font-bold text-red-600">
+                        {validationResults.invalid || 0}
+                      </p>
+                      <p className="text-sm font-medium text-red-700">Invalid</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -508,6 +659,37 @@ const VehicleBulkUploadModal = () => {
           </div>
         )}
 
+        {/* Failed Batch Status */}
+        {currentBatch && currentBatch.status === 'failed' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-7 w-7 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-bold text-red-900 text-lg mb-2">
+                  Batch Processing Failed
+                </h4>
+                <p className="text-sm text-red-800 mb-3">
+                  <strong>Batch ID:</strong> {currentBatch.batch_id}
+                </p>
+                <p className="text-sm text-red-800 leading-relaxed">
+                  The batch processing encountered an error and could not be completed. 
+                  {currentBatch.processing_notes && (
+                    <>
+                      <br /><strong>Error Details:</strong> {currentBatch.processing_notes}
+                    </>
+                  )}
+                </p>
+                <div className="mt-4 p-3 bg-red-100 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    💡 <strong>Next Steps:</strong> Please check your Excel file format and try uploading again. 
+                    Contact support if the issue persists.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Error Display */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -523,7 +705,11 @@ const VehicleBulkUploadModal = () => {
           </div>
         )}
       </div>
-    </Modal>
+      </Modal>
+      
+      {/* Vehicle Error Details Modal */}
+      <VehicleErrorDetailsModal />
+    </>
   );
 };
 

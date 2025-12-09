@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState } from "react";
+﻿import React, { useRef, useState, useEffect } from "react";
 import { Plus, X, Upload, FileText, Image, Eye } from "lucide-react";
 import { useSelector } from "react-redux";
 import { CustomSelect } from "./Select";
@@ -19,6 +19,7 @@ const ThemeTable = ({
   onRowSelect,
   canRemoveRows = true,
   canAddRows = true,
+  isRowRemovable, // Function to check if a specific row can be removed
   customRenderers = {},
   validationRules = {},
   className = "",
@@ -26,6 +27,23 @@ const ThemeTable = ({
   const { masterData } = useSelector((state) => state.transporter);
   const fileInputRefs = useRef({});
   const [previewDocument, setPreviewDocument] = useState(null);
+
+  // Handle ESC key to close preview modal
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && previewDocument) {
+        closePreview();
+      }
+    };
+
+    if (previewDocument) {
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [previewDocument]);
 
   const handleCellChange = (rowIndex, columnKey, value) => {
     const updatedData = [...data];
@@ -89,24 +107,34 @@ const ThemeTable = ({
     }
 
     try {
-      // Store file object for backend upload
-      const updatedData = [...data];
-      updatedData[rowIndex] = {
-        ...updatedData[rowIndex],
-        [columnKey]: file, // Store file object directly
-        [`${columnKey}_preview`]: URL.createObjectURL(file), // For preview
+      // Convert file to base64 for storage and preview
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+
+        const updatedData = [...data];
+        updatedData[rowIndex] = {
+          ...updatedData[rowIndex],
+          [columnKey]: file, // Store file object for backend upload
+          [`${columnKey}_preview`]: URL.createObjectURL(file), // For preview
+          fileName: file.name,
+          fileType: file.type,
+          fileData: base64Data, // Store base64 for preview modal
+        };
+
+        console.log(`📎 ThemeTable - File uploaded:`, {
+          rowIndex,
+          columnKey,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          isFileObject: file instanceof File,
+          hasBase64Data: !!base64Data,
+        });
+
+        onDataChange(updatedData);
       };
-
-      console.log(`📎 ThemeTable - File uploaded:`, {
-        rowIndex,
-        columnKey,
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        isFileObject: file instanceof File,
-      });
-
-      onDataChange(updatedData);
+      reader.readAsDataURL(file);
     } catch (error) {
       alert("Error uploading file: " + error.message);
     }
@@ -114,6 +142,13 @@ const ThemeTable = ({
 
   const removeFile = (rowIndex, columnKey = "photo") => {
     const updatedData = [...data];
+
+    // Clean up preview URL if it exists
+    const previewUrl = updatedData[rowIndex][`${columnKey}_preview`];
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
     updatedData[rowIndex] = {
       ...updatedData[rowIndex],
       [columnKey]: null,
@@ -132,21 +167,105 @@ const ThemeTable = ({
 
   const getFileIcon = (fileType) => {
     if (fileType?.startsWith("image/")) {
-      return <Image className="w-4 h-4 text-blue-500" />;
+      return <Image className="w-5 h-5 text-[#6366F1]" />;
     } else if (fileType === "application/pdf") {
-      return <FileText className="w-4 h-4 text-red-500" />;
+      return <FileText className="w-5 h-5 text-[#6366F1]" />;
     } else {
-      return <FileText className="w-4 h-4 text-gray-500" />;
+      return <FileText className="w-5 h-5 text-[#6366F1]" />;
     }
   };
 
-  const handlePreviewDocument = (row) => {
-    if (row.fileData && row.fileType) {
-      setPreviewDocument({
-        fileName: row.fileName,
-        fileType: row.fileType,
-        fileData: row.fileData,
-      });
+  const handlePreviewDocument = async (row) => {
+    try {
+      const fileValue = row.fileUpload || row.photo || null;
+      const isFileObject = fileValue instanceof File;
+
+      if (isFileObject) {
+        // Case 1: New File objects - convert to base64 for preview
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: fileValue.name,
+            fileType: fileValue.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(fileValue);
+      } else if (row.fileData && row.fileType && row.fileName) {
+        // Case 2: Existing uploaded documents with base64 data already available
+        setPreviewDocument({
+          fileName: row.fileName,
+          fileType: row.fileType,
+          fileData: row.fileData,
+        });
+      } else if (row._backend_document_unique_id && row._backend_customer_id) {
+        // Case 3: Backend documents - fetch from API
+        console.log("📋 Fetching document from backend for preview:", {
+          documentId: row._backend_document_unique_id,
+          customerId: row._backend_customer_id
+        });
+
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${row._backend_customer_id}/documents/${row._backend_document_unique_id}/download`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch document: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: row.fileName || "Document",
+            fileType: blob.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(blob);
+      } else if (row.contact_photo && row.contact_id && row._backend_customer_id) {
+        // Case 4: Contact photos - fetch from API
+        console.log("📋 Fetching contact photo from backend for preview:", {
+          contactId: row.contact_id,
+          customerId: row._backend_customer_id
+        });
+
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${row._backend_customer_id}/contacts/${row.contact_id}/photo`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch contact photo: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
+          setPreviewDocument({
+            fileName: `${row.name || 'Contact'} Photo`,
+            fileType: blob.type,
+            fileData: base64Data,
+          });
+        };
+        reader.readAsDataURL(blob);
+      } else {
+        console.log("📋 No valid file data for preview:", row);
+        alert("No document available for preview");
+      }
+    } catch (error) {
+      console.error("Error previewing document:", error);
+      alert(`Failed to load document for preview: ${error.message}`);
     }
   };
 
@@ -209,17 +328,14 @@ const ThemeTable = ({
               <span className="text-sm text-gray-700 truncate flex-1">
                 {fileName}
               </span>
-              {(previewUrl ||
-                (typeof fileValue === "string" &&
-                  fileValue.startsWith("http"))) && (
+              {/* Preview button - show if we have file data, uploaded file, or backend document */}
+              {(isFileObject ||
+                (row.fileData && row.fileType) ||
+                (row.fileName && row.fileType) ||
+                row._backend_document_unique_id ||
+                (row.contact_photo && row.contact_id)) && (
                 <button
-                  onClick={() =>
-                    handlePreviewDocument({
-                      fileName,
-                      fileType,
-                      fileData: previewUrl || fileValue,
-                    })
-                  }
+                  onClick={() => handlePreviewDocument(row)}
                   className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
                   title="Preview"
                 >
@@ -253,15 +369,25 @@ const ThemeTable = ({
 
     // Select dropdown
     if (column.type === "select") {
+      // Get options - either static or dynamic based on row data
+      const selectOptions = column.getDynamicOptions
+        ? column.getDynamicOptions(row)
+        : column.options || [];
+
+      // Get disabled state - either static or dynamic based on row data
+      const isDisabled = column.getDisabled
+        ? column.getDisabled(row, rowIndex)
+        : column.disabled || false;
+
       return (
         <CustomSelect
           value={value}
-          onValueChange={(newValue) =>
-            handleCellChange(rowIndex, column.key, newValue)
-          }
-          options={column.options || []}
+          onValueChange={(newValue) => {
+            handleCellChange(rowIndex, column.key, newValue);
+          }}
+          options={selectOptions}
           placeholder={column.placeholder || `Select ${column.label}`}
-          disabled={column.disabled}
+          disabled={isDisabled}
           searchable={column.searchable || false}
           getOptionLabel={(option) => option.label}
           getOptionValue={(option) => option.value}
@@ -322,6 +448,11 @@ const ThemeTable = ({
     }
 
     // Default text input
+    // Get disabled state - either static or dynamic based on row data
+    const isInputDisabled = column.getDisabled
+      ? column.getDisabled(row, rowIndex)
+      : column.disabled || false;
+
     return (
       <input
         type={column.type || "text"}
@@ -329,7 +460,7 @@ const ThemeTable = ({
         onChange={(e) => handleCellChange(rowIndex, column.key, e.target.value)}
         placeholder={column.placeholder}
         className={`w-full min-w-[200px] px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#10B981] focus:border-transparent ${errorClass}`}
-        disabled={column.disabled}
+        disabled={isInputDisabled}
       />
     );
   };
@@ -369,6 +500,9 @@ const ThemeTable = ({
                       }`}
                     >
                       {column.label}
+                      {column.required && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
                     </th>
                   ))}
                   {canRemoveRows && <th className="pb-3 w-12"></th>}
@@ -401,8 +535,16 @@ const ThemeTable = ({
                         <td className="px-3">
                           <button
                             onClick={() => onRemoveRow(rowIndex)}
-                            disabled={data.length <= 1}
+                            disabled={
+                              data.length <= 1 ||
+                              (isRowRemovable && !isRowRemovable(rowIndex))
+                            }
                             className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={
+                              isRowRemovable && !isRowRemovable(rowIndex)
+                                ? "This document is mandatory and cannot be removed"
+                                : "Remove row"
+                            }
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -428,11 +570,13 @@ const ThemeTable = ({
       {/* Document Preview Modal */}
       {previewDocument && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] min-h-[600px] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                {getFileIcon(previewDocument.fileType)}
+                <div className="p-2 bg-[#E0E7FF] rounded-lg">
+                  {getFileIcon(previewDocument.fileType)}
+                </div>
                 <h3 className="text-lg font-semibold text-gray-800">
                   {previewDocument.fileName}
                 </h3>
@@ -440,22 +584,31 @@ const ThemeTable = ({
               <button
                 onClick={closePreview}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Close Preview"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
-            {/* Modal Body - Preview Area */}
-            <div className="flex-1 overflow-auto p-4">
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-6 min-h-[400px] flex items-center justify-center">
               {previewDocument.fileType?.startsWith("image/") ? (
                 <img
-                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  src={
+                    previewDocument.fileData.startsWith("http")
+                      ? previewDocument.fileData
+                      : `data:${previewDocument.fileType};base64,${previewDocument.fileData}`
+                  }
                   alt={previewDocument.fileName}
-                  className="max-w-full h-auto mx-auto"
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
                 />
               ) : previewDocument.fileType === "application/pdf" ? (
                 <iframe
-                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  src={
+                    previewDocument.fileData.startsWith("http")
+                      ? previewDocument.fileData
+                      : `data:application/pdf;base64,${previewDocument.fileData}`
+                  }
                   className="w-full h-[600px] border-0"
                   title={previewDocument.fileName}
                 />
@@ -473,10 +626,10 @@ const ThemeTable = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+            <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
               <button
                 onClick={closePreview}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Close
               </button>

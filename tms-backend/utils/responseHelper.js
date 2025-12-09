@@ -117,19 +117,31 @@ const errorResponse = (res, code, message, details = [], statusCode = 400) => {
 
 /**
  * Validation Error Response
- * Formats Joi validation errors into field-level error details
+ * Formats validation errors into field-level error details
+ * Supports both Joi validation errors and manual validation errors
  * @param {Object} res - Express response object
- * @param {Object} error - Joi validation error object
+ * @param {Object} error - Validation error object
  */
 const validationErrorResponse = (res, error) => {
   const details = error.details.map(detail => {
-    // Extract field path from Joi error
-    // Example: "general.customer_name" or "contacts[0].email"
-    const fieldPath = detail.path.join('.');
+    let fieldPath;
+    
+    // Handle Joi validation error format (has path array)
+    if (detail.path && Array.isArray(detail.path)) {
+      fieldPath = detail.path.join('.');
+    }
+    // Handle manual validation error format (has field string)
+    else if (detail.field) {
+      fieldPath = detail.field;
+    }
+    // Fallback for malformed error objects
+    else {
+      fieldPath = 'unknown';
+    }
     
     return {
       field: fieldPath,
-      message: detail.message
+      message: detail.message || 'Validation error'
     };
   });
 

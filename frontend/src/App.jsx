@@ -37,6 +37,7 @@ import ConfigurationListPage from "./pages/ConfigurationListPage";
 import ConsignorConfigurationPage from "./pages/ConsignorConfigurationPage";
 import ConsignorConfigurationListPage from "./pages/ConsignorConfigurationListPage";
 import SuperAdminApprovalList from "./pages/SuperAdminApprovalList";
+import TransporterVehicleConfigPage from "./features/transporterVehicleConfig";
 import SessionExpiryWarningModal from "./components/auth/SessionExpiryWarningModal";
 import {
   verifyToken,
@@ -578,6 +579,16 @@ function App() {
                         <Layout>
                           <ConsignorConfigurationPage />
                         </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  {/* Transporter Configuration - Transporter Vehicle Configured Data */}
+                  <Route
+                    path="/transporter-configuration/tv-config-data"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <TransporterVehicleConfigPage />
                       </PrivateRoute>
                     }
                   />

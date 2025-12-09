@@ -28,7 +28,11 @@ import {
 import { openModal } from "../../redux/slices/bulkUploadSlice";
 import BulkUploadModal from "./components/BulkUploadModal";
 import BulkUploadHistory from "./components/BulkUploadHistory";
-import { createTransporterSchema, validateFormSection } from "./validation";
+import {
+  createTransporterSchema,
+  validateFormSection,
+  validateGSTPANRelationship,
+} from "./validation";
 import { getComponentTheme } from "../../utils/theme";
 import { TOAST_TYPES, ERROR_MESSAGES } from "../../utils/constants";
 import { addToast } from "../../redux/slices/uiSlice";
@@ -64,66 +68,74 @@ const CreateTransporterPage = () => {
   const theme = getPageTheme("general");
 
   const [activeTab, setActiveTab] = useState(0);
-  const [formData, setFormData] = useState({
-    transporterId: null,
-    generalDetails: {
-      businessName: "",
-      fromDate: "",
-      toDate: "",
-      avgRating: 0,
-      transMode: {
-        road: false,
-        rail: false,
-        air: false,
-        sea: false,
+
+  // Create initial form data with current date - MUST be created once and reused
+  const [initialFormState] = useState(() => {
+    const currentDate = new Date().toISOString().split("T")[0];
+    return {
+      transporterId: null,
+      generalDetails: {
+        businessName: "",
+        fromDate: currentDate, // Default to today's date
+        toDate: "",
+        avgRating: 0,
+        transMode: {
+          road: false,
+          rail: false,
+          air: false,
+          sea: false,
+        },
+        activeFlag: true,
       },
-      activeFlag: true,
-    },
-    addresses: [
-      {
-        vatNumber: "",
-        country: "",
-        state: "",
-        city: "",
-        district: "",
-        street1: "",
-        street2: "",
-        postalCode: "",
-        isPrimary: true,
-        contacts: [
-          {
-            name: "",
-            role: "",
-            phoneNumber: "",
-            alternatePhoneNumber: "",
-            email: "",
-            alternateEmail: "",
-            whatsappNumber: "",
-          },
-        ],
-      },
-    ],
-    serviceableAreas: [
-      {
-        country: "",
-        states: [],
-      },
-    ],
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        referenceNumber: "",
-        country: "",
-        validFrom: "",
-        validTo: "",
-        status: true,
-        fileName: "",
-        fileType: "",
-        fileData: "",
-      },
-    ],
+      addresses: [
+        {
+          vatNumber: "",
+          country: "",
+          state: "",
+          city: "",
+          district: "",
+          street1: "",
+          street2: "",
+          postalCode: "",
+          isPrimary: true,
+          contacts: [
+            {
+              name: "",
+              role: "",
+              phoneNumber: "",
+              alternatePhoneNumber: "",
+              email: "",
+              alternateEmail: "",
+              whatsappNumber: "",
+            },
+          ],
+        },
+      ],
+      serviceableAreas: [
+        {
+          country: "",
+          states: [],
+        },
+      ],
+      documents: [
+        {
+          documentType: "",
+          documentNumber: "",
+          referenceNumber: "",
+          country: "",
+          validFrom: "",
+          validTo: "",
+          status: true,
+          fileName: "",
+          fileType: "",
+          fileData: "",
+        },
+      ],
+    };
   });
+
+  // Use the same initial state for formData
+  const [formData, setFormData] = useState(initialFormState);
 
   const [validationErrors, setValidationErrors] = useState({});
   const [tabErrors, setTabErrors] = useState({
@@ -137,67 +149,8 @@ const CreateTransporterPage = () => {
   // DRAFT MANAGEMENT HOOKS
   // ============================================
 
-  // Initial form data for dirty tracking
-  const initialFormData = {
-    transporterId: null,
-    generalDetails: {
-      businessName: "",
-      fromDate: "",
-      toDate: "",
-      avgRating: 0,
-      transMode: {
-        road: false,
-        rail: false,
-        air: false,
-        sea: false,
-      },
-      activeFlag: true,
-    },
-    addresses: [
-      {
-        vatNumber: "",
-        country: "",
-        state: "",
-        city: "",
-        district: "",
-        street1: "",
-        street2: "",
-        postalCode: "",
-        isPrimary: true,
-        contacts: [
-          {
-            name: "",
-            role: "",
-            phoneNumber: "",
-            alternatePhoneNumber: "",
-            email: "",
-            alternateEmail: "",
-            whatsappNumber: "",
-          },
-        ],
-      },
-    ],
-    serviceableAreas: [
-      {
-        country: "",
-        states: [],
-      },
-    ],
-    documents: [
-      {
-        documentType: "",
-        documentNumber: "",
-        referenceNumber: "",
-        country: "",
-        validFrom: "",
-        validTo: "",
-        status: true,
-        fileName: "",
-        fileType: "",
-        fileData: "",
-      },
-    ],
-  };
+  // Use the same object reference for dirty tracking to prevent false positives
+  const initialFormData = initialFormState;
 
   // Form dirty tracking - Pass INITIAL form data (empty baseline) to the hook
   const { isDirty, setCurrentData, resetDirty } =
@@ -207,6 +160,17 @@ const CreateTransporterPage = () => {
   useEffect(() => {
     setCurrentData(formData);
   }, [formData, setCurrentData]);
+
+  // Reset dirty state after component mounts with pre-filled data
+  // This ensures that pre-filled default values (fromDate) don't trigger dirty state on page load
+  useEffect(() => {
+    // Run only once on mount after initial render
+    const timer = setTimeout(() => {
+      resetDirty(formData);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array - runs only once on mount
 
   // Save as draft hook
   const {
@@ -461,6 +425,61 @@ const CreateTransporterPage = () => {
       2: false,
       3: false,
     });
+
+    // ========================================
+    // GST-PAN VALIDATION (before main validation)
+    // ========================================
+    const gstPanErrors = validateGSTPANRelationship(formData);
+
+    if (gstPanErrors.gstPan) {
+      const error = gstPanErrors.gstPan;
+      const nestedErrors = {};
+
+      // Set error on the appropriate field
+      if (error.tab === "addresses") {
+        // Find primary address index
+        const primaryIndex = formData.addresses?.findIndex(
+          (addr) => addr.isPrimary === true
+        );
+        if (primaryIndex >= 0) {
+          nestedErrors.addresses = [];
+          nestedErrors.addresses[primaryIndex] = {
+            vatNumber: error.message,
+          };
+        }
+      } else if (error.tab === "documents") {
+        nestedErrors.documents = {
+          _general: error.message,
+        };
+      }
+
+      setValidationErrors(nestedErrors);
+
+      // Set tab errors
+      const newTabErrors = {
+        0: false,
+        1: error.tab === "addresses",
+        2: false,
+        3: error.tab === "documents",
+      };
+      setTabErrors(newTabErrors);
+
+      // Switch to the tab with error
+      const errorTab = error.tab === "addresses" ? 1 : 3;
+      setActiveTab(errorTab);
+
+      // Show toast notification
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "GST-PAN Validation Failed",
+          details: [error.message, error.hint].filter(Boolean),
+          duration: 8000,
+        })
+      );
+
+      return;
+    }
 
     // Validate entire form
     const validation = createTransporterSchema.safeParse(formData);

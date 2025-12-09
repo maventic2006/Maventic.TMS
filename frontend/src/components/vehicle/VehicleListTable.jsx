@@ -259,6 +259,32 @@ const VehicleListTable = ({
                     {displayValue(vehicle.vehicleCondition)}
                   </span>
                 </div>
+                {vehicle.approver && (
+                  <div>
+                    <span style={{ color: theme.colors.text.secondary }}>
+                      Approver:
+                    </span>
+                    <span
+                      className="ml-2 font-semibold"
+                      style={{ color: theme.colors.text.primary }}
+                    >
+                      {vehicle.approver}
+                    </span>
+                  </div>
+                )}
+                {vehicle.approvedOn && (
+                  <div>
+                    <span style={{ color: theme.colors.text.secondary }}>
+                      Approved On:
+                    </span>
+                    <span
+                      className="ml-2 font-semibold"
+                      style={{ color: theme.colors.text.primary }}
+                    >
+                      {vehicle.approvedOn}
+                    </span>
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -484,13 +510,13 @@ const VehicleListTable = ({
                     className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
                     style={{ color: theme.colors.text.primary }}
                   >
-                    {displayValue(vehicle.approvedName)}
+                    {displayValue(vehicle.approver)}
                   </td>
                   <td
                     className="px-4 py-2 text-sm text-center font-semibold text-nowrap"
                     style={{ color: theme.colors.text.primary }}
                   >
-                    {displayValue(vehicle.approvedBy)}
+                    {displayValue(vehicle.approvedOn)}
                   </td>
                   <td className="px-4 py-2 text-center text-nowrap">
                     {vehicle.status === "SAVE_AS_DRAFT" && onDeleteDraft && (

@@ -349,6 +349,11 @@ const consignorSlice = createSlice({
     resetUploadProgress: (state) => {
       state.uploadProgress = 0;
     },
+
+    // Reset pagination to first page
+    resetPaginationToFirstPage: (state) => {
+      state.pagination.page = 1;
+    },
   },
 
   extraReducers: (builder) => {
@@ -624,6 +629,7 @@ export const {
   resetLastUpdated,
   setUploadProgress,
   resetUploadProgress,
+  resetPaginationToFirstPage,
 } = consignorSlice.actions;
 
 // Export reducer

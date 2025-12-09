@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import TMSHeader from "../components/layout/TMSHeader";
 import { getPageTheme } from "../theme.config";
@@ -10,6 +10,7 @@ import PaginationBar from "../components/transporter/PaginationBar";
 import {
   fetchTransporters,
   deleteTransporterDraft,
+  resetPaginationToFirstPage,
 } from "../redux/slices/transporterSlice";
 import { addToast, TOAST_TYPES } from "../redux/slices/uiSlice";
 
@@ -50,6 +51,7 @@ const TransporterMaintenance = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const theme = getPageTheme("list");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Redux state
   const { transporters, pagination, isFetching, error } = useSelector(
@@ -60,34 +62,40 @@ const TransporterMaintenance = () => {
   const [searchText, setSearchText] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Separate state for filter inputs and applied filters
-  const [filters, setFilters] = useState({
-    transporterId: "",
-    tan: "",
-    tinPan: "",
-    vatGst: "",
-    status: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-    transportMode: [],
-  });
+  // ✅ Helper: Read filters from URL query parameters
+  const getFiltersFromURL = useCallback(() => {
+    return {
+      transporterId: searchParams.get("transporterId") || "",
+      tan: searchParams.get("tan") || "",
+      tinPan: searchParams.get("tinPan") || "",
+      vatGst: searchParams.get("vatGst") || "",
+      status: searchParams.get("status") || "",
+      createdOnStart: searchParams.get("createdOnStart") || "",
+      createdOnEnd: searchParams.get("createdOnEnd") || "",
+      transportMode: searchParams.get("transportMode")
+        ? searchParams.get("transportMode").split(",")
+        : [],
+    };
+  }, [searchParams]);
 
-  const [appliedFilters, setAppliedFilters] = useState({
-    transporterId: "",
-    tan: "",
-    tinPan: "",
-    vatGst: "",
-    status: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-    transportMode: [],
-  });
+  // ✅ Initialize filters from URL on mount
+  const [filters, setFilters] = useState(() => getFiltersFromURL());
+  const [appliedFilters, setAppliedFilters] = useState(() =>
+    getFiltersFromURL()
+  );
+
+  // ✅ Sync URL params back to filter state when searchParams change (e.g., browser back button)
+  useEffect(() => {
+    const urlFilters = getFiltersFromURL();
+    setFilters(urlFilters);
+    setAppliedFilters(urlFilters);
+  }, [searchParams]); // Changed from getFiltersFromURL to searchParams to prevent infinite loop
 
   // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
     // Prevent multiple simultaneous calls
     if (isFetching) return;
-    
+
     const fetchData = () => {
       const params = {
         page: pagination.page,
@@ -136,7 +144,27 @@ const TransporterMaintenance = () => {
   const handleApplyFilters = useCallback(() => {
     // Apply filters by copying current filter state to appliedFilters
     setAppliedFilters({ ...filters });
-  }, [filters]);
+
+    // ✅ Sync filters to URL query parameters
+    const params = new URLSearchParams();
+    if (filters.transporterId)
+      params.set("transporterId", filters.transporterId);
+    if (filters.tan) params.set("tan", filters.tan);
+    if (filters.tinPan) params.set("tinPan", filters.tinPan);
+    if (filters.vatGst) params.set("vatGst", filters.vatGst);
+    if (filters.status) params.set("status", filters.status);
+    if (filters.createdOnStart)
+      params.set("createdOnStart", filters.createdOnStart);
+    if (filters.createdOnEnd) params.set("createdOnEnd", filters.createdOnEnd);
+    if (filters.transportMode.length > 0) {
+      params.set("transportMode", filters.transportMode.join(","));
+    }
+
+    setSearchParams(params);
+
+    // Reset pagination to page 1 when applying new filters
+    dispatch(resetPaginationToFirstPage());
+  }, [filters, dispatch, setSearchParams]);
 
   const handleClearFilters = useCallback(() => {
     // Clear both filter input state and applied filters
@@ -152,7 +180,10 @@ const TransporterMaintenance = () => {
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
-  }, []);
+
+    // ✅ Clear URL query parameters
+    setSearchParams(new URLSearchParams());
+  }, [setSearchParams]);
 
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);

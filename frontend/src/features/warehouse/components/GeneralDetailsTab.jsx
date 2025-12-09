@@ -9,6 +9,10 @@ import {
 const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
   const { user } = useSelector((state) => state.auth);
 
+  // Check if user is super admin (Product Owner)
+  const isSuperAdmin =
+    user?.user_type_id === "UT001" || user?.role === "Product Owner";
+
   // Safe navigation - ensure formData has the expected structure
   const generalDetails = formData?.generalDetails || {
     consignorId: user?.consignor_id,
@@ -44,21 +48,54 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
     <GlobalDropdownProvider>
       <div className="bg-white rounded-xl p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Consignor ID - Read-only, Auto-filled */}
+          {/* Consignor ID - Dropdown for Super Admin, Auto-filled for Consignors */}
           <div className="space-y-1">
             <label className="block text-xs font-medium text-[#0D1A33]">
-              Consignor ID
+              Consignor ID <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={user?.consignor_id || "AUTO-GENERATED"}
-              readOnly
-              disabled
-              className="w-full px-3 py-1.5 text-sm bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed"
-            />
-            <p className="text-xs text-gray-500">
-              Auto-filled based on logged-in user
-            </p>
+            {isSuperAdmin ? (
+              <>
+                <CustomSelect
+                  value={generalDetails.consignorId || ""}
+                  onValueChange={(value) => handleChange("consignorId", value)}
+                  options={masterData?.consignors || []}
+                  getOptionLabel={(option) =>
+                    `${option.customer_id} - ${option.customer_name}`
+                  }
+                  getOptionValue={(option) => option.customer_id}
+                  placeholder={
+                    masterData?.consignors?.length > 0
+                      ? "Select consignor"
+                      : "Loading consignors..."
+                  }
+                  error={errors?.["generalDetails.consignorId"]}
+                  required
+                  searchable
+                  disabled={
+                    !masterData?.consignors ||
+                    masterData.consignors.length === 0
+                  }
+                />
+                {errors?.["generalDetails.consignorId"] && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    ⚠️ {errors["generalDetails.consignorId"]}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={user?.consignor_id || "AUTO-GENERATED"}
+                  readOnly
+                  disabled
+                  className="w-full px-3 py-1.5 text-sm bg-gray-100 border border-gray-300 rounded-lg cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500">
+                  Auto-filled based on logged-in user
+                </p>
+              </>
+            )}
           </div>
 
           {/* Warehouse Name 1 - Mandatory */}
@@ -169,9 +206,9 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
                 ⚠️ {errors["generalDetails.materialType"]}
               </p>
             )}
-            <p className="text-xs text-gray-500">
+            {/* <p className="text-xs text-gray-500">
               Type of materials that can be shipped from this warehouse
-            </p>
+            </p> */}
           </div>
 
           {/* Language - Mandatory, Default EN */}
@@ -204,9 +241,9 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
               placeholder="Maximum number of vehicles in the warehouse"
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
             />
-            <p className="text-xs text-gray-500">
+            {/* <p className="text-xs text-gray-500">
               Maximum number of vehicle capacity in the warehouse
-            </p>
+            </p> */}
           </div>
 
           {/* Speed Limit - Mandatory, Default 20 KM/H */}
@@ -225,7 +262,7 @@ const GeneralDetailsTab = ({ formData, setFormData, errors, masterData }) => {
               placeholder="20"
               className="w-full px-3 py-1.5 text-sm border border-[#E5E7EB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 focus:border-[#3B82F6] transition-colors"
             />
-            <p className="text-xs text-gray-500">Default: 20 KM/H</p>
+            {/* <p className="text-xs text-gray-500">Default: 20 KM/H</p> */}
           </div>
 
           {/* Virtual Yard-In - Optional Boolean */}

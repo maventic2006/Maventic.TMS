@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import TMSHeader from "../components/layout/TMSHeader";
 import { getPageTheme } from "../theme.config";
-import { fetchDrivers } from "../redux/slices/driverSlice";
+import {
+  fetchDrivers,
+  resetPaginationToFirstPage,
+} from "../redux/slices/driverSlice";
 import DriverTopActionBar from "../components/driver/DriverTopActionBar";
 import DriverFilterPanel from "../components/driver/DriverFilterPanel";
 import DriverListTable from "../components/driver/DriverListTable";
@@ -60,6 +63,27 @@ const DriverMaintenance = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const theme = getPageTheme("list");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Helper: Read filters from URL query parameters
+  const getFiltersFromURL = useCallback(() => {
+    return {
+      driverId: searchParams.get("driverId") || "",
+      fullName: searchParams.get("fullName") || "",
+      phoneNumber: searchParams.get("phoneNumber") || "",
+      licenseNumber: searchParams.get("licenseNumber") || "",
+      country: searchParams.get("country") || "",
+      state: searchParams.get("state") || "",
+      city: searchParams.get("city") || "",
+      postalCode: searchParams.get("postalCode") || "",
+      status: searchParams.get("status") || "",
+      gender: searchParams.get("gender") || "",
+      bloodGroup: searchParams.get("bloodGroup") || "",
+      avgRating: searchParams.get("avgRating") || "",
+      createdOnStart: searchParams.get("createdOnStart") || "",
+      createdOnEnd: searchParams.get("createdOnEnd") || "",
+    };
+  }, [searchParams]);
 
   // Redux state
   const { drivers, pagination, isFetching, error } = useSelector(
@@ -70,46 +94,25 @@ const DriverMaintenance = () => {
   const [searchText, setSearchText] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Filter state
-  const [filters, setFilters] = useState({
-    driverId: "",
-    fullName: "",
-    phoneNumber: "",
-    licenseNumber: "",
-    country: "",
-    state: "",
-    city: "",
-    postalCode: "",
-    status: "",
-    gender: "",
-    bloodGroup: "",
-    avgRating: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-  });
+  // Filter state - initialize from URL on mount
+  const [filters, setFilters] = useState(() => getFiltersFromURL());
 
-  const [appliedFilters, setAppliedFilters] = useState({
-    driverId: "",
-    fullName: "",
-    phoneNumber: "",
-    licenseNumber: "",
-    country: "",
-    state: "",
-    city: "",
-    postalCode: "",
-    status: "",
-    gender: "",
-    bloodGroup: "",
-    avgRating: "",
-    createdOnStart: "",
-    createdOnEnd: "",
-  });
+  const [appliedFilters, setAppliedFilters] = useState(() =>
+    getFiltersFromURL()
+  );
+
+  // ✅ Sync URL params back to filter state when searchParams change (e.g., browser back button)
+  useEffect(() => {
+    const urlFilters = getFiltersFromURL();
+    setFilters(urlFilters);
+    setAppliedFilters(urlFilters);
+  }, [searchParams]); // Changed from getFiltersFromURL to searchParams to prevent infinite loop
 
   // Single useEffect for data fetching - prevents infinite loops
   useEffect(() => {
     // Prevent multiple simultaneous calls
     if (isFetching) return;
-    
+
     const fetchData = () => {
       const params = {
         page: pagination.page || 1,
@@ -152,8 +155,30 @@ const DriverMaintenance = () => {
   }, []);
 
   const handleApplyFilters = useCallback(() => {
+    dispatch(resetPaginationToFirstPage());
     setAppliedFilters({ ...filters });
-  }, [filters]);
+
+    // Sync filters to URL query parameters
+    const params = new URLSearchParams();
+    if (filters.driverId) params.set("driverId", filters.driverId);
+    if (filters.fullName) params.set("fullName", filters.fullName);
+    if (filters.phoneNumber) params.set("phoneNumber", filters.phoneNumber);
+    if (filters.licenseNumber)
+      params.set("licenseNumber", filters.licenseNumber);
+    if (filters.country) params.set("country", filters.country);
+    if (filters.state) params.set("state", filters.state);
+    if (filters.city) params.set("city", filters.city);
+    if (filters.postalCode) params.set("postalCode", filters.postalCode);
+    if (filters.status) params.set("status", filters.status);
+    if (filters.gender) params.set("gender", filters.gender);
+    if (filters.bloodGroup) params.set("bloodGroup", filters.bloodGroup);
+    if (filters.avgRating) params.set("avgRating", filters.avgRating);
+    if (filters.createdOnStart)
+      params.set("createdOnStart", filters.createdOnStart);
+    if (filters.createdOnEnd) params.set("createdOnEnd", filters.createdOnEnd);
+
+    setSearchParams(params);
+  }, [filters, dispatch, setSearchParams]);
 
   const handleClearFilters = useCallback(() => {
     const emptyFilters = {
@@ -174,7 +199,10 @@ const DriverMaintenance = () => {
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
-  }, []);
+
+    // Clear URL query parameters
+    setSearchParams(new URLSearchParams());
+  }, [setSearchParams]);
 
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);

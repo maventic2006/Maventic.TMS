@@ -34,6 +34,7 @@ import { validateTab } from "../validation";
 import { TOAST_TYPES } from "../../../utils/constants";
 import EmptyState from "../../../components/ui/EmptyState";
 import ApprovalActionBar from "../../../components/approval/ApprovalActionBar";
+import SubmitDraftModal from "../../../components/ui/SubmitDraftModal";
 
 // Import view tab components
 import GeneralInfoViewTab from "../components/GeneralInfoViewTab";
@@ -55,9 +56,14 @@ const ConsignorDetailsPage = () => {
   const dispatch = useDispatch();
 
   const { user, role } = useSelector((state) => state.auth);
-  const { currentConsignor, isFetching, isUpdating, error } = useSelector(
-    (state) => state.consignor
-  );
+  const { 
+    currentConsignor, 
+    isFetching, 
+    isUpdating, 
+    isUpdatingDraft,
+    isSubmittingDraft,
+    error 
+  } = useSelector((state) => state.consignor);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -71,6 +77,7 @@ const ConsignorDetailsPage = () => {
     4: false, // Warehouse List
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   const actionButtonTheme = getComponentTheme("actionButton");
   const tabButtonTheme = getComponentTheme("tabButton");
@@ -133,24 +140,95 @@ const ConsignorDetailsPage = () => {
       console.log("📋 ===== CONSIGNOR DETAILS PAGE DEBUG =====");
       console.log("currentConsignor from Redux:", currentConsignor);
 
-      // Transform currentConsignor data into nested structure expected by edit components
-      // Extract contacts, organization, documents from currentConsignor
-      const { contacts, organization, documents, ...generalFields } =
-        currentConsignor;
+      // The Redux slice already flattened the backend response 
+      // Backend returns: { general: {...}, contacts: [...], documents: [...] }
+      // Redux flattens to: { ...general, contacts: [...], documents: [...] }
+      // We need to reconstruct the nested structure for edit components
 
-      // Create nested formData structure
+      const { 
+        contacts, 
+        organization, 
+        documents, 
+        userApprovalStatus, 
+        ...generalFields 
+      } = currentConsignor;
+
+      // 🔄 MAP BACKEND CONTACT FIELDS TO FRONTEND FIELD NAMES
+      const mappedContacts = (contacts || []).map(contact => ({
+        // Map backend field names to frontend field names expected by ContactTab
+        contact_id: contact.contact_id,
+        designation: contact.contact_designation || contact.designation || "",
+        name: contact.contact_name || contact.name || "",
+        number: contact.contact_number || contact.number || "",
+        photo: contact.contact_photo || contact.photo || null,
+        role: contact.contact_role || contact.role || "",
+        email: contact.email_id || contact.email || "",
+        linkedin_link: contact.linkedin_link || "",
+        status: contact.status || "ACTIVE",
+        // ✅ ADD REQUIRED FIELDS FOR THEMETABLE CONTACT PHOTO PREVIEW
+        contact_photo: contact.contact_photo, // Required for ThemeTable photo preview logic
+        _backend_customer_id: currentConsignor.customer_id, // Required for API call
+        // 📸 ADD EXISTING PHOTO PREVIEW FOR THEMETABLE
+        photo_preview: contact.contact_photo ? 
+          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${currentConsignor.customer_id}/contacts/${contact.contact_id}/photo` : 
+          null,
+        // Add metadata for ThemeTable to recognize existing files
+        fileName: contact.contact_photo ? `${contact.contact_name || 'Contact'}_Photo` : "",
+        fileType: contact.contact_photo ? "image/jpeg" : "", // Assume JPEG for contact photos
+        fileData: null // ThemeTable expects this for preview mode
+      }));
+
+      // 🔄 MAP BACKEND DOCUMENT FIELDS TO FRONTEND FIELD NAMES
+      const mappedDocuments = (documents || []).map(document => ({
+        // Map backend field names to frontend field names expected by DocumentsTab
+        documentType: document.document_type || document.documentType || "",
+        documentNumber: document.document_number || document.documentNumber || "",
+        referenceNumber: document.reference_number || document.referenceNumber || "",
+        country: document.country || "",
+        validFrom: document.valid_from || document.validFrom || "",
+        validTo: document.valid_to || document.validTo || "",
+        status: document.status || true,
+        fileName: document.file_name || document.fileName || "",
+        fileType: document.file_type || document.fileType || "",
+        fileData: "", // Will be populated on preview request
+        fileUpload: null,
+        documentProvider: document.document_provider || document.documentProvider || "",
+        premiumAmount: document.premium_amount || document.premiumAmount || 0,
+        remarks: document.remarks || "",
+        // 📎 ADD EXISTING DOCUMENT PREVIEW DATA FOR THEMETABLE
+        fileUpload_preview: document.document_unique_id ? 
+          `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"}/consignors/${currentConsignor.customer_id}/documents/${document.document_unique_id}/download` : 
+          null,
+        // Keep original backend fields for reference
+        _backend_document_id: document.document_id,
+        _backend_document_unique_id: document.document_unique_id,
+        _backend_customer_id: currentConsignor.customer_id
+      }));
+
+      // Create proper nested formData structure with field mapping
       const transformedData = {
-        general: generalFields,
-        contacts: contacts || [],
+        general: generalFields, // All general fields (customer_name, upload_nda, upload_msa, approved_date, etc.)
+        contacts: mappedContacts,
         organization: organization || {
           company_code: "",
           business_area: "",
           status: "ACTIVE",
         },
-        documents: documents || [],
+        documents: mappedDocuments,
       };
 
-      console.log("📋 Transformed data for edit mode:", transformedData);
+      console.log("📋 Transformed data for edit mode:");
+      console.log("  general:", transformedData.general);
+      console.log("  ✅ approved_date:", transformedData.general?.approved_date);
+      console.log("  contacts (mapped):", transformedData.contacts);
+      console.log("  ✅ First contact phone:", transformedData.contacts[0]?.number);
+      console.log("  ✅ First contact photo:", transformedData.contacts[0]?.photo);
+      console.log("  organization:", transformedData.organization);
+      console.log("  documents (mapped):", transformedData.documents);
+      console.log("  ✅ First document country:", transformedData.documents[0]?.country);
+      console.log("  ✅ First document validFrom:", transformedData.documents[0]?.validFrom);
+      console.log("🔍 NDA Document ID:", transformedData.general?.upload_nda);
+      console.log("🔍 MSA Document ID:", transformedData.general?.upload_msa);
       console.log("==========================================");
 
       setEditFormData(transformedData);
@@ -188,6 +266,109 @@ const ConsignorDetailsPage = () => {
         });
     }
   };
+
+  // Check if consignor is a draft
+  const isDraftConsignor = currentConsignor?.status === "SAVE_AS_DRAFT";
+
+  // Check if current user is the creator of this consignor
+  // Use String() to ensure type consistency in comparison
+  const isCreator =
+    currentConsignor?.created_by &&
+    user?.user_id &&
+    String(currentConsignor.created_by) === String(user.user_id);
+
+  // Check if current user is an approver
+  // Check both role and user_type_id for Product Owner detection
+  const isApprover =
+    user?.role === "Product Owner" ||
+    user?.role === "admin" ||
+    user?.user_type_id === "UT001"; // UT001 is Owner/Product Owner
+
+  // 🔍 DEBUG: Log creator and approver checks
+  console.log("🔍 EDIT BUTTON DEBUG - CONSIGNOR:");
+  console.log("  Current User ID:", user?.user_id, typeof user?.user_id);
+  console.log("  Current User Role:", user?.role);
+  console.log("  Current User Type ID:", user?.user_type_id);
+  console.log(
+    "  Consignor Created By:",
+    currentConsignor?.created_by,
+    typeof currentConsignor?.created_by
+  );
+  console.log(
+    "  String Comparison:",
+    String(currentConsignor?.created_by),
+    "===",
+    String(user?.user_id)
+  );
+  console.log("  Is Creator:", isCreator);
+  console.log("  Is Approver:", isApprover, "(role-based or UT001)");
+  console.log("  Is Draft:", isDraftConsignor);
+  console.log("  Status:", currentConsignor?.status);
+
+  // ✅ PERMISSION LOGIC - Rejection/Resubmission Workflow
+  // Determine if user can edit based on entity status and user role
+  const canEdit = React.useMemo(() => {
+    const status = currentConsignor?.status;
+
+    console.log("🔍 CANEDIT CALCULATION - CONSIGNOR:");
+    console.log("  Status:", status);
+    console.log("  isDraftConsignor:", isDraftConsignor);
+    console.log("  isCreator:", isCreator);
+    console.log("  isApprover:", isApprover);
+
+    // DRAFT: Only creator can edit
+    if (isDraftConsignor) {
+      console.log("  Result: DRAFT - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // INACTIVE (rejected): Only creator can edit
+    if (status === "INACTIVE") {
+      console.log("  Result: INACTIVE - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // PENDING: No one can edit (locked during approval)
+    if (status === "PENDING") {
+      console.log("  Result: PENDING - returning false");
+      return false;
+    }
+
+    // ACTIVE: Only approvers can edit
+    if (status === "ACTIVE") {
+      console.log("  Result: ACTIVE - returning isApprover:", isApprover);
+      return isApprover;
+    }
+
+    // Default: Allow edit
+    console.log("  Result: DEFAULT - returning true");
+    return true;
+  }, [currentConsignor?.status, isCreator, isApprover, isDraftConsignor]);
+
+  console.log("🔍 FINAL CANEDIT VALUE - CONSIGNOR:", canEdit);
+
+  // Debug logging for approval data
+  useEffect(() => {
+    if (currentConsignor) {
+      console.log("🔍 ConsignorDetailsPage - Consignor Data Loaded:");
+      console.log("  Consignor ID:", currentConsignor.customerId);
+      console.log("  Status:", currentConsignor.general?.status);
+      console.log(
+        "  User Approval Status:",
+        currentConsignor.userApprovalStatus
+      );
+      console.log(
+        "  ✅ Remarks Available:",
+        currentConsignor.userApprovalStatus?.remarks ? "YES" : "NO"
+      );
+      console.log(
+        "  Remarks Content:",
+        currentConsignor.userApprovalStatus?.remarks
+      );
+      console.log("  Current User:", user);
+      console.log("  Full currentConsignor object:", currentConsignor);
+    }
+  }, [currentConsignor, user]);
 
   const handleEditToggle = () => {
     if (isEditMode && hasUnsavedChanges) {
@@ -253,6 +434,13 @@ const ConsignorDetailsPage = () => {
   };
 
   const handleSaveChanges = async () => {
+    // If this is a draft consignor, show the submit modal
+    if (currentConsignor?.status === "SAVE_AS_DRAFT") {
+      setShowSubmitModal(true);
+      return;
+    }
+
+    // For non-draft consignors, proceed with normal update
     try {
       // Clear previous errors
       setValidationErrors({});
@@ -315,47 +503,79 @@ const ConsignorDetailsPage = () => {
       const files = {};
       const cleanFormData = { ...editFormData };
 
-      // Process contacts to extract photo files
+      // Process contacts to extract photo files but KEEP frontend field names
       if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
         cleanFormData.contacts = cleanFormData.contacts.map(
           (contact, index) => {
-            const cleanContact = { ...contact };
+            // ✅ KEEP Frontend field names for validation (backend expects these)
+            const cleanContact = {
+              contact_id: contact.contact_id || null,
+              designation: contact.designation || "",
+              name: contact.name || "",
+              number: contact.number || "",
+              email: contact.email || "",
+              linkedin_link: contact.linkedin_link || "",
+              team: contact.team || "",
+              role: contact.role || "",
+              status: contact.status || "ACTIVE",
+              // Keep existing photo logic
+              photo: contact.photo
+            };
 
             // Extract photo file if it exists
             if (cleanContact.photo instanceof File) {
               files[`contact_${index}_photo`] = cleanContact.photo;
               cleanContact.photo = null;
             } else if (typeof cleanContact.photo === "string") {
-              cleanContact.photo = null;
+              // Keep existing photo ID for update
+              cleanContact.photo = contact._backend_photo_id || cleanContact.photo;
             }
 
-            // Remove preview URL (not needed for backend)
+            // Remove preview URL and frontend-specific fields
             delete cleanContact.photo_preview;
+            delete cleanContact._backend_photo_id;
+            delete cleanContact._backend_number;
+            delete cleanContact._backend_name;
 
             return cleanContact;
           }
         );
       }
 
-      // Process documents to extract file uploads
+      // Process documents to extract file uploads but KEEP frontend field names
       if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
         cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
-          const cleanDoc = { ...doc };
+          // ✅ KEEP Frontend field names for validation (backend expects these)
+          const cleanDoc = {
+            document_unique_id: doc._backend_document_unique_id || null,
+            document_type_id: doc.document_type_id || null, 
+            documentType: doc.documentType || "",
+            documentNumber: doc.documentNumber || "",
+            referenceNumber: doc.referenceNumber || "",
+            country: doc.country || "",
+            validFrom: doc.validFrom || "",
+            validTo: doc.validTo || "",
+            status: doc.status !== undefined ? doc.status : true,
+            fileName: doc.fileName || "",
+            fileType: doc.fileType || "",
+            fileData: doc.fileData || "",
+            document_id: doc._backend_document_id || null
+          };
 
           // Extract document file if it exists
           // Check for File instance OR File-like object (has name, size, type properties)
           const isFileOrFileLike =
-            cleanDoc.fileUpload &&
-            (cleanDoc.fileUpload instanceof File ||
-              cleanDoc.fileUpload instanceof Blob ||
-              (typeof cleanDoc.fileUpload === "object" &&
-                "name" in cleanDoc.fileUpload &&
-                "size" in cleanDoc.fileUpload &&
-                "type" in cleanDoc.fileUpload));
+            doc.fileUpload &&
+            (doc.fileUpload instanceof File ||
+              doc.fileUpload instanceof Blob ||
+              (typeof doc.fileUpload === "object" &&
+                "name" in doc.fileUpload &&
+                "size" in doc.fileUpload &&
+                "type" in doc.fileUpload));
 
           if (isFileOrFileLike) {
             const fileKey = `document_${index}_file`;
-            files[fileKey] = cleanDoc.fileUpload;
+            files[fileKey] = doc.fileUpload;
             // Add fileKey reference for backend
             cleanDoc.fileKey = fileKey;
           } else {
@@ -363,10 +583,22 @@ const ConsignorDetailsPage = () => {
             cleanDoc.fileKey = null;
           }
 
-          // Remove preview URL (not needed for backend)
+          // Remove fields not accepted by backend and frontend-specific fields
           delete cleanDoc.fileUpload_preview;
-          // Remove fileUpload from payload (already extracted)
           delete cleanDoc.fileUpload;
+          delete cleanDoc.documentProvider; // Not in backend schema
+          delete cleanDoc.premiumAmount; // Not in backend schema
+          delete cleanDoc.remarks; // Not in backend schema
+          delete cleanDoc._backend_document_id;
+          delete cleanDoc._backend_document_unique_id;
+
+          return cleanDoc;
+          delete cleanDoc.referenceNumber;
+          delete cleanDoc.validFrom;
+          delete cleanDoc.validTo;
+          delete cleanDoc.fileName;
+          delete cleanDoc.fileType;
+          delete cleanDoc.fileData;
 
           return cleanDoc;
         });
@@ -389,6 +621,13 @@ const ConsignorDetailsPage = () => {
         } else if (typeof cleanFormData.general.upload_msa === "string") {
           cleanFormData.general.upload_msa = null;
         }
+
+        // Remove database audit fields not allowed in validation schema
+        delete cleanFormData.general.created_by; // Database audit field, not user input
+        delete cleanFormData.general.updated_by; // Database audit field, not user input  
+        delete cleanFormData.general.created_at; // Database audit field, not user input
+        delete cleanFormData.general.updated_at; // Database audit field, not user input
+        delete cleanFormData.general.consignor_unique_id; // Database primary key, not user input
       }
 
       // Prepare data for backend API (needs nested structure)
@@ -405,12 +644,28 @@ const ConsignorDetailsPage = () => {
       });
       console.log("===========================\n");
 
+      // ✅ RESUBMISSION LOGIC - If entity is INACTIVE (rejected), change status to PENDING
+      const isResubmission = currentConsignor?.status === "INACTIVE";
+
+      // If resubmitting, update the status to PENDING to restart approval workflow
+      const finalGeneral = isResubmission
+        ? {
+            ...general,
+            status: "PENDING", // Restart approval workflow
+          }
+        : general;
+
+      console.log("🔍 RESUBMISSION CHECK - CONSIGNOR:");
+      console.log("  Current Status:", currentConsignor?.status);
+      console.log("  Is Resubmission:", isResubmission);
+      console.log("  Final Status:", finalGeneral?.status);
+
       // Call the update API
       const result = await dispatch(
         updateConsignor({
           customerId: id,
           data: {
-            general,
+            general: finalGeneral,
             contacts,
             organization,
             documents,
@@ -423,7 +678,9 @@ const ConsignorDetailsPage = () => {
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: "Consignor updated successfully!",
+          message: isResubmission
+            ? "Consignor resubmitted for approval successfully! Status changed to PENDING."
+            : "Consignor updated successfully!",
         })
       );
 
@@ -528,6 +785,8 @@ const ConsignorDetailsPage = () => {
 
   // Handle update draft (for SAVE_AS_DRAFT status only)
   const handleUpdateDraft = async () => {
+    setShowSubmitModal(false);
+
     try {
       // Extract file objects from editFormData
       const files = {};
@@ -552,29 +811,46 @@ const ConsignorDetailsPage = () => {
       }
       console.log("===========================\n");
 
-      // Process contacts to extract photo files
+      // Process contacts to extract photo files but KEEP frontend field names for validation
       if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
         cleanFormData.contacts = cleanFormData.contacts.map(
           (contact, index) => {
-            const cleanContact = { ...contact };
+            // ✅ KEEP Frontend field names (backend validation expects these)
+            const cleanContact = {
+              contact_id: contact.contact_id || null,
+              designation: contact.designation || "",
+              name: contact.name || "",
+              number: contact.number || "",
+              email: contact.email || "",
+              linkedin_link: contact.linkedin_link || "",
+              team: contact.team || "",
+              role: contact.role || "",
+              status: contact.status || "ACTIVE",
+              // Keep existing photo logic
+              photo: contact.photo
+            };
 
             // Extract photo file if it exists
             if (cleanContact.photo instanceof File) {
               files[`contact_${index}_photo`] = cleanContact.photo;
               cleanContact.photo = null;
             } else if (typeof cleanContact.photo === "string") {
-              cleanContact.photo = null;
+              // Keep existing photo ID for update
+              cleanContact.photo = contact._backend_photo_id || cleanContact.photo;
             }
 
-            // Remove preview URL (not needed for backend)
+            // Remove preview URL and frontend-specific fields
             delete cleanContact.photo_preview;
+            delete cleanContact._backend_photo_id;
+            delete cleanContact._backend_number;
+            delete cleanContact._backend_name;
 
             return cleanContact;
           }
         );
       }
 
-      // Process documents to extract file uploads
+      // Process documents to extract file uploads and map field names (same as saveConsignorAsDraft)
       if (cleanFormData.documents && Array.isArray(cleanFormData.documents)) {
         cleanFormData.documents = cleanFormData.documents.map((doc, index) => {
           const cleanDoc = { ...doc };
@@ -588,7 +864,19 @@ const ConsignorDetailsPage = () => {
             constructor: cleanDoc.fileUpload?.constructor?.name || "N/A",
             hasNameProp: cleanDoc.fileUpload && "name" in cleanDoc.fileUpload,
             hasSizeProp: cleanDoc.fileUpload && "size" in cleanDoc.fileUpload,
+            documentType: cleanDoc.documentType,
+            documentNumber: cleanDoc.documentNumber,
           });
+
+          // ✅ FIXED: Map frontend field names to backend field names (same as saveConsignorAsDraft)
+          const mappedDoc = {
+            document_type_id: cleanDoc.documentType || cleanDoc.document_type_id,
+            document_number: cleanDoc.documentNumber || cleanDoc.document_number,
+            valid_from: cleanDoc.validFrom || cleanDoc.valid_from,
+            valid_to: cleanDoc.validTo || cleanDoc.valid_to,
+            country: cleanDoc.country,
+            status: cleanDoc.status !== undefined ? cleanDoc.status : true,
+          };
 
           // Extract document file if it exists
           // Check for File instance OR File-like object (has name, size, type properties)
@@ -605,24 +893,24 @@ const ConsignorDetailsPage = () => {
             const fileKey = `document_${index}_file`;
             files[fileKey] = cleanDoc.fileUpload;
             // Add fileKey reference for backend
-            cleanDoc.fileKey = fileKey;
+            mappedDoc.fileKey = fileKey;
             console.log(
               `✅ File extracted: ${fileKey} -> ${cleanDoc.fileUpload.name} (${cleanDoc.fileUpload.constructor.name})`
             );
           } else {
             // If no file uploaded, set fileKey to null
-            cleanDoc.fileKey = null;
+            mappedDoc.fileKey = null;
             console.log(
               `⚠️  No file to extract (fileUpload is ${typeof cleanDoc.fileUpload})`
             );
           }
 
-          // Remove preview URL (not needed for backend)
-          delete cleanDoc.fileUpload_preview;
-          // Remove fileUpload from payload (already extracted)
-          delete cleanDoc.fileUpload;
+          console.log(`✅ Document mapped:`, {
+            original: { documentType: cleanDoc.documentType, documentNumber: cleanDoc.documentNumber },
+            mapped: { document_type_id: mappedDoc.document_type_id, document_number: mappedDoc.document_number }
+          });
 
-          return cleanDoc;
+          return mappedDoc;
         });
       }
 
@@ -696,27 +984,57 @@ const ConsignorDetailsPage = () => {
 
   // Handle submit draft for approval (SAVE_AS_DRAFT → PENDING)
   const handleSubmitForApproval = async () => {
+    setShowSubmitModal(false);
+
     try {
       // Extract file objects from editFormData
       const files = {};
       const cleanFormData = { ...editFormData };
 
-      // Process contacts to extract photo files
+      // Process contacts to extract photo files but KEEP frontend field names for validation
       if (cleanFormData.contacts && Array.isArray(cleanFormData.contacts)) {
         cleanFormData.contacts = cleanFormData.contacts.map(
           (contact, index) => {
-            const cleanContact = { ...contact };
+            // ✅ KEEP Frontend field names (backend validation expects these)
+            const cleanContact = {
+              contact_id: contact.contact_id || null,
+              designation: contact.designation || "",
+              name: contact.name || "",
+              number: contact.number || "",
+              email: contact.email || "",
+              linkedin_link: contact.linkedin_link || "",
+              team: contact.team || "",
+              role: contact.role || "",
+              status: contact.status || "ACTIVE",
+              country_code: contact.country_code || "",
+              // Keep existing photo logic
+              photo: contact.photo
+            };
+
+            // Fix contact number field - ensure it's a string (required by validation)
+            if (cleanContact.number === null || cleanContact.number === undefined) {
+              cleanContact.number = ""; // Convert null to empty string to prevent validation error
+            }
+
+            // Ensure country_code is properly handled  
+            if (cleanContact.country_code === null || cleanContact.country_code === undefined) {
+              cleanContact.country_code = ""; // Convert null to empty string
+            }
 
             // Extract photo file if it exists
             if (cleanContact.photo instanceof File) {
               files[`contact_${index}_photo`] = cleanContact.photo;
               cleanContact.photo = null;
             } else if (typeof cleanContact.photo === "string") {
-              cleanContact.photo = null;
+              // ⭐ CRITICAL: Preserve existing photo ID for submit (don't nullify!)
+              cleanContact.photo = contact._backend_photo_id || cleanContact.photo;
             }
 
-            // Remove preview URL (not needed for backend)
+            // Remove preview URL and frontend-specific fields
             delete cleanContact.photo_preview;
+            delete cleanContact._backend_photo_id;
+            delete cleanContact._backend_number;
+            delete cleanContact._backend_name;
 
             return cleanContact;
           }
@@ -749,10 +1067,17 @@ const ConsignorDetailsPage = () => {
             cleanDoc.fileKey = null;
           }
 
-          // Remove preview URL (not needed for backend)
+          // Remove fields not accepted by backend validation
           delete cleanDoc.fileUpload_preview;
-          // Remove fileUpload from payload (already extracted)
           delete cleanDoc.fileUpload;
+          delete cleanDoc.documentProvider; // Not in backend schema
+          delete cleanDoc.premiumAmount; // Not in backend schema
+          delete cleanDoc.remarks; // Not in backend schema
+          
+          // Remove frontend-only fields that cause validation errors
+          delete cleanDoc.documentUniqueId; // Frontend display field, not allowed in backend
+          delete cleanDoc.documentTypeName; // Frontend display field, not allowed in backend  
+          delete cleanDoc.documentId; // Frontend reference field, not allowed in backend
 
           return cleanDoc;
         });
@@ -775,6 +1100,13 @@ const ConsignorDetailsPage = () => {
         } else if (typeof cleanFormData.general.upload_msa === "string") {
           cleanFormData.general.upload_msa = null;
         }
+
+        // Remove database audit fields not allowed in validation schema
+        delete cleanFormData.general.created_by; // Database audit field, not user input
+        delete cleanFormData.general.updated_by; // Database audit field, not user input  
+        delete cleanFormData.general.created_at; // Database audit field, not user input
+        delete cleanFormData.general.updated_at; // Database audit field, not user input
+        delete cleanFormData.general.consignor_unique_id; // Database primary key, not user input
       }
 
       // Prepare data for backend API (needs nested structure)
@@ -819,33 +1151,82 @@ const ConsignorDetailsPage = () => {
       console.error("Error submitting for approval:", err);
       dispatch(clearError());
 
-      // Handle validation errors
-      if (err.code === "VALIDATION_ERROR" && err.field) {
-        const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
-        if (fieldMatch) {
-          const [, section] = fieldMatch;
-          const tabMapping = {
-            general: 0,
-            contacts: 1,
-            organization: 2,
-            documents: 3,
-          };
-          const tabWithError = tabMapping[section];
-          if (tabWithError !== null) {
-            setActiveTab(tabWithError);
+      // Handle validation errors with multiple error details
+      if (err.code === "VALIDATION_ERROR") {
+        // If there are multiple validation errors in details array
+        if (err.errors && Array.isArray(err.errors) && err.errors.length > 0) {
+          // Show each error in a toast
+          err.errors.forEach((error) => {
+            const errorMessage = error.message || "Validation error";
+            dispatch(
+              addToast({
+                type: TOAST_TYPES.ERROR,
+                message: errorMessage,
+              })
+            );
+          });
+
+          // Switch to the first tab with errors
+          const firstError = err.errors[0];
+          if (firstError.field) {
+            const fieldMatch = firstError.field.match(
+              /^(\w+)(?:\[(\d+)\])?\.?(.+)?$/
+            );
+            if (fieldMatch) {
+              const [, section] = fieldMatch;
+              const tabMapping = {
+                general: 0,
+                contacts: 1,
+                organization: 2,
+                documents: 3,
+              };
+              const tabWithError = tabMapping[section];
+              if (tabWithError !== undefined && tabWithError !== null) {
+                setActiveTab(tabWithError);
+              }
+            }
           }
+          return;
         }
 
-        // Build user-friendly error message with expected format
-        let errorMessage = err.message;
-        if (err.expectedFormat) {
-          errorMessage = `${err.message} (Expected format: ${err.expectedFormat})`;
+        // Handle single validation error (backward compatibility)
+        if (err.field) {
+          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+          if (fieldMatch) {
+            const [, section] = fieldMatch;
+            const tabMapping = {
+              general: 0,
+              contacts: 1,
+              organization: 2,
+              documents: 3,
+            };
+            const tabWithError = tabMapping[section];
+            if (tabWithError !== null) {
+              setActiveTab(tabWithError);
+            }
+          }
+
+          // Build user-friendly error message with expected format
+          let errorMessage = err.message;
+          if (err.expectedFormat) {
+            errorMessage = `${err.message} (Expected format: ${err.expectedFormat})`;
+          }
+
+          dispatch(
+            addToast({
+              type: TOAST_TYPES.ERROR,
+              message: errorMessage,
+            })
+          );
+          return;
         }
 
+        // Generic validation error without field info
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
-            message: errorMessage,
+            message:
+              err.message || "Validation failed. Please check your input.",
           })
         );
         return;
@@ -924,10 +1305,10 @@ const ConsignorDetailsPage = () => {
             The requested consignor could not be found.
           </p>
           <button
-            onClick={() => navigate("/consignor")}
+            onClick={() => navigate(-1)}
             className="px-4 py-2 bg-[#10B981] text-white rounded-lg hover:bg-[#059669] transition-colors"
           >
-            Back to Consignors
+            Go Back
           </button>
         </div>
       </div>
@@ -1011,6 +1392,12 @@ const ConsignorDetailsPage = () => {
                 </>
               )}
 
+            {console.log("🔍 BUTTON RENDER CHECK - CONSIGNOR:", {
+              isEditMode,
+              canEdit,
+              showButton: !isEditMode && canEdit,
+            })}
+
             {isEditMode ? (
               <>
                 <button
@@ -1021,83 +1408,71 @@ const ConsignorDetailsPage = () => {
                   Cancel
                 </button>
 
-                {/* Show different save buttons based on status */}
-                {currentConsignor.status === "SAVE_AS_DRAFT" ? (
-                  <>
-                    {/* Update Draft button */}
-                    <button
-                      onClick={handleUpdateDraft}
-                      disabled={isUpdating}
-                      className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] text-white rounded-xl font-medium text-sm hover:from-[#2563EB] hover:to-[#3B82F6] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    >
-                      {isUpdating ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                          Update Draft
-                        </>
-                      )}
-                    </button>
-
-                    {/* Submit for Approval button */}
-                    <button
-                      onClick={handleSubmitForApproval}
-                      disabled={isUpdating}
-                      className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    >
-                      {isUpdating ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                          Submit for Approval
-                        </>
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  /* Regular Save Changes button for ACTIVE/PENDING status */
-                  <button
-                    onClick={handleSaveChanges}
-                    disabled={isUpdating}
-                    className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  >
-                    {isUpdating ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                        Save Changes
-                      </>
-                    )}
-                  </button>
-                )}
+                {/* Single Save Changes button for all statuses (including drafts) */}
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={isUpdating}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isUpdating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                      Save Changes
+                    </>
+                  )}
+                </button>
               </>
             ) : (
-              <button
-                onClick={handleEditToggle}
-                className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
-              >
-                <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                {currentConsignor.status === "SAVE_AS_DRAFT" ||
-                currentConsignor.status === "DRAFT"
-                  ? "Edit Draft"
-                  : "Edit Details"}
-              </button>
+              !isEditMode &&
+              canEdit && (
+                <button
+                  onClick={handleEditToggle}
+                  className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
+                >
+                  <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  {currentConsignor.status === "SAVE_AS_DRAFT" ||
+                  currentConsignor.status === "DRAFT"
+                    ? "Edit Draft"
+                    : "Edit Details"}
+                </button>
+              )
             )}
           </div>
         </div>
       </div>
+
+      {/* ✅ REJECTION REMARKS BANNER - Show when entity is rejected (INACTIVE) */}
+      {currentConsignor?.status === "INACTIVE" &&
+        currentConsignor?.userApprovalStatus?.remarks && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-6 mx-6 mt-4 rounded-lg shadow-sm">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-red-900 font-semibold text-lg mb-2 flex items-center gap-2">
+                  Rejection Remarks
+                  <span className="text-xs bg-red-100 px-2 py-1 rounded-full ml-2">
+                    Entity Rejected
+                  </span>
+                </h4>
+                <p className="text-red-800 whitespace-pre-wrap leading-relaxed">
+                  {currentConsignor.userApprovalStatus.remarks}
+                </p>
+                {isCreator && !isEditMode && (
+                  <div className="mt-4 text-sm text-red-700 bg-red-100 p-3 rounded-md">
+                    <strong>Note:</strong> Please address the rejection remarks
+                    above and click "Edit Details" to make the necessary
+                    changes, then save to resubmit for approval.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Modern Tab Navigation with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">
@@ -1185,7 +1560,8 @@ const ConsignorDetailsPage = () => {
                   {!TabComponent ? (
                     <EmptyState message="No data available" />
                   ) : (
-                    <div className="p-4">
+                    <div className="p-4" style={{ height: "775px" }}>
+                    {/* <div className="p-4" style={{height: "665px"}}> */}
                       <TabComponent
                         // For edit mode, pass formData. For view mode, pass consignor
                         {...(isEditMode
@@ -1220,6 +1596,17 @@ const ConsignorDetailsPage = () => {
           })}
         </div>
       </div>
+
+      {/* Submit Draft Modal */}
+      <SubmitDraftModal
+        isOpen={showSubmitModal}
+        onUpdateDraft={handleUpdateDraft}
+        onSubmitForApproval={handleSubmitForApproval}
+        onCancel={() => setShowSubmitModal(false)}
+        isLoading={isUpdating}
+        title="Submit Changes"
+        message="Would you like to update the draft or submit it for approval?"
+      />
     </div>
   );
 };

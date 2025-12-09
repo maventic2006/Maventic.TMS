@@ -90,17 +90,6 @@ const VehicleDetailsPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
 
-  // Check if vehicle is a draft (handle both DRAFT and SAVE_AS_DRAFT status values)
-  const isDraftVehicle =
-    currentVehicle?.status === "DRAFT" ||
-    currentVehicle?.status === "SAVE_AS_DRAFT";
-
-  // Check if current user is the creator of this vehicle
-  const isCreator = currentVehicle?.createdBy === user?.user_id;
-
-  // Determine if user can edit (creator-only for drafts, any product owner for non-drafts)
-  const canEdit = isDraftVehicle ? isCreator : true;
-
   // page theme helpers
   const theme = getPageTheme("tab");
 
@@ -171,6 +160,108 @@ const VehicleDetailsPage = () => {
     }
   };
 
+  // Check if vehicle is a draft (handle both DRAFT and SAVE_AS_DRAFT status values)
+  const isDraftVehicle =
+    currentVehicle?.status === "DRAFT" ||
+    currentVehicle?.status === "SAVE_AS_DRAFT";
+
+  // Check if current user is the creator of this vehicle
+  // Use String() to ensure type consistency in comparison
+  const isCreator =
+    currentVehicle?.createdBy &&
+    user?.user_id &&
+    String(currentVehicle.createdBy) === String(user.user_id);
+
+  // Check if current user is an approver
+  // Check both role and user_type_id for Product Owner detection
+  const isApprover =
+    user?.role === "Product Owner" ||
+    user?.role === "admin" ||
+    user?.user_type_id === "UT001"; // UT001 is Owner/Product Owner
+
+  // 🔍 DEBUG: Log creator and approver checks
+  console.log("🔍 EDIT BUTTON DEBUG - VEHICLE:");
+  console.log("  Current User ID:", user?.user_id, typeof user?.user_id);
+  console.log("  Current User Role:", user?.role);
+  console.log("  Current User Type ID:", user?.user_type_id);
+  console.log(
+    "  Vehicle Created By:",
+    currentVehicle?.createdBy,
+    typeof currentVehicle?.createdBy
+  );
+  console.log(
+    "  String Comparison:",
+    String(currentVehicle?.createdBy),
+    "===",
+    String(user?.user_id)
+  );
+  console.log("  Is Creator:", isCreator);
+  console.log("  Is Approver:", isApprover, "(role-based or UT001)");
+  console.log("  Is Draft:", isDraftVehicle);
+  console.log("  Status:", currentVehicle?.status);
+
+  // ✅ PERMISSION LOGIC - Rejection/Resubmission Workflow
+  // Determine if user can edit based on entity status and user role
+  const canEdit = React.useMemo(() => {
+    const status = currentVehicle?.status;
+
+    console.log("🔍 CANEDIT CALCULATION - VEHICLE:");
+    console.log("  Status:", status);
+    console.log("  isDraftVehicle:", isDraftVehicle);
+    console.log("  isCreator:", isCreator);
+    console.log("  isApprover:", isApprover);
+
+    // DRAFT: Only creator can edit
+    if (isDraftVehicle) {
+      console.log("  Result: DRAFT - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // INACTIVE (rejected): Only creator can edit
+    if (status === "INACTIVE") {
+      console.log("  Result: INACTIVE - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // PENDING: No one can edit (locked during approval)
+    if (status === "PENDING") {
+      console.log("  Result: PENDING - returning false");
+      return false;
+    }
+
+    // ACTIVE: Only approvers can edit
+    if (status === "ACTIVE") {
+      console.log("  Result: ACTIVE - returning isApprover:", isApprover);
+      return isApprover;
+    }
+
+    // Default: Allow edit
+    console.log("  Result: DEFAULT - returning true");
+    return true;
+  }, [currentVehicle?.status, isCreator, isApprover, isDraftVehicle]);
+
+  console.log("🔍 FINAL CANEDIT VALUE - VEHICLE:", canEdit);
+
+  // Debug logging for approval data
+  useEffect(() => {
+    if (currentVehicle) {
+      console.log("🔍 VehicleDetailsPage - Vehicle Data Loaded:");
+      console.log("  Vehicle ID:", currentVehicle.vehicleId);
+      console.log("  Status:", currentVehicle.status);
+      console.log("  User Approval Status:", currentVehicle.userApprovalStatus);
+      console.log(
+        "  ✅ Remarks Available:",
+        currentVehicle.userApprovalStatus?.remarks ? "YES" : "NO"
+      );
+      console.log(
+        "  Remarks Content:",
+        currentVehicle.userApprovalStatus?.remarks
+      );
+      console.log("  Current User:", user);
+      console.log("  Full currentVehicle object:", currentVehicle);
+    }
+  }, [currentVehicle, user]);
+
   // currentVehicle is already transformed by fetchVehicleById thunk - no need to transform again
   const transformedVehicle = useMemo(() => {
     if (!currentVehicle) {
@@ -206,6 +297,15 @@ const VehicleDetailsPage = () => {
 
       // Use transformedVehicle (already flattened) to populate form data
       // We need to restructure it into the nested format that the form components expect
+      console.log("📊 About to populate formData with:");
+      console.log(
+        "📝 registrationNumber:",
+        transformedVehicle.registrationNumber
+      );
+      console.log("📝 make:", transformedVehicle.make);
+      console.log("📝 model:", transformedVehicle.model);
+      console.log("📝 vin:", transformedVehicle.vin);
+
       setFormData({
         basicInformation: {
           registrationNumber: transformedVehicle.registrationNumber || "",
@@ -286,10 +386,10 @@ const VehicleDetailsPage = () => {
           "You have unsaved changes. Are you sure you want to leave?"
         )
       ) {
-        navigate("/vehicles");
+        navigate(-1);
       }
     } else {
-      navigate("/vehicles");
+      navigate(-1);
     }
   };
 
@@ -509,22 +609,67 @@ const VehicleDetailsPage = () => {
         };
       })(),
       documents: (frontendData.documents || [])
-        .map((doc) => ({
-          documentType: doc.documentType || "",
-          referenceNumber: doc.documentNumber || doc.referenceNumber || "",
-          vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
-          permitCategory: doc.permitCategory || "",
-          permitCode: doc.permitCode || "",
-          documentProvider: doc.documentProvider || "",
-          coverageType: doc.coverageType || "",
-          premiumAmount: doc.premiumAmount || 0,
-          validFrom: formatDate(doc.issueDate || doc.validFrom),
-          validTo: formatDate(doc.expiryDate || doc.validTo),
-          remarks: doc.remarks || "Document uploaded",
-          fileName: doc.fileName || "",
-          fileType: doc.fileType || "",
-          fileData: doc.fileData || "",
-        }))
+        .map((doc) => {
+          // Helper function to convert document type description back to ID
+          const getDocumentTypeId = (documentTypeDescription) => {
+            // If it's already a short ID code (e.g., DN001), return as-is
+            if (/^DN\d{3}$/.test(documentTypeDescription)) {
+              return documentTypeDescription;
+            }
+
+            // Map common document type descriptions to their ID codes
+            const documentTypeMap = {
+              "Vehicle Registration Certificate": "DN001",
+              "Vehicle Insurance": "DN009",
+              "PUC certificate": "DN010",
+              "Fitness Certificate": "DN012",
+              "Tax Certificate": "DN005",
+              Permit: "DN006",
+              "Driver License": "DN007",
+              "Road Tax": "DN008",
+              "Commercial Vehicle License": "DN011",
+              "Pollution Certificate": "DN010", // Same as PUC
+              "Insurance Policy": "DN009", // Same as Vehicle Insurance
+              "Vehicle Permit": "DN006", // Same as Permit
+            };
+
+            // Check if we have a mapping for this description
+            const mappedId = documentTypeMap[documentTypeDescription];
+            if (mappedId) {
+              return mappedId;
+            }
+
+            // If no mapping found, try to find it in master data
+            // This requires access to masterData, but it might not be available here
+            console.warn(
+              "⚠️ Unknown document type description:",
+              documentTypeDescription
+            );
+
+            // Return the original value as fallback
+            return documentTypeDescription;
+          };
+
+          return {
+            documentType: getDocumentTypeId(
+              doc.documentType || doc.documentTypeId || ""
+            ),
+            referenceNumber: doc.documentNumber || doc.referenceNumber || "",
+            vehicleMaintenanceId: doc.vehicleMaintenanceId || null,
+            permitCategory: doc.permitCategory || "",
+            permitCode: doc.permitCode || "",
+            documentProvider:
+              doc.documentProvider || doc.issuingAuthority || "",
+            coverageType: doc.coverageType || "",
+            premiumAmount: doc.premiumAmount || 0,
+            validFrom: formatDate(doc.issueDate || doc.validFrom),
+            validTo: formatDate(doc.expiryDate || doc.validTo),
+            remarks: doc.remarks || "Document uploaded",
+            fileName: doc.fileName || "",
+            fileType: doc.fileType || "",
+            fileData: doc.fileData || "",
+          };
+        })
         .filter((doc) => doc.documentType),
     };
   };
@@ -546,8 +691,24 @@ const VehicleDetailsPage = () => {
       // Clear previous errors
       setValidationErrors({});
 
+      // ✅ RESUBMISSION LOGIC - If entity is INACTIVE (rejected), change status to PENDING
+      const isResubmission = currentVehicle?.status === "INACTIVE";
+
       // Transform data for backend
-      const transformedData = transformFormDataForBackend(formData);
+      let transformedData = transformFormDataForBackend(formData);
+
+      // If resubmitting, update the status to PENDING to restart approval workflow
+      if (isResubmission) {
+        transformedData = {
+          ...transformedData,
+          status: "PENDING", // Restart approval workflow
+        };
+      }
+
+      console.log("🔍 RESUBMISSION CHECK - VEHICLE:");
+      console.log("  Current Status:", currentVehicle?.status);
+      console.log("  Is Resubmission:", isResubmission);
+      console.log("  Final Status:", transformedData?.status);
 
       // Regular update (full validation)
       const resultAction = await dispatch(
@@ -560,7 +721,9 @@ const VehicleDetailsPage = () => {
       if (updateVehicle.fulfilled.match(resultAction)) {
         dispatch(
           showToast({
-            message: "Vehicle updated successfully",
+            message: isResubmission
+              ? "Vehicle resubmitted for approval successfully! Status changed to PENDING."
+              : "Vehicle updated successfully",
             type: "success",
           })
         );
@@ -707,30 +870,38 @@ const VehicleDetailsPage = () => {
       } else {
         const errorPayload = resultAction.payload;
 
-        // Handle validation errors
-        if (errorPayload?.errors) {
-          setValidationErrors(errorPayload.errors);
-          dispatch(
-            showToast({
-              message:
-                "Please fix all validation errors before submitting for approval",
-              type: "error",
-            })
-          );
+        // Handle field-specific errors (GPS IMEI, Registration Number, VIN, etc.)
+        let errorMessage =
+          errorPayload?.message ||
+          "Failed to submit vehicle for approval. Please try again.";
+        let errorDetails = [];
 
-          // Stay in edit mode to fix errors
-          return;
+        if (errorPayload?.field) {
+          // Field-specific error (e.g., duplicate GPS IMEI)
+          errorDetails.push(`${errorPayload.field}: ${errorPayload.message}`);
+        } else if (errorPayload?.errors) {
+          // Multiple validation errors
+          errorDetails = errorPayload.errors.map((err) => {
+            if (typeof err === "string") return err;
+            if (err.field && err.message) return `${err.field}: ${err.message}`;
+            return err.message || err;
+          });
+          setValidationErrors(errorPayload.errors);
         }
 
-        // Other errors
         dispatch(
           showToast({
-            message:
-              errorPayload?.message ||
-              "Failed to submit vehicle for approval. Please try again.",
+            message: errorMessage,
             type: "error",
+            details: errorDetails.length > 0 ? errorDetails : undefined,
+            duration: 8000,
           })
         );
+
+        // Stay in edit mode to fix errors if there are validation errors
+        if (errorPayload?.errors || errorPayload?.field) {
+          return;
+        }
       }
     } catch (error) {
       console.error("Error submitting vehicle for approval:", error);
@@ -758,7 +929,7 @@ const VehicleDetailsPage = () => {
 
         // Close modal and navigate back to list
         setShowDeleteModal(false);
-        navigate("/vehicles");
+        navigate(-1);
       } else {
         const errorMessage =
           resultAction.payload?.message || "Failed to delete vehicle draft";
@@ -907,6 +1078,12 @@ const VehicleDetailsPage = () => {
               />
             )}
 
+            {console.log("🔍 BUTTON RENDER CHECK - VEHICLE:", {
+              isEditMode,
+              canEdit,
+              showButton: !isEditMode && canEdit,
+            })}
+
             {isEditMode ? (
               <>
                 <button
@@ -936,30 +1113,51 @@ const VehicleDetailsPage = () => {
                 </button>
               </>
             ) : (
-              <>
-                {/* Edit button (disabled for non-creator drafts) */}
-                <button
-                  onClick={handleEditToggle}
-                  disabled={isDraftVehicle && !isCreator}
-                  className={`group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isDraftVehicle && !isCreator
-                      ? "opacity-50 cursor-not-allowed"
-                      : ""
-                  }`}
-                  title={
-                    isDraftVehicle && !isCreator
-                      ? "Only the creator can edit this draft"
-                      : ""
-                  }
-                >
-                  <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
-                  {isDraftVehicle ? "Edit Draft" : "Edit Details"}
-                </button>
-              </>
+              !isEditMode &&
+              canEdit && (
+                <>
+                  {/* Edit button - only shown when user has permission */}
+                  <button
+                    onClick={handleEditToggle}
+                    className="group inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#10B981] to-[#059669] text-white rounded-xl font-medium text-sm hover:from-[#059669] hover:to-[#10B981] transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-green-500/25"
+                  >
+                    <Edit className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                    {isDraftVehicle ? "Edit Draft" : "Edit Details"}
+                  </button>
+                </>
+              )
             )}
           </div>
         </div>
       </div>
+
+      {/* ✅ REJECTION REMARKS BANNER - Show when entity is rejected (INACTIVE) */}
+      {currentVehicle?.status === "INACTIVE" &&
+        currentVehicle?.userApprovalStatus?.remarks && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-6 mx-6 mt-4 rounded-lg shadow-sm">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-red-900 font-semibold text-lg mb-2 flex items-center gap-2">
+                  Rejection Remarks
+                  <span className="text-xs bg-red-100 px-2 py-1 rounded-full ml-2">
+                    Entity Rejected
+                  </span>
+                </h4>
+                <p className="text-red-800 whitespace-pre-wrap leading-relaxed">
+                  {currentVehicle.userApprovalStatus.remarks}
+                </p>
+                {isCreator && !isEditMode && (
+                  <div className="mt-4 text-sm text-red-700 bg-red-100 p-3 rounded-md">
+                    <strong>Note:</strong> Please address the rejection remarks
+                    above and click "Edit Details" to make the necessary
+                    changes, then save to resubmit for approval.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Modern Tab Navigation with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">

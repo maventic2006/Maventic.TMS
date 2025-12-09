@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 
 import { getComponentTheme } from "../../utils/theme";
-import { validateFormSection } from "./validation";
+import { validateFormSection, validateGSTPANRelationship } from "./validation";
 import { TOAST_TYPES } from "../../utils/constants";
 import EmptyState from "../../components/ui/EmptyState";
 import SubmitDraftModal from "../../components/ui/SubmitDraftModal";
@@ -46,6 +46,18 @@ import GeneralDetailsTab from "./components/GeneralDetailsTab";
 import AddressContactsTab from "./components/AddressContactsTab";
 import ServiceableAreaTab from "./components/ServiceableAreaTab";
 import DocumentsTab from "./components/DocumentsTab";
+
+// Import mapping components
+import ConsignorMappingTab from "./components/ConsignorMappingTab";
+import ConsignorMappingViewTab from "./components/ConsignorMappingViewTab";
+import VehicleMappingTab from "./components/VehicleMappingTab";
+import VehicleMappingViewTab from "./components/VehicleMappingViewTab";
+import DriverMappingTab from "./components/DriverMappingTab";
+import DriverMappingViewTab from "./components/DriverMappingViewTab";
+import OwnerMappingTab from "./components/OwnerMappingTab";
+import OwnerMappingViewTab from "./components/OwnerMappingViewTab";
+import BlacklistMappingTab from "./components/BlacklistMappingTab";
+import BlacklistMappingViewTab from "./components/BlacklistMappingViewTab";
 
 // Import approval component
 import ApprovalActionBar from "../../components/approval/ApprovalActionBar";
@@ -115,26 +127,36 @@ const TransporterDetailsPage = () => {
       id: 4,
       name: "Transporter and Consignor Mapping",
       icon: User,
+      viewComponent: ConsignorMappingViewTab,
+      editComponent: ConsignorMappingTab,
     },
     {
       id: 5,
       name: "Transporter and Vehicle Mapping",
       icon: Caravan,
+      viewComponent: VehicleMappingViewTab,
+      editComponent: VehicleMappingTab,
     },
     {
       id: 6,
       name: "Transporter and Driver Mapping",
       icon: User,
+      viewComponent: DriverMappingViewTab,
+      editComponent: DriverMappingTab,
     },
     {
       id: 7,
       name: "Transporter and Vehicle Owner Mapping",
       icon: User,
+      viewComponent: OwnerMappingViewTab,
+      editComponent: OwnerMappingTab,
     },
     {
       id: 8,
       name: "Blacklist Mapping",
       icon: User,
+      viewComponent: BlacklistMappingViewTab,
+      editComponent: BlacklistMappingTab,
     },
   ];
 
@@ -150,12 +172,20 @@ const TransporterDetailsPage = () => {
     dispatch(fetchMasterData());
   }, [dispatch]);
 
-  // Set edit form data when transporter data is loaded
+  // Clear editFormData when transporter ID changes
   useEffect(() => {
-    if (selectedTransporter && !editFormData) {
+    setEditFormData(null);
+    setIsEditMode(false);
+    setHasUnsavedChanges(false);
+    setValidationErrors({});
+  }, [id]);
+
+  // Re-transform when selectedTransporter changes
+  useEffect(() => {
+    if (selectedTransporter) {
       setEditFormData(selectedTransporter);
     }
-  }, [selectedTransporter, editFormData]);
+  }, [selectedTransporter?.transporterId, selectedTransporter]);
 
   // Debug logging for approval data
   useEffect(() => {
@@ -166,6 +196,14 @@ const TransporterDetailsPage = () => {
       console.log(
         "  User Approval Status:",
         selectedTransporter.userApprovalStatus
+      );
+      console.log(
+        "  ✅ Remarks Available:",
+        selectedTransporter.userApprovalStatus?.remarks ? "YES" : "NO"
+      );
+      console.log(
+        "  Remarks Content:",
+        selectedTransporter.userApprovalStatus?.remarks
       );
       console.log("  Current User:", user);
       console.log("  Full selectedTransporter object:", selectedTransporter);
@@ -184,11 +222,87 @@ const TransporterDetailsPage = () => {
     selectedTransporter?.generalDetails?.status === "SAVE_AS_DRAFT";
 
   // Check if current user is the creator of this transporter
+  // Use String() to ensure type consistency in comparison
   const isCreator =
-    selectedTransporter?.generalDetails?.createdBy === user?.user_id;
+    selectedTransporter?.generalDetails?.createdBy &&
+    user?.user_id &&
+    String(selectedTransporter.generalDetails.createdBy) ===
+      String(user.user_id);
 
-  // Determine if user can edit (creator-only for drafts, any product owner for non-drafts)
-  const canEdit = isDraftTransporter ? isCreator : true;
+  // Check if current user is an approver
+  // Check both role and user_type_id for Product Owner detection
+  const isApprover =
+    user?.role === "Product Owner" ||
+    user?.role === "admin" ||
+    user?.user_type_id === "UT001"; // UT001 is Owner/Product Owner
+
+  // 🔍 DEBUG: Log creator and approver checks
+  console.log("🔍 EDIT BUTTON DEBUG:");
+  console.log("  Current User ID:", user?.user_id, typeof user?.user_id);
+  console.log("  Current User Role:", user?.role);
+  console.log("  Current User Type ID:", user?.user_type_id);
+  console.log(
+    "  Transporter Created By:",
+    selectedTransporter?.generalDetails?.createdBy,
+    typeof selectedTransporter?.generalDetails?.createdBy
+  );
+  console.log(
+    "  String Comparison:",
+    String(selectedTransporter?.generalDetails?.createdBy),
+    "===",
+    String(user?.user_id)
+  );
+  console.log("  Is Creator:", isCreator);
+  console.log("  Is Approver:", isApprover, "(role-based or UT001)");
+  console.log("  Is Draft:", isDraftTransporter);
+  console.log("  Status:", selectedTransporter?.generalDetails?.status);
+
+  // ✅ PERMISSION LOGIC - Rejection/Resubmission Workflow
+  // Determine if user can edit based on entity status and user role
+  const canEdit = React.useMemo(() => {
+    const status = selectedTransporter?.generalDetails?.status;
+
+    console.log("🔍 CANEDIT CALCULATION:");
+    console.log("  Status:", status);
+    console.log("  isDraftTransporter:", isDraftTransporter);
+    console.log("  isCreator:", isCreator);
+    console.log("  isApprover:", isApprover);
+
+    // DRAFT: Only creator can edit
+    if (isDraftTransporter) {
+      console.log("  Result: DRAFT - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // INACTIVE (rejected): Only creator can edit
+    if (status === "INACTIVE") {
+      console.log("  Result: INACTIVE - returning isCreator:", isCreator);
+      return isCreator;
+    }
+
+    // PENDING: No one can edit (locked during approval)
+    if (status === "PENDING") {
+      console.log("  Result: PENDING - returning false");
+      return false;
+    }
+
+    // ACTIVE: Only approvers can edit
+    if (status === "ACTIVE") {
+      console.log("  Result: ACTIVE - returning isApprover:", isApprover);
+      return isApprover;
+    }
+
+    // Default: Allow edit
+    console.log("  Result: DEFAULT - returning true");
+    return true;
+  }, [
+    selectedTransporter?.generalDetails?.status,
+    isCreator,
+    isApprover,
+    isDraftTransporter,
+  ]);
+
+  console.log("🔍 FINAL CANEDIT VALUE:", canEdit);
 
   // Track unsaved changes
   useEffect(() => {
@@ -361,6 +475,61 @@ const TransporterDetailsPage = () => {
         3: false,
       });
 
+      // ========================================
+      // GST-PAN VALIDATION (before main validation)
+      // ========================================
+      const gstPanErrors = validateGSTPANRelationship(editFormData);
+
+      if (gstPanErrors.gstPan) {
+        const error = gstPanErrors.gstPan;
+        const nestedErrors = {};
+
+        // Set error on the appropriate field
+        if (error.tab === "addresses") {
+          // Find primary address index
+          const primaryIndex = editFormData.addresses?.findIndex(
+            (addr) => addr.isPrimary === true
+          );
+          if (primaryIndex >= 0) {
+            nestedErrors.addresses = {};
+            nestedErrors.addresses[primaryIndex] = {
+              vatNumber: error.message,
+            };
+          }
+        } else if (error.tab === "documents") {
+          nestedErrors.documents = {
+            _general: error.message,
+          };
+        }
+
+        setValidationErrors(nestedErrors);
+
+        // Set tab errors
+        const newTabErrors = {
+          0: false,
+          1: error.tab === "addresses",
+          2: false,
+          3: error.tab === "documents",
+        };
+        setTabErrors(newTabErrors);
+
+        // Switch to the tab with error
+        const errorTab = error.tab === "addresses" ? 1 : 3;
+        setActiveTab(errorTab);
+
+        // Show toast notification
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "GST-PAN Validation Failed",
+            details: [error.message, error.hint].filter(Boolean),
+            duration: 8000,
+          })
+        );
+
+        return;
+      }
+
       // Full validation - same as create transporter
       const errors = validateAllSections(editFormData);
 
@@ -446,9 +615,10 @@ const TransporterDetailsPage = () => {
       dispatch(clearError());
 
       // Check if it's a validation error from backend (400 Bad Request)
+      // Backend returns: { success: false, error: { code, message, field } }
       if (
-        err.code === "VALIDATION_ERROR" ||
-        err.message?.includes("required")
+        err.error?.code === "VALIDATION_ERROR" ||
+        err.error?.message?.includes("required")
       ) {
         // Backend validation error - show inline errors and stay in edit mode
 
@@ -456,9 +626,11 @@ const TransporterDetailsPage = () => {
         let tabWithError = null;
         const backendErrors = {};
 
-        if (err.field) {
+        if (err.error?.field) {
           // Parse field path like "documents[0].documentNumber"
-          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+          const fieldMatch = err.error.field.match(
+            /^(\w+)(?:\[(\d+)\])?\.?(.+)?$/
+          );
 
           if (fieldMatch) {
             const [, section, index, field] = fieldMatch;
@@ -479,12 +651,12 @@ const TransporterDetailsPage = () => {
               if (!backendErrors[section][index])
                 backendErrors[section][index] = {};
               if (field) {
-                backendErrors[section][index][field] = err.message;
+                backendErrors[section][index][field] = err.error.message;
               }
             } else if (field) {
               // Object field error (e.g., generalDetails.businessName)
               if (!backendErrors[section]) backendErrors[section] = {};
-              backendErrors[section][field] = err.message;
+              backendErrors[section][field] = err.error.message;
             }
           }
         }
@@ -506,12 +678,14 @@ const TransporterDetailsPage = () => {
           setActiveTab(tabWithError);
         }
 
-        // Show error toast
+        // Show error toast with validation details
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
             message:
-              err.message || "Please fix validation errors before submitting.",
+              err.error.message ||
+              "Please fix validation errors before submitting.",
+            details: err.error.expectedFormats || undefined,
           })
         );
 
@@ -523,7 +697,10 @@ const TransporterDetailsPage = () => {
       dispatch(
         addToast({
           type: TOAST_TYPES.ERROR,
-          message: err.message || "Failed to submit draft. Please try again.",
+          message:
+            err.error?.message ||
+            err.message ||
+            "Failed to submit draft. Please try again.",
         })
       );
     }
@@ -540,6 +717,61 @@ const TransporterDetailsPage = () => {
         2: false,
         3: false,
       });
+
+      // ========================================
+      // GST-PAN VALIDATION (before main validation)
+      // ========================================
+      const gstPanErrors = validateGSTPANRelationship(editFormData);
+
+      if (gstPanErrors.gstPan) {
+        const error = gstPanErrors.gstPan;
+        const nestedErrors = {};
+
+        // Set error on the appropriate field
+        if (error.tab === "addresses") {
+          // Find primary address index
+          const primaryIndex = editFormData.addresses?.findIndex(
+            (addr) => addr.isPrimary === true
+          );
+          if (primaryIndex >= 0) {
+            nestedErrors.addresses = {};
+            nestedErrors.addresses[primaryIndex] = {
+              vatNumber: error.message,
+            };
+          }
+        } else if (error.tab === "documents") {
+          nestedErrors.documents = {
+            _general: error.message,
+          };
+        }
+
+        setValidationErrors(nestedErrors);
+
+        // Set tab errors
+        const newTabErrors = {
+          0: false,
+          1: error.tab === "addresses",
+          2: false,
+          3: error.tab === "documents",
+        };
+        setTabErrors(newTabErrors);
+
+        // Switch to the tab with error
+        const errorTab = error.tab === "addresses" ? 1 : 3;
+        setActiveTab(errorTab);
+
+        // Show toast notification
+        dispatch(
+          addToast({
+            type: TOAST_TYPES.ERROR,
+            message: "GST-PAN Validation Failed",
+            details: [error.message, error.hint].filter(Boolean),
+            duration: 8000,
+          })
+        );
+
+        return;
+      }
 
       // Validate all sections
       const errors = validateAllSections(editFormData);
@@ -590,24 +822,39 @@ const TransporterDetailsPage = () => {
       });
       dispatch(clearError());
 
+      // ✅ RESUBMISSION LOGIC - If entity is INACTIVE, change status to PENDING for resubmission
+      const isResubmission =
+        selectedTransporter?.generalDetails?.status === "INACTIVE";
+      const updatedFormData = isResubmission
+        ? {
+            ...editFormData,
+            generalDetails: {
+              ...editFormData.generalDetails,
+              status: "PENDING", // Restart approval workflow
+            },
+          }
+        : editFormData;
+
       // Call the update API
       const result = await dispatch(
         updateTransporter({
           transporterId: id,
           transporterData: {
-            generalDetails: editFormData.generalDetails,
-            addresses: editFormData.addresses,
-            serviceableAreas: editFormData.serviceableAreas,
-            documents: editFormData.documents,
+            generalDetails: updatedFormData.generalDetails,
+            addresses: updatedFormData.addresses,
+            serviceableAreas: updatedFormData.serviceableAreas,
+            documents: updatedFormData.documents,
           },
         })
       ).unwrap();
 
-      // Success - show toast notification
+      // Success - show toast notification with resubmission message if applicable
       dispatch(
         addToast({
           type: TOAST_TYPES.SUCCESS,
-          message: "Transporter updated successfully!",
+          message: isResubmission
+            ? "Transporter resubmitted for approval successfully! Status changed to PENDING."
+            : "Transporter updated successfully!",
         })
       );
 
@@ -625,9 +872,10 @@ const TransporterDetailsPage = () => {
       dispatch(clearError());
 
       // Check if it's a validation error from backend (400 Bad Request)
+      // Backend returns: { success: false, error: { code, message, field } }
       if (
-        err.code === "VALIDATION_ERROR" ||
-        err.message?.includes("required")
+        err.error?.code === "VALIDATION_ERROR" ||
+        err.error?.message?.includes("required")
       ) {
         // Backend validation error - show inline errors and stay in edit mode
 
@@ -635,9 +883,11 @@ const TransporterDetailsPage = () => {
         let tabWithError = null;
         const backendErrors = {};
 
-        if (err.field) {
+        if (err.error?.field) {
           // Parse field path like "documents[0].documentNumber"
-          const fieldMatch = err.field.match(/^(\w+)(?:\[(\d+)\])?\.?(.+)?$/);
+          const fieldMatch = err.error.field.match(
+            /^(\w+)(?:\[(\d+)\])?\.?(.+)?$/
+          );
 
           if (fieldMatch) {
             const [, section, index, field] = fieldMatch;
@@ -658,12 +908,12 @@ const TransporterDetailsPage = () => {
               if (!backendErrors[section][index])
                 backendErrors[section][index] = {};
               if (field) {
-                backendErrors[section][index][field] = err.message;
+                backendErrors[section][index][field] = err.error.message;
               }
             } else if (field) {
               // Object field error (e.g., generalDetails.businessName)
               if (!backendErrors[section]) backendErrors[section] = {};
-              backendErrors[section][field] = err.message;
+              backendErrors[section][field] = err.error.message;
             }
           }
         }
@@ -685,12 +935,14 @@ const TransporterDetailsPage = () => {
           setActiveTab(tabWithError);
         }
 
-        // Show error toast
+        // Show error toast with validation details
         dispatch(
           addToast({
             type: TOAST_TYPES.ERROR,
             message:
-              err.message || "Please fix validation errors before saving.",
+              err.error.message ||
+              "Please fix validation errors before saving.",
+            details: err.error.expectedFormats || undefined,
           })
         );
 
@@ -703,7 +955,9 @@ const TransporterDetailsPage = () => {
         addToast({
           type: TOAST_TYPES.ERROR,
           message:
-            err.message || "Failed to update transporter. Please try again.",
+            err.error?.message ||
+            err.message ||
+            "Failed to update transporter. Please try again.",
         })
       );
     }
@@ -844,6 +1098,11 @@ const TransporterDetailsPage = () => {
             )}
 
             {/* Edit/Save/Cancel Buttons */}
+            {console.log("🔍 BUTTON RENDER CHECK:", {
+              isEditMode,
+              canEdit,
+              showButton: !isEditMode && canEdit,
+            })}
             {isEditMode ? (
               <>
                 <button
@@ -887,6 +1146,34 @@ const TransporterDetailsPage = () => {
         </div>
       </div>
 
+      {/* ✅ REJECTION REMARKS DISPLAY - Show for INACTIVE status */}
+      {selectedTransporter?.generalDetails?.status === "INACTIVE" &&
+        selectedTransporter?.userApprovalStatus?.remarks && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-6 mx-6 mt-4 rounded-lg shadow-sm">
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-red-900 font-semibold text-lg mb-2 flex items-center gap-2">
+                  Rejection Remarks
+                  <span className="text-xs font-normal text-red-700 bg-red-100 px-2 py-1 rounded-full">
+                    Entity Rejected
+                  </span>
+                </h4>
+                <p className="text-red-800 leading-relaxed whitespace-pre-wrap">
+                  {selectedTransporter.userApprovalStatus.remarks}
+                </p>
+                {isCreator && !isEditMode && (
+                  <div className="mt-4 text-sm text-red-700 bg-red-100 p-3 rounded-md">
+                    <strong>Note:</strong> Please address the rejection remarks
+                    and click "Edit Details" to make changes, then save to
+                    resubmit for approval.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
       {/* Modern Tab Navigation with glassmorphism */}
       <div className="bg-gradient-to-r from-[#0D1A33] to-[#1A2B47] px-6 relative">
         {/* Tab backdrop blur effect */}
@@ -902,7 +1189,7 @@ const TransporterDetailsPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`text-nowrap group relative px-6 py-4 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-3 ${
+                className={`text-nowrap group relative mx-0.5 px-6 py-4 font-medium text-sm rounded-t-2xl transition-all duration-300 flex items-center gap-4 ${
                   isActive
                     ? "bg-gradient-to-br from-white via-white to-gray-50 text-[#0D1A33] shadow-lg transform -translate-y-1 scale-105"
                     : "bg-white/5 backdrop-blur-sm text-blue-100/80 hover:bg-white/10 hover:text-white border border-white/10 hover:border-white/20"
@@ -994,6 +1281,7 @@ const TransporterDetailsPage = () => {
                         }
                         isEditMode={isEditMode}
                         transporterData={selectedTransporter}
+                        transporterId={id}
                       />
                     </div>
                   )}

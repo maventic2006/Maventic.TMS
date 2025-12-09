@@ -141,19 +141,11 @@ const GeneralDetailsTab = ({
           <input
             type="date"
             value={formData.generalDetails?.fromDate || ""}
-            onChange={(e) => handleInputChange("fromDate", e.target.value)}
-            max={new Date().toISOString().split("T")[0]}
-            className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
-              errors.fromDate
-                ? "border-red-500 focus:border-red-500"
-                : "border-[#E5E7EB] focus:border-[#3B82F6]"
-            }`}
+            readOnly
+            disabled
+            className="w-full px-3 py-1.5 text-sm border rounded-lg bg-gray-50 cursor-not-allowed opacity-70 border-[#E5E7EB]"
+            title="From Date is automatically set to current date"
           />
-          {/* {formData.generalDetails?.fromDate && (
-            <p className="text-xs text-gray-600">
-              Display format: {formatDate(formData.generalDetails.fromDate)}
-            </p>
-          )} */}
           {errors.fromDate && (
             <p className="text-sm text-red-500 flex items-center gap-1">
               ⚠️ {errors.fromDate}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Plus, Edit3, Trash2, Download, Upload, Calendar, Flag, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Edit3, Trash2, Download, Upload, Calendar, Flag, CheckCircle, XCircle, AlertCircle, Eye, X } from 'lucide-react';
 import { Card, CardContent } from '../../ui/Card';
 import { Button } from '../../ui/Button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../../ui/Table';
@@ -8,6 +8,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '.
 const DocumentsTab = ({ transporter, transporterId, onUpdate }) => {
   // Use actual API data
   const documents = transporter?.documents || [];
+  const [previewDocument, setPreviewDocument] = useState(null);
 
   // Document type mapping
   const getDocumentTypeLabel = (documentType) => {
@@ -60,6 +61,20 @@ const DocumentsTab = ({ transporter, transporterId, onUpdate }) => {
     } else {
       return { text: 'Active', color: 'bg-green-100 text-green-800' };
     }
+  };
+
+  const handlePreviewDocument = (document) => {
+    if (document.fileData && document.fileType) {
+      setPreviewDocument({
+        fileName: document.fileName,
+        fileType: document.fileType,
+        fileData: document.fileData,
+      });
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewDocument(null);
   };
 
   const DocumentCard = ({ document, index }) => {
@@ -129,13 +144,18 @@ const DocumentsTab = ({ transporter, transporterId, onUpdate }) => {
             Document ID: {document.id} • User Type: {document.userType}
           </div>
           <div className="flex space-x-2">
-            <Button variant="ghost" size="sm">
+            {document.fileData && document.fileType && (
+              <Button variant="ghost" size="sm" onClick={() => handlePreviewDocument(document)} title="Preview">
+                <Eye className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" title="Download">
               <Download className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" title="Edit">
               <Edit3 className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
+            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700" title="Delete">
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
@@ -282,6 +302,11 @@ const DocumentsTab = ({ transporter, transporterId, onUpdate }) => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center space-x-1">
+                          {document.fileData && document.fileType && (
+                            <Button variant="ghost" size="sm" onClick={() => handlePreviewDocument(document)} title="Preview">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button variant="ghost" size="sm" title="Download">
                             <Download className="h-4 w-4" />
                           </Button>
@@ -347,6 +372,68 @@ const DocumentsTab = ({ transporter, transporterId, onUpdate }) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#E0E7FF] rounded-lg">
+                  <FileText className="h-5 w-5 text-[#6366F1]" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {previewDocument.fileName}
+                </h3>
+              </div>
+              <button
+                onClick={closePreview}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-4">
+              {previewDocument.fileType?.startsWith("image/") ? (
+                <img
+                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
+                  alt={previewDocument.fileName}
+                  className="max-w-full h-auto mx-auto"
+                />
+              ) : previewDocument.fileType === "application/pdf" ? (
+                <iframe
+                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
+                  className="w-full h-[600px] border-0"
+                  title={previewDocument.fileName}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    You can still download the file
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+              <button
+                onClick={closePreview}
+                className="px-6 py-2.5 border border-[#E5E7EB] text-[#4A5568] rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };

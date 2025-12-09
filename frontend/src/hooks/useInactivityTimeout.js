@@ -33,19 +33,96 @@ export const useInactivityTimeout = (
   const lastActivityRef = useRef(Date.now());
   const tokenRefreshIntervalRef = useRef(null);
 
+
+    /**
+   * Handle logout due to inactivity
+   */
+  const handleLogout = useCallback(() => {
+    console.log('� CRITICAL: handleLogout() called!');
+    console.log('🕐 Time since page load:', (Date.now() - performance.timing.navigationStart)/1000, 'seconds');
+    console.log('🔍 Call stack:', new Error().stack);
+    console.log('👤 Auth state at logout:', isAuthenticated);
+    console.log('📍 Current page:', window.location.href);
+    console.log('⏰ Expected timeout duration:', inactivityTimeout / 1000 / 60, 'minutes');
+    console.log('🔍 Was this premature?', (Date.now() - performance.timing.navigationStart) < 60000 ? 'YES - PREMATURE!' : 'No - Normal timeout');
+    
+    // 🚨 CRITICAL SAFETY CHECK: Prevent premature logout during navigation
+    const timeSincePageLoad = Date.now() - performance.timing.navigationStart;
+    if (timeSincePageLoad < 10000) { // Less than 10 seconds since navigation
+      console.error('🛑 PREVENTED PREMATURE LOGOUT!');
+      console.error('   Time since navigation:', timeSincePageLoad, 'ms');
+      console.error('   This appears to be a navigation-related false trigger');
+      console.error('   Skipping logout to prevent unexpected user logout');
+      return; // Exit early - do not logout
+    }
+    
+    // 🚨 ADDITIONAL SAFETY CHECK: Ensure user is still authenticated
+    if (!isAuthenticated) {
+      console.error('🛑 PREVENTED LOGOUT - User not authenticated');
+      console.error('   This suggests auth state changed during navigation');
+      console.error('   Skipping logout as user is already logged out');
+      return; // Exit early - do not logout
+    }
+    
+    console.log('🚪 PROCEEDING WITH INACTIVITY LOGOUT');
+    console.log('⏰ Timeout Duration:', inactivityTimeout / 1000 / 60, 'minutes');
+    console.log('⚠️ Warning Time:', warningTime / 1000, 'seconds');
+    console.log('👤 Authentication Status:', isAuthenticated);
+    console.log('📍 Current Page:', window.location.pathname);
+    console.log('🕐 Current Time:', new Date().toLocaleTimeString());
+    
+    // Clear all timers
+    if (timeoutIdRef.current) {
+      clearTimeout(timeoutIdRef.current);
+      console.log('⏹️ Cleared main timeout timer');
+    }
+    if (warningTimeoutIdRef.current) {
+      clearTimeout(warningTimeoutIdRef.current);
+      console.log('⏹️ Cleared warning timeout timer');
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      console.log('⏹️ Cleared countdown interval');
+    }
+    if (tokenRefreshIntervalRef.current) {
+      clearInterval(tokenRefreshIntervalRef.current);
+      console.log('⏹️ Cleared token refresh interval');
+    }
+
+    // Dispatch logout action
+    console.log('📞 Calling dispatch(logoutUser())...');
+    dispatch(logoutUser());
+    
+    // Store logout reason in sessionStorage for displaying message on login page
+    sessionStorage.setItem('logoutReason', 'Session expired due to inactivity');
+    console.log('💾 Stored logout reason in sessionStorage');
+  }, [dispatch, inactivityTimeout, warningTime, isAuthenticated]);
+
   /**
    * Reset the inactivity timer
    */
   const resetTimer = useCallback(() => {
+    if (!isAuthenticated) {
+      console.log('🔒 Not resetting timer - user not authenticated');
+      return;
+    }
+
+    console.log('🔄 Resetting inactivity timer');
+    console.log('📍 Current Page:', window.location.pathname);
+    console.log('🕐 Reset Time:', new Date().toLocaleTimeString());
+    
     // Clear existing timers
     if (timeoutIdRef.current) {
       clearTimeout(timeoutIdRef.current);
+      console.log('⏹️ Cleared existing timeout timer');
     }
     if (warningTimeoutIdRef.current) {
       clearTimeout(warningTimeoutIdRef.current);
+      console.log('⏹️ Cleared existing warning timer');
     }
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
+      console.log('⏹️ Cleared countdown interval');
     }
 
     // Hide warning if showing
@@ -57,6 +134,8 @@ export const useInactivityTimeout = (
 
     // Set warning timeout (show warning 1 minute before logout)
     warningTimeoutIdRef.current = setTimeout(() => {
+      console.log('⚠️ SHOWING INACTIVITY WARNING - 1 minute until logout');
+      console.log('📍 Warning shown on page:', window.location.pathname);
       setShowWarning(true);
       
       // Start countdown
@@ -75,26 +154,27 @@ export const useInactivityTimeout = (
 
     // Set logout timeout
     timeoutIdRef.current = setTimeout(() => {
+      console.log('💥 INACTIVITY TIMEOUT REACHED - Calling handleLogout()');
+      console.log('📍 Logout triggered on page:', window.location.pathname);
+      console.log('🕐 Time since navigation:', (Date.now() - performance.timing.navigationStart)/1000, 'seconds');
+      
+      // 🚨 ADDITIONAL SAFETY CHECK before calling handleLogout
+      const timeSincePageLoad = Date.now() - performance.timing.navigationStart;
+      if (timeSincePageLoad < 30000) { // Less than 30 seconds since navigation
+        console.error('🛑 PREVENTED SUSPICIOUS TIMEOUT TRIGGER!');
+        console.error('   Timeout triggered only', timeSincePageLoad, 'ms after navigation');
+        console.error('   This is suspicious - expected timeout is 15 minutes');
+        console.error('   Skipping handleLogout() call to prevent false logout');
+        return; // Exit early - do not call handleLogout
+      }
+      
       handleLogout();
     }, inactivityTimeout);
-  }, [inactivityTimeout, warningTime]);
 
-  /**
-   * Handle logout due to inactivity
-   */
-  const handleLogout = useCallback(() => {
-    // Clear all timers
-    if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
-    if (warningTimeoutIdRef.current) clearTimeout(warningTimeoutIdRef.current);
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    if (tokenRefreshIntervalRef.current) clearInterval(tokenRefreshIntervalRef.current);
+    console.log(`✅ Timers set - Warning in ${(inactivityTimeout - warningTime)/1000/60} min, Logout in ${inactivityTimeout/1000/60} min`);
+  }, [inactivityTimeout, warningTime, isAuthenticated, handleLogout]);
 
-    // Dispatch logout action
-    dispatch(logoutUser());
-    
-    // Store logout reason in sessionStorage for displaying message on login page
-    sessionStorage.setItem('logoutReason', 'Session expired due to inactivity');
-  }, [dispatch]);
+
 
   /**
    * Extend session when user clicks "Stay Logged In"
@@ -178,11 +258,35 @@ export const useInactivityTimeout = (
   useEffect(() => {
     // ⚠️ CRITICAL: Only run inactivity tracking if user is authenticated
     if (!isAuthenticated) {
-      console.log('🔒 User not authenticated, skipping inactivity timeout');
+      console.log('🔒 User not authenticated, skipping inactivity timeout initialization');
+      console.log('📍 Current Page:', window.location.pathname);
+      console.log('🕐 Time since navigation:', (Date.now() - performance.timing.navigationStart)/1000, 'seconds');
+      
+      // Clear any existing timers if user becomes unauthenticated
+      if (timeoutIdRef.current) {
+        clearTimeout(timeoutIdRef.current);
+        console.log('⏹️ Cleared timeout timer (user not authenticated)');
+      }
+      if (warningTimeoutIdRef.current) {
+        clearTimeout(warningTimeoutIdRef.current);
+        console.log('⏹️ Cleared warning timer (user not authenticated)');
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        console.log('⏹️ Cleared countdown interval (user not authenticated)');
+      }
+      if (tokenRefreshIntervalRef.current) {
+        clearInterval(tokenRefreshIntervalRef.current);
+        console.log('⏹️ Cleared token refresh interval (user not authenticated)');
+      }
       return;
     }
 
     console.log('✅ Inactivity timeout initialized for authenticated user');
+    console.log(`⏰ Timeout: ${inactivityTimeout/1000/60} minutes, Warning: ${warningTime/1000} seconds`);
+    console.log('📍 Initialized on page:', window.location.pathname);
+    console.log('🕐 Initialization time:', new Date().toLocaleTimeString());
+    console.log('🕐 Time since navigation:', (Date.now() - performance.timing.navigationStart)/1000, 'seconds');
     
     const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
     
@@ -191,6 +295,7 @@ export const useInactivityTimeout = (
     });
 
     // Initial timer setup
+    console.log('🎬 Starting initial timer setup...');
     resetTimer();
     
     // Setup token refresh interval
@@ -199,16 +304,49 @@ export const useInactivityTimeout = (
     return () => {
       // Cleanup
       console.log('🧹 Cleaning up inactivity timeout');
+      console.log('📍 Cleanup on page:', window.location.pathname);
+      console.log('🕐 Cleanup time:', new Date().toLocaleTimeString());
+      console.log('🕐 Time since navigation:', (Date.now() - performance.timing.navigationStart)/1000, 'seconds');
+      
       events.forEach((event) => {
         window.removeEventListener(event, handleActivity);
       });
       
-      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current);
-      if (warningTimeoutIdRef.current) clearTimeout(warningTimeoutIdRef.current);
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-      if (tokenRefreshIntervalRef.current) clearInterval(tokenRefreshIntervalRef.current);
+      if (timeoutIdRef.current) {
+        clearTimeout(timeoutIdRef.current);
+        console.log('⏹️ Cleanup: Cleared timeout timer');
+      }
+      if (warningTimeoutIdRef.current) {
+        clearTimeout(warningTimeoutIdRef.current);
+        console.log('⏹️ Cleanup: Cleared warning timer');
+      }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        console.log('⏹️ Cleanup: Cleared countdown interval');
+      }
+      if (tokenRefreshIntervalRef.current) {
+        clearInterval(tokenRefreshIntervalRef.current);
+        console.log('⏹️ Cleanup: Cleared token refresh interval');
+      }
     };
-  }, [isAuthenticated, handleActivity, resetTimer, setupTokenRefresh]);
+  }, [isAuthenticated, inactivityTimeout, warningTime, handleActivity, resetTimer, setupTokenRefresh]);
+
+  // 🔍 MONITOR AUTHENTICATION STATE CHANGES
+  useEffect(() => {
+    console.log('🔄 AUTH STATE CHANGE detected in useInactivityTimeout');
+    console.log('   New isAuthenticated value:', isAuthenticated);
+    console.log('   Current page:', window.location.pathname);
+    console.log('   Time since navigation:', (Date.now() - performance.timing.navigationStart)/1000, 'seconds');
+    console.log('   Timestamp:', new Date().toLocaleTimeString());
+    
+    // Check if this is a premature auth state change during navigation
+    const timeSincePageLoad = Date.now() - performance.timing.navigationStart;
+    if (timeSincePageLoad < 10000 && !isAuthenticated) {
+      console.warn('⚠️ SUSPICIOUS: Auth state became false shortly after navigation');
+      console.warn('   This might be causing premature logout trigger');
+      console.warn('   Time since navigation:', timeSincePageLoad, 'ms');
+    }
+  }, [isAuthenticated]);
 
   return {
     showWarning,
