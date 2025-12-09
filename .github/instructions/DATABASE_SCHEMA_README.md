@@ -78,14 +78,14 @@ The schema documentation can be regenerated at any time to reflect the latest da
 ### Method 1: Using npm Script (Recommended)
 
 ```bash
-cd tms-backend
+cd backend
 npm run generate-schema
 ```
 
 ### Method 2: Direct Script Execution
 
 ```bash
-cd tms-backend
+cd backend
 node generate-schema-docs.js
 ```
 
@@ -560,7 +560,7 @@ AND status = 'ACTIVE';
 
 #### Data Population
 
-**Seed File**: `tms-backend/seeds/03_driver_seed.js`
+**Seed File**: `backend/seeds/03_driver_seed.js`
 
 - Creates 25 sample drivers with complete profiles
 - Covers all Indian states (Maharashtra, Karnataka, Tamil Nadu, Delhi, Gujarat, Rajasthan, West Bengal, Telangana, Kerala)
@@ -577,7 +577,7 @@ AND status = 'ACTIVE';
 **Running the Seed**:
 
 ```bash
-cd tms-backend
+cd backend
 npx knex seed:run --specific=03_driver_seed.js
 ```
 
@@ -674,5 +674,5 @@ Current schema (as of generation):
 ---
 
 **Last Updated**: Auto-generated from database  
-**Script Location**: `tms-backend/generate-schema-docs.js`  
+**Script Location**: `backend/generate-schema-docs.js`  
 **Documentation File**: `.github/instructions/database-schema.json`

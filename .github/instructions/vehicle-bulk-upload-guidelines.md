@@ -398,7 +398,7 @@ CREATE TABLE tms_bulk_upload_vehicles (
 
 #### **1.2 Database Migration Script**
 
-**File**: `tms-backend/create-vehicle-bulk-upload-tables.js`
+**File**: `backend/create-vehicle-bulk-upload-tables.js`
 
 ```javascript
 require('dotenv').config();
@@ -476,7 +476,7 @@ createVehicleBulkUploadTables();
 #### **2.1 File Structure**
 
 ```
-tms-backend/
+backend/
 ├── controllers/
 │   └── bulkUpload/
 │       ├── vehicleBulkUploadController.js    (Main controller - NEW)

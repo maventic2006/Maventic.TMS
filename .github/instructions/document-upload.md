@@ -120,7 +120,7 @@ const storage = multer.diskStorage({
 ##  Storage Organization
 
 ```
-tms-backend/uploads/documents/
+backend/uploads/documents/
  transporter/
  vehicle/
  driver/

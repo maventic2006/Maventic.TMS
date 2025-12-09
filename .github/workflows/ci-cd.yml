@@ -1,0 +1,46 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code (staging)
+        uses: actions/checkout@v3
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Setup Node.js in v20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Copy Frontend .env file from secrets
+        run: |
+          cp /home/tms/secrets/frontend/.env /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/frontend/.env
+
+      - name: Copy Backend .env file from secrets
+        run: |
+          cp /home/tms/secrets/backend/.env /home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/backend/.env
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install Backend Dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Restart PM2 applications
+        run: |
+          pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+          pm2 save
