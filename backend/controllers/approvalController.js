@@ -11,7 +11,7 @@ exports.getApprovals = async (req, res) => {
       requestType,
       dateFrom,
       dateTo,
-      status = "Pending for Approval", // Default to pending
+      status = "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
       page = 1,
       limit = 25,
     } = req.query;
@@ -97,15 +97,11 @@ exports.getApprovals = async (req, res) => {
     }
 
     // Filter by status
-    // Default to 'Pending for Approval' if not specified
+    // Default to 'PENDING' if not specified
     // Allow empty string or 'All' to show all statuses
     if (status && status !== "All" && status !== "") {
-      // Handle status variations - if "Approve" is selected, include both "Approve" and "APPROVED"
-      if (status === "Approve") {
-        query = query.whereIn("aft.s_status", ["Approve", "APPROVED"]);
-      } else {
-        query = query.where("aft.s_status", status);
-      }
+      // ✅ STANDARDIZED: Direct status match, no variations
+      query = query.where("aft.s_status", status);
     }
 
     // Count total records (for pagination) - Build separate count query without limit
@@ -134,15 +130,8 @@ exports.getApprovals = async (req, res) => {
       countQuery = countQuery.where("aft.created_at", "<=", dateTo);
     }
     if (status && status !== "All" && status !== "") {
-      // Handle status variations - if "Approve" is selected, include both "Approve" and "APPROVED"
-      if (status === "Approve") {
-        countQuery = countQuery.whereIn("aft.s_status", [
-          "Approve",
-          "APPROVED",
-        ]);
-      } else {
-        countQuery = countQuery.where("aft.s_status", status);
-      }
+      // ✅ STANDARDIZED: Direct status match, no variations
+      countQuery = countQuery.where("aft.s_status", status);
     }
 
     const totalCount = await countQuery

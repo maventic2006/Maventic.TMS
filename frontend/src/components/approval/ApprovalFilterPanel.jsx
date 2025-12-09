@@ -14,7 +14,7 @@ const inputTheme = getComponentTheme('formInput');
  * Features:
  * - Request Type dropdown filter
  * - Date Range filters (From/To)
- * - Status filter with default 'Pending for Approval'
+ * - Status filter with default 'PENDING'
  * - Apply and Clear buttons
  * - Smooth slide-in animation
  * 
@@ -41,7 +41,7 @@ const ApprovalFilterPanel = ({
   // Status options - matches backend status values
   const statusOptions = [
     { value: '', label: 'All' },
-    { value: 'Pending for Approval', label: 'Pending for Approval' },
+    { value: 'PENDING', label: 'Pending' }, // ✅ STANDARDIZED: Use single "PENDING" status
     { value: 'Approve', label: 'Approved' },
     { value: 'Sent Back', label: 'Sent Back' },
     { value: 'Rejected', label: 'Rejected' },
@@ -155,7 +155,7 @@ const ApprovalFilterPanel = ({
                 Status
               </label>
               <select
-                value={filters.status || 'Pending for Approval'}
+                value={filters.status || 'PENDING'}
                 onChange={(e) => handleChange('status', e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg text-sm transition-all duration-200 focus:outline-none focus:ring-2"
                 style={{

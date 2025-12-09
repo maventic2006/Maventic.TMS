@@ -1699,7 +1699,7 @@ const submitConsignorFromDraft = async (req, res) => {
         created_by_user_id: req.user.user_id,
         password: hashedPassword,
         password_type: "initial",
-        status: "Pending for Approval",
+        status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
         created_by: req.user.user_id,
         updated_by: req.user.user_id,
         created_at: new Date(),
@@ -1788,7 +1788,7 @@ const submitConsignorFromDraft = async (req, res) => {
         approval_config_id: approvalConfig.approval_config_id,
         approval_type_id: "AT002", // Consignor Admin
         user_id_reference_id: id, // 🔥 FIX: Store actual consignor entity ID instead of admin user ID
-        s_status: "Pending for Approval",
+        s_status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
         approver_level: 1,
         pending_with_role_id: "RL001", // Product Owner role
         pending_with_user_id: pendingWithUserId,

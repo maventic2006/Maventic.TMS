@@ -205,7 +205,7 @@ const ApprovalListTable = ({
 
                 {/* Actions */}
                 <td className="px-6 py-4">
-                  {(approval.status === 'Pending for Approval' || approval.status === 'PENDING') ? (
+                  {approval.status === 'PENDING' ? (
                     <div className="flex items-center justify-center space-x-2">
                       {/* Approve Button */}
                       <button

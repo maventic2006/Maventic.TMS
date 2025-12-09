@@ -994,7 +994,7 @@ const createVehicle = async (req, res) => {
       approval_config_id: "AC0004",
       approval_type_id: "AT004",
       user_id_reference_id: vehicleOwnerUserId,
-      s_status: "Pending for Approval",
+      s_status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
       approver_level: 1,
       pending_with_role_id: "RL001",
       pending_with_user_id: pendingWithUserId,
@@ -1025,7 +1025,7 @@ const createVehicle = async (req, res) => {
           userId: vehicleOwnerUserId,
           userType: "Independent Vehicle Owner",
           initialPassword: initialPassword,
-          status: "Pending for Approval",
+          status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
           pendingWith: pendingWithName,
         },
       },
@@ -1878,14 +1878,14 @@ const updateVehicle = async (req, res) => {
         console.log(`✅ Approval flow restarted for ${vehicleOwnerUserId}`);
       }
 
-      // Update user status to Pending for Approval
+      // Update user status to PENDING
       await trx("user_master").where("user_id", vehicleOwnerUserId).update({
-        status: "Pending for Approval",
+        status: "PENDING", // ✅ STANDARDIZED: Use single "PENDING" status
         updated_at: db.fn.now(),
       });
 
       console.log(
-        `✅ User status updated to Pending for Approval: ${vehicleOwnerUserId}`
+        `✅ User status updated to PENDING: ${vehicleOwnerUserId}`
       );
     }
 

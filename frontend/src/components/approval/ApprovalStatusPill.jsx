@@ -7,7 +7,7 @@ import { CheckCircle, Clock, XCircle, RotateCcw } from 'lucide-react';
  * Consistent with Vehicle and Driver status pills.
  * 
  * @param {string} status - Status value:
- *   - 'Pending for Approval' | 'PENDING' -> Yellow pending pill
+ *   - 'PENDING' -> Yellow pending pill
  *   - 'Approve' | 'APPROVED' -> Green approved pill  
  *   - 'Sent Back' | 'SENT_BACK' -> Orange sent back pill
  *   - 'Rejected' | 'REJECTED' -> Red rejected pill
@@ -16,13 +16,6 @@ import { CheckCircle, Clock, XCircle, RotateCcw } from 'lucide-react';
 const ApprovalStatusPill = ({ status, className = '' }) => {
   // Status configuration
   const statusConfig = {
-    'Pending for Approval': {
-      bgColor: 'bg-yellow-100',
-      textColor: 'text-yellow-800',
-      borderColor: 'border-yellow-200',
-      icon: Clock,
-      label: 'Pending'
-    },
     'PENDING': {
       bgColor: 'bg-yellow-100',
       textColor: 'text-yellow-800',
@@ -74,7 +67,7 @@ const ApprovalStatusPill = ({ status, className = '' }) => {
     }
   };
 
-  const config = statusConfig[status] || statusConfig['Pending for Approval'];
+  const config = statusConfig[status] || statusConfig['PENDING']; // ✅ STANDARDIZED: Default to "PENDING"
   const Icon = config.icon;
 
   return (
