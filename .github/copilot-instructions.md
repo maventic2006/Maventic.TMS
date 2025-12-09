@@ -70,7 +70,7 @@ frontend/                         # React + Vite frontend application
 ├── .env                          # Environment configuration
 └── package.json
 
-tms-backend/                      # Node.js + Express backend API
+backend/                      # Node.js + Express backend API
 ├── controllers/                  # Business logic layer
 │   ├── authController.js
 │   ├── transporterController.js

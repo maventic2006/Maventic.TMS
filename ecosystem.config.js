@@ -12,11 +12,11 @@ module.exports = {
       }
     },
     {
-      name: "tms-backend-server",
-      cwd: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/tms-backend",
+      name: "backend-server",
+      cwd: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/backend",
       script: "npm",
       args: "start",
-      env_file: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/tms-backend/.env",
+      env_file: "/home/tms/actions-runner/_work/Maventic.TMS/Maventic.TMS/backend/.env",
       env: {
         NODE_ENV: "development",
         PORT: 5000

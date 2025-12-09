@@ -7,7 +7,5 @@ test-data/
 dist/
 build/ 
 .history/
-*.md
-*.log
-*.tmp
-*.bak
+*.*
+!ecosystem.config.js

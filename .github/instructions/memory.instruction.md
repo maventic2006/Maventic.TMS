@@ -1360,7 +1360,7 @@ export const ERROR_MESSAGES = {
 };
 ```
 
-**Backend Error Messages**: Located in `tms-backend/utils/errorMessages.js`
+**Backend Error Messages**: Located in `backend/utils/errorMessages.js`
 
 ```javascript
 module.exports = {
@@ -1608,11 +1608,11 @@ const query = knex("tms_address")
 **How to Regenerate:**
 
 ```bash
-cd tms-backend
+cd backend
 npm run generate-schema
 ```
 
-**Script Location:** `tms-backend/generate-schema-docs.js`
+**Script Location:** `backend/generate-schema-docs.js`
 
 ### Common Database Tables Reference
 
