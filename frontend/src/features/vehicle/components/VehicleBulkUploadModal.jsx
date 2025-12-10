@@ -86,13 +86,24 @@ const VehicleBulkUploadModal = () => {
       socketService.on('vehicleBulkUploadComplete', handleComplete);
       socketService.on('vehicleBulkUploadError', handleError);
       
-      // Fallback polling mechanism (in case Socket.IO doesn't work)
+      // Fallback polling mechanism (ONLY if Socket.IO connection fails)
       let pollingInterval = null;
-      if (isUploading || currentBatch?.status === 'processing') {
-        pollingInterval = setInterval(() => {
-          dispatch(fetchVehicleBatchStatus(batchId));
-        }, 3000); // Poll every 3 seconds
-      }
+      
+      // Check Socket.IO connection status after a short delay
+      setTimeout(() => {
+        const isSocketConnected = socketService.isConnected;
+        console.log('🔌 Socket.IO connection status:', isSocketConnected);
+        
+        // Only enable polling if Socket.IO is NOT connected AND batch is processing
+        if (!isSocketConnected && (isUploading || currentBatch?.status === 'processing')) {
+          console.log('⚠️ Socket.IO not connected - enabling polling fallback');
+          pollingInterval = setInterval(() => {
+            dispatch(fetchVehicleBatchStatus(batchId));
+          }, 3000); // Poll every 3 seconds
+        } else if (isSocketConnected) {
+          console.log('✅ Socket.IO connected - polling disabled');
+        }
+      }, 1000); // Wait 1 second for Socket.IO connection to establish
       
       // Cleanup on unmount or batch change
       return () => {

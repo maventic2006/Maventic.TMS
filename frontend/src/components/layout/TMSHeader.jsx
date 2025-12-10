@@ -614,7 +614,7 @@ const TMSHeader = ({ theme }) => {
                     className="text-lg font-bold"
                     style={{ color: "#FFFFFF" }}
                   >
-                    TMS Portal
+                    mFleet
                   </h1>
                   <p
                     className="text-xs font-semibold hidden lg:block leading-none"

@@ -1,6 +1,7 @@
 docs/
 node_modules/
 test-data/
+testing/
 .vscode/
 .DS_Store
 .env/

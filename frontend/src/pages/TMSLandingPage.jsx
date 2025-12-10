@@ -647,7 +647,7 @@ const TMSLandingPage = () => {
                     className="text-lg font-bold"
                     style={{ color: "#0D1A33" }}
                   >
-                    TMS Portal
+                    mFleet
                   </h1>
                   <p
                     className="text-xs font-semibold hidden lg:block leading-none"
