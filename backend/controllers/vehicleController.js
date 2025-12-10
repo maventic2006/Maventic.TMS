@@ -30,13 +30,13 @@ const formatDateTimeForMySQL = (isoDateString) => {
     }
 
     // Convert to MySQL datetime format (YYYY-MM-DD HH:mm:ss)
-    // Use UTC to maintain consistency with input timezone
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-    const hours = String(date.getUTCHours()).padStart(2, "0");
-    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-    const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+    // ✅ FIX: Use local timezone to match server timezone
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
 
     const result = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     console.log(
@@ -69,10 +69,10 @@ const formatDateForMySQL = (isoDateString) => {
     }
 
     // Convert to MySQL date format (YYYY-MM-DD)
-    // Use UTC to maintain consistency
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
+    // ✅ FIX: Use local timezone to match MySQL DATE behavior
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
     const result = `${year}-${month}-${day}`;
     console.log(
@@ -1396,6 +1396,74 @@ const getAllVehicles = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch vehicles",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================================
+// GET VEHICLE STATUS COUNTS
+// ============================================================================
+
+/**
+ * Get vehicle status counts
+ * @route GET /api/vehicle/status-counts
+ */
+const getVehicleStatusCounts = async (req, res) => {
+  try {
+    console.log("📊 Fetching vehicle status counts...");
+    console.log("User ID:", req.user.user_id);
+
+    // Initialize status counts
+    const statusCounts = {
+      ACTIVE: 0,
+      INACTIVE: 0,
+      PENDING: 0,
+      DRAFT: 0,
+    };
+
+    // Base query for status counts
+    let query = db("vehicle_basic_information_hdr")
+      .select("status")
+      .count("* as count")
+      .groupBy("status");
+
+    const counts = await query;
+
+    console.log("Raw status counts:", counts);
+
+    // Map counts to status object
+    counts.forEach((item) => {
+      const status = item.status;
+      const count = parseInt(item.count) || 0;
+
+      if (status === "ACTIVE") statusCounts.ACTIVE = count;
+      else if (status === "INACTIVE") statusCounts.INACTIVE = count;
+      else if (status === "PENDING") statusCounts.PENDING = count;
+      // DRAFT handled separately below
+    });
+
+    // Separate query for DRAFT count (only user's own drafts)
+
+    const draftCount = await db("vehicle_basic_information_hdr")
+      .whereIn("status", ["SAVE_AS_DRAFT", "DRAFT"])
+      .where("created_by", req.user.user_id)
+      .count("* as count")
+      .first();
+
+    statusCounts.DRAFT = parseInt(draftCount.count) || 0;
+
+    console.log("✅ Status counts:", statusCounts);
+
+    res.status(200).json({
+      success: true,
+      data: statusCounts,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching vehicle status counts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch vehicle status counts",
       error: error.message,
     });
   }
@@ -3843,6 +3911,7 @@ const lookupVehicleByRC = async (req, res) => {
 module.exports = {
   createVehicle,
   getAllVehicles,
+  getVehicleStatusCounts,
   getVehicleById,
   updateVehicle,
   deleteVehicle,

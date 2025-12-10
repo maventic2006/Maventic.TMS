@@ -153,37 +153,6 @@ const GeneralDetailsTab = ({
           )}
         </div>
 
-        {/* Row 3 */}
-        <div className="space-y-1">
-          <label className="block text-xs font-medium text-[#0D1A33]">
-            To Date <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={formData.generalDetails?.toDate || ""}
-            onChange={(e) => handleInputChange("toDate", e.target.value)}
-            min={
-              formData.generalDetails?.fromDate ||
-              new Date().toISOString().split("T")[0]
-            }
-            className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20 transition-colors ${
-              errors.toDate
-                ? "border-red-500 focus:border-red-500"
-                : "border-[#E5E7EB] focus:border-[#3B82F6]"
-            }`}
-          />
-          {/* {formData.generalDetails?.toDate && (
-            <p className="text-xs text-gray-600">
-              Display format: {formatDate(formData.generalDetails.toDate)}
-            </p>
-          )} */}
-          {errors.toDate && (
-            <p className="text-sm text-red-500 flex items-center gap-1">
-              ⚠️ {errors.toDate}
-            </p>
-          )}
-        </div>
-
         {/* Transport Modes Section */}
         <div className="space-y-1 mb-4 col-span-3">
           <div className="flex items-center justify-between">

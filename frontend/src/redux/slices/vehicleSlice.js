@@ -311,6 +311,24 @@ export const fetchVehicles = createAsyncThunk(
   }
 );
 
+// Fetch vehicle status counts
+export const fetchVehicleStatusCounts = createAsyncThunk(
+  "vehicle/fetchStatusCounts",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await vehicleAPI.getVehicleStatusCounts();
+      return response;
+    } catch (error) {
+      return rejectWithValue({
+        code: error.response?.data?.code || "FETCH_ERROR",
+        message:
+          error.response?.data?.message ||
+          "Failed to fetch vehicle status counts",
+      });
+    }
+  }
+);
+
 // Transform detailed vehicle data from backend to flat frontend format
 const transformVehicleDetails = (backendData) => {
   console.log("🔄 transformVehicleDetails - Processing vehicle data");
@@ -905,6 +923,9 @@ const vehicleSlice = createSlice({
       total: 0,
       pages: 0,
     },
+    statusCounts: { ACTIVE: 0, INACTIVE: 0, PENDING: 0, DRAFT: 0 },
+    statusCountsLoading: false,
+    statusCountsError: null,
     isFetching: false,
     isCreating: false,
     isUpdating: false,
@@ -947,6 +968,19 @@ const vehicleSlice = createSlice({
       .addCase(fetchVehicles.rejected, (state, action) => {
         state.isFetching = false;
         state.error = action.payload;
+      })
+      // Fetch vehicle status counts
+      .addCase(fetchVehicleStatusCounts.pending, (state) => {
+        state.statusCountsLoading = true;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchVehicleStatusCounts.fulfilled, (state, action) => {
+        state.statusCounts = action.payload;
+        state.statusCountsLoading = false;
+      })
+      .addCase(fetchVehicleStatusCounts.rejected, (state, action) => {
+        state.statusCountsLoading = false;
+        state.statusCountsError = action.payload;
       })
       // Fetch vehicle by ID
       .addCase(fetchVehicleById.pending, (state) => {
@@ -1086,8 +1120,12 @@ const vehicleSlice = createSlice({
   },
 });
 
-export const { clearError, clearSuccessMessage, clearCurrentVehicle, resetPaginationToFirstPage } =
-  vehicleSlice.actions;
+export const {
+  clearError,
+  clearSuccessMessage,
+  clearCurrentVehicle,
+  resetPaginationToFirstPage,
+} = vehicleSlice.actions;
 
 // Export the transform function for use in components
 export { transformVehicleDetails };

@@ -77,7 +77,7 @@ const DriverFilterPanel = ({
     { value: "", label: "All Status" },
     { value: "ACTIVE", label: "Active" },
     { value: "INACTIVE", label: "Inactive" },
-    { value: "DRAFT", label: "Draft" },
+    { value: "SAVE_AS_DRAFT", label: "Draft" },
     { value: "PENDING", label: "Pending" },
   ];
 
@@ -267,44 +267,65 @@ const DriverFilterPanel = ({
                   />
                 </div>
 
-                <div className="space-y-2 group">
-                  <Label
-                    htmlFor="createdOnStart"
-                    className="text-sm text-[#0D1A33] font-semibold"
-                  >
-                    Created On (Start):
-                  </Label>
-                  <Input
-                    id="createdOnStart"
-                    type="date"
-                    value={filters.createdOnStart}
-                    onChange={(e) =>
-                      onFilterChange("createdOnStart", e.target.value)
-                    }
-                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+                <div className="flex-shrink-0 group flex items-center gap-4">
+                  <div>
+                    <Label
+                      htmlFor="createdOnStart"
+                      className="text-sm text-[#0D1A33] font-semibold"
+                    >
+                      Created On (Start):
+                    </Label>
+                    <Input
+                      id="createdOnStart"
+                      type="date"
+                      value={filters.createdOnStart}
+                      onChange={(e) =>
+                        onFilterChange("createdOnStart", e.target.value)
+                      }
+                      className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
       focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
       transition-all duration-200 rounded-lg h-10"
-                  />
-                </div>
-
-                <div className="space-y-2 group">
-                  <Label
-                    htmlFor="createdOnEnd"
-                    className="text-sm text-[#0D1A33] font-semibold"
-                  >
-                    Created On (End):
-                  </Label>
-                  <Input
-                    id="createdOnEnd"
-                    type="date"
-                    value={filters.createdOnEnd}
-                    onChange={(e) =>
-                      onFilterChange("createdOnEnd", e.target.value)
-                    }
-                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+                    />
+                  </div>
+                  <div>
+                    <Label
+                      htmlFor="createdOnEnd"
+                      className="text-sm text-[#0D1A33] font-semibold"
+                    >
+                      Created On (End):
+                    </Label>
+                    <Input
+                      id="createdOnEnd"
+                      type="date"
+                      value={filters.createdOnEnd}
+                      onChange={(e) =>
+                        onFilterChange("createdOnEnd", e.target.value)
+                      }
+                      className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
       focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
       transition-all duration-200 rounded-lg h-10"
-                  />
+                    />
+                  </div>
+                  <div>
+                    <Label
+                      htmlFor="licenseValidityDate"
+                      className="text-sm text-[#0D1A33] font-semibold"
+                    >
+                      License Valid Till:
+                    </Label>
+                    <Input
+                      id="licenseValidityDate"
+                      type="date"
+                      value={filters.licenseValidityDate}
+                      onChange={(e) =>
+                        onFilterChange("licenseValidityDate", e.target.value)
+                      }
+                      placeholder="Select date"
+                      className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+      focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
+      transition-all duration-200 rounded-lg h-10"
+                    />
+                  </div>
                 </div>
               </div>
 

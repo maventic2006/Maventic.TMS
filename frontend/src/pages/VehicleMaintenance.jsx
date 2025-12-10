@@ -9,6 +9,7 @@ import VehicleBulkUploadModal from "../features/vehicle/components/VehicleBulkUp
 import VehicleBulkUploadHistory from "../features/vehicle/components/VehicleBulkUploadHistory";
 import {
   fetchVehicles,
+  fetchVehicleStatusCounts,
   deleteVehicleDraft,
   resetPaginationToFirstPage,
 } from "../redux/slices/vehicleSlice";
@@ -98,9 +99,14 @@ const VehicleMaintenance = () => {
   }, [searchParams]);
 
   // Redux state
-  const { vehicles, pagination, isFetching, error } = useSelector(
-    (state) => state.vehicle
-  );
+  const {
+    vehicles,
+    pagination,
+    isFetching,
+    error,
+    statusCounts,
+    statusCountsLoading,
+  } = useSelector((state) => state.vehicle);
 
   // Local state
   const [searchText, setSearchText] = useState("");
@@ -198,6 +204,11 @@ const VehicleMaintenance = () => {
     fetchData();
   }, [dispatch, appliedFilters, pagination.page]);
 
+  // Fetch status counts on mount and when vehicles change
+  useEffect(() => {
+    dispatch(fetchVehicleStatusCounts());
+  }, [dispatch, vehicles]);
+
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }, []);
@@ -275,6 +286,29 @@ const VehicleMaintenance = () => {
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);
   }, []);
+
+  // Handle status badge click
+  const handleStatusClick = useCallback(
+    (status) => {
+      const currentStatus = searchParams.get("status");
+      const newSearchParams = new URLSearchParams(searchParams);
+
+      // Toggle: if same status clicked, clear it; otherwise set new status
+      if (currentStatus === status) {
+        newSearchParams.delete("status");
+        setFilters((prev) => ({ ...prev, status: "" }));
+        setAppliedFilters((prev) => ({ ...prev, status: "" }));
+      } else {
+        newSearchParams.set("status", status);
+        setFilters((prev) => ({ ...prev, status }));
+        setAppliedFilters((prev) => ({ ...prev, status }));
+      }
+
+      setSearchParams(newSearchParams);
+      dispatch(resetPaginationToFirstPage());
+    },
+    [searchParams, setSearchParams, dispatch]
+  );
 
   const handlePageChange = useCallback(
     (page) => {
@@ -459,6 +493,11 @@ const VehicleMaintenance = () => {
           // Search props
           searchText={searchText}
           onSearchChange={handleSearchChange}
+          // Status badge props
+          statusCounts={statusCounts}
+          statusCountsLoading={statusCountsLoading}
+          selectedStatus={searchParams.get("status")}
+          onStatusClick={handleStatusClick}
         />
 
         {error && (

@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Trash2,
 } from "lucide-react";
+import StatusBadges from "../ui/StatusBadges";
 
 const ConsignorListTable = ({
   consignors,
@@ -27,6 +28,11 @@ const ConsignorListTable = ({
   searchText,
   onSearchChange,
   onDeleteDraft,
+  // Status badges props
+  statusCounts,
+  statusCountsLoading,
+  selectedStatus,
+  onStatusClick,
 }) => {
   const navigate = useNavigate();
 
@@ -107,11 +113,14 @@ const ConsignorListTable = ({
       {/* Results Count and Search Section - Always visible */}
       <div className="px-6 py-4 border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between">
-          {/* Left side - Results count */}
-          <p className="text-sm text-[#0D1A33] font-semibold">
-            <span className="text-[#1D4ED8] font-bold">{filteredCount}</span>{" "}
-            Consignors Found
-          </p>
+          {/* Left side - Status badges */}
+          <StatusBadges
+            counts={statusCounts}
+            selectedStatus={selectedStatus}
+            onStatusClick={onStatusClick}
+            loading={statusCountsLoading}
+            module="consignor"
+          />
 
           {/* Right side - Search bar - Always visible */}
           <div className="flex items-center gap-4">

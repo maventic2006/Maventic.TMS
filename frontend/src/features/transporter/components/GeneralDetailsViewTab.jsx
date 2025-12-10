@@ -145,17 +145,20 @@ const GeneralDetailsViewTab = ({ formData, transporterData }) => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-600">
-              Valid To
-            </label>
-            <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-500" />
-              <p className="text-gray-800">
-                {formatDate(data?.generalDetails?.toDate)}
-              </p>
+          {/* ✅ Conditionally show Valid To only when to_date is not null */}
+          {data?.generalDetails?.toDate && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-600">
+                Valid To
+              </label>
+              <div className="bg-white/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-gray-200/50 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-500" />
+                <p className="text-gray-800">
+                  {formatDate(data?.generalDetails?.toDate)}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

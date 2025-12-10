@@ -256,6 +256,48 @@ const validateVATNumber = (vatNumber, country) => {
   return pattern ? pattern.test(vatNumber) : /^[A-Z0-9]{8,15}$/.test(vatNumber);
 };
 
+// Helper function to update transporter dates based on status and active_flag changes
+const updateTransporterDates = async (
+  trx,
+  transporterId,
+  newStatus,
+  newActiveFlag,
+  oldStatus = null,
+  oldActiveFlag = null
+) => {
+  const updates = {};
+
+  // Set from_date when status changes to ACTIVE
+  if (newStatus === "ACTIVE" && oldStatus !== "ACTIVE") {
+    updates.from_date = trx.raw("CURDATE()");
+  }
+
+  // Set to_date when active_flag becomes 0 OR status becomes INACTIVE
+  if (
+    (newActiveFlag === 0 && oldActiveFlag !== 0) ||
+    (newStatus === "INACTIVE" && oldStatus !== "INACTIVE")
+  ) {
+    updates.to_date = trx.raw("CURDATE()");
+  }
+
+  // Clear to_date when active_flag changes from 0 to 1 (reactivation)
+  if (oldActiveFlag === 0 && newActiveFlag === 1) {
+    updates.to_date = null;
+  }
+
+  // Apply updates if any
+  if (Object.keys(updates).length > 0) {
+    await trx("transporter_general_info")
+      .where("transporter_id", transporterId)
+      .update(updates);
+
+    console.log(
+      `📅 Auto-updated transporter dates for ${transporterId}:`,
+      updates
+    );
+  }
+};
+
 // Create Transporter Controller
 const createTransporter = async (req, res) => {
   try {
@@ -286,13 +328,14 @@ const createTransporter = async (req, res) => {
       });
     }
 
+    // Validate from date
     if (!generalDetails.fromDate) {
       return res.status(400).json({
         success: false,
         error: {
           code: "VALIDATION_ERROR",
           message: ERROR_MESSAGES.FROM_DATE_REQUIRED,
-          field: "fromDate",
+          field: "generalDetails.fromDate",
         },
       });
     }
@@ -872,8 +915,8 @@ const createTransporter = async (req, res) => {
           generalDetails.activeFlag !== undefined
             ? generalDetails.activeFlag
             : true,
-        from_date: generalDetails.fromDate,
-        to_date: generalDetails.toDate || null,
+        from_date: null, // Will be set automatically when status changes to ACTIVE
+        to_date: null, // Will be set automatically when active_flag becomes 0
         avg_rating: generalDetails.avgRating || 0,
         created_by: currentUser,
         updated_by: currentUser,
@@ -1331,18 +1374,7 @@ const updateTransporter = async (req, res) => {
         });
       }
 
-      if (!generalDetails.fromDate) {
-        await trx.rollback();
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "From date is required",
-            field: "fromDate",
-          },
-          timestamp: new Date().toISOString(),
-        });
-      }
+      // ✅ REMOVED fromDate validation - dates are now auto-managed by backend
 
       // Validate transport modes - at least one must be selected
       const transportModes = [
@@ -1913,23 +1945,43 @@ const updateTransporter = async (req, res) => {
 
     // Update general details if provided
     if (generalDetails) {
+      // Get old values for date automation
+      const oldStatus = currentStatus;
+      const oldActiveFlag = existingTransporter.active_flag;
+      const newStatus = generalDetails.status || currentStatus;
+      const newActiveFlag =
+        generalDetails.activeFlag !== undefined
+          ? generalDetails.activeFlag !== false
+            ? 1
+            : 0
+          : oldActiveFlag;
+
       await trx("transporter_general_info")
         .where("transporter_id", id)
         .update({
           business_name: generalDetails.businessName,
-          from_date: generalDetails.fromDate,
-          to_date: generalDetails.toDate || null,
+          // ✅ REMOVED from_date and to_date - now auto-managed by backend
           avg_rating: generalDetails.avgRating || 0,
           trans_mode_road: generalDetails.transMode.road ? 1 : 0,
           trans_mode_rail: generalDetails.transMode.rail ? 1 : 0,
           trans_mode_air: generalDetails.transMode.air ? 1 : 0,
           trans_mode_sea: generalDetails.transMode.sea ? 1 : 0,
-          active_flag: generalDetails.activeFlag !== false ? 1 : 0,
-          status: generalDetails.status || currentStatus, // Update status if provided
+          active_flag: newActiveFlag,
+          status: newStatus,
           updated_at: currentTimestamp,
           updated_on: currentTimestamp,
           updated_by: currentUser,
         });
+
+      // ✅ AUTO-UPDATE DATES based on status/flag changes
+      await updateTransporterDates(
+        trx,
+        id,
+        newStatus,
+        newActiveFlag,
+        oldStatus,
+        oldActiveFlag
+      );
     }
 
     // Update addresses if provided
@@ -2445,6 +2497,8 @@ const getTransporters = async (req, res) => {
       tan = "",
       createdOnStart = "",
       createdOnEnd = "",
+      activeFromDate = "", // NEW: Filter transporters active from this date (from_date >= activeFromDate)
+      activeToDate = "", // NEW: Filter transporters active till this date (to_date is null OR to_date >= activeToDate)
     } = req.query;
 
     const userId = req.user?.user_id; // Get current user from JWT
@@ -2503,6 +2557,7 @@ const getTransporters = async (req, res) => {
         "tgi.transporter_id",
         "tan_doc.transporter_id"
       )
+      // ✅ FIX: user_id_reference_id stores transporter entity ID (T001, T002) not admin user ID (TA0001)
       .leftJoin(
         knex.raw(`(
           SELECT aft1.*
@@ -2516,9 +2571,7 @@ const getTransporters = async (req, res) => {
           ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
                AND aft1.approval_flow_unique_id = aft2.max_id
         ) as aft`),
-        knex.raw(
-          "CONCAT('T', CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED))"
-        ),
+        "aft.user_id_reference_id",
         "tgi.transporter_id"
       )
       .select(
@@ -2641,6 +2694,23 @@ const getTransporters = async (req, res) => {
       query = query.where("tgi.created_on", "<=", endDateWithTime);
     }
 
+    //Active Date Range Filter (NEW)
+    // Shows transporters that were active during the specified period
+    if (activeFromDate) {
+      // Transporter became active on or after this date
+      query = query.where("tgi.from_date", ">=", activeFromDate);
+    }
+    if (activeToDate) {
+      // Transporter is still active on this date (to_date is null OR to_date >= activeToDate)
+      query = query.where(function () {
+        this.whereNull("tgi.to_date").orWhere(
+          "tgi.to_date",
+          ">=",
+          activeToDate
+        );
+      });
+    }
+
     // Count query (with same date filters and document joins for TAN filter)
     let countQuery = knex("transporter_general_info as tgi");
 
@@ -2760,6 +2830,20 @@ const getTransporters = async (req, res) => {
       countQuery = countQuery.where("tgi.created_on", "<=", endDateWithTime);
     }
 
+    // Active Date Filters for Count Query (NEW)
+    if (activeFromDate) {
+      countQuery = countQuery.where("tgi.from_date", ">=", activeFromDate);
+    }
+    if (activeToDate) {
+      countQuery = countQuery.where(function () {
+        this.whereNull("tgi.to_date").orWhere(
+          "tgi.to_date",
+          ">=",
+          activeToDate
+        );
+      });
+    }
+
     const totalResult = await countQuery
       .countDistinct("tgi.transporter_id as count")
       .first();
@@ -2843,6 +2927,73 @@ const getTransporters = async (req, res) => {
       error: {
         code: "FETCH_ERROR",
         message: "Failed to fetch transporters",
+        details: error.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+// Get transporter status counts
+const getTransporterStatusCounts = async (req, res) => {
+  try {
+    const userId = req.user?.user_id; // Get current user from JWT
+
+    // Query to get counts for each status
+    const counts = await knex("transporter_general_info")
+      .select("status")
+      .count("* as count")
+      .where(function () {
+        // Only show SAVE_AS_DRAFT records created by current user
+        this.where(function () {
+          this.whereNot("status", "SAVE_AS_DRAFT");
+        }).orWhere(function () {
+          this.where("status", "SAVE_AS_DRAFT").where(
+            "created_by",
+            "=",
+            userId
+          );
+        });
+      })
+      .groupBy("status");
+
+    // Transform to object with UPPERCASE status keys to match frontend expectations
+    const statusCounts = {
+      ACTIVE: 0,
+      INACTIVE: 0,
+      PENDING: 0,
+      DRAFT: 0,
+      total: 0,
+    };
+
+    counts.forEach((item) => {
+      const count = parseInt(item.count);
+      statusCounts.total += count;
+
+      // Database stores status in UPPERCASE (ACTIVE, INACTIVE, PENDING, SAVE_AS_DRAFT)
+      if (item.status === "ACTIVE") {
+        statusCounts.ACTIVE = count;
+      } else if (item.status === "INACTIVE" || item.status === "Inactive") {
+        statusCounts.INACTIVE = count;
+      } else if (item.status === "PENDING" || item.status === "Pending") {
+        statusCounts.PENDING = count;
+      } else if (item.status === "SAVE_AS_DRAFT") {
+        statusCounts.DRAFT = count;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: statusCounts,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error fetching transporter status counts:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch status counts",
         details: error.message,
       },
       timestamp: new Date().toISOString(),
@@ -3082,7 +3233,9 @@ const getTransporterById = async (req, res) => {
     });
 
     // Helper function to format date to YYYY-MM-DD
-    // Fixed to handle timezone issues - prevents date shifting
+    // ✅ FIX: Use local timezone to match MySQL DATE behavior
+    // MySQL DATE fields don't have timezone info - they're just dates
+    // Using UTC methods causes date shifting for timezones ahead of UTC
     const formatDateForInput = (dateValue) => {
       if (!dateValue) return null;
 
@@ -3099,10 +3252,11 @@ const getTransporterById = async (req, res) => {
       // Check if date is valid
       if (isNaN(date.getTime())) return null;
 
-      // Use UTC methods to avoid timezone shifts
-      const year = date.getUTCFullYear();
-      const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-      const day = String(date.getUTCDate()).padStart(2, "0");
+      // ✅ FIX: Use local timezone methods instead of UTC
+      // This ensures the date matches what MySQL CURDATE() returns
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
 
       return `${year}-${month}-${day}`;
     };
@@ -3248,14 +3402,15 @@ const getTransporterById = async (req, res) => {
       if (associatedUser) {
         console.log(`✅ Found associated user: ${associatedUser.user_id}`);
 
-        // Get approval flow for this user
+        // ✅ FIX: user_id_reference_id stores transporter entity ID (T001), not admin user ID
+        // Get approval flow using transporter ID, not admin user ID
         const approvalFlows = await knex("approval_flow_trans as aft")
           .leftJoin(
             "approval_type_master as atm",
             "aft.approval_type_id",
             "atm.approval_type_id"
           )
-          .where("aft.user_id_reference_id", associatedUser.user_id)
+          .where("aft.user_id_reference_id", id) // Use transporter entity ID (T001)
           .select(
             "aft.*",
             "atm.approval_type as approval_category",
@@ -3504,8 +3659,8 @@ const saveTransporterAsDraft = async (req, res) => {
           generalDetails.activeFlag !== undefined
             ? generalDetails.activeFlag
             : true,
-        from_date: generalDetails.fromDate || null,
-        to_date: generalDetails.toDate || null,
+        from_date: null, // ✅ Will be set automatically when status changes to ACTIVE
+        to_date: null, // ✅ Will be set automatically when active_flag becomes 0
         avg_rating: generalDetails.avgRating || 0,
         status: "SAVE_AS_DRAFT", // Draft status
         created_by: userId,
@@ -3806,8 +3961,8 @@ const updateTransporterDraft = async (req, res) => {
           trans_mode_rail: generalDetails.transMode?.rail || false,
           trans_mode_air: generalDetails.transMode?.air || false,
           trans_mode_sea: generalDetails.transMode?.sea || false,
-          from_date: generalDetails.fromDate || null,
-          to_date: generalDetails.toDate || null,
+          from_date: null, // ✅ Keep as null - will be set when status changes to ACTIVE
+          to_date: null, // ✅ Keep as null - will be set when active_flag becomes 0
           avg_rating: generalDetails.avgRating || 0,
           updated_by: userId,
           updated_at: knex.fn.now(),
@@ -4093,17 +4248,7 @@ const submitTransporterFromDraft = async (req, res) => {
       });
     }
 
-    // Validate from date
-    if (!generalDetails.fromDate) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: ERROR_MESSAGES.FROM_DATE_REQUIRED,
-          field: "generalDetails.fromDate",
-        },
-      });
-    }
+    // ✅ REMOVED fromDate validation - dates are now auto-managed by backend
 
     // Validate transport modes - at least one must be selected
     const transportModes = [
@@ -4630,6 +4775,14 @@ const submitTransporterFromDraft = async (req, res) => {
     const trx = await knex.transaction();
 
     try {
+      // Get old values for date automation
+      const existingTransporter = await trx("transporter_general_info")
+        .where("transporter_id", id)
+        .first();
+
+      const oldStatus = existingTransporter.status;
+      const oldActiveFlag = existingTransporter.active_flag;
+
       // Update general info to PENDING status
       await trx("transporter_general_info")
         .where("transporter_id", id)
@@ -4639,13 +4792,23 @@ const submitTransporterFromDraft = async (req, res) => {
           trans_mode_rail: generalDetails.transMode?.rail || false,
           trans_mode_air: generalDetails.transMode?.air || false,
           trans_mode_sea: generalDetails.transMode?.sea || false,
-          from_date: generalDetails.fromDate || null,
-          to_date: generalDetails.toDate || null,
+          from_date: null, // ✅ Will be set automatically when status changes to ACTIVE
+          to_date: null, // ✅ Will be set automatically when active_flag becomes 0
           avg_rating: generalDetails.avgRating || 0,
           status: "PENDING", // Change status to PENDING
           updated_by: userId,
           updated_at: knex.fn.now(),
         });
+
+      // ✅ AUTO-UPDATE DATES based on status changes (if approval auto-activates)
+      await updateTransporterDates(
+        trx,
+        id,
+        "PENDING",
+        existingTransporter.active_flag,
+        oldStatus,
+        oldActiveFlag
+      );
 
       // Update user_master to PENDING status
       // Derive TA user ID from transporter ID (T001 -> TA0001)
@@ -6044,6 +6207,7 @@ module.exports = {
   getStatesByCountry,
   getCitiesByCountryAndState,
   getTransporters,
+  getTransporterStatusCounts,
   getTransporterById,
   getDocumentFile,
   saveTransporterAsDraft,

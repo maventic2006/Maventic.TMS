@@ -8,6 +8,7 @@ const router = express.Router();
 const multer = require("multer");
 const {
   getConsignors,
+  getConsignorStatusCounts,
   getConsignorById,
   createConsignor,
   updateConsignor,
@@ -70,24 +71,33 @@ const checkConsignorAccess = (req, res, next) => {
   console.log("\n🔒 ===== CONSIGNOR ACCESS CHECK =====");
   console.log("👤 User ID:", userId);
   console.log("🏷️  User Type:", userType);
-  console.log("✅ Allowed Types: UT001 (Product Owner), UT006 (Consignor Admin)");
+  console.log(
+    "✅ Allowed Types: UT001 (Product Owner), UT006 (Consignor Admin)"
+  );
 
   // UT001 is Product Owner, UT006 is Consignor Admin - both can access consignor resources
   const allowedTypes = ["UT001", "UT006"];
-  
+
   if (!allowedTypes.includes(userType)) {
-    console.log("❌ ACCESS DENIED - User is not authorized for consignor resources");
+    console.log(
+      "❌ ACCESS DENIED - User is not authorized for consignor resources"
+    );
     console.log("🔒 ===== ACCESS CHECK FAILED =====\n");
     return res.status(403).json({
       success: false,
       error: {
         code: "ACCESS_DENIED",
-        message: "Only product owners and consignor admins can access this resource",
+        message:
+          "Only product owners and consignor admins can access this resource",
       },
     });
   }
 
-  console.log(`✅ ACCESS GRANTED - User has ${userType === "UT001" ? "Product Owner" : "Consignor Admin"} access`);
+  console.log(
+    `✅ ACCESS GRANTED - User has ${
+      userType === "UT001" ? "Product Owner" : "Consignor Admin"
+    } access`
+  );
   console.log("🔒 ===== ACCESS CHECK PASSED =====\n");
   next();
 };
@@ -115,6 +125,15 @@ router.get(
   authenticateToken,
   checkConsignorAccess,
   getMasterData
+);
+
+// 2️⃣ Status counts route (must be before /:id to avoid conflict)
+// GET /api/consignors/status-counts
+router.get(
+  "/status-counts",
+  authenticateToken,
+  checkConsignorAccess,
+  getConsignorStatusCounts
 );
 
 // ============================================================================
@@ -198,12 +217,7 @@ router.post(
 
 // 4️⃣ Get single consignor details by ID (must come after specific routes)
 // GET /api/consignors/:id
-router.get(
-  "/:id",
-  authenticateToken,
-  checkConsignorAccess,
-  getConsignorById
-);
+router.get("/:id", authenticateToken, checkConsignorAccess, getConsignorById);
 
 // 5️⃣ UPDATE EXISTING CONSIGNOR (with file upload support)
 // PUT /api/consignors/:id
@@ -217,12 +231,7 @@ router.put(
 
 // 6️⃣ SOFT DELETE CONSIGNOR (sets status to INACTIVE)
 // DELETE /api/consignors/:id
-router.delete(
-  "/:id",
-  authenticateToken,
-  checkConsignorAccess,
-  deleteConsignor
-);
+router.delete("/:id", authenticateToken, checkConsignorAccess, deleteConsignor);
 
 // ============================================================================
 // DOCUMENT DOWNLOAD ROUTES

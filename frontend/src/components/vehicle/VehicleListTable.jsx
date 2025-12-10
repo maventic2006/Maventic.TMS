@@ -19,6 +19,7 @@ import {
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import VehicleStatusPill from "./VehicleStatusPill";
+import StatusBadges from "../ui/StatusBadges";
 import { getPageTheme } from "../../theme.config";
 import { formatDate } from "../../utils/helpers";
 
@@ -44,6 +45,11 @@ const VehicleListTable = ({
   // Search props
   searchText,
   onSearchChange,
+  // Status badge props
+  statusCounts,
+  statusCountsLoading,
+  selectedStatus,
+  onStatusClick,
 }) => {
   // Pagination calculations
   const startItem = (currentPage - 1) * itemsPerPage + 1;
@@ -77,13 +83,13 @@ const VehicleListTable = ({
               className="text-sm mt-1"
               style={{ color: theme.colors.text.secondary }}
             >
-              <span
-                className="font-semibold"
-                style={{ color: theme.colors.pagination.active }}
-              >
-                {filteredCount}
-              </span>{" "}
-              vehicles found
+              <StatusBadges
+                counts={statusCounts}
+                selectedStatus={selectedStatus}
+                onStatusClick={onStatusClick}
+                loading={statusCountsLoading}
+                module="vehicle"
+              />
             </p>
           </div>
           <div className="relative w-full sm:w-auto">

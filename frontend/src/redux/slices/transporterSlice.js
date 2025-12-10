@@ -291,6 +291,32 @@ export const fetchTransporters = createAsyncThunk(
   }
 );
 
+// Fetch transporter status counts
+export const fetchTransporterStatusCounts = createAsyncThunk(
+  "transporter/fetchStatusCounts",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/transporter/status-counts");
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(
+          response.data.error || "Failed to fetch status counts"
+        );
+      }
+    } catch (error) {
+      console.error("API Error fetching status counts:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "NETWORK_ERROR",
+          message: "Failed to fetch status counts",
+        }
+      );
+    }
+  }
+);
+
 // Fetch single transporter by ID
 export const fetchTransporterById = createAsyncThunk(
   "transporter/fetchTransporterById",
@@ -966,6 +992,16 @@ const initialState = {
 
   // Success state
   lastCreatedTransporter: null,
+
+  // Status counts
+  statusCounts: {
+    ACTIVE: 0,
+    INACTIVE: 0,
+    PENDING: 0,
+    DRAFT: 0,
+  },
+  statusCountsLoading: false,
+  statusCountsError: null,
 };
 
 const transporterSlice = createSlice({
@@ -1155,6 +1191,21 @@ const transporterSlice = createSlice({
       .addCase(fetchTransporterById.rejected, (state, action) => {
         state.isFetchingDetails = false;
         state.error = action.payload;
+      })
+
+      // Fetch Transporter Status Counts
+      .addCase(fetchTransporterStatusCounts.pending, (state) => {
+        state.statusCountsLoading = true;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchTransporterStatusCounts.fulfilled, (state, action) => {
+        state.statusCountsLoading = false;
+        state.statusCounts = action.payload;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchTransporterStatusCounts.rejected, (state, action) => {
+        state.statusCountsLoading = false;
+        state.statusCountsError = action.payload;
       })
 
       // ============================================

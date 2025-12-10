@@ -7,6 +7,7 @@ const {
   getStatesByCountry,
   getCitiesByCountryAndState,
   getTransporters,
+  getTransporterStatusCounts,
   getTransporterById,
   getDocumentFile,
   saveTransporterAsDraft,
@@ -67,6 +68,12 @@ router.get(
   authenticateToken,
   checkProductOwnerAccess,
   getMasterData
+);
+router.get(
+  "/status-counts",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getTransporterStatusCounts
 );
 router.get(
   "/mapping-master-data",

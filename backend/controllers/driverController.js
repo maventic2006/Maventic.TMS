@@ -297,10 +297,10 @@ const formatDateForInput = (dateValue) => {
   // Check if date is valid
   if (isNaN(date.getTime())) return null;
 
-  // Use UTC methods to avoid timezone shifts
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
+  // ✅ FIX: Use local timezone methods to match MySQL DATE behavior
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 };
@@ -2913,6 +2913,7 @@ const getDrivers = async (req, res) => {
       avgRating = "",
       createdOnStart = "",
       createdOnEnd = "",
+      licenseValidityDate = "", // Filter by Driver License (DOC002) expiry date
     } = req.query;
 
     // Get current user ID for draft filtering
@@ -2922,6 +2923,7 @@ const getDrivers = async (req, res) => {
     console.log("  Current User ID:", currentUserId);
     console.log("  User Type:", req.user?.user_type_id);
     console.log("  Filters:", { status, driverId, fullName });
+    console.log("  License Validity Date Filter:", licenseValidityDate);
 
     // Convert page and limit
     const pageNum = parseInt(page);
@@ -3066,6 +3068,40 @@ const getDrivers = async (req, res) => {
 
       query.whereRaw(rawCondition, [`%${licenseNumber}%`]);
       countQuery.whereRaw(rawCondition, [`%${licenseNumber}%`]);
+    }
+
+    // ------- LICENSE VALIDITY DATE (DRIVER LICENSE DOC002) -------
+    // Filter drivers whose Driver License (DOC002) expires on or after the selected date
+    // Use Case: "Show drivers whose licenses expire after Jan 1, 2026"
+    if (licenseValidityDate) {
+      console.log("🔍 LICENSE VALIDITY FILTER APPLIED:", licenseValidityDate);
+
+      // Ensure date is in YYYY-MM-DD format for MySQL DATE comparison
+      const dateValue = licenseValidityDate.includes("T")
+        ? licenseValidityDate.split("T")[0]
+        : licenseValidityDate;
+
+      console.log("🔍 Formatted date for query:", dateValue);
+
+      // Only filter by Driver License (DOC002)
+      // Include drivers regardless of their status (ACTIVE, INACTIVE, PENDING, DRAFT)
+      // Show drivers whose license expires on or after the selected date (valid_to >= date)
+      const rawCondition = `
+        dbi.driver_id IN (
+          SELECT driver_id 
+          FROM driver_documents 
+          WHERE document_type_id = 'DOC002'
+            AND valid_to >= ?
+        )
+      `;
+
+      query.whereRaw(rawCondition, [dateValue]);
+      countQuery.whereRaw(rawCondition, [dateValue]);
+
+      console.log(
+        "✅ License validity filter added - DOC002 with valid_to >=",
+        dateValue
+      );
     }
 
     // ------- CREATED ON DATE RANGE (NEW) -------
@@ -3264,6 +3300,73 @@ const getDrivers = async (req, res) => {
       error: {
         code: "FETCH_ERROR",
         message: "Failed to fetch drivers",
+        details: error.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+// Get driver status counts
+const getDriverStatusCounts = async (req, res) => {
+  try {
+    const userId = req.user?.user_id; // Get current user from JWT
+
+    // Query to get counts for each status
+    const counts = await knex("driver_basic_information")
+      .select("status")
+      .count("* as count")
+      .where(function () {
+        // Only show SAVE_AS_DRAFT records created by current user
+        this.where(function () {
+          this.whereNot("status", "SAVE_AS_DRAFT");
+        }).orWhere(function () {
+          this.where("status", "SAVE_AS_DRAFT").where(
+            "created_by",
+            "=",
+            userId
+          );
+        });
+      })
+      .groupBy("status");
+
+    // Transform to object with UPPERCASE status keys to match frontend expectations
+    const statusCounts = {
+      ACTIVE: 0,
+      INACTIVE: 0,
+      PENDING: 0,
+      DRAFT: 0,
+      total: 0,
+    };
+
+    counts.forEach((item) => {
+      const count = parseInt(item.count);
+      statusCounts.total += count;
+
+      // Database stores status in UPPERCASE (ACTIVE, INACTIVE, PENDING, SAVE_AS_DRAFT)
+      if (item.status === "ACTIVE") {
+        statusCounts.ACTIVE = count;
+      } else if (item.status === "INACTIVE") {
+        statusCounts.INACTIVE = count;
+      } else if (item.status === "PENDING") {
+        statusCounts.PENDING = count;
+      } else if (item.status === "SAVE_AS_DRAFT") {
+        statusCounts.DRAFT = count;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: statusCounts,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error fetching driver status counts:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "FETCH_ERROR",
+        message: "Failed to fetch status counts",
         details: error.message,
       },
       timestamp: new Date().toISOString(),
@@ -5936,6 +6039,7 @@ module.exports = {
   createDriver,
   updateDriver,
   getDrivers,
+  getDriverStatusCounts,
   getDriverById,
   getMasterData,
   getMandatoryDocuments,

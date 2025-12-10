@@ -1,5 +1,47 @@
 const knex = require("../config/database");
 
+// Helper function to update transporter dates based on status and active_flag changes
+const updateTransporterDates = async (
+  trx,
+  transporterId,
+  newStatus,
+  newActiveFlag,
+  oldStatus = null,
+  oldActiveFlag = null
+) => {
+  const updates = {};
+
+  // Set from_date when status changes to ACTIVE
+  if (newStatus === "ACTIVE" && oldStatus !== "ACTIVE") {
+    updates.from_date = trx.raw("CURDATE()");
+  }
+
+  // Set to_date when active_flag becomes 0 OR status becomes INACTIVE
+  if (
+    (newActiveFlag === 0 && oldActiveFlag !== 0) ||
+    (newStatus === "INACTIVE" && oldStatus !== "INACTIVE")
+  ) {
+    updates.to_date = trx.raw("CURDATE()");
+  }
+
+  // Clear to_date when active_flag changes from 0 to 1 (reactivation)
+  if (oldActiveFlag === 0 && newActiveFlag === 1) {
+    updates.to_date = null;
+  }
+
+  // Apply updates if any
+  if (Object.keys(updates).length > 0) {
+    await trx("transporter_general_info")
+      .where("transporter_id", transporterId)
+      .update(updates);
+
+    console.log(
+      `📅 Auto-updated transporter dates for ${transporterId}:`,
+      updates
+    );
+  }
+};
+
 /**
  * Get approvals list with filters
  * GET /api/approvals
@@ -506,20 +548,27 @@ async function updateRelatedEntityStatus(
   try {
     // Transporter Admin User Creation (AT001)
     if (approval_type_id === "AT001") {
+      // ✅ FIX: user_id_reference_id stores transporter entity ID (T001) not admin user ID
+      // Derive TA user ID from transporter ID (T001 → TA0001, T109 → TA0109)
+      const transporterId = user_id_reference_id; // T001, T002, etc.
+      const transporterNumber = transporterId.substring(1); // Remove 'T' prefix → "001"
+      const transporterAdminUserId = `TA${transporterNumber.padStart(4, "0")}`; // TA0001, TA0109, etc.
+
       // Update TA user status
-      await trx("user_master").where("user_id", user_id_reference_id).update({
+      await trx("user_master").where("user_id", transporterAdminUserId).update({
         status: userStatus,
         is_active: isActive,
         updated_at: knex.fn.now(),
       });
       console.log(
-        `✅ Updated Transporter Admin user status: ${user_id_reference_id} → ${userStatus}`
+        `✅ Updated Transporter Admin user status: ${transporterAdminUserId} → ${userStatus}`
       );
 
       // CRITICAL: Also update the transporter status in transporter_general_info
-      // Derive transporter ID from TA user ID (TA0001 → T001, TA0109 → T109)
-      const transporterNumber = user_id_reference_id.substring(2); // Remove 'TA' prefix
-      const transporterId = `T${parseInt(transporterNumber)}`; // T001, T109, etc.
+      // Get old values before update for date automation
+      const oldTransporter = await trx("transporter_general_info")
+        .where("transporter_id", transporterId)
+        .first();
 
       await trx("transporter_general_info")
         .where("transporter_id", transporterId)
@@ -529,6 +578,16 @@ async function updateRelatedEntityStatus(
         });
       console.log(
         `✅ Updated Transporter status: ${transporterId} → ${entityStatus}`
+      );
+
+      // ✅ AUTO-UPDATE DATES based on status change
+      await updateTransporterDates(
+        trx,
+        transporterId,
+        entityStatus,
+        oldTransporter?.active_flag,
+        oldTransporter?.status,
+        oldTransporter?.active_flag
       );
     }
 

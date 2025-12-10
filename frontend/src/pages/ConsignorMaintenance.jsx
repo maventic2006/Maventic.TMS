@@ -9,6 +9,7 @@ import ConsignorListTable from "../components/consignor/ConsignorListTable";
 import PaginationBar from "../components/consignor/PaginationBar";
 import {
   fetchConsignors,
+  fetchConsignorStatusCounts,
   setFilters as setReduxFilters,
   clearFilters,
   deleteConsignorDraft,
@@ -36,8 +37,16 @@ const ConsignorMaintenance = () => {
   }, [searchParams]);
 
   // Redux state
-  const { consignors, pagination, filters, isFetching, error, masterData } =
-    useSelector((state) => state.consignor);
+  const {
+    consignors,
+    pagination,
+    filters,
+    isFetching,
+    error,
+    masterData,
+    statusCounts,
+    statusCountsLoading,
+  } = useSelector((state) => state.consignor);
 
   // Local state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -92,6 +101,11 @@ const ConsignorMaintenance = () => {
       })
     );
   }, [dispatch, appliedFilters, pagination.page, pagination.limit]);
+
+  // Fetch status counts on mount and when data changes
+  useEffect(() => {
+    dispatch(fetchConsignorStatusCounts());
+  }, [dispatch, consignors]);
 
   // Handle filter changes (only updates local state, not applied)
   const handleFilterChange = useCallback((newFilters) => {
@@ -220,6 +234,37 @@ const ConsignorMaintenance = () => {
   const handleToggleFilters = useCallback(() => {
     setShowFilters((prev) => !prev);
   }, []);
+
+  // Handle status badge click - toggle filter
+  const handleStatusClick = useCallback(
+    (status) => {
+      // If clicking the same status, clear the filter
+      if (appliedFilters.status === status) {
+        // Clear status filter
+        const newFilters = { ...localFilters, status: "" };
+        const newAppliedFilters = { ...appliedFilters, status: "" };
+        setLocalFilters(newFilters);
+        setAppliedFilters(newAppliedFilters);
+
+        // Update URL - remove status param
+        const params = new URLSearchParams(searchParams);
+        params.delete("status");
+        setSearchParams(params);
+      } else {
+        // Apply new status filter
+        const newFilters = { ...localFilters, status };
+        const newAppliedFilters = { ...appliedFilters, status };
+        setLocalFilters(newFilters);
+        setAppliedFilters(newAppliedFilters);
+
+        // Update URL - set status param
+        const params = new URLSearchParams(searchParams);
+        params.set("status", status);
+        setSearchParams(params);
+      }
+    },
+    [localFilters, appliedFilters, searchParams, setSearchParams]
+  );
 
   // Handle delete draft
   const handleDeleteDraft = useCallback(
@@ -381,6 +426,11 @@ const ConsignorMaintenance = () => {
             searchText={searchText}
             onSearchChange={handleSearchChange}
             onDeleteDraft={handleDeleteDraft}
+            // Status badges props
+            statusCounts={statusCounts}
+            statusCountsLoading={statusCountsLoading}
+            selectedStatus={appliedFilters.status}
+            onStatusClick={handleStatusClick}
           />
 
           {/* Pagination Bar */}

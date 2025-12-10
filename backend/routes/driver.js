@@ -8,6 +8,7 @@ const {
   getStatesByCountry,
   getCitiesByCountryAndState,
   getDrivers,
+  getDriverStatusCounts,
   getDriverById,
   saveDriverAsDraft,
   updateDriverDraft,
@@ -63,6 +64,12 @@ router.get(
   authenticateToken,
   checkProductOwnerAccess,
   getCitiesByCountryAndState
+);
+router.get(
+  "/status-counts",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getDriverStatusCounts
 );
 
 // List and detail routes

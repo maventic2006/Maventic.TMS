@@ -234,10 +234,10 @@ const formatDateForMySQL = (dateValue) => {
   // Check if date is valid
   if (isNaN(date.getTime())) return null;
 
-  // Use UTC methods to avoid timezone shifts
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
+  // ✅ FIX: Use local timezone methods to match MySQL DATE behavior
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 };
@@ -525,7 +525,13 @@ const getWarehouseList = async (req, res) => {
       );
 
     // FILTER: Consignor
-    if (consignorId) {
+    // First check if there's an explicit consignorId filter from query params (for admin users)
+    // Otherwise, use the auto-filter for consignor users
+    if (req.query.consignorId && !consignorId) {
+      // Admin user filtering by specific consignor
+      query.where("w.consignor_id", "like", `%${req.query.consignorId}%`);
+    } else if (consignorId) {
+      // Consignor user - auto-filter by their own consignor_id
       query.where("w.consignor_id", consignorId);
     }
 
@@ -599,7 +605,12 @@ const getWarehouseList = async (req, res) => {
     const countResult = await knex("warehouse_basic_information as w")
       .count("* as count")
       .where((builder) => {
-        if (consignorId) {
+        // FILTER: Consignor - same logic as main query
+        if (req.query.consignorId && !consignorId) {
+          // Admin user filtering by specific consignor
+          builder.where("w.consignor_id", "like", `%${req.query.consignorId}%`);
+        } else if (consignorId) {
+          // Consignor user - auto-filter by their own consignor_id
           builder.where("w.consignor_id", consignorId);
         }
 
@@ -742,6 +753,82 @@ const getWarehouseList = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch warehouses",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get warehouse status counts
+// @route   GET /api/warehouse/status-counts
+// @access  Private (Consignor, Admin, Super Admin)
+const getWarehouseStatusCounts = async (req, res) => {
+  try {
+    console.log("📊 Fetching warehouse status counts...");
+    console.log("User ID:", req.user.user_id);
+
+    // Initialize status counts
+    const statusCounts = {
+      ACTIVE: 0,
+      INACTIVE: 0,
+      PENDING: 0,
+      DRAFT: 0,
+    };
+
+    // Base query - filter by consignor_id only if user has one
+    let query = knex("warehouse_basic_information")
+      .select("status")
+      .count("* as count")
+      .groupBy("status");
+
+    // Apply consignor filter if user has consignor_id
+    if (req.user.consignor_id) {
+      query = query.where("consignor_id", req.user.consignor_id);
+    }
+
+    const counts = await query;
+
+    console.log("Raw status counts:", counts);
+
+    // Map counts to status object
+    counts.forEach((item) => {
+      const status = item.status;
+      const count = parseInt(item.count) || 0;
+
+      if (status === "ACTIVE") statusCounts.ACTIVE = count;
+      else if (status === "INACTIVE") statusCounts.INACTIVE = count;
+      else if (status === "PENDING") statusCounts.PENDING = count;
+      else if (status === "SAVE_AS_DRAFT") {
+        // For drafts, only count those created by current user
+        // We need a separate query for this
+      }
+    });
+
+    // Separate query for DRAFT count (only user's own drafts)
+    const draftCount = await knex("warehouse_basic_information")
+      .where("status", "SAVE_AS_DRAFT")
+      .where("created_by", req.user.user_id)
+      .modify((queryBuilder) => {
+        // Apply consignor filter if user has consignor_id
+        if (req.user.consignor_id) {
+          queryBuilder.where("consignor_id", req.user.consignor_id);
+        }
+      })
+      .count("* as count")
+      .first();
+
+    statusCounts.DRAFT = parseInt(draftCount.count) || 0;
+
+    console.log("✅ Status counts:", statusCounts);
+
+    res.status(200).json({
+      success: true,
+      data: statusCounts,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching warehouse status counts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch warehouse status counts",
       error: error.message,
     });
   }
@@ -3831,6 +3918,7 @@ const deleteWarehouseDraft = async (req, res) => {
 
 module.exports = {
   getWarehouseList,
+  getWarehouseStatusCounts,
   getWarehouseById,
   createWarehouse,
   updateWarehouse,

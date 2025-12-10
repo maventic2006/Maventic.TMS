@@ -22,12 +22,12 @@ const TransporterFilterPanel = ({
 
   const statusOptions = [
     { value: "", label: "All Status" },
-    { value: "Active", label: "Active" },
-    { value: "Approved", label: "Approved" },
-    { value: "Pending", label: "Pending" },
+    { value: "ACTIVE", label: "Active" },
+    { value: "PENDING", label: "Pending" },
     { value: "SAVE_AS_DRAFT", label: "Draft" },
-    { value: "Inactive", label: "Inactive" },
-    { value: "Rejected", label: "Rejected" },
+    { value: "INACTIVE", label: "Inactive" },
+    // { value: "Approved", label: "Approved" },
+    // { value: "Rejected", label: "Rejected" },
   ];
 
   return (
@@ -121,65 +121,104 @@ const TransporterFilterPanel = ({
                   />
                 </div>
 
-                <div className="space-y-2 group">
-                  <Label
-                    htmlFor="createdOnStart"
-                    className="text-sm text-[#0D1A33] font-semibold"
-                  >
-                    Created On (Start):
-                  </Label>
-                  <Input
-                    id="createdOnStart"
-                    type="date"
-                    value={filters.createdOnStart}
-                    onChange={(e) =>
-                      onFilterChange("createdOnStart", e.target.value)
-                    }
-                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+                <div className="flex-shrink-0 flex items-center gap-4 group">
+                  <div>
+                    <Label
+                      htmlFor="createdOnStart"
+                      className="text-sm text-[#0D1A33] font-semibold"
+                    >
+                      Created On (Start):
+                    </Label>
+                    <Input
+                      id="createdOnStart"
+                      type="date"
+                      value={filters.createdOnStart}
+                      onChange={(e) =>
+                        onFilterChange("createdOnStart", e.target.value)
+                      }
+                      className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
       focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
       transition-all duration-200 rounded-lg h-10"
-                  />
-                </div>
-
-                <div className="space-y-2 group">
-                  <Label
-                    htmlFor="createdOnEnd"
-                    className="text-sm text-[#0D1A33] font-semibold"
-                  >
-                    Created On (End):
-                  </Label>
-                  <Input
-                    id="createdOnEnd"
-                    type="date"
-                    value={filters.createdOnEnd}
-                    onChange={(e) =>
-                      onFilterChange("createdOnEnd", e.target.value)
-                    }
-                    className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+                    />
+                  </div>
+                  <div>
+                    <Label
+                      htmlFor="createdOnEnd"
+                      className="text-sm text-[#0D1A33] font-semibold"
+                    >
+                      Created On (End):
+                    </Label>
+                    <Input
+                      id="createdOnEnd"
+                      type="date"
+                      value={filters.createdOnEnd}
+                      onChange={(e) =>
+                        onFilterChange("createdOnEnd", e.target.value)
+                      }
+                      className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
       focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
       transition-all duration-200 rounded-lg h-10"
-                  />
+                    />
+                  </div>
+                  {/* Active Date Range Filters */}
+                  <div>
+                    <Label
+                      htmlFor="activeFromDate"
+                      className="text-sm text-[#0D1A33] font-semibold"
+                    >
+                      Active From Date:
+                    </Label>
+                    <Input
+                      id="activeFromDate"
+                      type="date"
+                      value={filters.activeFromDate}
+                      onChange={(e) =>
+                        onFilterChange("activeFromDate", e.target.value)
+                      }
+                      className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+      focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
+      transition-all duration-200 rounded-lg h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label
+                      htmlFor="activeToDate"
+                      className="text-sm text-[#0D1A33] font-semibold"
+                    >
+                      Active To Date:
+                    </Label>
+                    <Input
+                      id="activeToDate"
+                      type="date"
+                      value={filters.activeToDate}
+                      onChange={(e) =>
+                        onFilterChange("activeToDate", e.target.value)
+                      }
+                      className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+      focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
+      transition-all duration-200 rounded-lg h-10"
+                    />
+                  </div>
+                  {/* Status Section */}
+                  <div className="space-y-2 group flex-shrink-0">
+                    <Label className="text-sm text-[#0D1A33] font-semibold">
+                      Status:
+                    </Label>
+                    <div className="w-full sm:w-48">
+                      <StatusSelect
+                        value={filters.status}
+                        onChange={(value) => onFilterChange("status", value)}
+                        options={statusOptions}
+                        placeholder="All Status"
+                        className="w-full transition-all duration-200"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Status and Transport Mode Row */}
               <div className="flex flex-col sm:flex-row sm:items-start lg:items-end gap-6 mb-6">
-                {/* Status Section */}
-                <div className="space-y-2 group flex-shrink-0">
-                  <Label className="text-sm text-[#0D1A33] font-semibold">
-                    Status:
-                  </Label>
-                  <div className="w-full sm:w-48">
-                    <StatusSelect
-                      value={filters.status}
-                      onChange={(value) => onFilterChange("status", value)}
-                      options={statusOptions}
-                      placeholder="All Status"
-                      className="w-full transition-all duration-200"
-                    />
-                  </div>
-                </div>
-
                 {/* Transport Mode Section */}
                 <div className="space-y-2 group flex-1 min-w-0">
                   <Label className="text-sm text-[#0D1A33] font-semibold">

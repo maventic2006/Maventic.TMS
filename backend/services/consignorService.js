@@ -19,13 +19,13 @@ const { uploadFile } = require("../utils/storageService");
 /**
  * Convert ISO date string to MySQL date format (YYYY-MM-DD)
  * Handles both date-only and datetime strings with timezone
- * 
+ *
  * @param {string} isoDateString - ISO date/datetime string (e.g., '2025-09-21T18:30:00.000Z')
  * @returns {string|null} MySQL date format (YYYY-MM-DD) or null if invalid
  */
 const formatDateForMySQL = (isoDateString) => {
   if (!isoDateString || isoDateString === "") return null;
-  
+
   try {
     const date = new Date(isoDateString);
     if (isNaN(date.getTime())) {
@@ -40,10 +40,15 @@ const formatDateForMySQL = (isoDateString) => {
     const day = String(date.getUTCDate()).padStart(2, "0");
 
     const result = `${year}-${month}-${day}`;
-    console.log(`[Consignor Service] Date converted: ${isoDateString} → ${result}`);
+    console.log(
+      `[Consignor Service] Date converted: ${isoDateString} → ${result}`
+    );
     return result;
   } catch (error) {
-    console.warn(`[Consignor Service] Error formatting date ${isoDateString}:`, error.message);
+    console.warn(
+      `[Consignor Service] Error formatting date ${isoDateString}:`,
+      error.message
+    );
     return null;
   }
 };
@@ -182,7 +187,7 @@ const isCompanyCodeUnique = async (companyCode, excludeCustomerId = null) => {
 const generateCompanyCodeSuggestions = async (baseCode, maxSuggestions = 3) => {
   const suggestions = [];
   const cleanCode = baseCode.toUpperCase().trim();
-  
+
   // Try adding numbers 1-9
   for (let i = 1; i <= 9 && suggestions.length < maxSuggestions; i++) {
     const suggestion = `${cleanCode}${i}`;
@@ -190,7 +195,7 @@ const generateCompanyCodeSuggestions = async (baseCode, maxSuggestions = 3) => {
       suggestions.push(suggestion);
     }
   }
-  
+
   // Try adding two-digit numbers 10-20
   for (let i = 10; i <= 20 && suggestions.length < maxSuggestions; i++) {
     const suggestion = `${cleanCode}${i}`;
@@ -198,10 +203,10 @@ const generateCompanyCodeSuggestions = async (baseCode, maxSuggestions = 3) => {
       suggestions.push(suggestion);
     }
   }
-  
+
   // Try alternative patterns if still no suggestions
   if (suggestions.length < maxSuggestions) {
-    const patterns = ['_01', '_02', '_03', 'INC', 'LTD', 'CO'];
+    const patterns = ["_01", "_02", "_03", "INC", "LTD", "CO"];
     for (const pattern of patterns) {
       if (suggestions.length >= maxSuggestions) break;
       const suggestion = `${cleanCode}${pattern}`;
@@ -210,7 +215,7 @@ const generateCompanyCodeSuggestions = async (baseCode, maxSuggestions = 3) => {
       }
     }
   }
-  
+
   return suggestions;
 };
 
@@ -446,11 +451,16 @@ const getConsignorList = async (queryParams, user = null) => {
       if (status === "SAVE_AS_DRAFT") {
         // 🔒 DRAFT PRIVACY: Only show drafts created by current user
         if (currentUserId) {
-          baseQuery.where("consignor_basic_information.status", status)
-                   .where("consignor_basic_information.created_by", currentUserId);
+          baseQuery
+            .where("consignor_basic_information.status", status)
+            .where("consignor_basic_information.created_by", currentUserId);
         } else {
           // If no user context, exclude all drafts
-          baseQuery.where("consignor_basic_information.status", "!=", "SAVE_AS_DRAFT");
+          baseQuery.where(
+            "consignor_basic_information.status",
+            "!=",
+            "SAVE_AS_DRAFT"
+          );
         }
       } else {
         // For non-draft statuses, show all records regardless of creator
@@ -459,12 +469,20 @@ const getConsignorList = async (queryParams, user = null) => {
     } else {
       // 🔒 DEFAULT BEHAVIOR: Hide all drafts if no specific status filter is applied
       // This ensures drafts don't appear in general lists unless explicitly requested
-      baseQuery.where(function() {
-        this.where("consignor_basic_information.status", "!=", "SAVE_AS_DRAFT")
-            .orWhere(function() {
-              this.where("consignor_basic_information.status", "SAVE_AS_DRAFT")
-                  .where("consignor_basic_information.created_by", currentUserId || "");
-            });
+      baseQuery.where(function () {
+        this.where(
+          "consignor_basic_information.status",
+          "!=",
+          "SAVE_AS_DRAFT"
+        ).orWhere(function () {
+          this.where(
+            "consignor_basic_information.status",
+            "SAVE_AS_DRAFT"
+          ).where(
+            "consignor_basic_information.created_by",
+            currentUserId || ""
+          );
+        });
       });
     }
 
@@ -618,6 +636,62 @@ const getConsignorList = async (queryParams, user = null) => {
     };
   } catch (error) {
     console.error("Get consignor list error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get consignor status counts
+ * Returns counts for ACTIVE, INACTIVE, PENDING, and DRAFT statuses
+ * Drafts are filtered to show only user's own drafts
+ */
+const getConsignorStatusCounts = async (user) => {
+  try {
+    console.log("📊 Fetching consignor status counts for user:", user.user_id);
+
+    // Initialize status counts
+    const statusCounts = {
+      ACTIVE: 0,
+      INACTIVE: 0,
+      PENDING: 0,
+      DRAFT: 0,
+    };
+
+    // Base query for status counts
+    let query = knex("consignor_basic_information")
+      .select("status")
+      .count("* as count")
+      .groupBy("status");
+
+    const counts = await query;
+
+    console.log("Raw status counts:", counts);
+
+    // Map counts to status object
+    counts.forEach((item) => {
+      const status = item.status;
+      const count = parseInt(item.count) || 0;
+
+      if (status === "ACTIVE") statusCounts.ACTIVE = count;
+      else if (status === "INACTIVE") statusCounts.INACTIVE = count;
+      else if (status === "PENDING") statusCounts.PENDING = count;
+      // DRAFT handled separately below
+    });
+
+    // Separate query for DRAFT count (only user's own drafts)
+    const draftCount = await knex("consignor_basic_information")
+      .where("status", "SAVE_AS_DRAFT")
+      .where("created_by", user.user_id)
+      .count("* as count")
+      .first();
+
+    statusCounts.DRAFT = parseInt(draftCount.count) || 0;
+
+    console.log("✅ Final status counts:", statusCounts);
+
+    return statusCounts;
+  } catch (error) {
+    console.error("❌ Get consignor status counts error:", error);
     throw error;
   }
 };
@@ -914,31 +988,31 @@ const getConsignorById = async (customerId) => {
         // ✅ PRIMARY IDENTIFIERS
         document_unique_id: d.document_unique_id, // Backend snake_case format for DocumentsViewTab
         documentUniqueId: d.document_unique_id, // Legacy camelCase format for backward compatibility
-        
-        // ✅ DOCUMENT TYPE INFORMATION  
+
+        // ✅ DOCUMENT TYPE INFORMATION
         document_type_id: d.document_type_id, // Backend field for edit mode
         document_type: d.document_type, // Backend field for view mode (DocumentsViewTab expects this)
         documentType: d.document_type_id, // Legacy frontend field
         documentTypeName: d.document_type, // Human readable name
-        
+
         // ✅ DOCUMENT IDENTIFICATION
         document_number: d.document_number, // Backend field for DocumentsViewTab
         documentNumber: d.document_number, // Legacy frontend field
         referenceNumber: "", // Not stored in database, return empty
         country: "", // Not stored in database, return empty
-        
+
         // ✅ VALIDITY DATES - DUAL FORMAT FOR COMPLETE COMPATIBILITY
         valid_from: d.valid_from, // Backend snake_case format for DocumentsViewTab
-        valid_to: d.valid_to, // Backend snake_case format for DocumentsViewTab  
+        valid_to: d.valid_to, // Backend snake_case format for DocumentsViewTab
         validFrom: d.valid_from, // Legacy camelCase format for edit mode
         validTo: d.valid_to, // Legacy camelCase format for edit mode
-        
+
         // ✅ FILE INFORMATION - DUAL FORMAT
         file_name: d.file_name || "", // Backend snake_case format for DocumentsViewTab
         file_type: d.file_type || "", // Backend snake_case format for DocumentsViewTab
         fileName: d.file_name || "", // Legacy camelCase format for edit mode
         fileType: d.file_type || "", // Legacy camelCase format for edit mode
-        
+
         // ✅ METADATA
         document_id: d.document_id, // Backend document upload ID for download
         documentId: d.document_id, // Legacy field name
@@ -1032,12 +1106,17 @@ const createConsignor = async (payload, files, userId) => {
           organization.company_code,
           3
         );
-        
-        let message = "Company code already exists. Please use a different code.";
-        if (suggestions && Array.isArray(suggestions) && suggestions.length > 0) {
+
+        let message =
+          "Company code already exists. Please use a different code.";
+        if (
+          suggestions &&
+          Array.isArray(suggestions) &&
+          suggestions.length > 0
+        ) {
           message += ` Suggested alternatives: ${suggestions.join(", ")}`;
         }
-        
+
         throw {
           type: "VALIDATION_ERROR",
           details: [
@@ -1153,21 +1232,24 @@ const createConsignor = async (payload, files, userId) => {
           );
 
           // ✅ VALIDATION: Ensure document_type_id is present
-          const documentTypeId = doc.document_type_id || doc.documentTypeId || doc.documentType;
-          
+          const documentTypeId =
+            doc.document_type_id || doc.documentTypeId || doc.documentType;
+
           console.log(`  - document_type_id: ${doc.document_type_id}`);
           console.log(`  - documentTypeId: ${doc.documentTypeId}`);
           console.log(`  - documentType: ${doc.documentType}`);
           console.log(`  - Final documentTypeId: ${documentTypeId}`);
-          
+
           if (!documentTypeId) {
             console.error(`❌ MISSING DOCUMENT TYPE ID for document ${i + 1}`);
             throw {
               type: "VALIDATION_ERROR",
-              details: [{
-                field: `documents[${i}].document_type_id`,
-                message: "Document type ID is required for file uploads",
-              }],
+              details: [
+                {
+                  field: `documents[${i}].document_type_id`,
+                  message: "Document type ID is required for file uploads",
+                },
+              ],
               message: "Document validation failed - missing document type",
             };
           }
@@ -1729,7 +1811,7 @@ const updateConsignor = async (
     // 4. Handle document updates if provided
     if (documents && files) {
       console.log(`\n📄 ===== PROCESSING ${documents.length} DOCUMENTS =====`);
-      
+
       for (let i = 0; i < documents.length; i++) {
         const doc = documents[i];
         const file = files[doc.fileKey];
@@ -1744,16 +1826,19 @@ const updateConsignor = async (
 
         if (file) {
           // ✅ VALIDATION: Ensure document_type_id is present
-          const documentTypeId = doc.document_type_id || doc.documentTypeId || doc.documentType;
-          
+          const documentTypeId =
+            doc.document_type_id || doc.documentTypeId || doc.documentType;
+
           if (!documentTypeId) {
             console.error(`❌ MISSING DOCUMENT TYPE ID for document ${i + 1}`);
             throw {
               type: "VALIDATION_ERROR",
-              details: [{
-                field: `documents[${i}].document_type_id`,
-                message: "Document type ID is required for file uploads",
-              }],
+              details: [
+                {
+                  field: `documents[${i}].document_type_id`,
+                  message: "Document type ID is required for file uploads",
+                },
+              ],
               message: "Document validation failed - missing document type",
             };
           }
@@ -2034,6 +2119,7 @@ const getGeneralDocument = async (customerId, fileType) => {
 
 module.exports = {
   getConsignorList,
+  getConsignorStatusCounts,
   getConsignorById,
   createConsignor,
   updateConsignor,

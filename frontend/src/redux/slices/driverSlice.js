@@ -178,6 +178,32 @@ export const fetchDrivers = createAsyncThunk(
   }
 );
 
+// Fetch driver status counts
+export const fetchDriverStatusCounts = createAsyncThunk(
+  "driver/fetchStatusCounts",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/driver/status-counts");
+
+      if (response.data.success) {
+        return response.data.data;
+      } else {
+        return rejectWithValue(
+          response.data.error || "Failed to fetch status counts"
+        );
+      }
+    } catch (error) {
+      console.error("API Error fetching status counts:", error);
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "NETWORK_ERROR",
+          message: "Failed to fetch status counts",
+        }
+      );
+    }
+  }
+);
+
 // Fetch single driver by ID
 export const fetchDriverById = createAsyncThunk(
   "driver/fetchDriverById",
@@ -529,6 +555,16 @@ const initialState = {
   // Success state
   lastCreated: null,
 
+  // Status counts
+  statusCounts: {
+    ACTIVE: 0,
+    INACTIVE: 0,
+    PENDING: 0,
+    DRAFT: 0,
+  },
+  statusCountsLoading: false,
+  statusCountsError: null,
+
   // Draft management state
   isSavingDraft: false,
   isUpdatingDraft: false,
@@ -674,6 +710,21 @@ const driverSlice = createSlice({
         state.error = action.payload;
       })
 
+      // Fetch Driver Status Counts
+      .addCase(fetchDriverStatusCounts.pending, (state) => {
+        state.statusCountsLoading = true;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchDriverStatusCounts.fulfilled, (state, action) => {
+        state.statusCountsLoading = false;
+        state.statusCounts = action.payload;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchDriverStatusCounts.rejected, (state, action) => {
+        state.statusCountsLoading = false;
+        state.statusCountsError = action.payload;
+      })
+
       // Download Template
       .addCase(downloadDriverTemplate.pending, (state) => {
         state.bulkUpload.isDownloadingTemplate = true;
@@ -808,7 +859,12 @@ const driverSlice = createSlice({
   },
 });
 
-export const { clearError, clearSelectedDriver, clearLastCreated, resetDriverState, resetPaginationToFirstPage } =
-  driverSlice.actions;
+export const {
+  clearError,
+  clearSelectedDriver,
+  clearLastCreated,
+  resetDriverState,
+  resetPaginationToFirstPage,
+} = driverSlice.actions;
 
 export default driverSlice.reducer;

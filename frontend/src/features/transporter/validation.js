@@ -51,6 +51,7 @@ export const generalDetailsSchema = z
         today.setHours(0, 0, 0, 0);
         return selectedDate <= today;
       }, ERROR_MESSAGES.FROM_DATE_FUTURE),
+    // toDate is optional - kept for backward compatibility with existing data
     toDate: z
       .string()
       .optional()
@@ -78,6 +79,7 @@ export const generalDetailsSchema = z
   })
   .refine(
     (data) => {
+      // Only validate toDate relationship if it's provided (backward compatibility)
       if (data.fromDate && data.toDate) {
         return new Date(data.toDate) > new Date(data.fromDate);
       }

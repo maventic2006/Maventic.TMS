@@ -31,6 +31,9 @@ const validateWarehouseListQuery = (query) => {
     errors.push({ field: "status", message: "Invalid status value" });
   }
 
+  // ✅ Allow consignorId filter parameter (optional)
+  // No validation needed - just a string filter
+
   return {
     isValid: errors.length === 0,
     errors,

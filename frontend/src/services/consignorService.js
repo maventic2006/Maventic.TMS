@@ -237,6 +237,27 @@ export const getMasterData = async () => {
 };
 
 /**
+ * Get consignor status counts
+ * @returns {Promise} - Status counts
+ */
+export const getConsignorStatusCounts = async () => {
+  try {
+    const response = await api.get("/consignors/status-counts");
+
+    if (response.data.success) {
+      return response.data.data;
+    }
+
+    throw new Error(
+      response.data.error?.message || "Failed to fetch consignor status counts"
+    );
+  } catch (error) {
+    console.error("getConsignorStatusCounts error:", error);
+    throw error.response?.data || error;
+  }
+};
+
+/**
  * Upload document for consignor
  * @param {string} customerId - Customer ID
  * @param {FormData} formData - Form data with file and metadata

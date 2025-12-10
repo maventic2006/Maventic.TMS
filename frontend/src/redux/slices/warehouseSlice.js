@@ -101,6 +101,9 @@ const initialState = {
     geoFencing: null,
     status: "",
   },
+  statusCounts: { ACTIVE: 0, INACTIVE: 0, PENDING: 0, DRAFT: 0 },
+  statusCountsLoading: false,
+  statusCountsError: null,
   useMockData: false, // Flag to switch between mock and real data - now using real API
 
   // Approval state (for warehouse manager users)
@@ -153,6 +156,21 @@ export const fetchWarehouses = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || "Failed to fetch warehouses"
+      );
+    }
+  }
+);
+
+export const fetchWarehouseStatusCounts = createAsyncThunk(
+  "warehouse/fetchStatusCounts",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/warehouse/status-counts");
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message ||
+          "Failed to fetch warehouse status counts"
       );
     }
   }
@@ -604,6 +622,21 @@ const warehouseSlice = createSlice({
       .addCase(fetchWarehouses.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // Fetch warehouse status counts
+      .addCase(fetchWarehouseStatusCounts.pending, (state) => {
+        state.statusCountsLoading = true;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchWarehouseStatusCounts.fulfilled, (state, action) => {
+        state.statusCounts = action.payload;
+        state.statusCountsLoading = false;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchWarehouseStatusCounts.rejected, (state, action) => {
+        state.statusCountsLoading = false;
+        state.statusCountsError = action.payload;
       })
 
       // Fetch warehouse by ID

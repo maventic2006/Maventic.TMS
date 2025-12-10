@@ -5,6 +5,7 @@ import TMSHeader from "../components/layout/TMSHeader";
 import { getPageTheme } from "../theme.config";
 import {
   fetchWarehouses,
+  fetchWarehouseStatusCounts,
   deleteWarehouseDraft,
   resetPaginationToFirstPage,
 } from "../redux/slices/warehouseSlice"; // ✅ Add deleteWarehouseDraft
@@ -63,6 +64,7 @@ const WarehouseMaintenance = () => {
     return {
       warehouseId: searchParams.get("warehouseId") || "",
       warehouseName: searchParams.get("warehouseName") || "",
+      consignorId: searchParams.get("consignorId") || "",
       status: searchParams.get("status") || "",
       createdOnStart: searchParams.get("createdOnStart") || "",
       createdOnEnd: searchParams.get("createdOnEnd") || "",
@@ -74,9 +76,14 @@ const WarehouseMaintenance = () => {
   }, [searchParams]);
 
   // Redux state
-  const { warehouses, pagination, loading, error } = useSelector(
-    (state) => state.warehouse
-  );
+  const {
+    warehouses,
+    pagination,
+    loading,
+    error,
+    statusCounts,
+    statusCountsLoading,
+  } = useSelector((state) => state.warehouse);
 
   // Local state
   const [searchText, setSearchText] = useState("");
@@ -114,6 +121,9 @@ const WarehouseMaintenance = () => {
       if (appliedFilters.warehouseName) {
         params.warehouseName = appliedFilters.warehouseName;
       }
+      if (appliedFilters.consignorId) {
+        params.consignorId = appliedFilters.consignorId;
+      }
       if (appliedFilters.status) {
         params.status = appliedFilters.status;
       }
@@ -142,6 +152,11 @@ const WarehouseMaintenance = () => {
     fetchData();
   }, [dispatch, appliedFilters, pagination.page, pagination.limit]);
 
+  // Fetch status counts on mount and when data changes
+  useEffect(() => {
+    dispatch(fetchWarehouseStatusCounts());
+  }, [dispatch, warehouses]);
+
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({
       ...prev,
@@ -159,6 +174,7 @@ const WarehouseMaintenance = () => {
     if (filters.warehouseId) params.set("warehouseId", filters.warehouseId);
     if (filters.warehouseName)
       params.set("warehouseName", filters.warehouseName);
+    if (filters.consignorId) params.set("consignorId", filters.consignorId);
     if (filters.status) params.set("status", filters.status);
     if (filters.createdOnStart)
       params.set("createdOnStart", filters.createdOnStart);
@@ -183,6 +199,7 @@ const WarehouseMaintenance = () => {
     const emptyFilters = {
       warehouseId: "",
       warehouseName: "",
+      consignorId: "",
       status: "",
       createdOnStart: "",
       createdOnEnd: "",
@@ -201,6 +218,37 @@ const WarehouseMaintenance = () => {
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);
   }, []);
+
+  // Handle status badge click - toggle filter
+  const handleStatusClick = useCallback(
+    (status) => {
+      // If clicking the same status, clear the filter
+      if (appliedFilters.status === status) {
+        // Clear status filter
+        const newFilters = { ...filters, status: "" };
+        const newAppliedFilters = { ...appliedFilters, status: "" };
+        setFilters(newFilters);
+        setAppliedFilters(newAppliedFilters);
+
+        // Update URL - remove status param
+        const params = new URLSearchParams(searchParams);
+        params.delete("status");
+        setSearchParams(params);
+      } else {
+        // Apply new status filter
+        const newFilters = { ...filters, status };
+        const newAppliedFilters = { ...appliedFilters, status };
+        setFilters(newFilters);
+        setAppliedFilters(newAppliedFilters);
+
+        // Update URL - set status param
+        const params = new URLSearchParams(searchParams);
+        params.set("status", status);
+        setSearchParams(params);
+      }
+    },
+    [filters, appliedFilters, searchParams, setSearchParams]
+  );
 
   // Apply client-side fuzzy search filtering on backend results
   const filteredWarehouses = useMemo(() => {
@@ -235,6 +283,9 @@ const WarehouseMaintenance = () => {
       }
       if (appliedFilters.warehouseName) {
         params.warehouseName = appliedFilters.warehouseName;
+      }
+      if (appliedFilters.consignorId) {
+        params.consignorId = appliedFilters.consignorId;
       }
       if (appliedFilters.status) {
         params.status = appliedFilters.status;
@@ -371,6 +422,11 @@ const WarehouseMaintenance = () => {
             filteredCount={filteredWarehouses.length}
             searchText={searchText}
             onSearchChange={handleSearchChange}
+            // Status badges props
+            statusCounts={statusCounts}
+            statusCountsLoading={statusCountsLoading}
+            selectedStatus={appliedFilters.status}
+            onStatusClick={handleStatusClick}
           />
 
           {error && (

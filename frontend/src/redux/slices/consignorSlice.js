@@ -117,6 +117,19 @@ export const fetchConsignorMasterData = createAsyncThunk(
   }
 );
 
+// Fetch consignor status counts
+export const fetchConsignorStatusCounts = createAsyncThunk(
+  "consignor/fetchStatusCounts",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await consignorService.getConsignorStatusCounts();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 /**
  * Save consignor as draft
  * Creates a new draft record with minimal validation (business_name only)
@@ -280,6 +293,9 @@ const initialState = {
     industryType: "",
     status: "",
   },
+  statusCounts: { ACTIVE: 0, INACTIVE: 0, PENDING: 0, DRAFT: 0 },
+  statusCountsLoading: false,
+  statusCountsError: null,
   isFetching: false,
   isCreating: false,
   isUpdating: false,
@@ -376,6 +392,22 @@ const consignorSlice = createSlice({
       .addCase(fetchConsignors.rejected, (state, action) => {
         state.isFetching = false;
         state.error = action.payload;
+      });
+
+    // Fetch Consignor Status Counts
+    builder
+      .addCase(fetchConsignorStatusCounts.pending, (state) => {
+        state.statusCountsLoading = true;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchConsignorStatusCounts.fulfilled, (state, action) => {
+        state.statusCounts = action.payload;
+        state.statusCountsLoading = false;
+        state.statusCountsError = null;
+      })
+      .addCase(fetchConsignorStatusCounts.rejected, (state, action) => {
+        state.statusCountsLoading = false;
+        state.statusCountsError = action.payload;
       });
 
     // Fetch Consignor By ID

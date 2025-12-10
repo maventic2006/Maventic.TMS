@@ -25,6 +25,7 @@ import {
 import { Card, CardContent } from "../ui/Card";
 import { Button } from "../ui/Button";
 import StatusPill from "./StatusPill";
+import StatusBadges from "../ui/StatusBadges";
 
 // Helper function to display N/A for empty or null values
 const displayValue = (value) => {
@@ -71,6 +72,11 @@ const WarehouseListTable = ({
   // Search props
   searchText,
   onSearchChange,
+  // Status badges props
+  statusCounts,
+  statusCountsLoading,
+  selectedStatus,
+  onStatusClick,
 }) => {
   // Pagination calculations
   const startItem = (currentPage - 1) * itemsPerPage + 1;
@@ -87,11 +93,14 @@ const WarehouseListTable = ({
       {/* Results Count Section - Always visible */}
       <div className="px-0 pb-4 border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between">
-          {/* Left side - Results count */}
-          <p className="text-sm text-[#0D1A33] font-semibold">
-            <span className="text-[#1D4ED8] font-bold">{filteredCount}</span>{" "}
-            Warehouses Found
-          </p>
+          {/* Left side - Status badges */}
+          <StatusBadges
+            counts={statusCounts}
+            selectedStatus={selectedStatus}
+            onStatusClick={onStatusClick}
+            loading={statusCountsLoading}
+            module="warehouse"
+          />
 
           {/* Right side - Search bar - Always visible */}
           <div className="flex items-center gap-4">

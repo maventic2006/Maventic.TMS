@@ -77,7 +77,6 @@ const CreateTransporterPage = () => {
       generalDetails: {
         businessName: "",
         fromDate: currentDate, // Default to today's date
-        toDate: "",
         avgRating: 0,
         transMode: {
           road: false,

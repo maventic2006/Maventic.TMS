@@ -23,6 +23,7 @@ import {
 } from "../ui/Table";
 import { Card, CardContent } from "../ui/Card";
 import { Button } from "../ui/Button";
+import StatusBadges from "../ui/StatusBadges";
 import { Country, State } from "country-state-city";
 
 // Helper function to display N/A for empty or null values
@@ -88,6 +89,11 @@ const DriverListTable = ({
   filteredCount,
   searchText,
   onSearchChange,
+  // Status badges props
+  statusCounts,
+  statusCountsLoading,
+  selectedStatus,
+  onStatusClick,
 }) => {
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
@@ -101,11 +107,16 @@ const DriverListTable = ({
       {/* Results Count and Search Section */}
       <div className="px-0 py-0 pb-4 border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-[#0D1A33] font-semibold">
-            <span className="text-[#1D4ED8] font-bold">{filteredCount}</span>{" "}
-            Drivers Found
-          </p>
+          {/* Left side - Status badges */}
+          <StatusBadges
+            counts={statusCounts}
+            selectedStatus={selectedStatus}
+            onStatusClick={onStatusClick}
+            loading={statusCountsLoading}
+            module="driver"
+          />
 
+          {/* Right side - Search bar */}
           <div className="flex items-center gap-4">
             {searchText && (
               <div className="text-xs text-[#4A5568] hidden sm:block">

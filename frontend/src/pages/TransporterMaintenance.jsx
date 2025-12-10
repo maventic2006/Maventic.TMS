@@ -9,6 +9,7 @@ import TransporterListTable from "../components/transporter/TransporterListTable
 import PaginationBar from "../components/transporter/PaginationBar";
 import {
   fetchTransporters,
+  fetchTransporterStatusCounts,
   deleteTransporterDraft,
   resetPaginationToFirstPage,
 } from "../redux/slices/transporterSlice";
@@ -54,9 +55,14 @@ const TransporterMaintenance = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Redux state
-  const { transporters, pagination, isFetching, error } = useSelector(
-    (state) => state.transporter
-  );
+  const {
+    transporters,
+    pagination,
+    isFetching,
+    error,
+    statusCounts,
+    statusCountsLoading,
+  } = useSelector((state) => state.transporter);
 
   // Local state
   const [searchText, setSearchText] = useState("");
@@ -72,6 +78,8 @@ const TransporterMaintenance = () => {
       status: searchParams.get("status") || "",
       createdOnStart: searchParams.get("createdOnStart") || "",
       createdOnEnd: searchParams.get("createdOnEnd") || "",
+      activeFromDate: searchParams.get("activeFromDate") || "",
+      activeToDate: searchParams.get("activeToDate") || "",
       transportMode: searchParams.get("transportMode")
         ? searchParams.get("transportMode").split(",")
         : [],
@@ -127,12 +135,23 @@ const TransporterMaintenance = () => {
       if (appliedFilters.createdOnEnd) {
         params.createdOnEnd = appliedFilters.createdOnEnd;
       }
+      if (appliedFilters.activeFromDate) {
+        params.activeFromDate = appliedFilters.activeFromDate;
+      }
+      if (appliedFilters.activeToDate) {
+        params.activeToDate = appliedFilters.activeToDate;
+      }
 
       dispatch(fetchTransporters(params));
     };
 
     fetchData();
   }, [dispatch, appliedFilters, pagination.page]);
+
+  // Fetch status counts on mount and when data changes
+  useEffect(() => {
+    dispatch(fetchTransporterStatusCounts());
+  }, [dispatch, transporters]);
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({
@@ -159,6 +178,12 @@ const TransporterMaintenance = () => {
     if (filters.transportMode.length > 0) {
       params.set("transportMode", filters.transportMode.join(","));
     }
+    if (filters.activeFromDate) {
+      params.set("activeFromDate", filters.activeFromDate);
+    }
+    if (filters.activeToDate) {
+      params.set("activeToDate", filters.activeToDate);
+    }
 
     setSearchParams(params);
 
@@ -177,6 +202,8 @@ const TransporterMaintenance = () => {
       createdOnStart: "",
       createdOnEnd: "",
       transportMode: [],
+      activeFromDate: "",
+      activeToDate: "",
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
@@ -188,6 +215,38 @@ const TransporterMaintenance = () => {
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);
   }, []);
+
+  // Handle status badge click - toggle filter
+  const handleStatusClick = useCallback(
+    (status) => {
+      if (appliedFilters.status === status) {
+        // Clear the status filter if same badge clicked
+        const newFilters = { ...filters, status: "" };
+        const newAppliedFilters = { ...appliedFilters, status: "" };
+
+        setFilters(newFilters);
+        setAppliedFilters(newAppliedFilters);
+
+        // Update URL - remove status param
+        const params = new URLSearchParams(searchParams);
+        params.delete("status");
+        setSearchParams(params);
+      } else {
+        // Apply new status filter
+        const newFilters = { ...filters, status };
+        const newAppliedFilters = { ...appliedFilters, status };
+
+        setFilters(newFilters);
+        setAppliedFilters(newAppliedFilters);
+
+        // Update URL - set status param
+        const params = new URLSearchParams(searchParams);
+        params.set("status", status);
+        setSearchParams(params);
+      }
+    },
+    [filters, appliedFilters, searchParams, setSearchParams]
+  );
 
   // Apply client-side fuzzy search filtering
   const filteredTransporters = useMemo(() => {
@@ -332,6 +391,10 @@ const TransporterMaintenance = () => {
             filteredCount={filteredTransporters.length}
             searchText={searchText}
             onSearchChange={handleSearchChange}
+            statusCounts={statusCounts}
+            statusCountsLoading={statusCountsLoading}
+            selectedStatus={appliedFilters.status}
+            onStatusClick={handleStatusClick}
           />
 
           {error && (

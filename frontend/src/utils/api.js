@@ -326,6 +326,12 @@ export const vehicleAPI = {
     return api.get("/vehicles/master-data");
   },
 
+  // Get status counts for status badges
+  getVehicleStatusCounts: async () => {
+    const response = await api.get("/vehicles/status-counts");
+    return response.data.data;
+  },
+
   // RC Lookup API - Get vehicle details by registration number
   lookupVehicleByRC: (registrationNumber) => {
     return api.get(

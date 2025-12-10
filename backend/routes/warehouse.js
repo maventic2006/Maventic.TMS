@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   getWarehouseList,
+  getWarehouseStatusCounts,
   getWarehouseById,
   createWarehouse,
   updateWarehouse,
@@ -23,6 +24,13 @@ const allowedRoles = ["consignor", "admin", "product_owner"]; // Using product_o
 
 // GET /api/warehouse/master-data - Get master data (warehouse types, etc.)
 router.get("/master-data", authorizeRoles(allowedRoles), getMasterData);
+
+// GET /api/warehouse/status-counts - Get warehouse status counts
+router.get(
+  "/status-counts",
+  authorizeRoles(allowedRoles),
+  getWarehouseStatusCounts
+);
 
 // ============================================================================
 // DRAFT WORKFLOW ROUTES

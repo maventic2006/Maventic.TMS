@@ -5,6 +5,7 @@ import TMSHeader from "../components/layout/TMSHeader";
 import { getPageTheme } from "../theme.config";
 import {
   fetchDrivers,
+  fetchDriverStatusCounts,
   resetPaginationToFirstPage,
 } from "../redux/slices/driverSlice";
 import DriverTopActionBar from "../components/driver/DriverTopActionBar";
@@ -82,13 +83,19 @@ const DriverMaintenance = () => {
       avgRating: searchParams.get("avgRating") || "",
       createdOnStart: searchParams.get("createdOnStart") || "",
       createdOnEnd: searchParams.get("createdOnEnd") || "",
+      licenseValidityDate: searchParams.get("licenseValidityDate") || "",
     };
   }, [searchParams]);
 
   // Redux state
-  const { drivers, pagination, isFetching, error } = useSelector(
-    (state) => state.driver
-  );
+  const {
+    drivers,
+    pagination,
+    isFetching,
+    error,
+    statusCounts,
+    statusCountsLoading,
+  } = useSelector((state) => state.driver);
 
   // Local state
   const [searchText, setSearchText] = useState("");
@@ -140,12 +147,19 @@ const DriverMaintenance = () => {
         params.createdOnStart = appliedFilters.createdOnStart;
       if (appliedFilters.createdOnEnd)
         params.createdOnEnd = appliedFilters.createdOnEnd;
+      if (appliedFilters.licenseValidityDate)
+        params.licenseValidityDate = appliedFilters.licenseValidityDate;
 
       dispatch(fetchDrivers(params));
     };
 
     fetchData();
   }, [dispatch, appliedFilters, pagination.page]);
+
+  // Fetch status counts on mount and when data changes
+  useEffect(() => {
+    dispatch(fetchDriverStatusCounts());
+  }, [dispatch, drivers]);
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({
@@ -176,6 +190,8 @@ const DriverMaintenance = () => {
     if (filters.createdOnStart)
       params.set("createdOnStart", filters.createdOnStart);
     if (filters.createdOnEnd) params.set("createdOnEnd", filters.createdOnEnd);
+    if (filters.licenseValidityDate)
+      params.set("licenseValidityDate", filters.licenseValidityDate);
 
     setSearchParams(params);
   }, [filters, dispatch, setSearchParams]);
@@ -196,6 +212,7 @@ const DriverMaintenance = () => {
       avgRating: "",
       createdOnStart: "",
       createdOnEnd: "",
+      licenseValidityDate: "",
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
@@ -207,6 +224,38 @@ const DriverMaintenance = () => {
   const handleSearchChange = useCallback((text) => {
     setSearchText(text);
   }, []);
+
+  // Handle status badge click - toggle filter
+  const handleStatusClick = useCallback(
+    (status) => {
+      if (appliedFilters.status === status) {
+        // Clear the status filter if same badge clicked
+        const newFilters = { ...filters, status: "" };
+        const newAppliedFilters = { ...appliedFilters, status: "" };
+
+        setFilters(newFilters);
+        setAppliedFilters(newAppliedFilters);
+
+        // Update URL - remove status param
+        const params = new URLSearchParams(searchParams);
+        params.delete("status");
+        setSearchParams(params);
+      } else {
+        // Apply new status filter
+        const newFilters = { ...filters, status };
+        const newAppliedFilters = { ...appliedFilters, status };
+
+        setFilters(newFilters);
+        setAppliedFilters(newAppliedFilters);
+
+        // Update URL - set status param
+        const params = new URLSearchParams(searchParams);
+        params.set("status", status);
+        setSearchParams(params);
+      }
+    },
+    [filters, appliedFilters, searchParams, setSearchParams]
+  );
 
   // Apply client-side fuzzy search filtering
   const filteredDrivers = useMemo(() => {
@@ -256,6 +305,8 @@ const DriverMaintenance = () => {
         params.createdOnStart = appliedFilters.createdOnStart;
       if (appliedFilters.createdOnEnd)
         params.createdOnEnd = appliedFilters.createdOnEnd;
+      if (appliedFilters.licenseValidityDate)
+        params.licenseValidityDate = appliedFilters.licenseValidityDate;
 
       dispatch(fetchDrivers(params));
     },
@@ -299,6 +350,10 @@ const DriverMaintenance = () => {
             filteredCount={filteredDrivers.length}
             searchText={searchText}
             onSearchChange={handleSearchChange}
+            statusCounts={statusCounts}
+            statusCountsLoading={statusCountsLoading}
+            selectedStatus={appliedFilters.status}
+            onStatusClick={handleStatusClick}
           />
 
           {error && (
