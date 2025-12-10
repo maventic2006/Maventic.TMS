@@ -215,7 +215,7 @@ const SuperAdminApprovalList = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA]">
+    <div className="min-h-screen bg-[#F5F7FA] mb-8">
       {/* TMS Header - Same as Vehicle Maintenance */}
       <TMSHeader theme={theme} />
       

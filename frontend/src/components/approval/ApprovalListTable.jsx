@@ -108,25 +108,25 @@ const ApprovalListTable = ({
           {/* Table Header */}
           <thead className="bg-[#0D1A33] border-b border-gray-200">
             <tr>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">
                 Request Type
               </th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">
                 Entity ID
               </th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">
                 Created On
               </th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">
                 Requestor
               </th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">
                 Remarks
               </th>
-              <th className="px-6 py-4 text-center text-xs font-bold text-white uppercase tracking-wider">
+              <th className="px-3 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -142,8 +142,9 @@ const ApprovalListTable = ({
                 transition={{ delay: index * 0.05, duration: 0.3 }}
                 className="hover:bg-gray-50 transition-colors"
               >
+                {/* px-6 py-4 */}
                 {/* Request Type */}
-                <td className="px-6 py-4">
+                <td className="px-3 py-3">
                   <div className="flex items-center">
                     <FileText className="w-4 h-4 text-gray-400 mr-2" />
                     <span className="text-sm font-medium text-gray-900">
@@ -153,7 +154,7 @@ const ApprovalListTable = ({
                 </td>
 
                 {/* Entity ID - Clickable for navigation to entity details page */}
-                <td className="px-6 py-4">
+                <td className="px-3 py-3">
                   <button
                     onClick={() => handleEntityNavigation(approval.entityType, approval.entityId)}
                     className="text-sm text-blue-600 hover:text-blue-800 font-mono underline transition-colors duration-200 flex items-center group"
@@ -165,7 +166,7 @@ const ApprovalListTable = ({
                 </td>
 
                 {/* Created On */}
-                <td className="px-6 py-4">
+                <td className="px-3 py-3">
                   <div className="flex items-center text-sm text-gray-600">
                     <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                     {formatDate(approval.requestCreatedOn)}
@@ -173,7 +174,7 @@ const ApprovalListTable = ({
                 </td>
 
                 {/* Requestor */}
-                <td className="px-6 py-4">
+                <td className="px-3 py-3">
                   <div className="flex items-center">
                     <User className="w-4 h-4 text-gray-400 mr-2" />
                     <div>
@@ -188,12 +189,12 @@ const ApprovalListTable = ({
                 </td>
 
                 {/* Status */}
-                <td className="px-6 py-4">
+                <td className="px-3 py-3">
                   <ApprovalStatusPill status={approval.status} />
                 </td>
 
                 {/* Remarks (conditional) */}
-                <td className="px-6 py-4">
+                <td className="px-3 py-3">
                   {approval.remarks ? (
                     <div className="text-sm text-gray-600 max-w-xs truncate" title={approval.remarks}>
                       {approval.remarks}
@@ -204,7 +205,7 @@ const ApprovalListTable = ({
                 </td>
 
                 {/* Actions */}
-                <td className="px-6 py-4">
+                <td className="px-3 py-3">
                   {approval.status === 'PENDING' ? (
                     <div className="flex items-center justify-center space-x-2">
                       {/* Approve Button */}

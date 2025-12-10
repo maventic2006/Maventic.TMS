@@ -338,6 +338,8 @@ async function generateVehicleBulkUploadTemplate() {
     const instructions = [
       { field: '⚠️ IMPORTANT', desc: 'Read all instructions before filling the template', format: '' },
       { field: '', desc: '', format: '' },
+      { field: '📄 DOCUMENTS NOTE', desc: '⚠️ CRITICAL: Document metadata can be recorded in the Documents sheet for reference, but actual document files MUST be uploaded separately through the vehicle details page after bulk upload completion. The bulk upload process will NOT upload document files.', format: '❌ FILES NOT UPLOADED' },
+      { field: '', desc: '', format: '' },
       { field: 'Vehicle_Ref_ID', desc: 'Unique identifier for each vehicle (used to link all sheets). MUST be unique per batch.', format: 'VR001, VR002, VR003, etc.' },
       { field: 'Make_Brand', desc: 'Vehicle manufacturer/brand name', format: 'Tata, Ashok Leyland, Mahindra, etc. (Min 2 chars)' },
       { field: 'Model', desc: 'Vehicle model name', format: 'LPT 1918, Partner, Bolero, etc. (Min 2 chars)' },

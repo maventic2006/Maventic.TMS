@@ -366,14 +366,14 @@ const ConsignorConfigurationPage = () => {
         />
 
         {/* Pagination Bar */}
-        <ConfigurationPaginationBar
+        {/* <ConfigurationPaginationBar
           currentPage={currentPage}
           totalPages={pagination.totalPages}
           totalItems={pagination.totalRecords}
           itemsPerPage={pagination.limit}
           onPageChange={handlePageChange}
           loading={loading}
-        />
+        /> */}
 
         {/* Create Modal */}
         <ConsignorConfigurationModal

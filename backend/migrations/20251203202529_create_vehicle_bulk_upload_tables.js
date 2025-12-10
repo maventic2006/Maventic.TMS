@@ -5,23 +5,25 @@
  */
 
 exports.up = async function(knex) {
-  console.log("��� Creating vehicle bulk upload tables...");
+  console.log("��� Creating vehicle bulk upload tables...");
   
   // 1. Create vehicle bulk upload batches table
   await knex.schema.createTable("tms_bulk_upload_vehicle_batches", function(table) {
     table.increments("id").primary();
-    table.string("batch_id", 100).notNullable().unique();
-    table.integer("uploaded_by").notNullable();
-    table.string("filename", 500).notNullable();
-    table.integer("total_rows").defaultTo(0);
-    table.integer("processed_rows").defaultTo(0);
-    table.integer("success_count").defaultTo(0);
-    table.integer("error_count").defaultTo(0);
+    table.string("batch_id", 50).notNullable().unique();
+    table.string("uploaded_by", 20).notNullable(); // Changed from integer to string to match user_id format
+    table.string("filename", 255).notNullable();
+    table.integer("total_rows").notNullable(); // Changed to notNullable
+    table.integer("processed_rows").defaultTo(0); // ✅ KEPT - Required for progress tracking
+    table.integer("total_valid").defaultTo(0); // ✅ ADDED - Matches actual schema
+    table.integer("total_invalid").defaultTo(0); // ✅ ADDED - Matches actual schema
+    table.integer("total_created").defaultTo(0); // ✅ ADDED - Matches actual schema
+    table.integer("total_creation_failed").defaultTo(0); // ✅ ADDED - Matches actual schema
     table.enum("status", ["processing", "completed", "failed"]).defaultTo("processing");
-    table.string("error_report_path", 1000).nullable();
     table.timestamp("upload_timestamp").defaultTo(knex.fn.now());
     table.timestamp("processed_timestamp").nullable();
-    table.text("processing_notes").nullable();
+    table.string("error_report_path", 500).nullable(); // Reduced from 1000
+    table.text("error_message").nullable(); // ✅ ADDED - For batch-level error messages
     
     table.index(["batch_id"]);
     table.index(["uploaded_by"]);
@@ -32,14 +34,13 @@ exports.up = async function(knex) {
   // 2. Create vehicle bulk upload records table
   await knex.schema.createTable("tms_bulk_upload_vehicles", function(table) {
     table.increments("id").primary();
-    table.string("batch_id", 100).notNullable();
-    table.string("vehicle_ref_id", 50).notNullable(); // From Excel file
-    table.integer("row_number").notNullable();
+    table.string("batch_id", 50).notNullable(); // Matches batch_id size
+    table.string("vehicle_ref_id", 50).nullable(); // ✅ CHANGED - Can be null for invalid records
+    table.integer("excel_row_number").notNullable(); // ✅ RENAMED from row_number
     table.enum("validation_status", ["valid", "invalid"]).notNullable();
     table.json("validation_errors").nullable(); // JSON array of error messages
-    table.json("raw_data").nullable(); // Raw data from Excel
-    table.string("created_vehicle_id", 20).nullable(); // Generated VEH0001 ID
-    table.timestamp("processed_at").defaultTo(knex.fn.now());
+    table.json("data").nullable(); // ✅ RENAMED from raw_data - Parsed vehicle data
+    table.string("created_vehicle_id", 10).nullable(); // ✅ REDUCED - VEH0001 format
     
     table.index(["batch_id"]);
     table.index(["vehicle_ref_id"]);
@@ -54,7 +55,7 @@ exports.up = async function(knex) {
 };
 
 exports.down = async function(knex) {
-  console.log("���️ Dropping vehicle bulk upload tables...");
+  console.log("���️ Dropping vehicle bulk upload tables...");
   
   await knex.schema.dropTableIfExists("tms_bulk_upload_vehicles");
   await knex.schema.dropTableIfExists("tms_bulk_upload_vehicle_batches");
