@@ -212,16 +212,24 @@ const ThemeTable = ({
           {
             responseType: "arraybuffer",
             timeout: 10000,
+            headers: {
+              'Cache-Control': 'no-cache', // Prevent 304 Not Modified
+            },
           }
         );
 
-        const blob = new Blob([response.data]);
+        // Extract Content-Type from response headers
+        const contentType = response.headers['content-type'] || row.fileType || "application/octet-stream";
+        console.log("📋 Document Content-Type:", contentType);
+
+        // Create blob with proper Content-Type
+        const blob = new Blob([response.data], { type: contentType });
         const reader = new FileReader();
         reader.onload = (e) => {
           const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
           setPreviewDocument({
-            fileName: row.fileName || "Document",
-            fileType: blob.type,
+            fileName: row.fileName || row.documentNumber || "Document",
+            fileType: contentType,
             fileData: base64Data,
           });
         };
@@ -238,16 +246,24 @@ const ThemeTable = ({
           {
             responseType: "arraybuffer",
             timeout: 10000,
+            headers: {
+              'Cache-Control': 'no-cache', // Prevent 304 Not Modified
+            },
           }
         );
 
-        const blob = new Blob([response.data]);
+        // Extract Content-Type from response headers
+        const contentType = response.headers['content-type'] || "image/jpeg";
+        console.log("📋 Contact Photo Content-Type:", contentType);
+
+        // Create blob with proper Content-Type
+        const blob = new Blob([response.data], { type: contentType });
         const reader = new FileReader();
         reader.onload = (e) => {
           const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
           setPreviewDocument({
             fileName: `${row.name || 'Contact'} Photo`,
-            fileType: blob.type,
+            fileType: contentType,
             fileData: base64Data,
           });
         };
