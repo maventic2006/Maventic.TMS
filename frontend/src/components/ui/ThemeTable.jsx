@@ -4,6 +4,7 @@ import { useSelector } from "react-redux";
 import { CustomSelect } from "./Select";
 import ThemedCheckbox from "./themed/ThemedCheckbox";
 import ThemedSwitch from "./themed/ThemedSwitch";
+import api from "../../utils/api";
 
 const ThemeTable = ({
   data = [],
@@ -200,25 +201,21 @@ const ThemeTable = ({
           fileData: row.fileData,
         });
       } else if (row._backend_document_unique_id && row._backend_customer_id) {
-        // Case 3: Backend documents - fetch from API
+        // Case 3: Backend documents - fetch from API with authentication
         console.log("📋 Fetching document from backend for preview:", {
           documentId: row._backend_document_unique_id,
           customerId: row._backend_customer_id
         });
 
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${row._backend_customer_id}/documents/${row._backend_document_unique_id}/download`,
+        const response = await api.get(
+          `/consignors/${row._backend_customer_id}/documents/${row._backend_document_unique_id}/download`,
           {
-            method: "GET",
-            credentials: "include",
+            responseType: "arraybuffer",
+            timeout: 10000,
           }
         );
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch document: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
+        const blob = new Blob([response.data]);
         const reader = new FileReader();
         reader.onload = (e) => {
           const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
@@ -230,25 +227,21 @@ const ThemeTable = ({
         };
         reader.readAsDataURL(blob);
       } else if (row.contact_photo && row.contact_id && row._backend_customer_id) {
-        // Case 4: Contact photos - fetch from API
+        // Case 4: Contact photos - fetch from API with authentication
         console.log("📋 Fetching contact photo from backend for preview:", {
           contactId: row.contact_id,
           customerId: row._backend_customer_id
         });
 
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${row._backend_customer_id}/contacts/${row.contact_id}/photo`,
+        const response = await api.get(
+          `/consignors/${row._backend_customer_id}/contacts/${row.contact_id}/photo`,
           {
-            method: "GET",
-            credentials: "include",
+            responseType: "arraybuffer",
+            timeout: 10000,
           }
         );
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch contact photo: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
+        const blob = new Blob([response.data]);
         const reader = new FileReader();
         reader.onload = (e) => {
           const base64Data = e.target.result.split(",")[1]; // Remove data:... prefix
