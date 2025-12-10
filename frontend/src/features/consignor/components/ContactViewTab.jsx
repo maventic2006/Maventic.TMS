@@ -1,8 +1,50 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { User, Mail, Phone, Briefcase, Linkedin, Users } from "lucide-react";
+import api from "../../../utils/api";
 
 const ContactViewTab = ({ consignor }) => {
   const contacts = consignor?.contacts || [];
+  const [contactPhotos, setContactPhotos] = useState({});
+
+  // Fetch contact photos with authentication
+  useEffect(() => {
+    const fetchContactPhotos = async () => {
+      if (!consignor?.customer_id || !contacts.length) return;
+
+      const photoUrls = {};
+
+      for (const contact of contacts) {
+        if (contact.contact_photo && contact.contact_id) {
+          try {
+            const response = await api.get(
+              `/consignors/${consignor.customer_id}/contacts/${contact.contact_id}/photo`,
+              { responseType: "arraybuffer" }
+            );
+
+            // Convert arraybuffer to blob and create object URL
+            const blob = new Blob([response.data], {
+              type: response.headers["content-type"] || "image/jpeg",
+            });
+            photoUrls[contact.contact_id] = URL.createObjectURL(blob);
+          } catch (error) {
+            console.error(
+              `Failed to load photo for contact ${contact.contact_id}:`,
+              error
+            );
+          }
+        }
+      }
+
+      setContactPhotos(photoUrls);
+    };
+
+    fetchContactPhotos();
+
+    // Cleanup: Revoke object URLs when component unmounts
+    return () => {
+      Object.values(contactPhotos).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [consignor?.customer_id, contacts]);
 
   return (
     <div className="p-6">
@@ -26,14 +68,10 @@ const ContactViewTab = ({ consignor }) => {
             >
               {/* Contact Header */}
               <div className="flex items-center gap-4 mb-6">
-                {/* Photo */}
-                {contact.contact_photo ? (
+                {/* Photo with Authentication */}
+                {contact.contact_photo && contactPhotos[contact.contact_id] ? (
                   <img
-                    src={`${
-                      import.meta.env.VITE_API_URL || "http://localhost:5000"
-                    }/api/consignors/${consignor.customer_id}/contacts/${
-                      contact.contact_id
-                    }/photo`}
+                    src={contactPhotos[contact.contact_id]}
                     alt={contact.name}
                     className="w-16 h-16 rounded-full object-cover border-2 border-purple-200"
                     onError={(e) => {
@@ -46,7 +84,12 @@ const ContactViewTab = ({ consignor }) => {
                 {/* Default Avatar */}
                 <div
                   className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center"
-                  style={{ display: contact.contact_photo ? "none" : "flex" }}
+                  style={{
+                    display:
+                      contact.contact_photo && contactPhotos[contact.contact_id]
+                        ? "none"
+                        : "flex",
+                  }}
                 >
                   <User className="w-8 h-8 text-purple-600" />
                 </div>
