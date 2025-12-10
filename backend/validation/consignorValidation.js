@@ -449,6 +449,10 @@ const documentSchema = Joi.object({
   _backend_document_unique_id: Joi.string().optional().allow(null, "").messages({
     "string.base": "Backend document unique ID must be a string",
   }),
+
+  _backend_customer_id: Joi.string().optional().allow(null, "").messages({
+    "string.base": "Backend customer ID must be a string",
+  }),
 });
 
 /**
