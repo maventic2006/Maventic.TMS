@@ -15,6 +15,7 @@ import {
   Trash2
 } from "lucide-react";
 import { getPageTheme } from "../../../theme.config";
+import api from "../../../utils/api";
 
 const WarehouseListTab = ({ consignor, formData, handleInputChange }) => {
   const { id: customerId } = useParams();
@@ -46,25 +47,18 @@ const WarehouseListTab = ({ consignor, formData, handleInputChange }) => {
   const fetchWarehouses = async () => {
     setLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const queryParams = new URLSearchParams();
       
       Object.entries(filters).forEach(([key, value]) => {
         if (value) queryParams.append(key, value);
       });
 
-      const response = await fetch(
-        `${apiUrl}/api/consignors/${customerId}/warehouses?${queryParams}`,
-        { credentials: 'include' }
+      const response = await api.get(
+        `/consignors/${customerId}/warehouses?${queryParams}`
       );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch warehouses');
-      }
-
-      const result = await response.json();
-      setWarehouses(result.data || []);
-      setMeta(result.meta || {});
+      setWarehouses(response.data.data || []);
+      setMeta(response.data.meta || {});
     } catch (error) {
       console.error('Error fetching warehouses:', error);
     } finally {
@@ -75,20 +69,13 @@ const WarehouseListTab = ({ consignor, formData, handleInputChange }) => {
   // Fetch available warehouses for mapping
   const fetchAvailableWarehouses = async () => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(
-        `${apiUrl}/api/warehouse?limit=1000&status=ACTIVE`,
-        { credentials: 'include' }
+      const response = await api.get(
+        `/warehouse?limit=1000&status=ACTIVE`
       );
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch available warehouses');
-      }
-
-      const result = await response.json();
       // Filter out already mapped warehouses
       const mappedIds = warehouses.map(w => w.warehouse_id);
-      const available = (result.data || []).filter(w => !mappedIds.includes(w.warehouse_id));
+      const available = (response.data.data || []).filter(w => !mappedIds.includes(w.warehouse_id));
       setAvailableWarehouses(available);
     } catch (error) {
       console.error('Error fetching available warehouses:', error);
@@ -134,25 +121,13 @@ const WarehouseListTab = ({ consignor, formData, handleInputChange }) => {
     }
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(
-        `${apiUrl}/api/consignors/${customerId}/warehouses`,
+      await api.post(
+        `/consignors/${customerId}/warehouses`,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            warehouse_id: selectedWarehouse,
-            status: mappingStatus
-          })
+          warehouse_id: selectedWarehouse,
+          status: mappingStatus
         }
       );
-
-      if (!response.ok) {
-        throw new Error('Failed to create warehouse mapping');
-      }
 
       // Success - reset form and refresh list
       setShowMappingForm(false);
@@ -172,18 +147,9 @@ const WarehouseListTab = ({ consignor, formData, handleInputChange }) => {
     }
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(
-        `${apiUrl}/api/consignors/${customerId}/warehouses/${mappingId}`,
-        {
-          method: 'DELETE',
-          credentials: 'include'
-        }
+      await api.delete(
+        `/consignors/${customerId}/warehouses/${mappingId}`
       );
-
-      if (!response.ok) {
-        throw new Error('Failed to delete warehouse mapping');
-      }
 
       fetchWarehouses();
       alert('Warehouse mapping removed successfully!');

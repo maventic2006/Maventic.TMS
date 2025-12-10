@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getComponentTheme } from "../../../utils/theme";
 import { CustomSelect } from "@/components/ui/Select";
+import api from "../../../utils/api";
 
 const GeneralInfoTab = ({
   formData,
@@ -100,18 +101,26 @@ const GeneralInfoTab = ({
 
     try {
       const customerId = formData.general.customer_id;
-      const fileType = type; // 'nda' or 'msa'
-      const downloadUrl = `/api/consignors/${customerId}/general/${fileType}/download`;
       
-      // Create a temporary link to trigger download
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = doc.fileName;
+      // Use axios api instance with proper authentication
+      const response = await api.get(
+        `/consignors/${customerId}/general/${type}/download`,
+        { responseType: 'blob' }
+      );
+
+      // Create download link
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = doc.fileName || `${type.toUpperCase()}_Document`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error(`Error downloading ${type.toUpperCase()} document:`, error);
+      alert(`Failed to download ${type.toUpperCase()} document`);
     }
   };
 
@@ -146,29 +155,30 @@ const GeneralInfoTab = ({
           return;
         }
 
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${consignorId}/general/${type}/download`,
-          {
-            method: "GET",
-            credentials: "include",
+        // Use axios api instance with proper authentication instead of fetch
+        const response = await api.get(
+          `/consignors/${consignorId}/general/${type}/download`,
+          { 
+            responseType: 'arraybuffer',
+            timeout: 10000
           }
         );
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${type.toUpperCase()} document: ${response.statusText}`);
-        }
+        // Convert array buffer to base64
+        const base64String = btoa(
+          new Uint8Array(response.data).reduce(
+            (data, byte) => data + String.fromCharCode(byte),
+            ""
+          )
+        );
 
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64Data = e.target.result.split(',')[1]; // Remove data:... prefix
-          setPreviewDocument({
-            fileName: existingDoc.fileName || `${type.toUpperCase()} Document`,
-            fileType: blob.type,
-            fileData: base64Data,
-          });
-        };
-        reader.readAsDataURL(blob);
+        const contentType = response.headers['content-type'] || "application/pdf";
+
+        setPreviewDocument({
+          fileName: existingDoc.fileName || `${type.toUpperCase()} Document`,
+          fileType: contentType,
+          fileData: base64String,
+        });
         return;
       }
 

@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { getPageTheme } from "../../../theme.config";
+import api from "../../../utils/api";
 
 const WarehouseListViewTab = ({ consignor, isEditMode = false }) => {
   const { id: customerId } = useParams();
@@ -40,25 +41,18 @@ const WarehouseListViewTab = ({ consignor, isEditMode = false }) => {
   const fetchWarehouses = async () => {
     setLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
       const queryParams = new URLSearchParams();
 
       Object.entries(filters).forEach(([key, value]) => {
         if (value) queryParams.append(key, value);
       });
 
-      const response = await fetch(
-        `${apiUrl}/api/consignors/${customerId}/warehouses?${queryParams}`,
-        { credentials: "include" }
+      const response = await api.get(
+        `/consignors/${customerId}/warehouses?${queryParams}`
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch warehouses");
-      }
-
-      const result = await response.json();
-      setWarehouses(result.data || []);
-      setMeta(result.meta || {});
+      setWarehouses(response.data.data || []);
+      setMeta(response.data.meta || {});
     } catch (error) {
       console.error("Error fetching warehouses:", error);
     } finally {
