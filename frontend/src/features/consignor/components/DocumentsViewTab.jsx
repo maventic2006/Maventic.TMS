@@ -16,6 +16,8 @@ import {
 import { CustomSelect } from "../../../components/ui/Select";
 import { formatDate } from "../../../utils/helpers";
 import api from "../../../utils/api";
+import useDocumentPreview from "../../../hooks/useDocumentPreview";
+import PreviewModal from "../../../components/ui/PreviewModal";
 
 const InfoField = ({ label, value }) => (
   <div className="space-y-1">
@@ -29,7 +31,6 @@ const InfoField = ({ label, value }) => (
 const DocumentsViewTab = ({ consignor, isEditMode }) => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [previewDocument, setPreviewDocument] = useState(null);
   const [newDocument, setNewDocument] = useState({
     documentType: "",
     documentNumber: "",
@@ -38,6 +39,14 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
     issuingAuthority: "",
     remarks: "",
   });
+
+  // ✅ Use shared preview hook (same logic for View and Edit modes)
+  const {
+    previewDocument,
+    handlePreviewDocument,
+    handleDownloadDocument,
+    closePreview,
+  } = useDocumentPreview();
 
   if (isEditMode) {
     return (
@@ -87,94 +96,9 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
     setSelectedFile(null);
   };
 
-  const handlePreviewDocument = async (doc) => {
-    try {
-      // Use documentUniqueId which is the correct field for document lookup
-      // The backend service expects document_unique_id, not document_id
-      const documentId = doc.documentUniqueId || doc.document_unique_id;
-      
-      if (!documentId) {
-        console.error("❌ Document unique ID not found:", doc);
-        alert("Document ID is missing. Cannot preview document.");
-        return;
-      }
-      
-      console.log(`📄 Previewing document: ${documentId} for customer: ${consignor.customer_id}`);
-      console.log('📋 Full document object:', doc);
-      
-      // Use axios instance with proper authentication instead of fetch
-      const response = await api.get(
-        `/consignors/${consignor.customer_id}/documents/${documentId}/download`,
-        { 
-          responseType: 'arraybuffer',
-          timeout: 10000
-        }
-      );
+  // ✅ Preview and download functions now come from useDocumentPreview hook (View Mode logic)
 
-      const base64String = btoa(
-        new Uint8Array(response.data).reduce(
-          (data, byte) => data + String.fromCharCode(byte),
-          ""
-        )
-      );
-
-      // Get file type from response headers or determine from file name
-      const contentType = response.headers['content-type'] || 
-        doc.file_type || "application/octet-stream";
-
-      setPreviewDocument({
-        fileName: doc.file_name || doc.document_type || "Document",
-        fileType: contentType,
-        fileData: base64String,
-      });
-    } catch (error) {
-      console.error("Error fetching document for preview:", error);
-      alert("Failed to load document for preview");
-    }
-  };
-
-  const handleDownloadDocument = async (doc) => {
-    try {
-      // Use documentUniqueId which is the correct field for document lookup
-      const documentId = doc.documentUniqueId || doc.document_unique_id;
-      
-      if (!documentId) {
-        console.error("❌ Document unique ID not found:", doc);
-        alert("Document ID is missing. Cannot download document.");
-        return;
-      }
-      
-      console.log(`📥 Downloading document: ${documentId} for customer: ${consignor.customer_id}`);
-      console.log('📋 Full document object:', doc);
-      
-      // Use axios instance with proper authentication instead of fetch
-      const response = await api.get(
-        `/consignors/${consignor.customer_id}/documents/${documentId}/download`,
-        { responseType: 'blob' }
-      );
-
-      const blob = response.data;
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = doc.file_name || 
-        `${doc.document_type}_${doc.document_number}` ||
-        "document";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading document:", error);
-      alert("Failed to download document");
-    }
-  };
-
-  const closePreview = () => {
-    setPreviewDocument(null);
-  };
-
-  // ESC key support for modal
+  // ESC key support for modal (closePreview from hook)
   useEffect(() => {
     const handleEscKey = (event) => {
       if (event.key === "Escape") {
@@ -333,14 +257,14 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2 pt-4 border-t border-[#F3F4F6]">
                   <button
-                    onClick={() => handlePreviewDocument(doc)}
+                    onClick={() => handlePreviewDocument(doc, consignor.customer_id)}
                     className="flex items-center gap-2 px-3 py-1.5 text-[#6366F1] border border-[#6366F1] rounded-lg hover:bg-[#6366F1] hover:text-white transition-colors text-xs font-medium"
                   >
                     <Eye className="h-3 w-3" />
                     Preview
                   </button>
                   <button
-                    onClick={() => handleDownloadDocument(doc)}
+                    onClick={() => handleDownloadDocument(doc, consignor.customer_id)}
                     className="flex items-center gap-2 px-3 py-1.5 text-[#10B981] border border-[#10B981] rounded-lg hover:bg-[#10B981] hover:text-white transition-colors text-xs font-medium"
                   >
                     <Download className="h-3 w-3" />
@@ -506,67 +430,11 @@ const DocumentsViewTab = ({ consignor, isEditMode }) => {
         </div>
       )}
 
-      {/* Document Preview Modal */}
-      {previewDocument && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#E0E7FF] rounded-lg">
-                  <FileText className="h-5 w-5 text-[#6366F1]" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800">
-                  {previewDocument.fileName}
-                </h3>
-              </div>
-              <button
-                onClick={closePreview}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-auto p-4">
-              {previewDocument.fileType?.startsWith("image/") ? (
-                <img
-                  src={`data:${previewDocument.fileType};base64,${previewDocument.fileData}`}
-                  alt={previewDocument.fileName}
-                  className="max-w-full h-auto mx-auto"
-                />
-              ) : previewDocument.fileType === "application/pdf" ? (
-                <iframe
-                  src={`data:application/pdf;base64,${previewDocument.fileData}`}
-                  className="w-full h-[600px] border-0"
-                  title={previewDocument.fileName}
-                />
-              ) : (
-                <div className="text-center py-12">
-                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    Preview not available for this file type
-                  </p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    You can still download the file
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
-              <button
-                onClick={closePreview}
-                className="px-6 py-2.5 border border-[#E5E7EB] text-[#4A5568] rounded-lg hover:bg-gray-50 transition-colors text-sm font-semibold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ✅ Shared Preview Modal (View Mode component - same for View and Edit) */}
+      <PreviewModal 
+        previewDocument={previewDocument} 
+        onClose={closePreview} 
+      />
     </div>
   );
 };

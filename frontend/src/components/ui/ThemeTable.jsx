@@ -24,6 +24,7 @@ const ThemeTable = ({
   customRenderers = {},
   validationRules = {},
   className = "",
+  onPreview, // ✅ NEW: Optional custom preview handler (for Consignor module)
 }) => {
   const { masterData } = useSelector((state) => state.transporter);
   const fileInputRefs = useRef({});
@@ -177,6 +178,13 @@ const ThemeTable = ({
   };
 
   const handlePreviewDocument = async (row) => {
+    // ✅ If custom preview handler provided (e.g., for Consignor module), use it
+    if (onPreview) {
+      await onPreview(row);
+      return;
+    }
+
+    // Otherwise, use default ThemeTable preview logic (unchanged for other modules)
     try {
       const fileValue = row.fileUpload || row.photo || null;
       const isFileObject = fileValue instanceof File;

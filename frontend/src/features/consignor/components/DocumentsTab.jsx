@@ -3,11 +3,24 @@ import { FileText } from "lucide-react";
 import { useSelector } from "react-redux";
 import { Country } from "country-state-city";
 import ThemeTable from "../../../components/ui/ThemeTable";
+import useDocumentPreview from "../../../hooks/useDocumentPreview";
+import PreviewModal from "../../../components/ui/PreviewModal";
 
 const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
-  const { masterData } = useSelector((state) => state.consignor);
+  const { masterData, currentConsignor } = useSelector((state) => state.consignor);
 
   const documents = formData.documents || [];
+
+  // ✅ Use shared preview hook (View Mode logic)
+  const {
+    previewDocument,
+    handlePreviewDocument,
+    handleDownloadDocument,
+    closePreview,
+  } = useDocumentPreview();
+
+  // Get customer ID for preview API calls
+  const customerId = currentConsignor?.customer_id || formData?.general?.customer_id;
 
   // Document type options from master data (backend returns value/label format)
   const documentTypes = masterData?.documentTypes || [];
@@ -198,6 +211,13 @@ const DocumentsTab = ({ formData, setFormData, errors = {} }) => {
         canRemoveRows={true}
         canAddRows={true}
         className="w-full"
+        onPreview={(row) => handlePreviewDocument(row, customerId)} // ✅ Use View Mode preview logic
+      />
+
+      {/* ✅ Shared Preview Modal (View Mode component) */}
+      <PreviewModal 
+        previewDocument={previewDocument} 
+        onClose={closePreview} 
       />
 
       {/* Validation Error Summary */}
