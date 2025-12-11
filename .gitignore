@@ -10,3 +10,4 @@ build/
 .history/
 ./*.*
 !ecosystem.config.js
+*.md
