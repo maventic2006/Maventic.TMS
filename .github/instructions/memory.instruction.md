@@ -2199,3 +2199,192 @@ After implementing field stripping:
 2. Check backend logs for unknown field warnings
 3. Test all submit flows (create, update, submit-for-approval)
 4. Verify preview functionality still works (fields used before stripping)
+
+## Backend-to-Frontend Data Transformation Pattern (CRITICAL)
+
+### Problem
+
+When loading backend data into edit forms, RAW backend data structure is incompatible with frontend expectations:
+
+- Backend: `{ contact_designation: "Manager", contact_photo: "photo.jpg" }`
+- Frontend Expected: `{ designation: "Manager", photo: File, contact_photo: "photo.jpg", _backend_customer_id: "CON0083", fileData: "" }`
+
+**CRITICAL BUG:** Setting `editFormData = currentConsignor` (raw backend data) bypasses transformation, causing:
+1. Missing field name mappings (edit tabs expect different field names)
+2. Missing `fileData: ""` initialization → ThemeTable preview breaks (401 errors)
+3. Missing `_backend_*` tracking fields → API calls fail
+
+### The Fix Pattern
+
+**ALWAYS transform backend data before setting form state:**
+
+```javascript
+// ❌ WRONG - Bypasses transformation
+if (isEditMode) {
+  setEditFormData(currentConsignor);  // RAW BACKEND DATA!
+}
+
+// ✅ CORRECT - Transform backend data to frontend format
+if (isEditMode) {
+  const { contacts, documents, ...generalFields } = currentConsignor;
+
+  // Map ALL fields
+  const mappedContacts = (contacts || []).map(contact => ({
+    // Frontend field names (for edit tabs)
+    contact_id: contact.contact_id,
+    designation: contact.contact_designation || "",
+    name: contact.contact_name || "",
+    number: contact.contact_number || "",
+    photo: contact.contact_photo || null,
+    role: contact.contact_role || "",
+    email: contact.email_id || "",
+    linkedin_link: contact.linkedin_link || "",
+    status: contact.status || "ACTIVE",
+    
+    // ThemeTable preview fields (CRITICAL!)
+    contact_photo: contact.contact_photo,
+    _backend_customer_id: currentConsignor.customer_id,
+  }));
+
+  const mappedDocuments = (documents || []).map(document => ({
+    // Frontend field names
+    documentType: document.document_type || "",
+    documentNumber: document.document_number || "",
+    // ... all other fields ...
+    
+    // CRITICAL: Empty fileData prevents ThemeTable Case 2 match
+    fileData: "",  // ← MUST be empty string, not null/undefined
+    fileUpload: null,
+    
+    // ThemeTable preview fields
+    _backend_document_id: document.document_id,
+    _backend_document_unique_id: document.document_unique_id,
+    _backend_customer_id: currentConsignor.customer_id
+  }));
+
+  const transformedData = {
+    general: generalFields,
+    contacts: mappedContacts,
+    organization: organization || {},
+    documents: mappedDocuments,
+  };
+
+  setEditFormData(transformedData);  // ✅ Properly transformed!
+}
+```
+
+### Why `fileData: ""` is CRITICAL
+
+ThemeTable preview logic (lines 180-270):
+
+```javascript
+// Case 2: If fileData exists, use it directly
+if (row.fileData && row.fileType && row.fileName) {
+  setPreviewDocument({
+    fileData: row.fileData  // ← Passes through as-is!
+  });
+}
+// Case 3/4: Fetch from backend API
+else if (row._backend_document_unique_id) {
+  const response = await api.get(/* authenticated API call */);
+  // Convert response to base64 for preview
+}
+```
+
+**If `fileData` is truthy (not empty string):**
+- ThemeTable matches Case 2
+- Sets fileData directly in preview modal
+- Modal checks: `fileData.startsWith("http")` → true for HTTP URLs
+- Sets `<img src="http://192.168.2.32:5000/api/...">` 
+- Browser makes **direct navigation** (no cookies, no origin)
+- Backend returns **401 Unauthorized**
+
+**If `fileData === ""`  (empty string):**
+- Case 2 DOES NOT match (falsy value)
+- Falls through to Case 3/4
+- ThemeTable calls `api.get()` with `withCredentials: true`
+- Browser sends **XHR with cookies**
+- Backend authenticates successfully → **200 OK**
+
+### Implementation Locations
+
+Transform backend data in:
+
+1. **useEffect (Initial Load):**
+   ```javascript
+   useEffect(() => {
+     if (currentConsignor) {
+       const transformedData = transformBackendData(currentConsignor);
+       setEditFormData(transformedData);
+     }
+   }, [currentConsignor]);
+   ```
+
+2. **handleEditToggle (Cancel Edit):**
+   ```javascript
+   const handleEditToggle = () => {
+     if (isEditMode) {
+       // ✅ Transform currentConsignor same way as useEffect
+       const transformedData = transformBackendData(currentConsignor);
+       setEditFormData(transformedData);
+     }
+     setIsEditMode(!isEditMode);
+   };
+   ```
+
+3. **Any Other Reset Function:**
+   ```javascript
+   const resetForm = () => {
+     const transformedData = transformBackendData(currentConsignor);
+     setEditFormData(transformedData);
+   };
+   ```
+
+### Prevention Strategy
+
+**Extract transformation logic to reusable function:**
+
+```javascript
+const transformBackendData = useCallback((consignor) => {
+  if (!consignor) return null;
+
+  const { contacts, documents, ...generalFields } = consignor;
+
+  return {
+    general: generalFields,
+    contacts: (contacts || []).map(/* mapping logic */),
+    documents: (documents || []).map(/* mapping logic */),
+    organization: /* ... */,
+  };
+}, []);
+
+// Use everywhere:
+setEditFormData(transformBackendData(currentConsignor));
+```
+
+### Testing Checklist
+
+After implementing transformation:
+
+- [ ] Preview works in VIEW mode
+- [ ] Preview works in EDIT mode (first entry)
+- [ ] Make changes → Cancel → Edit Draft → Preview works ✅
+- [ ] Network tab shows XHR request (not direct navigation)
+- [ ] Network tab shows cookies included
+- [ ] Backend logs show Origin header present
+- [ ] Backend logs show authentication successful
+
+### Real-World Example
+
+**Bug Fixed:** Consignor Preview 401 Error (Dec 11, 2024)
+
+**File:** `frontend/src/features/consignor/pages/ConsignorDetailsPage.jsx`
+
+**Root Cause:** Line 380 set `editFormData = currentConsignor` (raw data) when canceling edit
+
+**Fix:** Added full transformation in `handleEditToggle()` (lines 374-451)
+
+**Result:** Preview now works consistently across all scenarios
+
+**Documentation:** `docs/CONSIGNOR_PREVIEW_401_FIX.md`
+
