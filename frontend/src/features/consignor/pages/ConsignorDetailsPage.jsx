@@ -156,7 +156,7 @@ const ConsignorDetailsPage = () => {
       // 🔄 MAP BACKEND CONTACT FIELDS TO FRONTEND FIELD NAMES
       const mappedContacts = (contacts || []).map(contact => ({
         // Map backend field names to frontend field names expected by ContactTab
-        contact_id: contact.contact_id,
+        contact_id: contact.contact_id, // Required for API call (e.g., "CON00227")
         designation: contact.contact_designation || contact.designation || "",
         name: contact.contact_name || contact.name || "",
         number: contact.contact_number || contact.number || "",
@@ -167,7 +167,6 @@ const ConsignorDetailsPage = () => {
         status: contact.status || "ACTIVE",
         // ✅ REQUIRED FIELDS FOR THEMETABLE CONTACT PHOTO PREVIEW
         contact_photo: contact.contact_photo, // Backend filename (e.g., "contact_photo_1733803447891.jpg")
-        contact_id: contact.contact_id, // Required for API call (e.g., "CON00227")
         _backend_customer_id: currentConsignor.customer_id, // Required for API call (e.g., "CON0083")
         // ℹ️ ThemeTable will fetch photo using: api.get(`/consignors/${_backend_customer_id}/contacts/${contact_id}/photo`)
         // ℹ️ No hardcoded URLs needed - ThemeTable uses api instance with correct base URL
@@ -376,8 +375,62 @@ const ConsignorDetailsPage = () => {
     }
 
     if (isEditMode) {
-      // Cancel edit mode - reset form data
-      setEditFormData(currentConsignor);
+      // Cancel edit mode - reset form data to properly transformed version
+      // ✅ FIX: Transform currentConsignor data same way as useEffect does (lines 137-229)
+      const { 
+        contacts, 
+        organization, 
+        documents, 
+        userApprovalStatus, 
+        ...generalFields 
+      } = currentConsignor;
+
+      const mappedContacts = (contacts || []).map(contact => ({
+        contact_id: contact.contact_id, // Required for API call (e.g., "CON00227")
+        designation: contact.contact_designation || contact.designation || "",
+        name: contact.contact_name || contact.name || "",
+        number: contact.contact_number || contact.number || "",
+        photo: contact.contact_photo || contact.photo || null,
+        role: contact.contact_role || contact.role || "",
+        email: contact.email_id || contact.email || "",
+        linkedin_link: contact.linkedin_link || "",
+        status: contact.status || "ACTIVE",
+        contact_photo: contact.contact_photo,
+        _backend_customer_id: currentConsignor.customer_id,
+      }));
+
+      const mappedDocuments = (documents || []).map(document => ({
+        documentType: document.document_type || document.documentType || "",
+        documentNumber: document.document_number || document.documentNumber || "",
+        referenceNumber: document.reference_number || document.referenceNumber || "",
+        country: document.country || "",
+        validFrom: document.valid_from || document.validFrom || "",
+        validTo: document.valid_to || document.validTo || "",
+        status: document.status || true,
+        fileName: document.file_name || document.fileName || "",
+        fileType: document.file_type || document.fileType || "",
+        fileData: "", // ✅ CRITICAL: Empty string prevents ThemeTable Case 2 from matching
+        fileUpload: null,
+        documentProvider: document.document_provider || document.documentProvider || "",
+        premiumAmount: document.premium_amount || document.premiumAmount || 0,
+        remarks: document.remarks || "",
+        _backend_document_id: document.document_id,
+        _backend_document_unique_id: document.document_unique_id,
+        _backend_customer_id: currentConsignor.customer_id
+      }));
+
+      const transformedData = {
+        general: generalFields,
+        contacts: mappedContacts,
+        organization: organization || {
+          company_code: "",
+          business_area: "",
+          status: "ACTIVE",
+        },
+        documents: mappedDocuments,
+      };
+
+      setEditFormData(transformedData);
       setValidationErrors({});
       setTabErrors({
         0: false,
