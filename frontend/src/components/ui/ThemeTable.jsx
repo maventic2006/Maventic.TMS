@@ -5,7 +5,7 @@ import { CustomSelect } from "./Select";
 import ThemedCheckbox from "./themed/ThemedCheckbox";
 import ThemedSwitch from "./themed/ThemedSwitch";
 import api from "../../utils/api";
-
+// themetable
 const ThemeTable = ({
   data = [],
   columns = [],
