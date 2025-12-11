@@ -2122,3 +2122,80 @@ serviceableAreas: areas.map((area) => ({
   ];
 }
 ```
+
+## Frontend-Backend Data Mapping Pattern (CRITICAL)
+
+### Field Naming Convention for UI-Only Fields
+
+ALL frontend-only fields that are NOT sent to the backend MUST use the `_backend_` prefix:
+
+**Examples**:
+- `_backend_customer_id` - Used by ThemeTable for API calls, not sent to backend
+- `_backend_document_unique_id` - Document identifier for fetching, not in backend schema
+- `_backend_document_id` - Internal reference field
+- `_backend_photo_id` - Photo reference for display
+
+### Field Stripping Pattern (MANDATORY)
+
+Before ANY API call that sends form data, ALL `_backend_*` fields MUST be explicitly deleted:
+
+```javascript
+// ✅ CORRECT - Strip ALL frontend-only fields
+const cleanData = { ...formData };
+
+// Documents
+delete cleanData._backend_document_id;
+delete cleanData._backend_document_unique_id;
+delete cleanData._backend_customer_id;
+delete cleanData.fileName; // Display field
+delete cleanData.fileType; // Display field
+delete cleanData.fileData; // Preview data
+
+// Contacts  
+delete cleanData._backend_customer_id;
+delete cleanData.contact_photo; // Backend filename, not user input
+delete cleanData.photo_preview; // Old URL field
+
+return cleanData; // Only backend-compatible fields
+```
+
+```javascript
+// ❌ WRONG - Missing field deletion causes validation errors
+const cleanData = { ...formData };
+delete cleanData.fileUpload_preview; // Only deletes some fields
+return cleanData; // ❌ Still has _backend_customer_id → Validation Error!
+```
+
+### Why This Matters
+
+1. **Backend Validation**: Backend schemas reject unknown fields (by design)
+2. **Data Integrity**: Prevents accidental data corruption
+3. **API Errors**: Missing stripping causes 400 Bad Request validation errors
+4. **Debugging**: Clear naming makes it obvious which fields need stripping
+
+### Implementation Checklist
+
+When adding frontend-only fields for UI/UX:
+
+- [ ] Use `_backend_` prefix for all frontend-only fields
+- [ ] Document why the field exists (comment: "// ThemeTable preview field")
+- [ ] Add explicit `delete` statement in ALL form submit handlers
+- [ ] Test create, update, and submit-for-approval flows
+- [ ] Verify backend doesn't receive the field (check logs)
+- [ ] Update all related functions with same stripping logic
+
+### Common Frontend-Only Field Categories
+
+1. **Preview/Display Fields**: `_backend_*`, `fileName`, `fileType`, `fileData`
+2. **Old/Deprecated Fields**: `photo_preview`, `fileUpload_preview`
+3. **Internal References**: `_backend_photo_id`, `_backend_number`
+4. **Unsupported Fields**: `documentProvider`, `premiumAmount`, `remarks`
+
+### Testing Strategy
+
+After implementing field stripping:
+
+1. Check browser console for validation errors
+2. Check backend logs for unknown field warnings
+3. Test all submit flows (create, update, submit-for-approval)
+4. Verify preview functionality still works (fields used before stripping)

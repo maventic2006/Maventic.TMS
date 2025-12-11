@@ -165,17 +165,12 @@ const ConsignorDetailsPage = () => {
         email: contact.email_id || contact.email || "",
         linkedin_link: contact.linkedin_link || "",
         status: contact.status || "ACTIVE",
-        // ✅ ADD REQUIRED FIELDS FOR THEMETABLE CONTACT PHOTO PREVIEW
-        contact_photo: contact.contact_photo, // Required for ThemeTable photo preview logic
-        _backend_customer_id: currentConsignor.customer_id, // Required for API call
-        // 📸 ADD EXISTING PHOTO PREVIEW FOR THEMETABLE
-        photo_preview: contact.contact_photo ? 
-          `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/consignors/${currentConsignor.customer_id}/contacts/${contact.contact_id}/photo` : 
-          null,
-        // Add metadata for ThemeTable to recognize existing files
-        fileName: contact.contact_photo ? `${contact.contact_name || 'Contact'}_Photo` : "",
-        fileType: contact.contact_photo ? "image/jpeg" : "", // Assume JPEG for contact photos
-        fileData: null // ThemeTable expects this for preview mode
+        // ✅ REQUIRED FIELDS FOR THEMETABLE CONTACT PHOTO PREVIEW
+        contact_photo: contact.contact_photo, // Backend filename (e.g., "contact_photo_1733803447891.jpg")
+        contact_id: contact.contact_id, // Required for API call (e.g., "CON00227")
+        _backend_customer_id: currentConsignor.customer_id, // Required for API call (e.g., "CON0083")
+        // ℹ️ ThemeTable will fetch photo using: api.get(`/consignors/${_backend_customer_id}/contacts/${contact_id}/photo`)
+        // ℹ️ No hardcoded URLs needed - ThemeTable uses api instance with correct base URL
       }));
 
       // 🔄 MAP BACKEND DOCUMENT FIELDS TO FRONTEND FIELD NAMES
@@ -195,14 +190,12 @@ const ConsignorDetailsPage = () => {
         documentProvider: document.document_provider || document.documentProvider || "",
         premiumAmount: document.premium_amount || document.premiumAmount || 0,
         remarks: document.remarks || "",
-        // 📎 ADD EXISTING DOCUMENT PREVIEW DATA FOR THEMETABLE
-        fileUpload_preview: document.document_unique_id ? 
-          `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"}/consignors/${currentConsignor.customer_id}/documents/${document.document_unique_id}/download` : 
-          null,
-        // Keep original backend fields for reference
-        _backend_document_id: document.document_id,
-        _backend_document_unique_id: document.document_unique_id,
-        _backend_customer_id: currentConsignor.customer_id
+        // ✅ REQUIRED FIELDS FOR THEMETABLE DOCUMENT PREVIEW
+        _backend_document_id: document.document_id, // Backend document ID
+        _backend_document_unique_id: document.document_unique_id, // Backend unique ID (e.g., "CDOC00248")
+        _backend_customer_id: currentConsignor.customer_id // Required for API call (e.g., "CON0083")
+        // ℹ️ ThemeTable will fetch document using: api.get(`/consignors/${_backend_customer_id}/documents/${_backend_document_unique_id}/download`)
+        // ℹ️ No hardcoded URLs needed - ThemeTable uses api instance with correct base URL
       }));
 
       // Create proper nested formData structure with field mapping
@@ -536,6 +529,9 @@ const ConsignorDetailsPage = () => {
             delete cleanContact._backend_photo_id;
             delete cleanContact._backend_number;
             delete cleanContact._backend_name;
+            delete cleanContact._backend_customer_id; // ThemeTable preview field
+            delete cleanContact.contact_photo; // ThemeTable preview field
+            delete cleanContact.contact_id; // Will be set by backend if needed
 
             return cleanContact;
           }
@@ -844,6 +840,8 @@ const ConsignorDetailsPage = () => {
             delete cleanContact._backend_photo_id;
             delete cleanContact._backend_number;
             delete cleanContact._backend_name;
+            delete cleanContact._backend_customer_id; // ThemeTable preview field
+            delete cleanContact.contact_photo; // ThemeTable preview field
 
             return cleanContact;
           }
@@ -909,6 +907,18 @@ const ConsignorDetailsPage = () => {
             original: { documentType: cleanDoc.documentType, documentNumber: cleanDoc.documentNumber },
             mapped: { document_type_id: mappedDoc.document_type_id, document_number: mappedDoc.document_number }
           });
+
+          // ✅ Remove ALL frontend-only fields before returning
+          delete mappedDoc._backend_document_id;
+          delete mappedDoc._backend_document_unique_id;
+          delete mappedDoc._backend_customer_id;
+          delete mappedDoc.fileName;
+          delete mappedDoc.fileType;
+          delete mappedDoc.fileData;
+          delete mappedDoc.fileUpload_preview;
+          delete mappedDoc.documentProvider;
+          delete mappedDoc.premiumAmount;
+          delete mappedDoc.remarks;
 
           return mappedDoc;
         });
@@ -1035,6 +1045,8 @@ const ConsignorDetailsPage = () => {
             delete cleanContact._backend_photo_id;
             delete cleanContact._backend_number;
             delete cleanContact._backend_name;
+            delete cleanContact._backend_customer_id; // ThemeTable preview field
+            delete cleanContact.contact_photo; // ThemeTable preview field
 
             return cleanContact;
           }
@@ -1078,6 +1090,14 @@ const ConsignorDetailsPage = () => {
           delete cleanDoc.documentUniqueId; // Frontend display field, not allowed in backend
           delete cleanDoc.documentTypeName; // Frontend display field, not allowed in backend  
           delete cleanDoc.documentId; // Frontend reference field, not allowed in backend
+          
+          // ✅ CRITICAL: Remove ALL _backend_* fields that ThemeTable uses for preview
+          delete cleanDoc._backend_document_id; // ThemeTable preview field
+          delete cleanDoc._backend_document_unique_id; // ThemeTable preview field
+          delete cleanDoc._backend_customer_id; // ThemeTable preview field - CAUSES VALIDATION ERROR!
+          delete cleanDoc.fileName; // ThemeTable preview field
+          delete cleanDoc.fileType; // ThemeTable preview field
+          delete cleanDoc.fileData; // ThemeTable preview field
 
           return cleanDoc;
         });
