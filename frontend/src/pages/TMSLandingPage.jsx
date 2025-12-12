@@ -583,7 +583,7 @@ const TMSLandingPage = () => {
     else if (
       item.title === "Role and Auth Control - User Create/Access Maintenance"
     ) {
-      const targetPath = "/user-maintenance/role-auth-control";
+      const targetPath = "/user-maintenance";
       console.log("👥 User Maintenance - Role and Auth Control");
       console.log("➡️ Navigating to:", targetPath);
       navigate(targetPath);

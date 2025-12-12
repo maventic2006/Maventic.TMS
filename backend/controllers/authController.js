@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const knex = require("knex")(require("../knexfile").development);
+const { getUserApplicationRoleColumn } = require('../utils/dbHelpers');
 
 // JWT Secret
 const JWT_SECRET =
@@ -310,14 +311,20 @@ const getUserApplications = async (req, res) => {
   try {
     const { user_id } = req.user;
 
-    // Get user applications based on their access
+    // Determine which column the `user_application_access` table uses for referencing a role
+    let userRoleCol;
+    try {
+      userRoleCol = await getUserApplicationRoleColumn();
+    } catch (err) {
+      console.error('Schema detection error for user_application_access:', err.message);
+      return res.status(500).json({ success: false, message: 'Database schema mismatch - unable to determine application role column' });
+    }
+
+    // Get user applications based on their access (join by user's role header)
     const applications = await knex("user_application_access as uaa")
-      .join(
-        "application_master as am",
-        "uaa.application_id",
-        "am.application_id"
-      )
-      .where("uaa.user_role_id", user_id)
+      .join('user_role_hdr as urh', knex.raw('urh.user_role_hdr_id = ??', [`uaa.${userRoleCol}`]))
+      .join('application_master as am', 'uaa.application_id', 'am.application_id')
+      .where('urh.user_id', user_id)
       .andWhere("uaa.is_active", true)
       .andWhere("uaa.status", "ACTIVE")
       .andWhere("am.is_active", true)

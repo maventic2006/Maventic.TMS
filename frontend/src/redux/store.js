@@ -17,6 +17,7 @@ import consignorSlice from "./slices/consignorSlice";
 import configurationSlice from "./slices/configurationSlice";
 import consignorConfigurationSlice from "./slices/consignorConfigurationSlice";
 import transporterVehicleConfigSlice from "./slices/transporterVehicleConfigSlice";
+import userSlice from "./slices/userSlice";
 
 export const store = configureStore({
   reducer: {
@@ -38,6 +39,7 @@ export const store = configureStore({
     configuration: configurationSlice,
     consignorConfiguration: consignorConfigurationSlice,
     transporterVehicleConfig: transporterVehicleConfigSlice,
+    user: userSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

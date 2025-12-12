@@ -7,6 +7,7 @@ const http = require("http");
 const socketIO = require("socket.io");
 const path = require("path");
 const { comprehensiveHealthCheck } = require("./utils/databaseHealthCheck");
+const { getUserApplicationRoleColumn } = require('./utils/dbHelpers');
 const knex = require("./config/database");
 require("dotenv").config();
 
@@ -121,11 +122,17 @@ const configurationRoutes = require("./routes/configuration");
 const consignorConfigurationRoutes = require("./routes/consignorConfiguration");
 const transporterVehicleConfigRoutes = require("./routes/transporter-vehicle-config");
 
+// User Management Module Routes (NEW)
+const userManagementRoutes = require("./modules/user/user.routes");
+const applicationRoutes = require("./modules/application/application.routes");
+
 // Routes
 app.use("/api/warehouse", warehouseRoutes);
 app.use("/api/consignors", consignorRoutes);
 app.use("/api/vehicles", vehicleRoutes);
-app.use("/api/users", userRoutes);
+app.use("/api/users", userRoutes); // User Management CRUD routes
+app.use("/api/user-management", userManagementRoutes); // NEW User Management Module
+app.use("/api/applications", applicationRoutes); // NEW Application Management
 app.use("/api/materials", materialRoutes);
 app.use("/api/transporters", transporterRoutes);
 app.use("/api/auth", authRoutes);
@@ -193,6 +200,16 @@ const startServer = async () => {
     }
 
     // Start HTTP server
+    // Verify `user_application_access` column exists under either 'user_role_hdr_id' or 'user_role_id'
+    try {
+      const userAppCol = await getUserApplicationRoleColumn();
+      console.log(`✅ user_application_access column detected: ${userAppCol}`);
+    } catch (err) {
+      console.error('❌ user_application_access schema mismatch:', err.message);
+      console.error('   Please run the migration to standardize the application access table to use user_role_hdr_id or user_role_id');
+      process.exit(1);
+    }
+
     server.listen(PORT, () => {
       console.log("✅ ========================================");
       console.log(`✅ Server running on port ${PORT}`);
