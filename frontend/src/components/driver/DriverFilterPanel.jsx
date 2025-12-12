@@ -1,4 +1,5 @@
 ﻿import React, { memo, useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../ui/Card";
@@ -6,6 +7,7 @@ import { Input, Label } from "../ui/Input";
 import { Button } from "../ui/Button";
 import { StatusSelect } from "../ui/Select";
 import { Country, State, City } from "country-state-city";
+import { fetchMappingMasterData } from "../../redux/slices/driverSlice";
 
 const DriverFilterPanel = ({
   filters,
@@ -14,10 +16,14 @@ const DriverFilterPanel = ({
   onClearFilters,
   showFilters,
 }) => {
+  const dispatch = useDispatch();
+  const { mappingMasterData } = useSelector((state) => state.driver);
+
   // Local state for cascading dropdowns
   const [countries, setCountries] = useState([]);
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
+  const [transporters, setTransporters] = useState([]);
 
   // Initialize countries on mount
   useEffect(() => {
@@ -27,6 +33,21 @@ const DriverFilterPanel = ({
     }));
     setCountries([{ value: "", label: "All Countries" }, ...allCountries]);
   }, []);
+
+  // Fetch mapping master data on mount (includes transporters list)
+  useEffect(() => {
+    dispatch(fetchMappingMasterData());
+  }, [dispatch]);
+
+  // Update transporters list when mapping master data loads
+  useEffect(() => {
+    if (mappingMasterData?.transporters) {
+      setTransporters([
+        { value: "", label: "All Transporters" },
+        ...mappingMasterData.transporters,
+      ]);
+    }
+  }, [mappingMasterData]);
 
   // Update states when country changes
   useEffect(() => {
@@ -324,6 +345,28 @@ const DriverFilterPanel = ({
                       className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
       focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
       transition-all duration-200 rounded-lg h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label
+                      htmlFor="transporterId"
+                      className="text-sm text-[#0D1A33] font-semibold"
+                    >
+                      Transporter:
+                    </Label>
+                    <StatusSelect
+                      id="transporterId"
+                      value={filters.transporterId}
+                      onChange={(value) =>
+                        onFilterChange("transporterId", value)
+                      }
+                      options={transporters}
+                      searchable
+                      placeholder="Select Transporter"
+                      className="bg-white border-[#E5E7EB] hover:border-[#1D4ED8] 
+      focus:border-[#1D4ED8] focus:ring-2 focus:ring-[#1D4ED8]/20 
+      transition-all duration-200 rounded-lg h-10"
+                      style={{ boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.05)" }}
                     />
                   </div>
                 </div>

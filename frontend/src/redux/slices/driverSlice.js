@@ -517,6 +517,296 @@ export const submitDriverFromDraft = createAsyncThunk(
   }
 );
 
+// ============================================
+// MAPPING MANAGEMENT ASYNC THUNKS
+// ============================================
+
+/**
+ * Fetch mapping master data (transporters, vehicles, consignors for dropdowns)
+ */
+export const fetchMappingMasterData = createAsyncThunk(
+  "driver/fetchMappingMasterData",
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get("/driver/mapping-master-data");
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "FETCH_ERROR",
+          message: "Failed to fetch mapping master data",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Fetch transporter mappings for a driver
+ */
+export const fetchTransporterMappings = createAsyncThunk(
+  "driver/fetchTransporterMappings",
+  async (driverId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        `/driver/${driverId}/transporter-mappings`
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "FETCH_ERROR",
+          message: "Failed to fetch transporter mappings",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Create transporter mapping
+ */
+export const createTransporterMapping = createAsyncThunk(
+  "driver/createTransporterMapping",
+  async ({ driverId, mappingData }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        `/driver/${driverId}/transporter-mappings`,
+        mappingData
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "CREATE_ERROR",
+          message: "Failed to create transporter mapping",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Update transporter mapping
+ */
+export const updateTransporterMapping = createAsyncThunk(
+  "driver/updateTransporterMapping",
+  async ({ driverId, mappingId, mappingData }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(
+        `/driver/${driverId}/transporter-mappings/${mappingId}`,
+        mappingData
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "UPDATE_ERROR",
+          message: "Failed to update transporter mapping",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Delete transporter mapping
+ */
+export const deleteTransporterMapping = createAsyncThunk(
+  "driver/deleteTransporterMapping",
+  async ({ driverId, mappingId }, { rejectWithValue }) => {
+    try {
+      const response = await api.delete(
+        `/driver/${driverId}/transporter-mappings/${mappingId}`
+      );
+      return { mappingId, ...response.data };
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "DELETE_ERROR",
+          message: "Failed to delete transporter mapping",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Fetch vehicle mappings for a driver
+ */
+export const fetchVehicleMappings = createAsyncThunk(
+  "driver/fetchVehicleMappings",
+  async (driverId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/driver/${driverId}/vehicle-mappings`);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "FETCH_ERROR",
+          message: "Failed to fetch vehicle mappings",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Create vehicle mapping
+ */
+export const createVehicleMapping = createAsyncThunk(
+  "driver/createVehicleMapping",
+  async ({ driverId, mappingData }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        `/driver/${driverId}/vehicle-mappings`,
+        mappingData
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "CREATE_ERROR",
+          message: "Failed to create vehicle mapping",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Update vehicle mapping
+ */
+export const updateVehicleMapping = createAsyncThunk(
+  "driver/updateVehicleMapping",
+  async ({ driverId, mappingId, mappingData }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(
+        `/driver/${driverId}/vehicle-mappings/${mappingId}`,
+        mappingData
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "UPDATE_ERROR",
+          message: "Failed to update vehicle mapping",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Delete vehicle mapping
+ */
+export const deleteVehicleMapping = createAsyncThunk(
+  "driver/deleteVehicleMapping",
+  async ({ driverId, mappingId }, { rejectWithValue }) => {
+    try {
+      const response = await api.delete(
+        `/driver/${driverId}/vehicle-mappings/${mappingId}`
+      );
+      return { mappingId, ...response.data };
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "DELETE_ERROR",
+          message: "Failed to delete vehicle mapping",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Fetch blacklist mappings for a driver
+ */
+export const fetchBlacklistMappings = createAsyncThunk(
+  "driver/fetchBlacklistMappings",
+  async (driverId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/driver/${driverId}/blacklist-mappings`);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "FETCH_ERROR",
+          message: "Failed to fetch blacklist mappings",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Create blacklist mapping
+ */
+export const createBlacklistMapping = createAsyncThunk(
+  "driver/createBlacklistMapping",
+  async ({ driverId, mappingData }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        `/driver/${driverId}/blacklist-mappings`,
+        mappingData
+      );
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "CREATE_ERROR",
+          message: "Failed to create blacklist mapping",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Update blacklist mapping
+ */
+export const updateBlacklistMapping = createAsyncThunk(
+  "driver/updateBlacklistMapping",
+  async ({ driverId, mappingId, mappingData }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(
+        `/driver/${driverId}/blacklist-mappings/${mappingId}`,
+        mappingData
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "UPDATE_ERROR",
+          message: "Failed to update blacklist mapping",
+        }
+      );
+    }
+  }
+);
+
+/**
+ * Delete blacklist mapping
+ */
+export const deleteBlacklistMapping = createAsyncThunk(
+  "driver/deleteBlacklistMapping",
+  async ({ driverId, mappingId }, { rejectWithValue }) => {
+    try {
+      const response = await api.delete(
+        `/driver/${driverId}/blacklist-mappings/${mappingId}`
+      );
+      return { mappingId, ...response.data };
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.error || {
+          code: "DELETE_ERROR",
+          message: "Failed to delete blacklist mapping",
+        }
+      );
+    }
+  }
+);
+
 const initialState = {
   // Master data
   masterData: {
@@ -572,6 +862,19 @@ const initialState = {
   isSubmittingDraft: false,
   draftError: null,
   lastDraftAction: null,
+
+  // Mapping state
+  transporterMappings: [],
+  vehicleMappings: [],
+  blacklistMappings: [],
+  mappingMasterData: {
+    transporters: [],
+    vehicles: [],
+    consignors: [],
+    userTypes: [],
+  },
+  isFetchingMappings: false,
+  mappingError: null,
 
   // Bulk upload state
   bulkUpload: {
@@ -855,6 +1158,58 @@ const driverSlice = createSlice({
       .addCase(submitDriverFromDraft.rejected, (state, action) => {
         state.isSubmittingDraft = false;
         state.draftError = action.payload;
+      })
+
+      // Mapping Master Data
+      .addCase(fetchMappingMasterData.pending, (state) => {
+        state.isFetchingMappings = true;
+      })
+      .addCase(fetchMappingMasterData.fulfilled, (state, action) => {
+        state.isFetchingMappings = false;
+        state.mappingMasterData = action.payload;
+      })
+      .addCase(fetchMappingMasterData.rejected, (state, action) => {
+        state.isFetchingMappings = false;
+        state.mappingError = action.payload;
+      })
+
+      // Transporter Mappings
+      .addCase(fetchTransporterMappings.pending, (state) => {
+        state.isFetchingMappings = true;
+      })
+      .addCase(fetchTransporterMappings.fulfilled, (state, action) => {
+        state.isFetchingMappings = false;
+        state.transporterMappings = action.payload;
+      })
+      .addCase(fetchTransporterMappings.rejected, (state, action) => {
+        state.isFetchingMappings = false;
+        state.mappingError = action.payload;
+      })
+
+      // Vehicle Mappings
+      .addCase(fetchVehicleMappings.pending, (state) => {
+        state.isFetchingMappings = true;
+      })
+      .addCase(fetchVehicleMappings.fulfilled, (state, action) => {
+        state.isFetchingMappings = false;
+        state.vehicleMappings = action.payload;
+      })
+      .addCase(fetchVehicleMappings.rejected, (state, action) => {
+        state.isFetchingMappings = false;
+        state.mappingError = action.payload;
+      })
+
+      // Blacklist Mappings
+      .addCase(fetchBlacklistMappings.pending, (state) => {
+        state.isFetchingMappings = true;
+      })
+      .addCase(fetchBlacklistMappings.fulfilled, (state, action) => {
+        state.isFetchingMappings = false;
+        state.blacklistMappings = action.payload;
+      })
+      .addCase(fetchBlacklistMappings.rejected, (state, action) => {
+        state.isFetchingMappings = false;
+        state.mappingError = action.payload;
       });
   },
 });

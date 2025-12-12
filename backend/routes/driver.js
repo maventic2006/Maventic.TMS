@@ -14,6 +14,20 @@ const {
   updateDriverDraft,
   deleteDriverDraft,
   submitDriverFromDraft,
+  // Mapping controllers
+  getTransporterMappings,
+  createTransporterMapping,
+  updateTransporterMapping,
+  deleteTransporterMapping,
+  getVehicleMappings,
+  createVehicleMappings,
+  updateVehicleMappings,
+  deleteVehicleMappings,
+  getBlacklistMappings,
+  createBlacklistMapping,
+  updateBlacklistMapping,
+  deleteBlacklistMapping,
+  getMappingMasterData,
 } = require("../controllers/driverController");
 const { authenticateToken } = require("../middleware/auth");
 
@@ -71,6 +85,12 @@ router.get(
   checkProductOwnerAccess,
   getDriverStatusCounts
 );
+router.get(
+  "/mapping-master-data",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getMappingMasterData
+);
 
 // List and detail routes
 router.get("/", authenticateToken, checkProductOwnerAccess, getDrivers);
@@ -105,6 +125,89 @@ router.delete(
   deleteDriverDraft
 );
 
+// ========================================
+// MAPPING ROUTES
+// ========================================
+
+// Transporter mappings
+router.get(
+  "/:id/transporter-mappings",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getTransporterMappings
+);
+router.post(
+  "/:id/transporter-mappings",
+  authenticateToken,
+  checkProductOwnerAccess,
+  createTransporterMapping
+);
+router.put(
+  "/:id/transporter-mappings/:mappingId",
+  authenticateToken,
+  checkProductOwnerAccess,
+  updateTransporterMapping
+);
+router.delete(
+  "/:id/transporter-mappings/:mappingId",
+  authenticateToken,
+  checkProductOwnerAccess,
+  deleteTransporterMapping
+);
+
+// Vehicle mappings
+router.get(
+  "/:id/vehicle-mappings",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getVehicleMappings
+);
+router.post(
+  "/:id/vehicle-mappings",
+  authenticateToken,
+  checkProductOwnerAccess,
+  createVehicleMappings
+);
+router.put(
+  "/:id/vehicle-mappings/:mappingId",
+  authenticateToken,
+  checkProductOwnerAccess,
+  updateVehicleMappings
+);
+router.delete(
+  "/:id/vehicle-mappings/:mappingId",
+  authenticateToken,
+  checkProductOwnerAccess,
+  deleteVehicleMappings
+);
+
+// Blacklist mappings
+router.get(
+  "/:id/blacklist-mappings",
+  authenticateToken,
+  checkProductOwnerAccess,
+  getBlacklistMappings
+);
+router.post(
+  "/:id/blacklist-mappings",
+  authenticateToken,
+  checkProductOwnerAccess,
+  createBlacklistMapping
+);
+router.put(
+  "/:id/blacklist-mappings/:mappingId",
+  authenticateToken,
+  checkProductOwnerAccess,
+  updateBlacklistMapping
+);
+router.delete(
+  "/:id/blacklist-mappings/:mappingId",
+  authenticateToken,
+  checkProductOwnerAccess,
+  deleteBlacklistMapping
+);
+
+// General update route (MUST be last to avoid matching specific routes)
 router.put("/:id", authenticateToken, checkProductOwnerAccess, updateDriver);
 
 module.exports = router;

@@ -84,6 +84,7 @@ const DriverMaintenance = () => {
       createdOnStart: searchParams.get("createdOnStart") || "",
       createdOnEnd: searchParams.get("createdOnEnd") || "",
       licenseValidityDate: searchParams.get("licenseValidityDate") || "",
+      transporterId: searchParams.get("transporterId") || "",
     };
   }, [searchParams]);
 
@@ -149,6 +150,8 @@ const DriverMaintenance = () => {
         params.createdOnEnd = appliedFilters.createdOnEnd;
       if (appliedFilters.licenseValidityDate)
         params.licenseValidityDate = appliedFilters.licenseValidityDate;
+      if (appliedFilters.transporterId)
+        params.transporterId = appliedFilters.transporterId;
 
       dispatch(fetchDrivers(params));
     };
@@ -192,6 +195,8 @@ const DriverMaintenance = () => {
     if (filters.createdOnEnd) params.set("createdOnEnd", filters.createdOnEnd);
     if (filters.licenseValidityDate)
       params.set("licenseValidityDate", filters.licenseValidityDate);
+    if (filters.transporterId)
+      params.set("transporterId", filters.transporterId);
 
     setSearchParams(params);
   }, [filters, dispatch, setSearchParams]);
@@ -213,6 +218,7 @@ const DriverMaintenance = () => {
       createdOnStart: "",
       createdOnEnd: "",
       licenseValidityDate: "",
+      transporterId: "",
     };
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);

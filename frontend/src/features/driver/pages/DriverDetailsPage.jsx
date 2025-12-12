@@ -1322,6 +1322,7 @@ const DriverDetailsPage = () => {
                 <div className="p-4">
                   <ActiveTabComponent
                     driver={selectedDriver}
+                    driverId={id}
                     formData={editFormData}
                     setFormData={setEditFormData}
                     onFormDataChange={handleFormDataChange}

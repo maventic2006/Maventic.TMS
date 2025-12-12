@@ -1,136 +1,128 @@
-﻿import React from 'react';
-import { Ban, Calendar } from 'lucide-react';
-import { getPageTheme } from '../../../theme.config';
+﻿import React, { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchBlacklistMappings } from "../../../redux/slices/driverSlice";
 
-const BlacklistMappingViewTab = ({ driver }) => {
-  const theme = getPageTheme('tab') || {};
-  const blacklistMappings = driver?.blacklistMappings || [];
+const BlacklistMappingViewTab = ({ driverId }) => {
+  const dispatch = useDispatch();
+  const { blacklistMappings, isFetchingMappings } = useSelector(
+    (state) => state.driver
+  );
+  const [expanded, setExpanded] = useState(true);
 
-  const safeTheme = {
-    colors: {
-      text: {
-        primary: theme.colors?.text?.primary || '#111827',
-        secondary: theme.colors?.text?.secondary || '#6B7280',
-      },
-      card: {
-        background: theme.colors?.card?.background || '#FFFFFF',
-        border: theme.colors?.card?.border || '#E5E7EB',
-      },
-    },
-  };
+  useEffect(() => {
+    if (driverId) dispatch(fetchBlacklistMappings(driverId));
+  }, [driverId, dispatch]);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  if (blacklistMappings.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <Ban className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-500 mb-2">
-          No Blacklist Records
-        </h3>
-        <p className="text-gray-400">
-          This driver is not blacklisted by any entity.
-        </p>
-      </div>
-    );
-  }
+  const formatDate = (date) =>
+    date ? new Date(date).toLocaleDateString("en-IN") : "N/A";
 
   return (
-    <div className="space-y-6">
-      {blacklistMappings.map((item, index) => (
-        <div
-          key={item.mappingId || index}
-          className="border-2 rounded-lg p-6 border-red-200 bg-red-50"
+    <div className="p-6 space-y-4">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100"
         >
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-lg flex items-center justify-center">
-              <Ban className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <h3
-                className="text-lg font-semibold"
-                style={{ color: safeTheme.colors.text.primary }}
-              >
-                Blacklisted By: {item.blacklistedBy || 'N/A'}
-              </h3>
-              <p
-                className="text-sm"
-                style={{ color: safeTheme.colors.text.secondary }}
-              >
-                ID: {item.blacklistedById || 'N/A'}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar
-                  className="w-4 h-4"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                />
-                <label
-                  className="text-sm font-medium"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                >
-                  Valid From
-                </label>
-              </div>
-              <p
-                className="text-sm font-medium"
-                style={{ color: safeTheme.colors.text.primary }}
-              >
-                {formatDate(item.validFrom)}
-              </p>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar
-                  className="w-4 h-4"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                />
-                <label
-                  className="text-sm font-medium"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                >
-                  Valid To
-                </label>
-              </div>
-              <p
-                className="text-sm font-medium"
-                style={{ color: safeTheme.colors.text.primary }}
-              >
-                {formatDate(item.validTo)}
-              </p>
-            </div>
-          </div>
-
-          {item.remark && (
-            <div className="mt-4">
-              <label
-                className="text-sm font-medium mb-2 block"
-                style={{ color: safeTheme.colors.text.secondary }}
-              >
-                Reason
-              </label>
-              <p
-                className="text-sm"
-                style={{ color: safeTheme.colors.text.primary }}
-              >
-                {item.remark}
-              </p>
-            </div>
+          <h3 className="text-lg font-semibold">Blacklist Mappings</h3>
+          {expanded ? (
+            <ChevronUp className="w-5 h-5" />
+          ) : (
+            <ChevronDown className="w-5 h-5" />
           )}
-        </div>
-      ))}
+        </button>
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="p-6">
+                {isFetchingMappings ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Loading...
+                  </div>
+                ) : !blacklistMappings || blacklistMappings.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No blacklist mappings
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {blacklistMappings.map((m, i) => (
+                      <div
+                        key={m.blacklist_mapping_id || i}
+                        className="bg-red-50 rounded-lg p-4 border border-red-200"
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              User Type
+                            </span>
+                            <p className="text-sm mt-1 capitalize">
+                              {m.user_type || "N/A"}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Entity Name
+                            </span>
+                            <p className="text-sm mt-1">
+                              {m.entity_name || "N/A"}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Valid From
+                            </span>
+                            <p className="text-sm mt-1">
+                              {formatDate(m.valid_from)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Valid To
+                            </span>
+                            <p className="text-sm mt-1">
+                              {formatDate(m.valid_to)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Status
+                            </span>
+                            <p className="text-sm mt-1">
+                              <span
+                                className={`inline-flex items-center px-2 py-1 rounded text-xs ${
+                                  m.active_flag
+                                    ? "bg-red-200 text-red-900"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {m.active_flag ? "Blacklisted" : "Inactive"}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-4">
+                          <span className="text-sm font-medium text-gray-500">
+                            Remark
+                          </span>
+                          <p className="text-sm mt-1">{m.remark || "-"}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };

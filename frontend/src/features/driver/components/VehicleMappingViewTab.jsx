@@ -1,153 +1,120 @@
-﻿import React from 'react';
-import { Car, Calendar, CheckCircle, XCircle } from 'lucide-react';
-import { getPageTheme } from '../../../theme.config';
+﻿import React, { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchVehicleMappings } from "../../../redux/slices/driverSlice";
 
-const VehicleMappingViewTab = ({ driver }) => {
-  const theme = getPageTheme('tab') || {};
-  const vehicleMappings = driver?.vehicleMappings || [];
+const VehicleMappingViewTab = ({ driverId }) => {
+  const dispatch = useDispatch();
+  const { vehicleMappings, isFetchingMappings } = useSelector(
+    (state) => state.driver
+  );
+  const [expanded, setExpanded] = useState(true);
 
-  const safeTheme = {
-    colors: {
-      text: {
-        primary: theme.colors?.text?.primary || '#111827',
-        secondary: theme.colors?.text?.secondary || '#6B7280',
-      },
-      card: {
-        background: theme.colors?.card?.background || '#FFFFFF',
-        border: theme.colors?.card?.border || '#E5E7EB',
-      },
-    },
-  };
+  useEffect(() => {
+    if (driverId) dispatch(fetchVehicleMappings(driverId));
+  }, [driverId, dispatch]);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  if (vehicleMappings.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <Car className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-500 mb-2">
-          No Vehicle Mappings
-        </h3>
-        <p className="text-gray-400">
-          No vehicle mappings have been added yet.
-        </p>
-      </div>
-    );
-  }
+  const formatDate = (date) =>
+    date ? new Date(date).toLocaleDateString("en-IN") : "N/A";
 
   return (
-    <div className="space-y-6">
-      {vehicleMappings.map((item, index) => (
-        <div
-          key={item.mappingId || index}
-          className="border-2 rounded-lg p-6"
-          style={{
-            borderColor: safeTheme.colors.card.border,
-            backgroundColor: safeTheme.colors.card.background,
-          }}
+    <div className="p-6 space-y-4">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100"
         >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <Car className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3
-                  className="text-lg font-semibold"
-                  style={{ color: safeTheme.colors.text.primary }}
-                >
-                  {item.vehicleNumber || item.vehicleId || 'N/A'}
-                </h3>
-                <p
-                  className="text-sm"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                >
-                  Type: {item.vehicleType || 'N/A'}
-                </p>
-              </div>
-            </div>
-
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-1 ${
-                item.activeFlag
-                  ? 'border-green-200 bg-green-100 text-green-800'
-                  : 'border-red-200 bg-red-100 text-red-800'
-              }`}
-            >
-              {item.activeFlag ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-              {item.activeFlag ? 'Active' : 'Inactive'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar
-                  className="w-4 h-4"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                />
-                <label
-                  className="text-sm font-medium"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                >
-                  Valid From
-                </label>
-              </div>
-              <p
-                className="text-sm font-medium"
-                style={{ color: safeTheme.colors.text.primary }}
-              >
-                {formatDate(item.validFrom)}
-              </p>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar
-                  className="w-4 h-4"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                />
-                <label
-                  className="text-sm font-medium"
-                  style={{ color: safeTheme.colors.text.secondary }}
-                >
-                  Valid To
-                </label>
-              </div>
-              <p
-                className="text-sm font-medium"
-                style={{ color: safeTheme.colors.text.primary }}
-              >
-                {formatDate(item.validTo)}
-              </p>
-            </div>
-          </div>
-
-          {item.remark && (
-            <div className="mt-4">
-              <label
-                className="text-sm font-medium mb-2 block"
-                style={{ color: safeTheme.colors.text.secondary }}
-              >
-                Remark
-              </label>
-              <p
-                className="text-sm"
-                style={{ color: safeTheme.colors.text.primary }}
-              >
-                {item.remark}
-              </p>
-            </div>
+          <h3 className="text-lg font-semibold">Vehicle Mappings</h3>
+          {expanded ? (
+            <ChevronUp className="w-5 h-5" />
+          ) : (
+            <ChevronDown className="w-5 h-5" />
           )}
-        </div>
-      ))}
+        </button>
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="p-6">
+                {isFetchingMappings ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Loading...
+                  </div>
+                ) : !vehicleMappings || vehicleMappings.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No vehicle mappings
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {vehicleMappings.map((m, i) => (
+                      <div
+                        key={m.vd_mapping_id || i}
+                        className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                      >
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Vehicle Registration
+                            </span>
+                            <p className="text-sm mt-1">
+                              {m.vehicle_registration || "N/A"}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Valid From
+                            </span>
+                            <p className="text-sm mt-1">
+                              {formatDate(m.valid_from)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Valid To
+                            </span>
+                            <p className="text-sm mt-1">
+                              {formatDate(m.valid_to)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Status
+                            </span>
+                            <p className="text-sm mt-1">
+                              <span
+                                className={`inline-flex items-center px-2 py-1 rounded text-xs ${
+                                  m.active_flag
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {m.active_flag ? "Active" : "Inactive"}
+                              </span>
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">
+                              Remark
+                            </span>
+                            <p className="text-sm mt-1">{m.remark || "-"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };
