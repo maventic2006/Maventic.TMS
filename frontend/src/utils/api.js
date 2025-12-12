@@ -1,4 +1,6 @@
 import axios from "axios";
+import store from "../redux/store";
+import { logoutUser } from "../redux/slices/authSlice";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
@@ -63,6 +65,11 @@ api.interceptors.request.use(
       data: config.data,
     });
 
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     return config;
   },
   (error) => {
@@ -81,99 +88,40 @@ api.interceptors.response.use(
     });
     return response;
   },
-  async (error) => {
-    const originalRequest = error.config;
+  (error) => {
+    console.log("🔍 API Interceptor - Error caught:", {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message,
+    });
 
-    // Handle 401 (Unauthorized) - redirect to login
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+    // ✅ CRITICAL: Skip auto-logout for specific endpoints during development
+    const developmentEndpoints = ["/users", "/user-management"];
+    const isDevEndpoint = developmentEndpoints.some((endpoint) =>
+      error.config?.url?.includes(endpoint)
+    );
 
-      // Don't log 401 errors for auth verification - they're expected
-      if (!originalRequest.url?.includes("/auth/verify")) {
-        console.log("🔒 Authentication required - redirecting to login");
-        // For cookie-based auth, redirect to login if not already there
-        if (!window.location.pathname.includes("/login")) {
-          window.location.href = "/login";
-        }
-      }
-      return Promise.reject(error);
-    }
+    // ✅ Skip auto-logout for:
+    // 1. Network errors (no response)
+    // 2. 404 errors (endpoint not found)
+    // 3. Development endpoints (user management)
+    // 4. Server errors (5xx)
+    const shouldSkipLogout =
+      !error.response ||
+      error.response.status === 404 ||
+      error.response.status >= 500 ||
+      isDevEndpoint;
 
-    // Handle 403 (Forbidden) - token might be corrupted or expired
-    if (error.response?.status === 403 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      const errorMessage =
-        error.response?.data?.error?.details ||
-        error.response?.data?.message ||
-        "";
-
-      // Check if it's a JWT error (malformed, expired, invalid)
-      if (errorMessage.includes("jwt") || errorMessage.includes("token")) {
-        console.warn("⚠️ JWT Token Error detected:", errorMessage);
-        console.log("🔄 Attempting to refresh authentication token...");
-
-        try {
-          // Try to refresh the token
-          const refreshResponse = await api.post("/auth/refresh");
-
-          if (refreshResponse.data.success) {
-            console.log(
-              "✅ Token refreshed successfully, retrying original request"
-            );
-
-            // Retry the original request with the new token (cookie auto-included)
-            return api(originalRequest);
-          } else {
-            throw new Error("Token refresh failed");
-          }
-        } catch (refreshError) {
-          console.error(
-            "❌ Token refresh failed:",
-            refreshError.response?.data || refreshError.message
-          );
-          console.log("🔒 Redirecting to login due to authentication failure");
-
-          // Clear any corrupted auth state and redirect to login
-          if (!window.location.pathname.includes("/login")) {
-            window.location.href = "/login";
-          }
-          return Promise.reject(refreshError);
-        }
-      }
-
-      // If not a token error, just log and reject
-      console.error("🚫 Access denied (403):", error.response.data.message);
-      return Promise.reject(error);
-    }
-
-    // Handle different error types
-    if (error.response?.status >= 500) {
-      // Server error
-      console.error("🔴 Server error:", error.response.data.message);
-    } else if (
-      error.code === "ECONNABORTED" ||
-      error.message?.includes("timeout")
-    ) {
-      // Timeout error - provide helpful message
-      console.error("⏱️ Request timeout error:", {
-        url: error.config?.url,
-        timeout: error.config?.timeout || "default (30s)",
-        message: error.message,
-        suggestion:
-          "The request took too long. For file uploads, this may indicate a large file or slow network.",
-      });
-    } else if (!error.response) {
-      // Network error
-      console.error("🔥 Network error details:", {
-        message: error.message,
-        code: error.code,
-        config: {
-          url: error.config?.url,
-          baseURL: error.config?.baseURL,
-          method: error.config?.method,
-        },
-      });
+    // Only trigger logout for real 401 authentication errors on production endpoints
+    if (error.response?.status === 401 && !shouldSkipLogout) {
+      console.log(
+        "🚪 API Interceptor - Triggering logout (401 on production endpoint)"
+      );
+      store.dispatch(logoutUser());
+    } else if (error.response?.status === 401 && shouldSkipLogout) {
+      console.log(
+        "⚠️ API Interceptor - Skipping logout (401 on development endpoint)"
+      );
     }
 
     return Promise.reject(error);

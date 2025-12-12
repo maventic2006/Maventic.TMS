@@ -32,6 +32,7 @@ import WarehouseCreatePage from "./features/warehouse/pages/WarehouseCreatePage"
 import ConsignorMaintenance from "./pages/ConsignorMaintenance";
 import ConsignorDetailsPage from "./pages/ConsignorDetailsPage";
 import ConsignorCreatePage from "./features/consignor/pages/ConsignorCreatePage";
+import UserMaintenance from "./pages/UserMaintenance";
 import ConfigurationPage from "./pages/ConfigurationPage";
 import ConfigurationListPage from "./pages/ConfigurationListPage";
 import ConsignorConfigurationPage from "./pages/ConsignorConfigurationPage";
@@ -498,6 +499,18 @@ function App() {
                       <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
                         <Layout>
                           <WarehouseDetails />
+                        </Layout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  {/* User Management Routes */}
+                  <Route
+                    path="/user-maintenance"
+                    element={
+                      <PrivateRoute roles={[USER_ROLES.PRODUCT_OWNER]}>
+                        <Layout>
+                          <UserMaintenance />
                         </Layout>
                       </PrivateRoute>
                     }
