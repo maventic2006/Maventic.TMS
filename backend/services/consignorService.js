@@ -49,6 +49,37 @@ const formatDateForMySQL = (isoDateString) => {
 };
 
 /**
+ * Convert MySQL date (Date object or string) to HTML date input format (YYYY-MM-DD)
+ * MySQL returns dates as JavaScript Date objects which need formatting for frontend date inputs
+ * 
+ * @param {Date|string} mysqlDate - MySQL DATE value (JavaScript Date object or ISO string)
+ * @returns {string|null} - Date in YYYY-MM-DD format for HTML date input, or null if invalid
+ */
+const formatDateForFrontend = (mysqlDate) => {
+  if (!mysqlDate) return null;
+  
+  try {
+    const date = new Date(mysqlDate);
+    if (isNaN(date.getTime())) {
+      console.warn(`[Consignor Service] Invalid MySQL date: ${mysqlDate}`);
+      return null;
+    }
+
+    // Convert to YYYY-MM-DD format for HTML date input
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    const result = `${year}-${month}-${day}`;
+    console.log(`[Consignor Service] MySQL date formatted for frontend: ${mysqlDate} → ${result}`);
+    return result;
+  } catch (error) {
+    console.warn(`[Consignor Service] Error formatting MySQL date ${mysqlDate}:`, error.message);
+    return null;
+  }
+};
+
+/**
  * Transform frontend field names to backend field names
  * Handles both camelCase (frontend) and snake_case (backend) field names
  */
@@ -879,11 +910,11 @@ const getConsignorById = async (customerId) => {
         website_url: consignor.website_url,
         name_on_po: consignor.name_on_po,
         approved_by: consignor.approved_by,
-        approved_date: consignor.approved_date,
+        approved_date: formatDateForFrontend(consignor.approved_date), // ✅ Format for HTML date input
         upload_nda: consignor.upload_nda, // NDA document ID
-        nda_validity: consignor.nda_validity, // NDA validity date
+        nda_validity: formatDateForFrontend(consignor.nda_validity), // ✅ Format for HTML date input
         upload_msa: consignor.upload_msa, // MSA document ID
-        msa_validity: consignor.msa_validity, // MSA validity date
+        msa_validity: formatDateForFrontend(consignor.msa_validity), // ✅ Format for HTML date input
         status: consignor.status,
         created_by: consignor.created_by, // Add creator field for permission checks
       },
@@ -926,10 +957,11 @@ const getConsignorById = async (customerId) => {
         country: "", // Not stored in database, return empty
         
         // ✅ VALIDITY DATES - DUAL FORMAT FOR COMPLETE COMPATIBILITY
-        valid_from: d.valid_from, // Backend snake_case format for DocumentsViewTab
-        valid_to: d.valid_to, // Backend snake_case format for DocumentsViewTab  
-        validFrom: d.valid_from, // Legacy camelCase format for edit mode
-        validTo: d.valid_to, // Legacy camelCase format for edit mode
+        // Format dates for HTML date input (YYYY-MM-DD)
+        valid_from: formatDateForFrontend(d.valid_from), // Backend snake_case format for DocumentsViewTab
+        valid_to: formatDateForFrontend(d.valid_to), // Backend snake_case format for DocumentsViewTab  
+        validFrom: formatDateForFrontend(d.valid_from), // Legacy camelCase format for edit mode
+        validTo: formatDateForFrontend(d.valid_to), // Legacy camelCase format for edit mode
         
         // ✅ FILE INFORMATION - DUAL FORMAT
         file_name: d.file_name || "", // Backend snake_case format for DocumentsViewTab
