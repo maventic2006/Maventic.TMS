@@ -90,17 +90,34 @@ export const createConsignor = async (consignorData, files = {}) => {
       },
     });
 
-    // Backend returns: { success: true, data: {...} }
+    // Backend returns: { success: true, data: {...} } OR { success: false, error: {...} }
     if (response.data.success) {
       return response.data.data;
     }
 
-    throw new Error(
-      response.data.error?.message || "Failed to create consignor"
-    );
+    // ✅ FIXED: When backend returns success: false, throw the entire error object
+    // This preserves the structure: { success: false, error: { code, message, details } }
+    throw response.data;
   } catch (error) {
-    console.error("createConsignor error:", error);
-    throw error.response?.data || error;
+    console.error("🔴 createConsignor service error:", error);
+    console.error("🔴 error.response:", error.response);
+    console.error("🔴 error.response?.data:", error.response?.data);
+    
+    // If it's already our error object with success: false, pass it through
+    if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+      console.log("✅ Passing through error object with success property");
+      throw error;
+    }
+    
+    // If it's an axios error with response data (422, 400, etc.), use response.data
+    if (error.response?.data) {
+      console.log("✅ Using error.response.data (axios error with response)");
+      throw error.response.data;
+    }
+    
+    // Fallback to error itself
+    console.log("⚠️  Fallback: throwing error as-is");
+    throw error;
   }
 };
 
@@ -131,17 +148,27 @@ export const updateConsignor = async (customerId, data, files = {}) => {
       },
     });
 
-    // Backend returns: { success: true, data: {...} }
+    // Backend returns: { success: true, data: {...} } OR { success: false, error: {...} }
     if (response.data.success) {
       return response.data.data;
     }
 
-    throw new Error(
-      response.data.error?.message || "Failed to update consignor"
-    );
+    // When backend returns success: false, throw the entire error object
+    throw response.data;
   } catch (error) {
     console.error("updateConsignor error:", error);
-    throw error.response?.data || error;
+    
+    // If it's already our error object with success: false, pass it through
+    if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+      throw error;
+    }
+    
+    // If it's an axios error with response data, use response.data
+    if (error.response?.data) {
+      throw error.response.data;
+    }
+    
+    throw error;
   }
 };
 
@@ -309,12 +336,22 @@ export const saveConsignorAsDraft = async (consignorData, files = {}) => {
       return response.data.data;
     }
 
-    throw new Error(
-      response.data.error?.message || "Failed to save consignor as draft"
-    );
+    // When backend returns success: false, throw the entire error object
+    throw response.data;
   } catch (error) {
     console.error("saveConsignorAsDraft error:", error);
-    throw error.response?.data || error;
+    
+    // If it's already our error object with success: false, pass it through
+    if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+      throw error;
+    }
+    
+    // If it's an axios error with response data, use response.data
+    if (error.response?.data) {
+      throw error.response.data;
+    }
+    
+    throw error;
   }
 };
 
@@ -384,12 +421,22 @@ export const updateConsignorDraft = async (customerId, data, files = {}) => {
       return response.data.data;
     }
 
-    throw new Error(
-      response.data.error?.message || "Failed to update consignor draft"
-    );
+    // When backend returns success: false, throw the entire error object
+    throw response.data;
   } catch (error) {
     console.error("updateConsignorDraft error:", error);
-    throw error.response?.data || error;
+    
+    // If it's already our error object with success: false, pass it through
+    if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+      throw error;
+    }
+    
+    // If it's an axios error with response data, use response.data
+    if (error.response?.data) {
+      throw error.response.data;
+    }
+    
+    throw error;
   }
 };
 
@@ -428,12 +475,22 @@ export const submitConsignorDraft = async (customerId, data, files = {}) => {
       return response.data.data;
     }
 
-    throw new Error(
-      response.data.error?.message || "Failed to submit consignor draft"
-    );
+    // When backend returns success: false, throw the entire error object
+    throw response.data;
   } catch (error) {
     console.error("submitConsignorDraft error:", error);
-    throw error.response?.data || error;
+    
+    // If it's already our error object with success: false, pass it through
+    if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+      throw error;
+    }
+    
+    // If it's an axios error with response data, use response.data
+    if (error.response?.data) {
+      throw error.response.data;
+    }
+    
+    throw error;
   }
 };
 

@@ -51,9 +51,16 @@ const uiSlice = createSlice({
         type: action.payload.type || "info",
         message: action.payload.message,
         details: action.payload.details || null,
-        duration: action.payload.duration || 5000,
+        // ✅ PERSISTENT BY DEFAULT: Use null (persistent) when duration is undefined
+        // If duration is explicitly set (e.g., 3000), use that value
+        // If duration is null or undefined, toast is persistent (no auto-dismiss)
+        duration: action.payload.duration ?? null,
       };
+      console.log("🎉 addToast reducer called with:", action.payload);
+      console.log("🎉 Created toast:", toast);
+      console.log("🎉 Current toasts before push:", state.toasts.length);
       state.toasts.push(toast);
+      console.log("🎉 Current toasts after push:", state.toasts.length);
     },
     removeToast: (state, action) => {
       state.toasts = state.toasts.filter(

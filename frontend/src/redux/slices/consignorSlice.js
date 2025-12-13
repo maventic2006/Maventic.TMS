@@ -44,7 +44,13 @@ export const createConsignor = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      // ✅ FIXED: Handle both axios errors and our custom error objects
+      // If error has 'success' property, it's our { success: false, error: {...} } structure
+      if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+        return rejectWithValue(error); // Pass through our structured error
+      }
+      // Otherwise, handle axios error
+      return rejectWithValue(error.response?.data || error.message || error);
     }
   }
 );
@@ -61,7 +67,11 @@ export const updateConsignor = createAsyncThunk(
       );
       return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      // ✅ FIXED: Handle both axios errors and our custom error objects
+      if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+        return rejectWithValue(error); // Pass through our structured error
+      }
+      return rejectWithValue(error.response?.data || error.message || error);
     }
   }
 );
@@ -142,6 +152,10 @@ export const saveConsignorAsDraft = createAsyncThunk(
       };
     } catch (error) {
       console.error("❌ Error saving consignor draft:", error);
+      // ✅ FIXED: Handle both axios errors and our custom error objects
+      if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+        return rejectWithValue(error); // Pass through our structured error
+      }
       return rejectWithValue({
         code: error.error?.code || "DRAFT_SAVE_ERROR",
         message: error.error?.message || "Failed to save consignor as draft",
@@ -177,6 +191,10 @@ export const updateConsignorDraft = createAsyncThunk(
       };
     } catch (error) {
       console.error("❌ Error updating consignor draft:", error);
+      // ✅ FIXED: Handle both axios errors and our custom error objects
+      if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+        return rejectWithValue(error); // Pass through our structured error
+      }
       return rejectWithValue({
         code: error.error?.code || "DRAFT_UPDATE_ERROR",
         message: error.error?.message || "Failed to update consignor draft",
@@ -216,6 +234,10 @@ export const submitConsignorFromDraft = createAsyncThunk(
       };
     } catch (error) {
       console.error("❌ Error submitting consignor draft:", error);
+      // ✅ FIXED: Handle both axios errors and our custom error objects
+      if (error && typeof error === 'object' && error.hasOwnProperty('success')) {
+        return rejectWithValue(error); // Pass through our structured error
+      }
       return rejectWithValue({
         code: error.error?.code || "DRAFT_SUBMIT_ERROR",
         message: error.error?.message || "Failed to submit consignor draft",
@@ -445,10 +467,14 @@ const consignorSlice = createSlice({
       })
       .addCase(createConsignor.rejected, (state, action) => {
         state.isCreating = false;
-        // ✅ Don't set error state for validation errors (they'll be shown as toast)
-        if (action.payload?.code !== "VALIDATION_ERROR") {
-          state.error = action.payload;
-        }
+        // ✅ ALWAYS set error state - useEffect will display toast with proper error parsing
+        console.log("%c🔴 createConsignor.rejected - REDUCER CALLED", "background: #ff0000; color: #ffffff; font-weight: bold; padding: 4px;");
+        console.log("  action.payload:", action.payload);
+        console.log("  action.type:", action.type);
+        console.log("  Current state.error BEFORE setting:", state.error);
+        state.error = action.payload;
+        console.log("  Current state.error AFTER setting:", state.error);
+        console.log("  state.isCreating:", state.isCreating);
       });
 
     // Update Consignor
@@ -473,10 +499,9 @@ const consignorSlice = createSlice({
       })
       .addCase(updateConsignor.rejected, (state, action) => {
         state.isUpdating = false;
-        // ✅ Don't set error state for validation errors (they'll be shown as toast)
-        if (action.payload?.code !== "VALIDATION_ERROR") {
-          state.error = action.payload;
-        }
+        // ✅ ALWAYS set error state - useEffect will display toast with proper error parsing
+        console.log("🔴 updateConsignor.rejected - Setting error:", action.payload);
+        state.error = action.payload;
       });
 
     // Delete Consignor

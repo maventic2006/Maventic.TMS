@@ -178,7 +178,6 @@ const WarehouseCreatePage = () => {
         addToast({
           type: TOAST_TYPES.SUCCESS,
           message: "Warehouse draft saved successfully!",
-          duration: 3000,
         })
       );
     },
@@ -188,7 +187,6 @@ const WarehouseCreatePage = () => {
         addToast({
           type: TOAST_TYPES.ERROR,
           message: error?.message || "Failed to save draft",
-          duration: 5000,
         })
       );
     }
@@ -307,7 +305,6 @@ const WarehouseCreatePage = () => {
             ? "Warehouse created successfully! Manager user created and pending approval."
             : "Warehouse created successfully!",
           details: toastDetails,
-          duration: 5000, // Longer duration for approval message
         })
       );
 

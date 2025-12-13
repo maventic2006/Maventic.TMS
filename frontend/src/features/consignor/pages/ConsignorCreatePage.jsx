@@ -152,7 +152,6 @@ const ConsignorCreatePage = () => {
         addToast({
           type: TOAST_TYPES.SUCCESS,
           message: "Consignor draft saved successfully!",
-          duration: 3000,
         })
       );
       // Navigate to consignor list page after successful save
@@ -166,7 +165,6 @@ const ConsignorCreatePage = () => {
         addToast({
           type: TOAST_TYPES.ERROR,
           message: error?.message || "Failed to save draft",
-          duration: 5000,
         })
       );
     }
@@ -226,45 +224,100 @@ const ConsignorCreatePage = () => {
 
   // Handle backend validation errors
   useEffect(() => {
+    console.log("%c🔍 useEffect ERROR HANDLER TRIGGERED", "background: #0000ff; color: #ffffff; font-weight: bold; padding: 4px;");
+    console.log("  error:", error);
+    console.log("  isCreating:", isCreating);
+    console.log("  error && !isCreating:", error && !isCreating);
+    
     if (error && !isCreating) {
+      console.log("%c✅ CONDITION MET - Processing error", "background: #00ff00; color: #000000; font-weight: bold; padding: 4px;");
+      console.log("🔴 ERROR OBJECT RECEIVED:", JSON.stringify(error, null, 2));
+      console.log("🔴 ERROR TYPE:", typeof error);
+      console.log("🔴 ERROR KEYS:", Object.keys(error));
+
       let errorMessage = "Failed to create consignor";
       let errorDetails = [];
 
+      // ✅ ENHANCED ERROR PARSING - Extract backend validation errors
       if (typeof error === "object") {
-        if (error.message) {
+        // Priority 1: Use backend error message if available
+        if (error.error?.message) {
+          errorMessage = error.error.message;
+          console.log("✅ Using error.error.message:", errorMessage);
+        } else if (error.message) {
           errorMessage = error.message;
+          console.log("✅ Using error.message:", errorMessage);
         }
 
-        if (error.code === "VALIDATION_ERROR" && error.field) {
-          errorDetails.push(`${error.field}: ${error.message}`);
-        }
+        // Priority 2: Extract validation details from backend response
+        // Backend format: { success: false, error: { code: "VALIDATION_ERROR", message: "...", details: [...] } }
+        const backendDetails = error.error?.details || error.details;
+        console.log("🔍 Backend details:", backendDetails);
 
-        if (error.details && Array.isArray(error.details)) {
-          errorDetails = error.details.map((detail) => {
+        if (backendDetails && Array.isArray(backendDetails)) {
+          console.log("✅ Found validation details array, length:", backendDetails.length);
+          errorDetails = backendDetails.map((detail) => {
             if (typeof detail === "string") {
               return detail;
             } else if (detail.field && detail.message) {
-              return `${detail.field}: ${detail.message}`;
+              // Format: "Field Name: Error message"
+              const fieldName = detail.field
+                .split(/[._]/) // Split by . or _
+                .map(
+                  (word) => word.charAt(0).toUpperCase() + word.slice(1)
+                ) // Capitalize
+                .join(" ");
+              return `${fieldName}: ${detail.message}`;
             } else if (detail.message) {
               return detail.message;
             }
             return "Validation error";
           });
         }
+
+        // Priority 3: Handle single field validation error
+        else if (error.code === "VALIDATION_ERROR" && error.field) {
+          const fieldName = error.field
+            .split(/[._]/)
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+          errorDetails.push(`${fieldName}: ${error.message}`);
+        }
+
+        // Priority 4: Handle database errors (duplicate entry, foreign key, etc.)
+        else if (error.code === "DUPLICATE_ENTRY" || error.error?.code === "DUPLICATE_ENTRY") {
+          errorMessage = error.error?.message || error.message || "Duplicate entry detected";
+        }
       } else if (typeof error === "string") {
         errorMessage = error;
       }
 
+      console.log("📢 TOAST MESSAGE:", errorMessage);
+      console.log("📢 TOAST DETAILS:", errorDetails);
+      console.log("%c📢 DISPATCHING TOAST", "background: #ff00ff; color: #ffffff; font-weight: bold; padding: 4px;");
+      console.log("Toast payload:", {
+        type: TOAST_TYPES.ERROR,
+        message: errorMessage,
+        details: errorDetails.length > 0 ? errorDetails : null,
+        duration: null,
+      });
+
+      // ✅ PERSISTENT ERROR TOAST - No auto-dismiss for validation errors
       dispatch(
         addToast({
           type: TOAST_TYPES.ERROR,
           message: errorMessage,
           details: errorDetails.length > 0 ? errorDetails : null,
-          duration: 8000,
+          duration: null, // null = persistent (user must close manually)
         })
       );
 
+      console.log("✅ Toast dispatched, now clearing error");
       dispatch(clearError());
+    } else {
+      console.log("%c⏭️ CONDITION NOT MET - Skipping", "background: #ffff00; color: #000000; font-weight: bold; padding: 4px;");
+      console.log("  error:", error);
+      console.log("  isCreating:", isCreating);
     }
   }, [error, isCreating, dispatch]);
 
@@ -276,7 +329,6 @@ const ConsignorCreatePage = () => {
           type: TOAST_TYPES.SUCCESS,
           message: "Consignor created successfully!",
           details: [`Consignor ID: ${lastCreatedId}`],
-          duration: 3000,
         })
       );
 
@@ -391,14 +443,27 @@ const ConsignorCreatePage = () => {
         setActiveTab(tabsWithErrors[0]);
       }
 
-      const uniqueErrors = [...new Set(errorMessages)].slice(0, 5);
+      // Format error messages with field names for better clarity
+      const formattedErrors = validation.error.issues.map((issue) => {
+        const path = Array.isArray(issue.path) ? issue.path.join(" → ") : "Unknown Field";
+        // Capitalize and format path (e.g., "general.customer_name" → "General → Customer Name")
+        const formattedPath = path
+          .split(/[._→]/)
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" → ");
+        return `${formattedPath}: ${issue.message}`;
+      });
+
+      const uniqueErrors = [...new Set(formattedErrors)].slice(0, 10); // Show up to 10 errors
+
+      console.log("🔴 FRONTEND VALIDATION ERRORS:", uniqueErrors);
 
       dispatch(
         addToast({
           type: TOAST_TYPES.ERROR,
-          message: ERROR_MESSAGES.VALIDATION_ERROR,
+          message: "Please fix the following validation errors:",
           details: uniqueErrors,
-          duration: 8000,
+          duration: null, // ✅ Persistent - stays until user closes
         })
       );
 
@@ -501,7 +566,6 @@ const ConsignorCreatePage = () => {
           addToast({
             type: TOAST_TYPES.SUCCESS,
             message: "Consignor created successfully",
-            duration: 3000,
           })
         );
 
@@ -512,15 +576,10 @@ const ConsignorCreatePage = () => {
         navigate("/consignor");
       })
       .catch((error) => {
+        // ❌ REMOVED - useEffect handles all error toasts
+        // The error will be set in Redux state and handled by the useEffect above
         console.error("❌ Failed to create consignor:", error);
-
-        dispatch(
-          addToast({
-            type: TOAST_TYPES.ERROR,
-            message: error.message || "Failed to create consignor",
-            duration: 5000,
-          })
-        );
+        console.log("Error will be displayed by useEffect error handler");
       });
   };
 

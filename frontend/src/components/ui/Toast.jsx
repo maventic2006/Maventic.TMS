@@ -146,12 +146,18 @@ const Toast = ({
   type = "info",
   message,
   details = null,
-  duration = 5000,
+  duration = null, // Default null = persistent (no auto-dismiss), user must close manually
 }) => {
   const dispatch = useDispatch();
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
+    // ✅ If duration is null or 0, toast is persistent (user must close manually)
+    if (!duration || duration === 0) {
+      console.log(`🔒 Toast ${id} is persistent - no auto-dismiss`);
+      return; // No timer, toast stays until user closes
+    }
+
     const timer = setTimeout(() => {
       dispatch(removeToast(id));
     }, duration);

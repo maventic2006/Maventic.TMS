@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { User, Mail, Phone, Briefcase, Linkedin, Users } from "lucide-react";
 import api from "../../../utils/api";
+import useContactPhotoPreview from "../../../hooks/useContactPhotoPreview";
+import PreviewModal from "../../../components/ui/PreviewModal";
 
 const ContactViewTab = ({ consignor }) => {
   const contacts = consignor?.contacts || [];
   const [contactPhotos, setContactPhotos] = useState({});
+
+  // ✅ Contact photo preview functionality (View Mode)
+  const {
+    previewPhoto,
+    handlePreviewPhoto,
+    closePreview,
+  } = useContactPhotoPreview();
 
   // Fetch contact photos with authentication
   useEffect(() => {
@@ -68,12 +77,15 @@ const ContactViewTab = ({ consignor }) => {
             >
               {/* Contact Header */}
               <div className="flex items-center gap-4 mb-6">
-                {/* Photo with Authentication */}
+                {/* Photo with Authentication - Clickable for Preview */}
                 {contact.contact_photo && contactPhotos[contact.contact_id] ? (
                   <img
                     src={contactPhotos[contact.contact_id]}
                     alt={contact.name}
-                    className="w-16 h-16 rounded-full object-cover border-2 border-purple-200"
+                    className="w-16 h-16 rounded-full object-cover border-2 border-purple-200 cursor-pointer hover:border-purple-400 hover:scale-105 transition-all"
+                    onClick={() =>
+                      handlePreviewPhoto(contact, consignor.customer_id)
+                    }
                     onError={(e) => {
                       e.target.style.display = "none";
                       e.target.nextSibling.style.display = "flex";
@@ -81,9 +93,13 @@ const ContactViewTab = ({ consignor }) => {
                   />
                 ) : null}
 
-                {/* Default Avatar */}
+                {/* Default Avatar - Clickable when photo exists */}
                 <div
-                  className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center"
+                  className={`w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center ${
+                    contact.contact_photo && contactPhotos[contact.contact_id]
+                      ? ""
+                      : "cursor-default"
+                  }`}
                   style={{
                     display:
                       contact.contact_photo && contactPhotos[contact.contact_id]
@@ -207,6 +223,9 @@ const ContactViewTab = ({ consignor }) => {
           ))}
         </div>
       )}
+
+      {/* Contact Photo Preview Modal */}
+      <PreviewModal previewDocument={previewPhoto} onClose={closePreview} />
     </div>
   );
 };

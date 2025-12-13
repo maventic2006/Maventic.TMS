@@ -17,26 +17,16 @@ const ContactTab = ({ formData, setFormData, errors = {} }) => {
 
   // ✅ Use shared contact photo preview hook (View Mode logic)
   const {
-    contactPhotos,
-    handlePreviewContactPhoto,
-    handleDownloadContactPhoto,
-  } = useContactPhotoPreview(customerId, contacts);
-
-  // State for manual preview modal
-  const [previewDocument, setPreviewDocument] = useState(null);
+    previewPhoto,
+    handlePreviewPhoto,
+    handleDownloadPhoto,
+    closePreview,
+  } = useContactPhotoPreview();
 
   // Custom preview handler for contact photos
-  const handleContactPhotoPreview = (row) => {
-    const preview = handlePreviewContactPhoto(row);
-    if (preview) {
-      setPreviewDocument(preview);
-    } else {
-      alert("Contact photo not available for preview");
-    }
-  };
-
-  const closePreview = () => {
-    setPreviewDocument(null);
+  const handleContactPhotoPreviewClick = (row) => {
+    console.log('📸 ContactTab - Preview clicked for contact:', row);
+    handlePreviewPhoto(row, customerId);
   };
 
   // Table column configuration
@@ -164,12 +154,12 @@ const ContactTab = ({ formData, setFormData, errors = {} }) => {
         canRemoveRows={true}
         canAddRows={true}
         className="w-full"
-        onPreview={handleContactPhotoPreview} // ✅ Use View Mode preview logic
+        onPreview={handleContactPhotoPreviewClick} // ✅ Use View Mode preview logic
       />
 
       {/* ✅ Shared Preview Modal (View Mode component) */}
       <PreviewModal 
-        previewDocument={previewDocument} 
+        previewDocument={previewPhoto} 
         onClose={closePreview} 
       />
 
