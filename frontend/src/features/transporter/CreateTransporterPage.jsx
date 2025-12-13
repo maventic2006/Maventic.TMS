@@ -602,7 +602,6 @@ const CreateTransporterPage = () => {
         addToast({
           type: TOAST_TYPES.SUCCESS,
           message: "Draft saved successfully",
-          duration: 3000,
         })
       );
 
@@ -614,7 +613,6 @@ const CreateTransporterPage = () => {
           type: TOAST_TYPES.ERROR,
           message: "Failed to save draft",
           details: [error.message || "An error occurred"],
-          duration: 5000,
         })
       );
     }

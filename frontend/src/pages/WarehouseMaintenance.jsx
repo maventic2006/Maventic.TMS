@@ -326,7 +326,6 @@ const WarehouseMaintenance = () => {
             addToast({
               type: TOAST_TYPES.ERROR,
               message: error?.message || "Failed to delete draft",
-              duration: 5000,
             })
           );
         }

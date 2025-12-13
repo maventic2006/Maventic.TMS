@@ -533,8 +533,7 @@ const getConsignorList = async (queryParams, user = null) => {
       .leftJoin(
         knex.raw(`(
           SELECT 
-            aft1.*,
-            um.consignor_id
+            aft1.*
           FROM approval_flow_trans aft1
           INNER JOIN (
             SELECT 
@@ -546,9 +545,8 @@ const getConsignorList = async (queryParams, user = null) => {
             GROUP BY user_id_reference_id
           ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
                 AND aft1.approval_flow_unique_id = aft2.max_id
-          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
         ) as aft`),
-        knex.raw("aft.consignor_id = consignor_basic_information.customer_id")
+        knex.raw("aft.user_id_reference_id = consignor_basic_information.customer_id")
       )
       .select(
         "consignor_basic_information.consignor_unique_id",
@@ -818,7 +816,7 @@ const getConsignorById = async (customerId) => {
     let userApprovalStatus = null;
     try {
       const consignorUser = await knex("user_master")
-        .where("consignor_id", customerId)
+        .where("customer_id", customerId) // ✅ FIXED: Use customer_id (correct column name in user_master)
         .where("user_type_id", "UT006") // Consignor Admin
         .first();
 
@@ -1362,7 +1360,7 @@ const createConsignor = async (payload, files, userId) => {
       user_full_name: `${general.customer_name} - Admin`,
       email_id: userEmail,
       mobile_number: userMobile,
-      consignor_id: general.customer_id, // Link to consignor
+      customer_id: general.customer_id, // ✅ FIXED: Use customer_id (correct column name in user_master)
       is_active: false, // Inactive until approved
       created_by_user_id: creatorUserId,
       password: hashedPassword,
@@ -1570,7 +1568,7 @@ const updateConsignor = async (
 
         // Get consignor admin user ID via user_master lookup
         const consignorUser = await trx("user_master")
-          .where("consignor_id", customerId)
+          .where("customer_id", customerId) // ✅ FIXED: Use customer_id (correct column name in user_master)
           .where("user_type_id", "UT006") // Consignor Admin
           .first();
 

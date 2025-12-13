@@ -1630,7 +1630,7 @@ const submitConsignorFromDraft = async (req, res) => {
 
     // Check if Consignor Admin user already exists
     const existingUser = await db("user_master")
-      .where("consignor_id", id)
+      .where("customer_id", id) // ✅ FIXED: Use customer_id (correct column name in user_master)
       .where("user_type_id", "UT006") // Consignor Admin
       .first();
 
@@ -1694,7 +1694,7 @@ const submitConsignorFromDraft = async (req, res) => {
         user_full_name: `${consignorDetails.customer_name} - Admin`,
         email_id: userEmail,
         mobile_number: userMobile,
-        consignor_id: id,
+        customer_id: id, // ✅ FIXED: Use customer_id (correct column name in user_master)
         is_active: false, // Inactive until approved
         created_by_user_id: req.user.user_id,
         password: hashedPassword,

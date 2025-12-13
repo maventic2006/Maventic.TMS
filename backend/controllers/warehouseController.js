@@ -999,7 +999,7 @@ const getWarehouseById = async (req, res) => {
 
         warehouseManagerUser = await knex("user_master")
           .where("user_type_id", "UT007") // Consignor WH Manager
-          .where("consignor_id", warehouse.consignor_id)
+          .where("customer_id", warehouse.consignor_id) // ✅ FIXED: Use customer_id (correct column name in user_master)
           .where("user_full_name", warehouse.warehouse_name1)
           .first();
       }
@@ -1943,7 +1943,7 @@ const updateWarehouse = async (req, res) => {
         console.log(`  Fallback: Searching by name and consignor`);
         warehouseUser = await trx("user_master")
           .where("user_type_id", "UT007") // Consignor WH Manager
-          .where("consignor_id", existingWarehouse.consignor_id)
+          .where("customer_id", existingWarehouse.consignor_id) // ✅ FIXED: Use customer_id (correct column name in user_master)
           .where("user_full_name", existingWarehouse.warehouse_name1)
           .first();
       }

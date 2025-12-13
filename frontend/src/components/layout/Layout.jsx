@@ -6,6 +6,8 @@ import Toast from "../ui/Toast";
 
 const Layout = ({ children }) => {
   const { toasts } = useSelector((state) => state.ui);
+  
+  console.log("🎨 Layout - Current toasts:", toasts.length, toasts);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

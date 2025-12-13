@@ -282,7 +282,6 @@ const TransporterMaintenance = () => {
               type: TOAST_TYPES.ERROR,
               message: "Failed to delete draft",
               details: [error.message || "An error occurred"],
-              duration: 5000,
             })
           );
         }

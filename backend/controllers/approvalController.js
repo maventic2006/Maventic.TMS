@@ -726,7 +726,7 @@ async function updateRelatedEntityStatus(
       // First, get the warehouse manager user details
       const warehouseUser = await trx("user_master")
         .where("user_id", user_id_reference_id)
-        .select("consignor_id", "created_at", "created_by_user_id")
+        .select("customer_id as consignor_id", "created_at", "created_by_user_id") // ✅ FIXED: Use customer_id (aliased as consignor_id for compatibility)
         .first();
 
       if (!warehouseUser) {

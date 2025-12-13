@@ -1382,7 +1382,6 @@ const CreateVehiclePage = () => {
           addToast({
             type: TOAST_TYPES.ERROR,
             message: `Invalid fuel type: "${fuelType}". Please select a valid option.`,
-            duration: 5000,
           })
         );
         return "";
@@ -1393,7 +1392,6 @@ const CreateVehiclePage = () => {
             type: TOAST_TYPES.ERROR,
             message:
               "Error validating fuel type. Please refresh and try again.",
-            duration: 5000,
           })
         );
         return "";
@@ -1687,7 +1685,6 @@ const CreateVehiclePage = () => {
             type: TOAST_TYPES.ERROR,
             message:
               "Error processing form data. Please check your inputs and try again.",
-            duration: 5000,
           })
         );
         // Return a minimal valid structure to prevent complete failure
@@ -1730,7 +1727,6 @@ const CreateVehiclePage = () => {
         addToast({
           type: TOAST_TYPES.SUCCESS,
           message: "Vehicle draft saved successfully!",
-          duration: 3000,
         })
       );
     },
@@ -1740,7 +1736,6 @@ const CreateVehiclePage = () => {
         addToast({
           type: TOAST_TYPES.ERROR,
           message: error?.message || "Failed to save draft",
-          duration: 5000,
         })
       );
     }
@@ -2018,7 +2013,6 @@ const CreateVehiclePage = () => {
         addToast({
           type: TOAST_TYPES.SUCCESS,
           message: `Vehicle ${result.vehicleId || ""} created successfully!`,
-          duration: 5000,
         })
       );
 
