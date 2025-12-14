@@ -3908,6 +3908,219 @@ const lookupVehicleByRC = async (req, res) => {
   }
 };
 
+// @desc    Export all vehicles for Excel download (no pagination)
+// @route   GET /api/vehicle/export
+// @access  Private
+const exportVehiclesForExcel = async (req, res) => {
+  try {
+    console.log("📊 Vehicle Excel Export API called");
+
+    const currentUserId = req.user?.user_id || null;
+
+    // Extract all filters (same as getAllVehicles)
+    const filters = req.query;
+
+    // Build query (same logic as getAllVehicles but NO limit/offset)
+    let query = db("vehicle_basic_information_hdr as vbih")
+      .leftJoin(
+        "vehicle_ownership_details as vod",
+        "vbih.vehicle_id_code_hdr",
+        "vod.vehicle_id_code"
+      )
+      .leftJoin(
+        "vehicle_type_master as vtm",
+        "vbih.vehicle_type_id",
+        "vtm.vehicle_type_id"
+      )
+      .leftJoin(
+        "fuel_type_master as ftm",
+        "vbih.fuel_type_id",
+        "ftm.fuel_type_id"
+      )
+      .leftJoin(
+        db.raw(`(
+          SELECT 
+            aft1.*,
+            um.user_full_name,
+            SUBSTRING_INDEX(um.user_full_name, ' - ', -1) as vehicle_id_extracted
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT004'
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
+        ) as aft`),
+        "aft.vehicle_id_extracted",
+        "vbih.vehicle_id_code_hdr"
+      )
+      .select(
+        "vbih.vehicle_id_code_hdr as vehicleId",
+        "vbih.vehicle_registration_number as registrationNumber",
+        "vbih.maker_brand_description as make",
+        "vbih.maker_model as model",
+        "vbih.vin_chassis_no as vin",
+        "vbih.vehicle_type_id as vehicleTypeId",
+        "vtm.vehicle_type_description as vehicleType",
+        "vbih.vehicle_category",
+        "vbih.fuel_type_id as fuelTypeId",
+        "ftm.fuel_type as fuelType",
+        "vbih.transmission_type",
+        "vbih.manufacturing_month_year as year",
+        "vbih.gross_vehicle_weight_kg as gvw",
+        "vbih.gps_tracker_imei_number as gpsIMEI",
+        "vbih.gps_tracker_active_flag as gpsEnabled",
+        "vbih.blacklist_status",
+        "vbih.status",
+        "vbih.created_at",
+        "vbih.created_by as createdBy",
+        "vbih.leasing_flag as leasingFlag",
+        "vbih.vehicle_condition",
+        "vbih.fuel_tank_capacity as fuelCapacity",
+        "vbih.engine_type_id",
+        "vbih.emission_standard",
+        "vbih.body_type_desc as bodyType",
+        "vbih.vehicle_colour as color",
+        "vbih.engine_number",
+        "vbih.vehicle_registered_at as registrationState",
+        "vod.ownership_name",
+        "vbih.towing_capacity as towingCapacity",
+        db.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
+      );
+
+    // Apply all filters from getAllVehicles function
+    Object.entries(filters).forEach(([key, value]) => {
+      if (!value || value === "") return;
+
+      switch (key) {
+        case "registrationNumber":
+          query.where("vbih.vehicle_registration_number", "like", `%${value}%`);
+          break;
+        case "vehicleType":
+          query.where("vbih.vehicle_type_id", value);
+          break;
+        case "status":
+          query.where("vbih.status", value);
+          break;
+        case "fuelType":
+          query.where("vbih.fuel_type_id", value);
+          break;
+        case "gpsEnabled":
+          query.where("vbih.gps_tracker_active_flag", value === "true" ? 1 : 0);
+          break;
+        case "leasingFlag":
+          query.where("vbih.leasing_flag", value === "true" ? 1 : 0);
+          break;
+        case "vehicleCondition":
+          query.where("vbih.vehicle_condition", value);
+          break;
+        case "registrationState":
+          query.where("vbih.vehicle_registered_at", "like", `%${value}%`);
+          break;
+        case "yearFrom":
+          query.where("vbih.manufacturing_month_year", ">=", `${value}-01-01`);
+          break;
+        case "yearTo":
+          query.where("vbih.manufacturing_month_year", "<=", `${value}-12-31`);
+          break;
+        case "make":
+          query.where("vbih.maker_brand_description", "like", `%${value}%`);
+          break;
+        case "model":
+          query.where("vbih.maker_model", "like", `%${value}%`);
+          break;
+        case "engineType":
+          query.where("vbih.engine_type_id", value);
+          break;
+        case "emissionStandard":
+          query.where("vbih.emission_standard", "like", `%${value}%`);
+          break;
+        case "bodyType":
+          query.where("vbih.body_type_desc", "like", `%${value}%`);
+          break;
+        case "towingCapacityMin":
+          query.where("vbih.towing_capacity", ">=", parseFloat(value));
+          break;
+        case "towingCapacityMax":
+          query.where("vbih.towing_capacity", "<=", parseFloat(value));
+          break;
+      }
+    });
+
+    // Filter drafts - only show to creator
+    query.where(function () {
+      this.where("vbih.status", "!=", "SAVE_AS_DRAFT").orWhere(function () {
+        this.where("vbih.status", "=", "SAVE_AS_DRAFT").andWhere(
+          "vbih.created_by",
+          currentUserId
+        );
+      });
+    });
+
+    // Fetch ALL records
+    const vehicles = await query.orderBy("vbih.vehicle_id_code_hdr", "asc");
+
+    console.log(`✅ Fetched ${vehicles.length} vehicles for export`);
+
+    // Transform data
+    const transformedVehicles = vehicles.map((vehicle) => ({
+      vehicle_id: vehicle.vehicleId,
+      registration_number: vehicle.registrationNumber,
+      make: vehicle.make,
+      model: vehicle.model,
+      vin: vehicle.vin,
+      vehicle_type: vehicle.vehicleType,
+      vehicle_category: vehicle.vehicle_category,
+      fuel_type: vehicle.fuelType,
+      transmission: vehicle.transmission_type,
+      year: vehicle.year,
+      gvw: vehicle.gvw,
+      gps_imei: vehicle.gpsIMEI,
+      gps_enabled: Boolean(vehicle.gpsEnabled),
+      blacklist_status: Boolean(vehicle.blacklist_status),
+      status: vehicle.status,
+      leasing_flag: Boolean(vehicle.leasingFlag),
+      vehicle_condition: vehicle.vehicle_condition,
+      fuel_capacity: parseFloat(vehicle.fuelCapacity) || 0,
+      engine_type_id: vehicle.engine_type_id,
+      emission_standard: vehicle.emission_standard,
+      body_type: vehicle.bodyType,
+      color: vehicle.color,
+      engine_number: vehicle.engine_number,
+      registration_state: vehicle.registrationState,
+      ownership_name: vehicle.ownership_name,
+      towing_capacity: parseFloat(vehicle.towingCapacity) || 0,
+      created_by: vehicle.createdBy,
+      created_at: vehicle.created_at,
+      approver: vehicle.approver_name || null,
+      approved_on:
+        vehicle.approved_on && vehicle.approval_status === "Approve"
+          ? new Date(vehicle.approved_on).toISOString().split("T")[0]
+          : null,
+    }));
+
+    res.json({
+      success: true,
+      data: transformedVehicles,
+      total: transformedVehicles.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error exporting vehicles:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to export vehicles",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createVehicle,
   getAllVehicles,
@@ -3921,4 +4134,5 @@ module.exports = {
   deleteVehicleDraft,
   submitVehicleFromDraft,
   updateVehicleDraft,
+  exportVehiclesForExcel,
 };

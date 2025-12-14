@@ -1,10 +1,11 @@
 ﻿import React, { memo } from "react";
-import { ArrowLeft, Plus, Filter, User } from "lucide-react";
+import { ArrowLeft, Plus, Filter, User, Download } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Card, CardContent } from "../ui/Card";
 
 const DriverTopActionBar = ({
   onCreateNew,
+  onDownloadExcel,
   totalCount,
   onBack,
   showFilters,
@@ -39,6 +40,16 @@ const DriverTopActionBar = ({
 
           {/* Right Section - Action Buttons */}
           <div className="flex items-center gap-4 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDownloadExcel}
+              className="border-[#10B981] text-[#10B981] hover:bg-[#10B981] hover:text-white font-semibold rounded-lg transition-all duration-200 py-2.5 px-5"
+            >
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Download Excel</span>
+            </Button>
+
             <Button
               variant="default"
               size="sm"

@@ -6653,6 +6653,341 @@ const getMappingMasterData = async (req, res) => {
   }
 };
 
+// @desc    Export all drivers for Excel download (no pagination)
+// @route   GET /api/driver/export
+// @access  Private
+const exportDriversForExcel = async (req, res) => {
+  try {
+    console.log("📊 Driver Excel Export API called");
+    console.log("Query params:", req.query);
+
+    const { Country, State, City } = require("country-state-city");
+    const currentUserId = req.user?.user_id || null;
+
+    // Extract filters (same as getDrivers but without pagination)
+    const {
+      search = "",
+      driverId = "",
+      fullName = "",
+      phoneNumber = "",
+      licenseNumber = "",
+      country = "",
+      state = "",
+      city = "",
+      postalCode = "",
+      status = "",
+      gender = "",
+      bloodGroup = "",
+      avgRating = "",
+      createdOnStart = "",
+      createdOnEnd = "",
+      licenseValidityDate = "",
+      transporterId = "",
+    } = req.query;
+
+    // Build main query (same logic as getDrivers but fetch ALL records)
+    let query = knex("driver_basic_information as dbi")
+      .leftJoin(
+        knex("driver_documents")
+          .select(
+            "driver_id",
+            knex.raw(
+              "GROUP_CONCAT(document_number SEPARATOR ', ') as license_numbers"
+            )
+          )
+          .whereIn("status", ["ACTIVE", "DRAFT"])
+          .groupBy("driver_id")
+          .as("dld"),
+        "dbi.driver_id",
+        "dld.driver_id"
+      )
+      .leftJoin(
+        knex.raw(`(
+          SELECT user_reference_id, country, state, city, district, postal_code
+          FROM tms_address
+          WHERE user_type = 'DRIVER' 
+            AND is_primary = true 
+            AND status IN ('ACTIVE', 'DRAFT')
+        ) as addr`),
+        "addr.user_reference_id",
+        "dbi.driver_id"
+      )
+      .leftJoin(
+        knex.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT003'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        "aft.user_id_reference_id",
+        "dbi.driver_id"
+      )
+      .select(
+        "dbi.driver_id",
+        "dbi.full_name",
+        "dbi.date_of_birth",
+        "dbi.gender",
+        "dbi.blood_group",
+        "dbi.phone_number",
+        "dbi.email_id",
+        "dbi.emergency_contact",
+        "dbi.alternate_phone_number",
+        "dbi.avg_rating",
+        "dbi.status",
+        "dld.license_numbers",
+        knex.raw("COALESCE(addr.country, 'N/A') as country"),
+        knex.raw("COALESCE(addr.state, 'N/A') as state"),
+        knex.raw("COALESCE(addr.city, 'N/A') as city"),
+        knex.raw("COALESCE(addr.district, 'N/A') as district"),
+        knex.raw("COALESCE(addr.postal_code, 'N/A') as postal_code"),
+        "dbi.created_by",
+        knex.raw("DATE_FORMAT(dbi.created_on, '%Y-%m-%d') as created_on"),
+        knex.raw("DATE_FORMAT(dbi.updated_on, '%Y-%m-%d') as updated_on"),
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
+      );
+
+    // Apply filters (same as getDrivers)
+    if (search) {
+      query.where(function () {
+        this.where("dbi.full_name", "like", `%${search}%`)
+          .orWhere("dbi.driver_id", "like", `%${search}%`)
+          .orWhere("dbi.phone_number", "like", `%${search}%`)
+          .orWhere("dbi.email_id", "like", `%${search}%`);
+      });
+    }
+
+    if (driverId) {
+      query.where("dbi.driver_id", "like", `%${driverId}%`);
+    }
+
+    if (fullName) {
+      query.where("dbi.full_name", "like", `%${fullName}%`);
+    }
+
+    if (phoneNumber) {
+      query.where("dbi.phone_number", "like", `%${phoneNumber}%`);
+    }
+
+    if (status) {
+      query.where("dbi.status", status);
+    }
+
+    if (gender) {
+      query.where("dbi.gender", gender);
+    }
+
+    if (bloodGroup) {
+      query.where("dbi.blood_group", bloodGroup);
+    }
+
+    if (avgRating) {
+      query.where("dbi.avg_rating", ">=", parseFloat(avgRating));
+    }
+
+    if (transporterId) {
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT driver_id 
+          FROM driver_transporter_mapping 
+          WHERE transporter_id LIKE ?
+        )
+      `;
+      query.whereRaw(rawFilter, [`%${transporterId}%`]);
+    }
+
+    if (licenseNumber) {
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT driver_id 
+          FROM driver_documents 
+          WHERE document_number LIKE ?
+            AND status IN ('ACTIVE', 'DRAFT')
+        )
+      `;
+      query.whereRaw(rawFilter, [`%${licenseNumber}%`]);
+    }
+
+    if (licenseValidityDate) {
+      const dateValue = `${licenseValidityDate}%`;
+      const rawCondition = `
+        dbi.driver_id IN (
+          SELECT dd.user_reference_id 
+          FROM driver_documents dd
+          WHERE dd.document_name = 'DOC002' 
+            AND dd.valid_to >= ?
+        )
+      `;
+      query.whereRaw(rawCondition, [dateValue]);
+    }
+
+    if (createdOnStart) {
+      query.where("dbi.created_on", ">=", createdOnStart);
+    }
+
+    if (createdOnEnd) {
+      const endDateWithTime = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd} 23:59:59`;
+      query.where("dbi.created_on", "<=", endDateWithTime);
+    }
+
+    if (country) {
+      let countryValue = country;
+      if (country.length === 2) {
+        const obj = Country.getCountryByCode(country);
+        countryValue = obj ? obj.name : country;
+      }
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT user_reference_id 
+          FROM tms_address 
+          WHERE user_type = 'DRIVER' 
+            AND country LIKE ? 
+            AND status IN ('ACTIVE', 'DRAFT')
+            AND is_primary = true
+        )
+      `;
+      query.whereRaw(rawFilter, [`%${countryValue}%`]);
+    }
+
+    if (state) {
+      let stateValue = state;
+      if (country && state.length <= 3) {
+        let countryCode = country.length === 2 ? country : null;
+        if (!countryCode) {
+          const obj = Country.getAllCountries().find(
+            (c) => c.name.toLowerCase() === country.toLowerCase()
+          );
+          countryCode = obj ? obj.isoCode : country;
+        }
+        const stateObj = State.getStateByCodeAndCountry(state, countryCode);
+        stateValue = stateObj ? stateObj.name : state;
+      }
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT user_reference_id 
+          FROM tms_address 
+          WHERE user_type = 'DRIVER' 
+            AND state LIKE ? 
+            AND status IN ('ACTIVE', 'DRAFT')
+            AND is_primary = true
+        )
+      `;
+      query.whereRaw(rawFilter, [`%${stateValue}%`]);
+    }
+
+    if (city) {
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT user_reference_id 
+          FROM tms_address 
+          WHERE user_type = 'DRIVER' 
+            AND city LIKE ? 
+            AND status IN ('ACTIVE', 'DRAFT')
+            AND is_primary = true
+        )
+      `;
+      query.whereRaw(rawFilter, [`%${city}%`]);
+    }
+
+    if (postalCode) {
+      const rawFilter = `
+        dbi.driver_id IN (
+          SELECT user_reference_id 
+          FROM tms_address 
+          WHERE user_type = 'DRIVER' 
+            AND postal_code LIKE ? 
+            AND status IN ('ACTIVE', 'DRAFT')
+            AND is_primary = true
+        )
+      `;
+      query.whereRaw(rawFilter, [`%${postalCode}%`]);
+    }
+
+    // Filter drafts - only show if user is creator
+    query.where(function () {
+      this.where(function () {
+        this.whereNotIn("dbi.status", ["DRAFT", "SAVE_AS_DRAFT"]);
+      }).orWhere(function () {
+        this.whereIn("dbi.status", ["DRAFT", "SAVE_AS_DRAFT"]).where(
+          "dbi.created_by",
+          "=",
+          currentUserId
+        );
+      });
+    });
+
+    // Fetch ALL records (no limit/offset)
+    const drivers = await query.orderBy("dbi.driver_id", "asc");
+
+    console.log(`✅ Fetched ${drivers.length} drivers for export`);
+
+    // Helper function to format dates
+    const formatDateForInput = (dateValue) => {
+      if (!dateValue) return null;
+      const date = new Date(dateValue);
+      return isNaN(date.getTime()) ? null : date.toISOString().split("T")[0];
+    };
+
+    // Transform data
+    const transformedDrivers = drivers.map((driver) => ({
+      id: driver.driver_id,
+      fullName: driver.full_name,
+      dateOfBirth: formatDateForInput(driver.date_of_birth),
+      gender: driver.gender,
+      bloodGroup: driver.blood_group,
+      phoneNumber: driver.phone_number,
+      emailId: driver.email_id,
+      emergencyContact: driver.emergency_contact,
+      alternatePhoneNumber: driver.alternate_phone_number,
+      avgRating: driver.avg_rating || 0,
+      status: driver.status,
+      licenseNumbers: driver.license_numbers || "N/A",
+      country: driver.country,
+      state: driver.state,
+      city: driver.city,
+      district: driver.district,
+      postalCode: driver.postal_code,
+      createdBy: driver.created_by,
+      createdOn: formatDateForInput(driver.created_on),
+      updatedOn: formatDateForInput(driver.updated_on),
+      approver: driver.approver_name || null,
+      approvedOn:
+        driver.approved_on && driver.approval_status === "Approve"
+          ? new Date(driver.approved_on).toISOString().split("T")[0]
+          : null,
+    }));
+
+    res.json({
+      success: true,
+      data: transformedDrivers,
+      total: transformedDrivers.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error exporting drivers:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "EXPORT_ERROR",
+        message: "Failed to export drivers",
+        details: error.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   createDriver,
   updateDriver,
@@ -6667,6 +7002,7 @@ module.exports = {
   updateDriverDraft,
   deleteDriverDraft,
   submitDriverFromDraft,
+  exportDriversForExcel,
   // Mapping controllers
   getTransporterMappings,
   createTransporterMapping,

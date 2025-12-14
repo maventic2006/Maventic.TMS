@@ -14,6 +14,7 @@ const {
   updateTransporterDraft,
   deleteTransporterDraft,
   submitTransporterFromDraft,
+  exportTransportersForExcel,
   // Mapping controllers
   getConsignorMappings,
   createConsignorMapping,
@@ -74,6 +75,12 @@ router.get(
   authenticateToken,
   checkProductOwnerAccess,
   getTransporterStatusCounts
+);
+router.get(
+  "/export",
+  authenticateToken,
+  checkProductOwnerAccess,
+  exportTransportersForExcel
 );
 router.get(
   "/mapping-master-data",

@@ -6200,6 +6200,317 @@ const getMappingMasterData = async (req, res) => {
   }
 };
 
+// @desc    Export all transporters for Excel download (no pagination)
+// @route   GET /api/transporter/export
+// @access  Private (Product Owner)
+const exportTransportersForExcel = async (req, res) => {
+  try {
+    console.log("📊 Transporter Excel Export API called");
+    console.log("Query params:", req.query);
+
+    const { Country, State, City } = require("country-state-city");
+
+    // Extract filters (same as getTransporters but without pagination)
+    const {
+      search = "",
+      transporterId = "",
+      tan = "",
+      tinPan = "",
+      vatGst = "",
+      status = "",
+      createdOnStart = "",
+      createdOnEnd = "",
+      activeFromDate = "",
+      activeToDate = "",
+      transportMode = "",
+      state = "",
+      city = "",
+    } = req.query;
+
+    // Parse transport mode filter
+    let transportModeFilter = [];
+    if (transportMode && transportMode.trim() !== "") {
+      transportModeFilter = transportMode
+        .split(",")
+        .map((mode) => mode.trim())
+        .filter((mode) => mode.length > 0);
+    }
+
+    // Build query (same logic as getTransporters but fetch ALL records)
+    let query = knex("transporter_general_info as tgi")
+      .leftJoin("tms_address as addr", function () {
+        this.on("tgi.transporter_id", "=", "addr.user_reference_id")
+          .andOn("addr.user_type", "=", knex.raw("'TRANSPORTER'"))
+          .andOn("addr.is_primary", "=", knex.raw("1"));
+      })
+      .leftJoin(
+        knex.raw(`(
+          SELECT tc1.*
+          FROM transporter_contact tc1
+          INNER JOIN (
+            SELECT transporter_id, MIN(tcontact_id) as min_contact_id, MIN(contact_unique_id) as min_unique_id
+            FROM transporter_contact
+            WHERE status = 'ACTIVE'
+            GROUP BY transporter_id
+          ) tc2 ON tc1.transporter_id = tc2.transporter_id 
+               AND tc1.tcontact_id = tc2.min_contact_id
+               AND tc1.contact_unique_id = tc2.min_unique_id
+        ) as tc`),
+        "tgi.transporter_id",
+        "tc.transporter_id"
+      )
+      // LEFT JOIN for PAN document (DN001)
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as pan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'DN001'
+            AND status = 'ACTIVE'
+        ) as pan_doc`),
+        "tgi.transporter_id",
+        "pan_doc.transporter_id"
+      )
+      // LEFT JOIN for TAN document (DN003)
+      .leftJoin(
+        knex.raw(`(
+          SELECT 
+            SUBSTRING_INDEX(document_unique_id, '_', 1) as transporter_id,
+            document_number as tan_number
+          FROM transporter_documents
+          WHERE document_type_id = 'DN003'
+            AND status = 'ACTIVE'
+        ) as tan_doc`),
+        "tgi.transporter_id",
+        "tan_doc.transporter_id"
+      )
+      .leftJoin(
+        knex.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT001'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        "aft.user_id_reference_id",
+        "tgi.transporter_id"
+      )
+      .select(
+        "tgi.transporter_id",
+        "tgi.business_name",
+        "tgi.trans_mode_road",
+        "tgi.trans_mode_rail",
+        "tgi.trans_mode_air",
+        "tgi.trans_mode_sea",
+        "tgi.active_flag",
+        "tgi.from_date",
+        "tgi.to_date",
+        "tgi.avg_rating",
+        "tgi.status",
+        "tgi.created_by",
+        knex.raw("SUBSTRING(tgi.created_at, 1, 10) as created_on"),
+        knex.raw("SUBSTRING(tgi.updated_at, 1, 10) as updated_on"),
+        "addr.country",
+        "addr.state",
+        "addr.city",
+        "addr.district",
+        "addr.vat_number",
+        // Get PAN and TAN from transporter_documents instead of transporter_general_info
+        "pan_doc.pan_number as tin_pan",
+        "tan_doc.tan_number as tan",
+        knex.raw("COALESCE(addr.street_1, '') as street_1"),
+        knex.raw("COALESCE(addr.street_2, '') as street_2"),
+        knex.raw("COALESCE(addr.postal_code, 'N/A') as postal_code"),
+        "tc.contact_person_name",
+        "tc.phone_number",
+        "tc.email_id",
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status"
+      );
+
+    // Apply filters (same as getTransporters)
+    if (search) {
+      query = query.where(function () {
+        this.where("tgi.business_name", "like", `%${search}%`)
+          .orWhere("tgi.transporter_id", "like", `%${search}%`)
+          .orWhere("addr.city", "like", `%${search}%`)
+          .orWhere("addr.state", "like", `%${search}%`);
+      });
+    }
+
+    if (transporterId) {
+      query = query.where("tgi.transporter_id", "like", `%${transporterId}%`);
+    }
+
+    if (tan) {
+      query = query.where("tan_doc.tan_number", "like", `%${tan}%`);
+    }
+
+    if (tinPan) {
+      query = query.where("pan_doc.pan_number", "like", `%${tinPan}%`);
+    }
+
+    if (vatGst) {
+      query = query.where("addr.vat_number", "like", `%${vatGst}%`);
+    }
+
+    if (status) {
+      query = query.where("tgi.status", status);
+    }
+
+    if (state) {
+      query = query.where("addr.state", "like", `%${state}%`);
+    }
+
+    if (city) {
+      query = query.where("addr.city", "like", `%${city}%`);
+    }
+
+    if (transportModeFilter.length > 0) {
+      query = query.where(function () {
+        transportModeFilter.forEach((mode) => {
+          this.orWhere("tgi.transport_mode", "like", `%${mode}%`);
+        });
+      });
+    }
+
+    if (createdOnStart) {
+      const startDateUTC = createdOnStart.includes("T")
+        ? createdOnStart
+        : `${createdOnStart}T00:00:00Z`;
+      query = query.where("tgi.created_at", ">=", startDateUTC);
+    }
+
+    if (createdOnEnd) {
+      const endDateUTC = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd}T23:59:59Z`;
+      query = query.where("tgi.created_at", "<=", endDateUTC);
+    }
+
+    if (activeFromDate) {
+      query = query.where("tgi.from_date", ">=", activeFromDate);
+    }
+
+    if (activeToDate) {
+      query = query.where(function () {
+        this.whereNull("tgi.to_date").orWhere(
+          "tgi.to_date",
+          ">=",
+          activeToDate
+        );
+      });
+    }
+
+    // Fetch ALL records (no limit/offset)
+    const transporters = await query.orderBy("tgi.transporter_id", "asc");
+
+    console.log(`✅ Fetched ${transporters.length} transporters for export`);
+
+    // Transform data with ISO code to name conversion
+    const transformedTransporters = transporters.map((transporter) => {
+      // Convert country code to name
+      let countryName = transporter.country;
+      if (transporter.country && transporter.country.length === 2) {
+        const countryObj = Country.getCountryByCode(transporter.country);
+        countryName = countryObj ? countryObj.name : transporter.country;
+      }
+
+      // Convert state code to name
+      let stateName = transporter.state;
+      if (
+        transporter.state &&
+        transporter.state.length <= 3 &&
+        transporter.country
+      ) {
+        let countryCode = transporter.country;
+        if (transporter.country.length !== 2) {
+          const countryObj = Country.getAllCountries().find(
+            (c) => c.name.toLowerCase() === transporter.country.toLowerCase()
+          );
+          countryCode = countryObj ? countryObj.isoCode : transporter.country;
+        }
+        const stateObj = State.getStateByCodeAndCountry(
+          transporter.state,
+          countryCode
+        );
+        stateName = stateObj ? stateObj.name : transporter.state;
+      }
+
+      // Build transport modes array from boolean columns
+      let transportModes = [];
+      if (transporter.trans_mode_road) transportModes.push("Road");
+      if (transporter.trans_mode_rail) transportModes.push("Rail");
+      if (transporter.trans_mode_air) transportModes.push("Air");
+      if (transporter.trans_mode_sea) transportModes.push("Sea");
+
+      // Combine street_1 and street_2 into address
+      let fullAddress = transporter.street_1 || "N/A";
+      if (transporter.street_2 && transporter.street_2.trim() !== "") {
+        fullAddress = `${transporter.street_1}, ${transporter.street_2}`;
+      }
+
+      return {
+        id: transporter.transporter_id,
+        businessName: transporter.business_name,
+        transportMode: transportModes,
+        status: transporter.status,
+        avgRating: transporter.avg_rating,
+        country: countryName,
+        state: stateName,
+        city: transporter.city,
+        district: transporter.district,
+        address: fullAddress,
+        postalCode: transporter.postal_code,
+        tinPan: transporter.tin_pan,
+        tan: transporter.tan,
+        vatGst: transporter.vat_number,
+        contactPersonName: transporter.contact_person_name,
+        mobileNumber: transporter.phone_number,
+        emailId: transporter.email_id,
+        createdBy: transporter.created_by,
+        createdOn: transporter.created_on,
+        updatedOn: transporter.updated_on,
+        activeFlag: transporter.active_flag,
+        fromDate: transporter.from_date,
+        toDate: transporter.to_date,
+        approver: transporter.approver_name || null,
+        approvedOn:
+          transporter.approved_on && transporter.approval_status === "Approve"
+            ? new Date(transporter.approved_on).toISOString().split("T")[0]
+            : null,
+      };
+    });
+
+    res.json({
+      success: true,
+      data: transformedTransporters,
+      total: transformedTransporters.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error exporting transporters:", error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: "EXPORT_ERROR",
+        message: "Failed to export transporters",
+        details: error.message,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   createTransporter,
   updateTransporter,
@@ -6214,6 +6525,7 @@ module.exports = {
   updateTransporterDraft,
   deleteTransporterDraft,
   submitTransporterFromDraft,
+  exportTransportersForExcel,
   // Mapping controllers
   getConsignorMappings,
   createConsignorMapping,

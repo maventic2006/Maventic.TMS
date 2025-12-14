@@ -412,6 +412,7 @@ const getConsignorList = async (queryParams, user = null) => {
       sortOrder,
       createdOnStart,
       createdOnEnd,
+      skipPagination = false, // NEW: Support for Excel export
     } = value;
 
     // Get user ID for draft filtering
@@ -551,8 +552,7 @@ const getConsignorList = async (queryParams, user = null) => {
       .leftJoin(
         knex.raw(`(
           SELECT 
-            aft1.*,
-            um.consignor_id
+            aft1.*
           FROM approval_flow_trans aft1
           INNER JOIN (
             SELECT 
@@ -564,9 +564,10 @@ const getConsignorList = async (queryParams, user = null) => {
             GROUP BY user_id_reference_id
           ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
                 AND aft1.approval_flow_unique_id = aft2.max_id
-          LEFT JOIN user_master um ON aft1.user_id_reference_id = um.user_id
         ) as aft`),
-        knex.raw("aft.consignor_id = consignor_basic_information.customer_id")
+        knex.raw(
+          "aft.user_id_reference_id = consignor_basic_information.customer_id"
+        )
       )
       .select(
         "consignor_basic_information.consignor_unique_id",
@@ -606,8 +607,10 @@ const getConsignorList = async (queryParams, user = null) => {
       : sortColumn;
     dataQuery.orderBy(qualifiedSortColumn, sortDirection);
 
-    // Apply pagination
-    dataQuery.limit(limitNum).offset(offset);
+    // Apply pagination (skip for Excel export)
+    if (!skipPagination) {
+      dataQuery.limit(limitNum).offset(offset);
+    }
 
     // Execute query
     const consignors = await dataQuery;

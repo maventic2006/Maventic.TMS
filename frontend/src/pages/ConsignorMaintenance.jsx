@@ -17,6 +17,8 @@ import {
 } from "../redux/slices/consignorSlice";
 import { addToast } from "../redux/slices/uiSlice";
 import { TOAST_TYPES } from "../utils/constants";
+import { exportToExcel, formatters } from "../utils/excelExport";
+import api from "../utils/api";
 
 const ConsignorMaintenance = () => {
   const navigate = useNavigate();
@@ -322,6 +324,81 @@ const ConsignorMaintenance = () => {
     [dispatch, pagination.page, pagination.limit, appliedFilters]
   );
 
+  const handleDownloadExcel = useCallback(async () => {
+    try {
+      // Show loading toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "Fetching all consignors data for export...",
+          duration: 3000,
+        })
+      );
+
+      // Call the new export endpoint with all applied filters
+      const response = await api.get("/consignors/export", {
+        params: appliedFilters,
+      });
+
+      const allConsignors = response.data.data || [];
+
+      const columns = [
+        { key: "customer_id", label: "Customer ID" },
+        { key: "customer_name", label: "Customer Name" },
+        { key: "industry_type", label: "Industry Type" },
+        { key: "currency_type", label: "Currency" },
+        { key: "payment_term", label: "Payment Term" },
+        { key: "contact_person", label: "Contact Person" },
+        { key: "mobile_number", label: "Mobile Number" },
+        { key: "email_id", label: "Email" },
+        {
+          key: "nda_start_date",
+          label: "NDA Start Date",
+          format: formatters.date,
+        },
+        { key: "nda_end_date", label: "NDA End Date", format: formatters.date },
+        {
+          key: "msa_start_date",
+          label: "MSA Start Date",
+          format: formatters.date,
+        },
+        { key: "msa_end_date", label: "MSA End Date", format: formatters.date },
+        { key: "country", label: "Country" },
+        { key: "state", label: "State" },
+        { key: "city", label: "City" },
+        { key: "district", label: "District" },
+        { key: "postal_code", label: "Postal Code" },
+        { key: "status", label: "Status" },
+        { key: "created_by", label: "Created By" },
+        { key: "created_on", label: "Created On", format: formatters.date },
+        { key: "updated_on", label: "Updated On", format: formatters.date },
+        { key: "approver", label: "Approver" },
+        { key: "approved_on", label: "Approved On", format: formatters.date },
+      ];
+
+      const timestamp = new Date().toISOString().split("T")[0];
+      exportToExcel(allConsignors, columns, `Consignors_${timestamp}`);
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: `Successfully exported ${allConsignors.length} consignors to Excel`,
+          duration: 3000,
+        })
+      );
+    } catch (error) {
+      console.error("Error exporting consignors:", error);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "Failed to download Excel file",
+          details: [error.message || "An error occurred"],
+          duration: 5000,
+        })
+      );
+    }
+  }, [dispatch, appliedFilters]);
+
   // Handle fuzzy search - client-side filtering on visible table fields only
   const handleSearchChange = useCallback((value) => {
     setSearchText(value);
@@ -375,6 +452,7 @@ const ConsignorMaintenance = () => {
           {/* Top Action Bar */}
           <TopActionBar
             onCreateNew={handleCreateNew}
+            onDownloadExcel={handleDownloadExcel}
             totalCount={pagination.total}
             onBack={handleBack}
             showFilters={showFilters}

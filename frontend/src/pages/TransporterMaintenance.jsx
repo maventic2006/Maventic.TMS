@@ -14,6 +14,8 @@ import {
   resetPaginationToFirstPage,
 } from "../redux/slices/transporterSlice";
 import { addToast, TOAST_TYPES } from "../redux/slices/uiSlice";
+import { exportToExcel, formatters } from "../utils/excelExport";
+import api from "../utils/api";
 
 // Fuzzy search utility function
 const fuzzySearch = (searchText, transporters) => {
@@ -312,6 +314,74 @@ const TransporterMaintenance = () => {
     [dispatch, pagination.limit, appliedFilters]
   );
 
+  const handleDownloadExcel = useCallback(async () => {
+    try {
+      // Show loading toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "Fetching all transporters data for export...",
+          duration: 3000,
+        })
+      );
+
+      // Call the new export endpoint with all applied filters
+      const response = await api.get("/transporter/export", {
+        params: appliedFilters,
+      });
+
+      const allTransporters = response.data.data || [];
+
+      const columns = [
+        { key: "id", label: "Transporter ID" },
+        { key: "businessName", label: "Business Name" },
+        {
+          key: "transportMode",
+          label: "Transport Mode",
+          format: formatters.array,
+        },
+        { key: "mobileNumber", label: "Mobile Number" },
+        { key: "emailId", label: "Email" },
+        { key: "tinPan", label: "TIN/PAN" },
+        { key: "tan", label: "TAN Number" },
+        { key: "vatGst", label: "VAT/GST Number" },
+        { key: "country", label: "Country" },
+        { key: "state", label: "State" },
+        { key: "city", label: "City" },
+        { key: "district", label: "District" },
+        { key: "address", label: "Address" },
+        { key: "status", label: "Status" },
+        { key: "avgRating", label: "Avg Rating" },
+        { key: "createdBy", label: "Created By" },
+        { key: "createdOn", label: "Created On", format: formatters.date },
+        { key: "updatedOn", label: "Updated On", format: formatters.date },
+        { key: "approver", label: "Approver" },
+        { key: "approvedOn", label: "Approved On", format: formatters.date },
+      ];
+
+      const timestamp = new Date().toISOString().split("T")[0];
+      exportToExcel(allTransporters, columns, `Transporters_${timestamp}`);
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: `Successfully exported ${allTransporters.length} transporters to Excel`,
+          duration: 3000,
+        })
+      );
+    } catch (error) {
+      console.error("Error exporting transporters:", error);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "Failed to download Excel file",
+          details: [error.message || "An error occurred"],
+          duration: 5000,
+        })
+      );
+    }
+  }, [dispatch, appliedFilters]);
+
   const handleDeleteDraft = useCallback(
     async (transporterId) => {
       if (
@@ -361,6 +431,7 @@ const TransporterMaintenance = () => {
         <div className="max-w-7xl mx-auto space-y-0">
           <TopActionBar
             onCreateNew={handleCreateNew}
+            onDownloadExcel={handleDownloadExcel}
             onLogout={handleLogout}
             onBack={handleBack}
             totalCount={pagination.total || 0}

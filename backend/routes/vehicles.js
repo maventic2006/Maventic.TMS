@@ -32,6 +32,17 @@ router.get(
 );
 
 /**
+ * @route   GET /api/vehicle/export
+ * @desc    Export all vehicles for Excel download (no pagination)
+ * @access  Private
+ */
+router.get(
+  "/export",
+  authenticateToken,
+  vehicleController.exportVehiclesForExcel
+);
+
+/**
  * @route   GET /api/vehicle/rc-lookup/:registrationNumber
  * @desc    Lookup vehicle details from RC database
  * @access  Private

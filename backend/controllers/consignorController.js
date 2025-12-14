@@ -2082,6 +2082,40 @@ const deleteConsignorDraft = async (req, res) => {
   }
 };
 
+// @desc    Export all consignors for Excel download (no pagination)
+// @route   GET /api/consignors/export
+// @access  Private
+const exportConsignorsForExcel = async (req, res) => {
+  try {
+    console.log("📊 Consignor Excel Export API called");
+
+    // Create modified query params for export (remove pagination)
+    const exportQuery = { ...req.query, skipPagination: true };
+
+    // Use existing service but with flag to skip pagination
+    const result = await consignorService.getConsignorList(
+      exportQuery,
+      req.user
+    );
+
+    console.log(`✅ Fetched ${result.data.length} consignors for export`);
+
+    return res.json({
+      success: true,
+      data: result.data,
+      total: result.data.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error exporting consignors:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to export consignors",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getConsignors,
   getConsignorStatusCounts,
@@ -2094,6 +2128,7 @@ module.exports = {
   downloadContactPhoto,
   downloadGeneralDocument,
   getConsignorWarehouses,
+  exportConsignorsForExcel,
   // Draft workflow functions
   saveConsignorAsDraft,
   updateConsignorDraft,

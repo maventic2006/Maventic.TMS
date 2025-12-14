@@ -183,7 +183,8 @@ const contactSchema = Joi.object({
     .messages({
       "string.empty": "Phone number is required",
       "string.max": "Phone number cannot exceed 15 characters",
-      "string.pattern.base": "Please enter a valid phone number with 7-15 digits",
+      "string.pattern.base":
+        "Please enter a valid phone number with 7-15 digits",
       "any.required": "Phone number is required",
     }),
 
@@ -195,7 +196,8 @@ const contactSchema = Joi.object({
     .allow(null, "")
     .messages({
       "string.max": "Country code cannot exceed 10 characters",
-      "string.pattern.base": "Please enter a valid country code (e.g., +1, +91)",
+      "string.pattern.base":
+        "Please enter a valid country code (e.g., +1, +91)",
     }),
 
   // Frontend uses 'email', maps to 'email_id' (VARCHAR(100))
@@ -421,7 +423,8 @@ const documentSchema = Joi.object({
     .optional()
     .default(true)
     .messages({
-      "alternatives.types": "Status must be a boolean value or valid status string (ACTIVE/INACTIVE)",
+      "alternatives.types":
+        "Status must be a boolean value or valid status string (ACTIVE/INACTIVE)",
     }),
 
   fileKey: Joi.string().optional().allow(null, "").messages({
@@ -446,9 +449,12 @@ const documentSchema = Joi.object({
     "string.base": "Backend document ID must be a string",
   }),
 
-  _backend_document_unique_id: Joi.string().optional().allow(null, "").messages({
-    "string.base": "Backend document unique ID must be a string",
-  }),
+  _backend_document_unique_id: Joi.string()
+    .optional()
+    .allow(null, "")
+    .messages({
+      "string.base": "Backend document unique ID must be a string",
+    }),
 });
 
 /**
@@ -514,6 +520,10 @@ const listQuerySchema = Joi.object({
     "string.base": "Customer ID must be a string",
   }),
 
+  customerName: Joi.string().trim().optional().allow("").messages({
+    "string.base": "Customer Name must be a string",
+  }),
+
   status: Joi.string()
     .valid("ACTIVE", "INACTIVE", "PENDING", "SAVE_AS_DRAFT")
     .optional()
@@ -522,6 +532,10 @@ const listQuerySchema = Joi.object({
       "any.only":
         "Status must be one of: ACTIVE, INACTIVE, PENDING, SAVE_AS_DRAFT",
     }),
+
+  skipPagination: Joi.boolean().optional().messages({
+    "boolean.base": "Skip pagination must be a boolean",
+  }),
 
   industry_type: Joi.string().trim().optional().allow("").messages({
     "string.base": "Industry type must be a string",

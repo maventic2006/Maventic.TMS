@@ -1,3 +1,4 @@
+import { BookLock, CheckCircle, Clock, XCircle } from "lucide-react";
 import React from "react";
 
 /**
@@ -12,20 +13,20 @@ import React from "react";
  * @param {boolean} loading - Whether status counts are loading
  * @param {string} module - Module name for dynamic labels (e.g., 'transporter', 'driver', 'warehouse')
  */
-const StatusBadges = ({ 
-  counts, 
-  selectedStatus, 
-  onStatusClick, 
+const StatusBadges = ({
+  counts,
+  selectedStatus,
+  onStatusClick,
   loading,
-  module = 'transporter' // Default to transporter for backward compatibility
+  module = "transporter", // Default to transporter for backward compatibility
 }) => {
   // Module name mapping for pluralization
   const moduleNames = {
-    transporter: 'transporters',
-    driver: 'drivers',
-    warehouse: 'warehouses',
-    vehicle: 'vehicles',
-    consignor: 'consignors',
+    transporter: "transporters",
+    driver: "drivers",
+    warehouse: "warehouses",
+    vehicle: "vehicles",
+    consignor: "consignors",
   };
 
   const moduleName = moduleNames[module] || module;
@@ -34,6 +35,7 @@ const StatusBadges = ({
     {
       status: "ACTIVE",
       label: "Active",
+      icon: <CheckCircle className="h-3 w-3" />,
       bgColor: "bg-green-100",
       textColor: "text-green-800",
       hoverColor: "hover:bg-green-200",
@@ -43,6 +45,7 @@ const StatusBadges = ({
     {
       status: "INACTIVE",
       label: "Inactive",
+      icon: <XCircle className="h-3 w-3" />,
       bgColor: "bg-red-100",
       textColor: "text-red-800",
       hoverColor: "hover:bg-red-200",
@@ -52,6 +55,7 @@ const StatusBadges = ({
     {
       status: "PENDING",
       label: "Pending",
+      icon: <Clock className="h-3 w-3" />,
       bgColor: "bg-yellow-100",
       textColor: "text-yellow-800",
       hoverColor: "hover:bg-yellow-200",
@@ -61,6 +65,7 @@ const StatusBadges = ({
     {
       status: "DRAFT",
       label: "Draft",
+      icon: <BookLock className="h-3 w-3" />,
       bgColor: "bg-gray-100",
       textColor: "text-gray-800",
       hoverColor: "hover:bg-gray-200",
@@ -86,6 +91,7 @@ const StatusBadges = ({
         ({
           status,
           label,
+          icon,
           bgColor,
           textColor,
           hoverColor,
@@ -106,7 +112,7 @@ const StatusBadges = ({
               onClick={() => onStatusClick(backendStatus)}
               className={`
               px-3 py-1.5 rounded-full text-sm font-medium 
-              transition-all duration-200 cursor-pointer
+              transition-all duration-200 cursor-pointer flex items-center gap-2
               ${
                 isSelected
                   ? `${selectedBg} ${selectedText} shadow-md`
@@ -121,10 +127,9 @@ const StatusBadges = ({
                   : `Click to filter by ${label} ${moduleName}`
               }
             >
+              <span>{icon}</span>
               <span className="font-semibold">{label}</span>
-              <span
-                className={`ml-1.5 ${isSelected ? "font-bold" : "font-normal"}`}
-              >
+              <span className={`${isSelected ? "font-bold" : "font-normal"}`}>
                 {count}
               </span>
             </button>

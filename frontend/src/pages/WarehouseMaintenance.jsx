@@ -11,6 +11,8 @@ import {
 } from "../redux/slices/warehouseSlice"; // ✅ Add deleteWarehouseDraft
 import { addToast } from "../redux/slices/uiSlice"; // ✅ Add toast for feedback
 import { TOAST_TYPES } from "../utils/constants"; // ✅ Add toast constants
+import { exportToExcel, formatters } from "../utils/excelExport";
+import api from "../utils/api";
 import TopActionBar from "../components/warehouse/TopActionBar";
 import WarehouseFilterPanel from "../components/warehouse/WarehouseFilterPanel";
 import WarehouseListTable from "../components/warehouse/WarehouseListTable";
@@ -314,6 +316,88 @@ const WarehouseMaintenance = () => {
     [dispatch, pagination.limit, appliedFilters]
   );
 
+  const handleDownloadExcel = useCallback(async () => {
+    try {
+      // Show loading toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "Fetching all warehouses data for export...",
+          duration: 3000,
+        })
+      );
+
+      // Call the new export endpoint with all applied filters
+      const response = await api.get("/warehouse/export", {
+        params: appliedFilters,
+      });
+
+      // ⚠️ CRITICAL: Warehouse returns "warehouses" key, not "data"
+      const allWarehouses = response.data.warehouses || [];
+
+      const columns = [
+        { key: "warehouse_id", label: "Warehouse ID" },
+        { key: "warehouse_name", label: "Warehouse Name" },
+        { key: "warehouse_type", label: "Warehouse Type" },
+        { key: "total_capacity", label: "Total Capacity" },
+        { key: "available_capacity", label: "Available Capacity" },
+        { key: "occupied_capacity", label: "Occupied Capacity" },
+        {
+          key: "weigh_bridge",
+          label: "Weigh Bridge",
+          format: formatters.boolean,
+        },
+        {
+          key: "virtual_yard_in",
+          label: "Virtual Yard In",
+          format: formatters.boolean,
+        },
+        {
+          key: "fuel_availability",
+          label: "Fuel Availability",
+          format: formatters.boolean,
+        },
+        {
+          key: "geo_fencing",
+          label: "Geo Fencing",
+          format: formatters.boolean,
+        },
+        { key: "country", label: "Country" },
+        { key: "state", label: "State" },
+        { key: "city", label: "City" },
+        { key: "district", label: "District" },
+        { key: "postal_code", label: "Postal Code" },
+        { key: "status", label: "Status" },
+        { key: "created_by", label: "Created By" },
+        { key: "created_on", label: "Created On", format: formatters.date },
+        { key: "updated_on", label: "Updated On", format: formatters.date },
+        { key: "approver", label: "Approver" },
+        { key: "approved_on", label: "Approved On", format: formatters.date },
+      ];
+
+      const timestamp = new Date().toISOString().split("T")[0];
+      exportToExcel(allWarehouses, columns, `Warehouses_${timestamp}`);
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: `Successfully exported ${allWarehouses.length} warehouses to Excel`,
+          duration: 3000,
+        })
+      );
+    } catch (error) {
+      console.error("Error exporting warehouses:", error);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "Failed to download Excel file",
+          details: [error.message || "An error occurred"],
+          duration: 5000,
+        })
+      );
+    }
+  }, [dispatch, appliedFilters]);
+
   const handleToggleFilters = useCallback(() => {
     setShowFilters(!showFilters);
   }, [showFilters]);
@@ -393,6 +477,7 @@ const WarehouseMaintenance = () => {
         <div className="max-w-7xl mx-auto space-y-0">
           <TopActionBar
             onCreateNew={handleCreateNew}
+            onDownloadExcel={handleDownloadExcel}
             totalCount={pagination.total || 0}
             onBack={handleBack}
             showFilters={showFilters}

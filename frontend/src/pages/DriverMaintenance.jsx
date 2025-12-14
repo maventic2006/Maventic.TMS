@@ -8,6 +8,10 @@ import {
   fetchDriverStatusCounts,
   resetPaginationToFirstPage,
 } from "../redux/slices/driverSlice";
+import { addToast } from "../redux/slices/uiSlice";
+import { TOAST_TYPES } from "../utils/constants";
+import { exportToExcel, formatters } from "../utils/excelExport";
+import api from "../utils/api";
 import DriverTopActionBar from "../components/driver/DriverTopActionBar";
 import DriverFilterPanel from "../components/driver/DriverFilterPanel";
 import DriverListTable from "../components/driver/DriverListTable";
@@ -323,6 +327,69 @@ const DriverMaintenance = () => {
     setShowFilters(!showFilters);
   }, [showFilters]);
 
+  const handleDownloadExcel = useCallback(async () => {
+    try {
+      // Show loading toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "Fetching all drivers data for export...",
+        })
+      );
+
+      // Call the new export endpoint with all applied filters
+      const response = await api.get("/driver/export", {
+        params: appliedFilters,
+      });
+
+      const allDrivers = response.data.data || [];
+
+      // Define columns for Excel export
+      const excelColumns = [
+        { key: "id", label: "Driver ID" },
+        { key: "fullName", label: "Full Name" },
+        { key: "dateOfBirth", label: "Date of Birth", format: formatters.date },
+        { key: "gender", label: "Gender" },
+        { key: "bloodGroup", label: "Blood Group" },
+        { key: "phoneNumber", label: "Phone Number" },
+        { key: "emailId", label: "Email ID" },
+        { key: "emergencyContact", label: "Emergency Contact" },
+        { key: "alternatePhoneNumber", label: "Alternate Phone" },
+        { key: "licenseNumbers", label: "License Numbers" },
+        { key: "country", label: "Country" },
+        { key: "state", label: "State" },
+        { key: "city", label: "City" },
+        { key: "district", label: "District" },
+        { key: "postalCode", label: "Postal Code" },
+        { key: "avgRating", label: "Average Rating" },
+        { key: "status", label: "Status" },
+        { key: "createdBy", label: "Created By" },
+        { key: "createdOn", label: "Created On", format: formatters.date },
+        { key: "updatedOn", label: "Updated On", format: formatters.date },
+        { key: "approver", label: "Approver" },
+        { key: "approvedOn", label: "Approved On", format: formatters.date },
+      ];
+
+      const timestamp = new Date().toISOString().split("T")[0];
+      exportToExcel(allDrivers, excelColumns, `drivers_${timestamp}`);
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: `Successfully exported ${allDrivers.length} drivers to Excel`,
+        })
+      );
+    } catch (error) {
+      console.error("Error exporting drivers:", error);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "Failed to export drivers to Excel",
+        })
+      );
+    }
+  }, [dispatch, appliedFilters]);
+
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <TMSHeader theme={theme} />
@@ -330,6 +397,7 @@ const DriverMaintenance = () => {
         <div className="max-w-7xl mx-auto space-y-0">
           <DriverTopActionBar
             onCreateNew={handleCreateNew}
+            onDownloadExcel={handleDownloadExcel}
             onBack={handleBack}
             totalCount={pagination.total || 0}
             showFilters={showFilters}

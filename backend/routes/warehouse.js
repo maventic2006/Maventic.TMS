@@ -8,6 +8,7 @@ const {
   updateWarehouse,
   getMasterData,
   getDocumentFile,
+  exportWarehousesForExcel,
   // Draft workflow functions
   saveWarehouseAsDraft,
   updateWarehouseDraft,
@@ -31,6 +32,9 @@ router.get(
   authorizeRoles(allowedRoles),
   getWarehouseStatusCounts
 );
+
+// GET /api/warehouse/export - Export all warehouses for Excel
+router.get("/export", authorizeRoles(allowedRoles), exportWarehousesForExcel);
 
 // ============================================================================
 // DRAFT WORKFLOW ROUTES

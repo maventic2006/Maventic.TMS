@@ -14,6 +14,7 @@ const {
   updateDriverDraft,
   deleteDriverDraft,
   submitDriverFromDraft,
+  exportDriversForExcel,
   // Mapping controllers
   getTransporterMappings,
   createTransporterMapping,
@@ -84,6 +85,12 @@ router.get(
   authenticateToken,
   checkProductOwnerAccess,
   getDriverStatusCounts
+);
+router.get(
+  "/export",
+  authenticateToken,
+  checkProductOwnerAccess,
+  exportDriversForExcel
 );
 router.get(
   "/mapping-master-data",

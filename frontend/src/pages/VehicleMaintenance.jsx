@@ -16,6 +16,8 @@ import {
 import { openVehicleBulkUploadModal } from "../redux/slices/vehicleBulkUploadSlice";
 import { addToast, TOAST_TYPES } from "../redux/slices/uiSlice";
 import { getPageTheme } from "../theme.config";
+import { exportToExcel, formatters } from "../utils/excelExport";
+import api from "../utils/api";
 
 // Enhanced fuzzy search utility with better field handling
 const fuzzySearch = (searchText, vehicles) => {
@@ -412,6 +414,88 @@ const VehicleMaintenance = () => {
     dispatch(openVehicleBulkUploadModal());
   }, [dispatch]);
 
+  const handleDownloadExcel = useCallback(async () => {
+    try {
+      // Show loading toast
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.INFO,
+          message: "Fetching all vehicles data for export...",
+          duration: 3000,
+        })
+      );
+
+      // Call the new export endpoint with all applied filters
+      const response = await api.get("/vehicles/export", {
+        params: appliedFilters,
+      });
+
+      const allVehicles = response.data.data || [];
+
+      const columns = [
+        { key: "vehicle_id", label: "Vehicle ID" },
+        { key: "registration_number", label: "Registration Number" },
+        { key: "vehicle_type", label: "Vehicle Type" },
+        { key: "manufacturer", label: "Manufacturer" },
+        { key: "model", label: "Model" },
+        { key: "year_of_manufacture", label: "Year of Manufacture" },
+        { key: "capacity", label: "Capacity" },
+        { key: "capacity_unit", label: "Capacity Unit" },
+        { key: "fuel_type", label: "Fuel Type" },
+        { key: "ownership_type", label: "Ownership Type" },
+        { key: "owner_name", label: "Owner Name" },
+        { key: "driver_name", label: "Driver Name" },
+        {
+          key: "gps_enabled",
+          label: "GPS Enabled",
+          format: formatters.boolean,
+        },
+        {
+          key: "insurance_expiry_date",
+          label: "Insurance Expiry",
+          format: formatters.date,
+        },
+        {
+          key: "fitness_certificate_expiry",
+          label: "Fitness Expiry",
+          format: formatters.date,
+        },
+        {
+          key: "permit_expiry_date",
+          label: "Permit Expiry",
+          format: formatters.date,
+        },
+        { key: "status", label: "Status" },
+        { key: "created_by", label: "Created By" },
+        { key: "created_on", label: "Created On", format: formatters.date },
+        { key: "updated_on", label: "Updated On", format: formatters.date },
+        { key: "approver", label: "Approver" },
+        { key: "approved_on", label: "Approved On", format: formatters.date },
+      ];
+
+      const timestamp = new Date().toISOString().split("T")[0];
+      exportToExcel(allVehicles, columns, `Vehicles_${timestamp}`);
+
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.SUCCESS,
+          message: `Successfully exported ${allVehicles.length} vehicles to Excel`,
+          duration: 3000,
+        })
+      );
+    } catch (error) {
+      console.error("Error exporting vehicles:", error);
+      dispatch(
+        addToast({
+          type: TOAST_TYPES.ERROR,
+          message: "Failed to download Excel file",
+          details: [error.message || "An error occurred"],
+          duration: 5000,
+        })
+      );
+    }
+  }, [dispatch, appliedFilters]);
+
   const handleDeleteDraft = useCallback(
     async (vehicleId) => {
       if (
@@ -463,6 +547,7 @@ const VehicleMaintenance = () => {
         <TopActionBar
           onCreateNew={handleCreateNew}
           onBulkUpload={handleBulkUpload}
+          onDownloadExcel={handleDownloadExcel}
           onBack={handleBack}
           totalCount={pagination.total || 0}
           showFilters={showFilters}

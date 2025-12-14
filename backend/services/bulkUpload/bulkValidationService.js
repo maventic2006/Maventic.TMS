@@ -358,23 +358,40 @@ async function validateAddresses(addresses) {
       }
     });
     
-    // Validate country code
+    // Validate country code or name
     if (address.Country) {
-      const countryExists = Country.getAllCountries().some(c => c.isoCode === address.Country.toUpperCase());
+      const countryValue = address.Country.trim();
+      const countryExists = Country.getAllCountries().some(c => 
+        c.isoCode.toUpperCase() === countryValue.toUpperCase() || 
+        c.name.toLowerCase() === countryValue.toLowerCase()
+      );
       if (!countryExists) {
         errors.push({
           type: 'INVALID_FORMAT',
           sheet: 'Addresses',
           row,
           field: 'Country',
-          message: `Invalid country code: ${address.Country}`
+          message: `Invalid country: ${address.Country}. Must be valid country name or ISO code.`
         });
       }
     }
     
     // Validate state against country
     if (address.Country && address.State) {
-      const states = State.getStatesOfCountry(address.Country.toUpperCase());
+      // Get country ISO code (handle both ISO code and full name)
+      const countryValue = address.Country.trim();
+      let countryIsoCode = countryValue.toUpperCase();
+      
+      const country = Country.getAllCountries().find(c => 
+        c.isoCode.toUpperCase() === countryValue.toUpperCase() || 
+        c.name.toLowerCase() === countryValue.toLowerCase()
+      );
+      
+      if (country) {
+        countryIsoCode = country.isoCode;
+      }
+      
+      const states = State.getStatesOfCountry(countryIsoCode);
       const stateExists = states.some(s => 
         s.name.toLowerCase() === address.State.toLowerCase() ||
         s.isoCode.toLowerCase() === address.State.toLowerCase()
@@ -520,15 +537,19 @@ function validateServiceableAreas(areas) {
       }
       countrySet.add(area.Service_Country);
       
-      // Validate country code
-      const countryExists = Country.getAllCountries().some(c => c.isoCode === area.Service_Country.toUpperCase());
+      // Validate country code or name
+      const countryValue = area.Service_Country.trim();
+      const countryExists = Country.getAllCountries().some(c => 
+        c.isoCode.toUpperCase() === countryValue.toUpperCase() || 
+        c.name.toLowerCase() === countryValue.toLowerCase()
+      );
       if (!countryExists) {
         errors.push({
           type: 'INVALID_FORMAT',
           sheet: 'Serviceable Areas',
           row,
           field: 'Service_Country',
-          message: `Invalid country code: ${area.Service_Country}`
+          message: `Invalid country: ${area.Service_Country}. Must be valid country name or ISO code.`
         });
       }
     }

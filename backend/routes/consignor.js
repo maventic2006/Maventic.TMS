@@ -18,6 +18,7 @@ const {
   downloadContactPhoto,
   downloadGeneralDocument,
   getConsignorWarehouses,
+  exportConsignorsForExcel,
   // Draft workflow functions
   saveConsignorAsDraft,
   updateConsignorDraft,
@@ -134,6 +135,15 @@ router.get(
   authenticateToken,
   checkConsignorAccess,
   getConsignorStatusCounts
+);
+
+// 3️⃣ Export route for Excel download (must be before /:id to avoid conflict)
+// GET /api/consignors/export
+router.get(
+  "/export",
+  authenticateToken,
+  checkConsignorAccess,
+  exportConsignorsForExcel
 );
 
 // ============================================================================

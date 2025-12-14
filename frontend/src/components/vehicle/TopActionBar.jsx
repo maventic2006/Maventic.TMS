@@ -1,6 +1,6 @@
 ﻿import React from "react";
 import { motion } from "framer-motion";
-import { Plus, ArrowLeft, Filter, Truck, Upload } from "lucide-react";
+import { Plus, ArrowLeft, Filter, Truck, Upload, Download } from "lucide-react";
 import { getPageTheme, getComponentTheme } from "../../theme.config";
 import { Button } from "../ui/Button";
 
@@ -10,6 +10,7 @@ const buttonTheme = getComponentTheme("actionButton");
 const TopActionBar = ({
   onCreateNew,
   onBulkUpload,
+  onDownloadExcel,
   onBack,
   totalCount,
   showFilters,
@@ -86,7 +87,6 @@ const TopActionBar = ({
 
         {/* Bulk Upload Button */}
         {onBulkUpload && (
-         
           <Button
             variant="default"
             size="sm"
@@ -97,6 +97,17 @@ const TopActionBar = ({
             <span className="hidden sm:inline">Bulk Upload</span>
           </Button>
         )}
+
+        {/* Download Excel Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDownloadExcel}
+          className="border-[#10B981] text-[#10B981] hover:bg-[#10B981] hover:text-white font-semibold rounded-lg transition-all duration-200 py-2.5 px-5"
+        >
+          <Download className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Download Excel</span>
+        </Button>
 
         {/* Filter Toggle Button */}
         {/* <motion.button

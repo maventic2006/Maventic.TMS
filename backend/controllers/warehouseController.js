@@ -3916,6 +3916,233 @@ const deleteWarehouseDraft = async (req, res) => {
   }
 };
 
+// @desc    Export all warehouses for Excel download (no pagination)
+// @route   GET /api/warehouse/export
+// @access  Private (Consignor, Admin, Super Admin)
+const exportWarehousesForExcel = async (req, res) => {
+  try {
+    console.log("📊 Warehouse Excel Export API called");
+    console.log("Query params:", req.query);
+    console.log("User:", req.user);
+
+    const { Country, State } = require("country-state-city");
+
+    // Extract filters (same as getWarehouseList but without pagination)
+    const {
+      warehouseId = "",
+      warehouseName = "",
+      consignorId = "",
+      status = "",
+      createdOnStart = "",
+      createdOnEnd = "",
+      weighBridge,
+      virtualYardIn,
+      fuelAvailability,
+      geoFencing,
+    } = req.query;
+
+    // Filter by consignor ID (for non-admin users)
+    const userConsignorId = req.user.consignor_id || null;
+
+    // Build query (same logic as getWarehouseList but fetch ALL records)
+    let query = knex("warehouse_basic_information as w")
+      .leftJoin("tms_address as addr", function () {
+        this.on("w.warehouse_id", "=", "addr.user_reference_id").andOn(
+          "addr.user_type",
+          "=",
+          knex.raw("'WH'")
+        );
+      })
+      .leftJoin(
+        "warehouse_type_master as wtm",
+        "w.warehouse_type",
+        "wtm.warehouse_type_id"
+      )
+      .leftJoin(
+        "material_types_master as mtm",
+        "w.material_type_id",
+        "mtm.material_types_id"
+      )
+      .leftJoin(
+        knex.raw(`(
+          SELECT aft1.*
+          FROM approval_flow_trans aft1
+          INNER JOIN (
+            SELECT user_id_reference_id, MAX(approval_flow_unique_id) as max_id
+            FROM approval_flow_trans
+            WHERE approval_type_id = 'AT005'
+              AND s_status IN ('Approve', 'Reject', 'PENDING')
+            GROUP BY user_id_reference_id
+          ) aft2 ON aft1.user_id_reference_id = aft2.user_id_reference_id
+               AND aft1.approval_flow_unique_id = aft2.max_id
+        ) as aft`),
+        knex.raw(
+          "CONCAT('WH', LPAD(CAST(SUBSTRING(aft.user_id_reference_id, 3) AS UNSIGNED), 3, '0'))"
+        ),
+        "w.warehouse_id"
+      )
+      .select(
+        "w.warehouse_id",
+        "w.consignor_id",
+        "w.warehouse_type",
+        "wtm.warehouse_type as warehouse_type_name",
+        "w.material_type_id",
+        "mtm.material_types as material_type_name",
+        "w.warehouse_name1",
+        "w.geo_fencing",
+        "w.weigh_bridge_availability",
+        "w.virtual_yard_in",
+        "w.gatepass_system_available",
+        "w.fuel_availability",
+        knex.raw("COALESCE(addr.city, 'N/A') as city"),
+        knex.raw("COALESCE(addr.state, 'N/A') as state"),
+        knex.raw("COALESCE(addr.country, 'N/A') as country"),
+        "w.region",
+        "w.zone",
+        "w.created_by",
+        knex.raw("SUBSTRING(w.created_at, 1, 10) as created_on"),
+        knex.raw(
+          "COALESCE(aft.actioned_by_name, aft.pending_with_name) as approver_name"
+        ),
+        "aft.approved_on",
+        "aft.s_status as approval_status",
+        "w.status"
+      );
+
+    // Apply filters (same as getWarehouseList)
+    if (consignorId && !userConsignorId) {
+      query.where("w.consignor_id", "like", `%${consignorId}%`);
+    } else if (userConsignorId) {
+      query.where("w.consignor_id", userConsignorId);
+    }
+
+    // Filter drafts - only show to creator
+    query.where(function () {
+      this.where("w.status", "!=", "SAVE_AS_DRAFT").orWhere(function () {
+        this.where("w.status", "=", "SAVE_AS_DRAFT").andWhere(
+          "w.created_by",
+          req.user.user_id
+        );
+      });
+    });
+
+    if (warehouseId) {
+      query.where("w.warehouse_id", "like", `%${warehouseId}%`);
+    }
+
+    if (warehouseName) {
+      query.where("w.warehouse_name1", "like", `%${warehouseName}%`);
+    }
+
+    if (status) {
+      query.where("w.status", status);
+    }
+
+    if (weighBridge !== undefined) {
+      query.where("w.weigh_bridge_availability", weighBridge === "true");
+    }
+
+    if (virtualYardIn !== undefined) {
+      query.where("w.virtual_yard_in", virtualYardIn === "true");
+    }
+
+    if (fuelAvailability !== undefined) {
+      query.where("w.fuel_availability", fuelAvailability === "true");
+    }
+
+    if (geoFencing !== undefined) {
+      query.where("w.geo_fencing", geoFencing === "true");
+    }
+
+    if (createdOnStart) {
+      const startDateUTC = createdOnStart.includes("T")
+        ? createdOnStart
+        : `${createdOnStart}T00:00:00Z`;
+      query.where("w.created_at", ">=", startDateUTC);
+    }
+
+    if (createdOnEnd) {
+      const endDateUTC = createdOnEnd.includes("T")
+        ? createdOnEnd
+        : `${createdOnEnd}T23:59:59Z`;
+      query.where("w.created_at", "<=", endDateUTC);
+    }
+
+    // Fetch ALL records (no limit/offset)
+    const warehouses = await query.orderBy("w.warehouse_id", "asc");
+
+    console.log(`✅ Fetched ${warehouses.length} warehouses for export`);
+
+    // Transform warehouses with ISO code to name conversion
+    const transformedWarehouses = warehouses.map((warehouse) => {
+      // Convert country code to name
+      let countryName = warehouse.country;
+      if (warehouse.country && warehouse.country.length === 2) {
+        const countryObj = Country.getCountryByCode(warehouse.country);
+        countryName = countryObj ? countryObj.name : warehouse.country;
+      }
+
+      // Convert state code to name
+      let stateName = warehouse.state;
+      if (warehouse.state && warehouse.state.length <= 3 && warehouse.country) {
+        let countryCode = warehouse.country;
+        if (warehouse.country.length !== 2) {
+          const countryObj = Country.getAllCountries().find(
+            (c) => c.name.toLowerCase() === warehouse.country.toLowerCase()
+          );
+          countryCode = countryObj ? countryObj.isoCode : warehouse.country;
+        }
+        const stateObj = State.getStateByCodeAndCountry(
+          warehouse.state,
+          countryCode
+        );
+        stateName = stateObj ? stateObj.name : warehouse.state;
+      }
+
+      return {
+        warehouse_id: warehouse.warehouse_id,
+        warehouse_name: warehouse.warehouse_name1,
+        warehouse_type:
+          warehouse.warehouse_type_name || warehouse.warehouse_type,
+        material_type:
+          warehouse.material_type_name || warehouse.material_type_id,
+        weigh_bridge: warehouse.weigh_bridge_availability,
+        virtual_yard_in: warehouse.virtual_yard_in,
+        fuel_availability: warehouse.fuel_availability,
+        geo_fencing: warehouse.geo_fencing,
+        gatepass_system: warehouse.gatepass_system_available,
+        country: countryName,
+        state: stateName,
+        city: warehouse.city,
+        region: warehouse.region,
+        zone: warehouse.zone,
+        status: warehouse.status,
+        created_by: warehouse.created_by,
+        created_on: warehouse.created_on,
+        approver: warehouse.approver_name || null,
+        approved_on:
+          warehouse.approved_on && warehouse.approval_status === "Approve"
+            ? new Date(warehouse.approved_on).toISOString().split("T")[0]
+            : null,
+      };
+    });
+
+    res.json({
+      success: true,
+      warehouses: transformedWarehouses,
+      total: transformedWarehouses.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("❌ Error exporting warehouses:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to export warehouses",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getWarehouseList,
   getWarehouseStatusCounts,
@@ -3924,6 +4151,7 @@ module.exports = {
   updateWarehouse,
   getMasterData,
   getDocumentFile,
+  exportWarehousesForExcel,
   // Draft workflow functions
   saveWarehouseAsDraft,
   updateWarehouseDraft,
